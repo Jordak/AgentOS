@@ -43,9 +43,18 @@ class AdapterSpec:
     def path_for(self, home: Path) -> Path:
         if self.override_parts:
             override = home.joinpath(*self.override_parts)
-            if override.is_file() and override.stat().st_size > 0:
+            try:
+                if override.is_file() and override.stat().st_size > 0:
+                    return override
+            except OSError:
                 return override
         return home.joinpath(*self.parts)
+
+    def all_paths_for(self, home: Path) -> tuple[Path, ...]:
+        paths = [home.joinpath(*self.parts)]
+        if self.override_parts:
+            paths.append(home.joinpath(*self.override_parts))
+        return tuple(paths)
 
 
 @dataclass(frozen=True)
@@ -166,6 +175,7 @@ def run(args: argparse.Namespace, home: Path, out: TextIO) -> int:
     home = home.expanduser().resolve()
     targets = collect_targets(
         home=home,
+        mode=mode,
         include_all_default_adapters=args.all_default_adapters,
         extra_adapters=args.adapter,
     )
@@ -384,6 +394,7 @@ def global_instructions_path(home: Path) -> Path:
 
 def collect_targets(
     home: Path,
+    mode: str,
     include_all_default_adapters: bool,
     extra_adapters: Iterable[str],
 ) -> list[Target]:
@@ -433,10 +444,39 @@ def collect_targets(
                     skipped_reason=f"default {spec.name} adapter skipped because {path.parent} does not exist",
                 )
             )
+        if mode in {"check", "remove"} and spec.override_parts:
+            for sibling in spec.all_paths_for(home):
+                if sibling == path:
+                    continue
+                if should_check_sibling_target(sibling, mode):
+                    if mode == "check":
+                        add_target(
+                            Target(
+                                f"{spec.name}:sibling",
+                                sibling,
+                                "adapter",
+                                spec.import_style,
+                                error_reason="inactive adapter sibling contains an AgentOS managed block; run --remove to clean it or inspect it before relying on --check",
+                            )
+                        )
+                    else:
+                        add_target(Target(f"{spec.name}:sibling", sibling, "adapter", spec.import_style))
     for raw in extra_adapters:
         path = resolve_user_path(raw, home)
         add_target(Target(f"adapter:{raw}", path, "adapter"))
     return targets
+
+
+def should_check_sibling_target(path: Path, mode: str) -> bool:
+    if mode == "remove":
+        return path.exists() or path.is_symlink()
+    if not (path.exists() or path.is_symlink()):
+        return False
+    try:
+        data = path.read_bytes()
+    except OSError:
+        return True
+    return ADAPTER_START.encode("utf-8") in data or ADAPTER_END.encode("utf-8") in data
 
 
 def resolve_user_path(raw: str, home: Path) -> Path:
@@ -947,6 +987,26 @@ def test_codex_override_file_is_effective_adapter_target() -> None:
         assert_true(not (home / ".codex" / "AGENTS.md").exists(), "Codex AGENTS.md should not be created when override is effective")
         code, output = run_args(["--agentos-home", str(agentos), "--check"], home)
         assert_true(code == 0, output)
+
+        fallback_home = root / "fallback-home"
+        fallback_home.mkdir()
+        (fallback_home / ".codex").mkdir()
+        agentos_one = make_fake_agentos(root, "AgentOS-one")
+        code, output = run_args(["--agentos-home", str(agentos_one), "--no-dry-run"], fallback_home)
+        assert_true(code == 0, output)
+        fallback_codex = fallback_home / ".codex" / "AGENTS.md"
+        fallback_override = fallback_home / ".codex" / "AGENTS.override.md"
+        fallback_override.write_text("Later override.\n", encoding="utf-8")
+        agentos_two = make_fake_agentos(root, "AgentOS-two")
+        code, output = run_args(["--agentos-home", str(agentos_two), "--no-dry-run"], fallback_home)
+        assert_true(code == 0, output)
+        code, output = run_args(["--agentos-home", str(agentos_two), "--check"], fallback_home)
+        assert_true(code == 1, "inactive Codex sibling should fail check")
+        assert_true("inactive adapter sibling" in output, "inactive sibling check should be explicit")
+        code, output = run_args(["--agentos-home", str(agentos_one), "--remove", "--no-dry-run"], fallback_home)
+        assert_true(code == 0, output)
+        assert_true(ADAPTER_START not in read_text_preserve_newlines(fallback_codex), "remove left managed block in Codex fallback")
+        assert_true(ADAPTER_START not in read_text_preserve_newlines(fallback_override), "remove left managed block in Codex override")
 
 
 def test_all_default_adapters_and_explicit_adapter() -> None:
