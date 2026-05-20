@@ -24,6 +24,9 @@ Before answering questions about Codex, ChatGPT, OpenAI APIs, Cursor, Claude Cod
 ## Working Rules
 
 - Build in small, usable increments.
+- Treat `main` as protected. Do not commit or push Core/public AgentOS changes directly to `main`.
+- Make Core/public changes on a feature branch in an isolated worktree, open a pull request, wait for required validators, and squash merge through GitHub.
+- Use the harness-provided worktree when one exists. Otherwise create an external Git worktree under `$CODEX_HOME/worktrees/`; do not create worktrees inside this repository.
 - For AgentOS public repository persistence, use `scripts/agent-push` instead of raw `git push` when that helper is available. If the helper is missing or unsuitable, pause and ask before pushing.
 - Prefer plain Markdown for the AgentOS control plane so it can move between tools.
 - Prefer static HTML for substantial human-facing reports, reviews, plans, explainers, and briefs. Use `os/playbook/ARTIFACTS.md` for output-format decisions.

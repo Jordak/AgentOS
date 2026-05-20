@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+ROOT="$(git rev-parse --show-toplevel)"
 ZERO_SHA="0000000000000000000000000000000000000000"
 LOCAL_SHAS=()
 
@@ -10,13 +10,30 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     echo "error: refusing tag push through AgentOS pre-push hook: $local_ref -> $remote_ref" >&2
     exit 2
   fi
+  if [[ "$remote_ref" == "refs/heads/main" ]]; then
+    cat >&2 <<'MESSAGE'
+error: refusing direct push to main through AgentOS pre-push hook.
+
+Use a feature branch, open a pull request, wait for required validators, and
+squash merge through GitHub.
+MESSAGE
+    exit 2
+  fi
   if [[ "$local_sha" == "$ZERO_SHA" ]]; then
     echo "error: refusing delete push through AgentOS pre-push hook: $remote_ref" >&2
     exit 2
   fi
   if [[ "$remote_sha" != "$ZERO_SHA" ]] && ! git -C "$ROOT" merge-base --is-ancestor "$remote_sha" "$local_sha"; then
-    echo "error: refusing non-fast-forward push through AgentOS pre-push hook: $local_ref -> $remote_ref" >&2
-    exit 2
+    current_branch="$(git -C "$ROOT" symbolic-ref --quiet --short HEAD)" || {
+      echo "error: refusing non-fast-forward push from detached HEAD" >&2
+      exit 2
+    }
+    current_ref="refs/heads/$current_branch"
+    if [[ "${AGENTOS_AGENT_PUSH_FORCE_WITH_LEASE:-}" != "1" || "$current_branch" == "main" || "$local_ref" != "$current_ref" || "$remote_ref" != "$current_ref" ]]; then
+      echo "error: refusing raw non-fast-forward push through AgentOS pre-push hook: $local_ref -> $remote_ref" >&2
+      echo "Use scripts/agent-push --force-with-lease only for the current non-main branch after rebasing." >&2
+      exit 2
+    fi
   fi
   LOCAL_SHAS+=("$local_sha")
 done

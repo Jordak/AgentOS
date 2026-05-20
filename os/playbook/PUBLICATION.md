@@ -58,6 +58,8 @@ Do not initialize fresh publication history, start the replacement GitHub reposi
 
 When pushing AgentOS public repository changes from this workspace, use `scripts/agent-push` instead of raw `git push` when that helper is available. This keeps publication checks and push behavior in one reviewed entrypoint. If the helper is missing or unsuitable, pause and ask before pushing.
 
+After publication, `main` is protected. Do not push Core/public changes directly to `main`; make them on an isolated feature-branch worktree, open a pull request, wait for required validators, and squash merge through GitHub.
+
 The public repository also runs `.github/workflows/agentos-validation.yml` on pushes to `main` and on pull requests. CI is a backstop, not a replacement for the local hooks and `scripts/agent-push`.
 
 ## Same-Directory Fresh-History Flow

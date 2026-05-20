@@ -3,16 +3,19 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DRY_RUN=0
+FORCE_WITH_LEASE=0
 REMOTE="origin"
 BRANCH=""
 
 usage() {
   cat >&2 <<'USAGE'
-usage: scripts/agent-push [--dry-run] [remote [branch]]
+usage: scripts/agent-push [--dry-run] [--force-with-lease] [remote-name [branch]]
 
 Runs AgentOS validation, scans the HEAD publication tree, optionally scans the
 staged index when staged changes exist, then pushes the current branch by
-default. Force, mirror, all, delete, tag, and raw refspec pushes are refused.
+default. Direct pushes to main are refused. Force, mirror, all, delete, tag,
+and raw refspec pushes are refused. --force-with-lease is allowed only for the
+current non-main branch after the same validation gates pass.
 USAGE
 }
 
@@ -30,7 +33,7 @@ refuse_dangerous_push_args() {
   local arg
   for arg in "$@"; do
     case "$arg" in
-      -f|--force|--force=*|--force-with-lease|--force-with-lease=*|--force-if-includes|--force-if-includes=*)
+      -f|--force|--force=*|--force-with-lease=*|--force-if-includes|--force-if-includes=*)
         echo "error: refusing force push argument: $arg" >&2
         exit 2
         ;;
@@ -69,9 +72,18 @@ while [[ "$#" -gt 0 ]]; do
       DRY_RUN=1
       shift
       ;;
+    --force-with-lease)
+      FORCE_WITH_LEASE=1
+      shift
+      ;;
     -h|--help)
       usage
       exit 0
+      ;;
+    -*)
+      echo "error: unsupported push option: $1" >&2
+      usage
+      exit 2
       ;;
     *)
       POSITIONAL+=("$1")
@@ -103,12 +115,42 @@ else
   BRANCH="$CURRENT_BRANCH"
 fi
 
+case "$REMOTE" in
+  *:*|+*|refs/*|HEAD|tag)
+    echo "error: refusing remote argument that looks like a URL, ref, or refspec: $REMOTE" >&2
+    echo "Use a configured remote name such as origin." >&2
+    exit 2
+    ;;
+esac
+
+case "$BRANCH" in
+  *:*|+*|refs/*|HEAD|tag)
+    echo "error: refusing raw ref or refspec branch argument: $BRANCH" >&2
+    exit 2
+    ;;
+esac
+
+if [[ "$CURRENT_BRANCH" == "main" || "$BRANCH" == "main" ]]; then
+  cat >&2 <<'MESSAGE'
+error: refusing to push main directly.
+
+AgentOS Core/public changes must be made on a feature branch in an isolated
+worktree, opened as a pull request, validated by GitHub Actions, and squash
+merged into main.
+MESSAGE
+  exit 2
+fi
+
 if [[ "$BRANCH" != "$CURRENT_BRANCH" ]]; then
   echo "error: refusing to push branch '$BRANCH' while current branch is '$CURRENT_BRANCH'" >&2
   exit 2
 fi
 
-PUSH_ARGS=("$REMOTE" "$BRANCH")
+PUSH_ARGS=()
+if [[ "$FORCE_WITH_LEASE" == "1" ]]; then
+  PUSH_ARGS+=("--force-with-lease=refs/heads/$BRANCH")
+fi
+PUSH_ARGS+=("$REMOTE" "$BRANCH")
 
 echo "Running AgentOS default validation..."
 python3 "$ROOT/os/verification/scripts/validate_agentos.py"
@@ -122,8 +164,16 @@ if ! git -C "$ROOT" diff --cached --quiet --; then
 fi
 
 if [[ "$DRY_RUN" == "1" ]]; then
-  echo "Dry run: would run $(quote_command git push "${PUSH_ARGS[@]}")"
+  if [[ "$FORCE_WITH_LEASE" == "1" ]]; then
+    echo "Dry run: would run AGENTOS_AGENT_PUSH_FORCE_WITH_LEASE=1 $(quote_command git push "${PUSH_ARGS[@]}")"
+  else
+    echo "Dry run: would run $(quote_command git push "${PUSH_ARGS[@]}")"
+  fi
   exit 0
 fi
 
-git -C "$ROOT" push "${PUSH_ARGS[@]}"
+if [[ "$FORCE_WITH_LEASE" == "1" ]]; then
+  AGENTOS_AGENT_PUSH_FORCE_WITH_LEASE=1 git -C "$ROOT" push "${PUSH_ARGS[@]}"
+else
+  git -C "$ROOT" push "${PUSH_ARGS[@]}"
+fi
