@@ -656,11 +656,17 @@ def ensure_trailing_newline(text: str) -> str:
 
 def backup_path_for(path: Path, timestamp: str) -> Path:
     candidate = path.with_name(f"{path.name}.agentos-backup-{timestamp}")
+    backup_error = validate_target_path(candidate, allow_missing=True)
+    if backup_error:
+        raise ManagedBlockError(f"unsafe backup path {candidate}: {backup_error}")
     if not candidate.exists():
         return candidate
     counter = 2
     while True:
         next_candidate = path.with_name(f"{path.name}.agentos-backup-{timestamp}-{counter}")
+        backup_error = validate_target_path(next_candidate, allow_missing=True)
+        if backup_error:
+            raise ManagedBlockError(f"unsafe backup path {next_candidate}: {backup_error}")
         if not next_candidate.exists():
             return next_candidate
         counter += 1
@@ -1000,6 +1006,31 @@ def test_symlink_targets_fail_closed_and_modes_are_preserved() -> None:
         assert_true(code == 1, "raw relative symlink ancestor should fail closed")
         assert_true("symlink" in output, "raw relative symlink ancestor failure should be explicit")
         assert_true(not (raw_outside / "nested-relative").exists(), "raw relative adapter wrote through a symlink ancestor")
+
+        backup_home = root / "backup-home"
+        backup_home.mkdir()
+        (backup_home / ".codex").mkdir()
+        resolved_backup_home = backup_home.resolve()
+        backup_codex = resolved_backup_home / ".codex" / "AGENTS.md"
+        backup_codex.write_text("Existing backup source.\n", encoding="utf-8")
+        timestamp = "20990101T000000Z"
+        backup_symlink = backup_codex.with_name(f"{backup_codex.name}.agentos-backup-{timestamp}")
+        outside_backup = root / "outside-backup-target"
+        backup_symlink.symlink_to(outside_backup)
+        try:
+            install_target(
+                Target("codex", backup_codex, "adapter"),
+                resolved_backup_home,
+                agentos.resolve(),
+                dry_run=False,
+                timestamp=timestamp,
+            )
+        except ManagedBlockError as exc:
+            assert_true("unsafe backup path" in str(exc), "backup symlink failure should be explicit")
+        else:
+            raise AssertionError("backup symlink should fail closed")
+        assert_true(not outside_backup.exists(), "backup was written through a symlink")
+        assert_true(read_text_preserve_newlines(backup_codex) == "Existing backup source.\n", "source changed after backup failure")
 
 
 def test_remediation_command_shell_quotes_dynamic_args() -> None:
