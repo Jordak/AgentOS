@@ -19,6 +19,8 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
+sys.dont_write_bytecode = True
+
 PUBLICATION_RULES_DIR = Path(__file__).resolve().parents[3] / "scripts"
 if str(PUBLICATION_RULES_DIR) not in sys.path:
     sys.path.insert(0, str(PUBLICATION_RULES_DIR))
