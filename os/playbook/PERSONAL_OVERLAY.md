@@ -15,6 +15,18 @@ Read AgentOS Core first. Then read matching files under the Personal Overlay whe
 
 If both roots contain guidance for the same topic, the Personal Overlay may add private detail or override user-specific facts. It should not silently replace Core behavior unless the personal file says that it does.
 
+## Canonical Local Overlay
+
+The Personal Overlay is ignored local state. In a multi-worktree setup, ignored files under `personal/os/` are not copied or synchronized into feature worktrees.
+
+Treat the canonical Personal Overlay as the `personal/os/` directory in the primary local AgentOS checkout. The primary checkout is the long-lived local AgentOS directory that owns the user's ignored private state; it is not defined by whichever branch name the current process is on.
+
+When an agent is running from an isolated feature worktree and is routed to a Personal Overlay path, it should resolve reads against the primary checkout's `personal/os/` unless the user or harness explicitly assigned a different private overlay workspace. If the primary checkout is unknown, ask before assuming that the current worktree's mostly empty `personal/os/` skeleton is authoritative.
+
+Writes to the canonical Personal Overlay are allowed only when the task is Personal Overlay work and the agent has clear path ownership. Parallel agents may write different Personal Overlay subtrees, but they should not edit the same ignored file concurrently.
+
+Do not broad-copy ignored Personal Overlay contents into feature worktrees to make paths line up. Copy only narrowly requested private inputs when a user-approved workflow requires it, and never force-add Personal Overlay files to Git.
+
 ## Directory Shape
 
 AgentOS Core and the Personal Overlay use the same layer names:
