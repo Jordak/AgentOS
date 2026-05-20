@@ -1,0 +1,46 @@
+name: AgentOS Validation
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate public boundary
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install Gitleaks
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/gitleaks/gitleaks/master/install.sh | sudo sh -s -- -b /usr/local/bin
+          gitleaks version
+
+      - name: Run AgentOS validator
+        run: python3 os/verification/scripts/validate_agentos.py
+
+      - name: Run AgentOS validator self-test
+        run: python3 os/verification/scripts/validate_agentos.py --self-test
+
+      - name: Run stale-instruction audit
+        run: scripts/audit_agentos_leak_paths.sh
+
+      - name: Scan committed publication tree
+        run: scripts/check_publication_tree_secrets.sh HEAD
+
+      - name: Scan staged publication snapshot
+        run: scripts/check_staged_publication_secrets.sh

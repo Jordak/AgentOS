@@ -17,6 +17,7 @@ PUBLIC_EXPORT_ROOT_FILES = {
 }
 
 PUBLIC_EXPORT_ROOT_DIRS = {
+    ".github",
     "docs",
     "os",
     "personal",
@@ -113,6 +114,20 @@ CORE_PERSONAL_ONLY_DIRS = {
 GENERATED_OUTPUT_PARTS = {"reports", "briefs", "weekly-review", "markdown-audit"}
 
 
+def github_metadata_reason(rel: Path) -> str | None:
+    if not rel.parts or rel.parts[0] != ".github":
+        return None
+
+    if (
+        len(rel.parts) == 3
+        and rel.parts[1] == "workflows"
+        and rel.suffix in {".yml", ".yaml"}
+    ):
+        return None
+
+    return "is GitHub metadata outside the public-safe CI workflow allowlist"
+
+
 def is_template_name(name: str) -> bool:
     return name.endswith(".template.md") or name == "TEMPLATE.md"
 
@@ -180,4 +195,4 @@ def generated_output_reason(rel: Path) -> str | None:
 
 
 def publication_path_reason(rel: Path) -> str | None:
-    return live_personal_core_reason(rel) or generated_output_reason(rel)
+    return github_metadata_reason(rel) or live_personal_core_reason(rel) or generated_output_reason(rel)

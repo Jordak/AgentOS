@@ -1418,6 +1418,11 @@ def run_self_test() -> int:
         marker_root_path_variant = root / "sensitive_client_name.txt"
         marker_root_path_variant.write_text("not allowlisted but path should be redacted\n", encoding="utf-8")
         (root / "unexpected.txt").write_text("not allowlisted\n", encoding="utf-8")
+        public_workflow = root / ".github/workflows/agentos-validation.yml"
+        public_workflow.parent.mkdir(parents=True)
+        public_workflow.write_text("name: fixture\n", encoding="utf-8")
+        disallowed_github_metadata = root / ".github/dependabot.yml"
+        disallowed_github_metadata.write_text("version: 2\n", encoding="utf-8")
         (root / "os/linked.raw").symlink_to("../unexpected.txt")
         nonempty_core_gitkeep = root / "os/memory/weekly-review/.gitkeep"
         nonempty_core_gitkeep.parent.mkdir(parents=True)
@@ -1454,6 +1459,7 @@ def run_self_test() -> int:
             "missing required Personal Overlay ignore rule",
             "unexpected Personal Overlay unignore rule",
             "root file is not allowlisted for public export",
+            "GitHub metadata outside the public-safe CI workflow allowlist",
             "public export contains a symbolic link",
             "publishable .gitkeep must be empty",
             "personal overlay .gitkeep path is not in the public-safe skeleton allowlist",

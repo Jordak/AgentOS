@@ -18,12 +18,14 @@ The publication candidate contains:
 
 - AgentOS Core under `$root/os/`.
 - Publishable root files such as `README.md`, `AGENTS.md`, `CLAUDE.md`, `DOMAIN.md`, `.gitignore`, and docs.
+- Public-safe GitHub Actions workflows under `$root/.github/workflows/`.
 - The tracked Personal Overlay skeleton under `$root/personal/`, using empty `.gitkeep` files only.
 - Only public-safe Personal Overlay directory names; private-specific directory names must remain ignored local state.
 
 The publication candidate must not contain:
 
 - private Personal Overlay files;
+- GitHub metadata outside public-safe workflow YAML files;
 - private generated outputs;
 - non-empty `.gitkeep` files;
 - old Git history from the current private repository;
@@ -55,6 +57,8 @@ GitHub's own guidance treats sensitive-data removal as history-rewrite work, not
 Do not initialize fresh publication history, start the replacement GitHub repository, push, change visibility, or delete/replace the current private repository before steps 1-5 are complete. Use step 6 when doing the final release operation or after changing export behavior.
 
 When pushing AgentOS public repository changes from this workspace, use `scripts/agent-push` instead of raw `git push` when that helper is available. This keeps publication checks and push behavior in one reviewed entrypoint. If the helper is missing or unsuitable, pause and ask before pushing.
+
+The public repository also runs `.github/workflows/agentos-validation.yml` on pushes to `main` and on pull requests. CI is a backstop, not a replacement for the local hooks and `scripts/agent-push`.
 
 ## Same-Directory Fresh-History Flow
 
