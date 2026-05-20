@@ -472,6 +472,10 @@ def should_check_sibling_target(path: Path, mode: str) -> bool:
         return path.exists() or path.is_symlink()
     if not (path.exists() or path.is_symlink()):
         return False
+    if path.is_symlink():
+        return True
+    if not path.is_file():
+        return True
     try:
         data = path.read_bytes()
     except OSError:
@@ -1007,6 +1011,16 @@ def test_codex_override_file_is_effective_adapter_target() -> None:
         assert_true(code == 0, output)
         assert_true(ADAPTER_START not in read_text_preserve_newlines(fallback_codex), "remove left managed block in Codex fallback")
         assert_true(ADAPTER_START not in read_text_preserve_newlines(fallback_override), "remove left managed block in Codex override")
+
+        unsafe_home = root / "unsafe-home"
+        unsafe_home.mkdir()
+        (unsafe_home / ".codex").mkdir()
+        (unsafe_home / ".codex" / "AGENTS.override.md").write_text("Active override.\n", encoding="utf-8")
+        unsafe_sibling_target = root / "unsafe-sibling-target"
+        (unsafe_home / ".codex" / "AGENTS.md").symlink_to(unsafe_sibling_target)
+        code, output = run_args(["--agentos-home", str(agentos), "--check"], unsafe_home)
+        assert_true(code == 1, "unsafe inactive Codex sibling should fail check")
+        assert_true("inactive adapter sibling" in output, "unsafe inactive sibling check should be explicit")
 
 
 def test_all_default_adapters_and_explicit_adapter() -> None:
