@@ -24,6 +24,8 @@ See `os/playbook/PERSONAL_OVERLAY.md` for the full load and migration rule.
 
 Install AgentOS wherever you want it to live. Common choices are a folder under the current user's home directory, but AgentOS does not require or assume a default path. In the examples below, replace `<agentos-home>` with the resolved path to your chosen checkout.
 
+Prefer a local directory that is not cloud-synced. Avoid placing AgentOS inside folders managed by iCloud Drive, OneDrive, Dropbox, Google Drive, or similar sync tools; AgentOS can contain ignored private overlay state, Git metadata, generated reports, and agent-written files that are better kept in a normal local development directory.
+
 Portable path notation:
 
 - macOS/Linux: `<home>/.agents/AGENTS.md`
@@ -46,7 +48,7 @@ Give this prompt to your agent:
 ```text
 Install AgentOS for me.
 
-1. Ask me where AgentOS should live. If I do not have a preference, suggest a conventional home-directory path, but do not assume or require one.
+1. Ask me where AgentOS should live. If I do not have a preference, suggest a conventional local development path that is not inside iCloud Drive, OneDrive, Dropbox, Google Drive, or another cloud-synced folder. Do not assume or require a default path.
 2. Clone https://github.com/Jordak/AgentOS.git into my chosen path.
 3. From that AgentOS checkout, run the installer self-test:
    python3 scripts/install_global_agent_instructions.py --self-test
@@ -79,9 +81,9 @@ python3 scripts/install_global_agent_instructions.py --agentos-home <agentos-hom
 python3 scripts/install_global_agent_instructions.py --agentos-home <agentos-home> --check
 ```
 
-## How To Start
+## First Read Sequence
 
-For an agent or human landing here for the first time:
+For an agent or human using an AgentOS checkout for the first time:
 
 1. Read `AGENTS.md`.
 2. Read `os/INDEX.md`.
