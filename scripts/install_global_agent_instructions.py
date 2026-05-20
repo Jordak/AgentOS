@@ -19,6 +19,7 @@ import re
 import shutil
 import sys
 import tempfile
+from contextlib import redirect_stderr
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -325,6 +326,14 @@ def resolve_user_path(raw: str, home: Path) -> Path:
             rest = raw[len(prefix) :]
             parts = [part for part in re.split(r"[\\/]+", rest) if part]
             return home.joinpath(*parts)
+    if raw == "~":
+        return home
+    tilde = "~"
+    for prefix in (tilde + "/", tilde + "\\"):
+        if raw.startswith(prefix):
+            rest = raw[len(prefix) :]
+            parts = [part for part in re.split(r"[\\/]+", rest) if part]
+            return home.joinpath(*parts)
     path = Path(os.path.expanduser(raw))
     if not path.is_absolute():
         path = Path.cwd() / path
@@ -612,6 +621,8 @@ def run_self_tests() -> int:
         test_all_default_adapters_and_explicit_adapter,
         test_crlf_paths_with_spaces_and_duplicate_blocks,
         test_duplicate_adapter_dedupes_and_conflicting_adapter_fails,
+        test_tilde_windows_and_relative_adapter_paths,
+        test_mode_conflicts,
         test_invalid_agentos_home_fails,
     ]
     try:
@@ -758,12 +769,12 @@ def test_all_default_adapters_and_explicit_adapter() -> None:
 def test_crlf_paths_with_spaces_and_duplicate_blocks() -> None:
     with tempfile.TemporaryDirectory(prefix="agentos global installer ") as tmp:
         root = Path(tmp)
-        home = root / "home with spaces"
+        home = root / "home with spaces and apostrophe's"
         home.mkdir()
         (home / ".codex").mkdir()
         codex = home / ".codex" / "AGENTS.md"
         codex.write_text("Existing\r\n", encoding="utf-8")
-        agentos = make_fake_agentos(root, "AgentOS with spaces")
+        agentos = make_fake_agentos(root, "AgentOS with spaces unicode-\u2603")
         code, output = run_args(["--agentos-home", str(agentos), "--no-dry-run"], home)
         assert_true(code == 0, output)
         codex_text = read_text_preserve_newlines(codex)
@@ -809,6 +820,61 @@ def test_duplicate_adapter_dedupes_and_conflicting_adapter_fails() -> None:
         )
         assert_true(code == 1, "adapter conflicting with global target should fail")
         assert_true("conflicts" in output, "conflict failure should be explicit")
+
+
+def test_tilde_windows_and_relative_adapter_paths() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-global-installer-") as tmp:
+        root = Path(tmp)
+        home = root / "home"
+        home.mkdir()
+        agentos = make_fake_agentos(root)
+        tilde_adapter = "~" + "/.hermes/AGENTS.md"
+        code, output = run_args(
+            [
+                "--agentos-home",
+                str(agentos),
+                "--adapter",
+                tilde_adapter,
+                "--adapter",
+                r"<home>\.openclaw\AGENTS.md",
+                "--no-dry-run",
+            ],
+            home,
+        )
+        assert_true(code == 0, output)
+        assert_true((home / ".hermes" / "AGENTS.md").exists(), "tilde adapter did not use fake home")
+        assert_true((home / ".openclaw" / "AGENTS.md").exists(), "Windows-style <home> adapter missing")
+
+        code, output = run_args(
+            [
+                "--agentos-home",
+                str(agentos),
+                "--adapter",
+                "relative-adapter/AGENTS.md",
+            ],
+            home,
+        )
+        assert_true(code == 0, output)
+        assert_true(str(Path.cwd() / "relative-adapter" / "AGENTS.md") in output, "relative adapter was not resolved")
+        assert_true(not (Path.cwd() / "relative-adapter").exists(), "relative dry-run created a directory")
+
+
+def test_mode_conflicts() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-global-installer-") as tmp:
+        root = Path(tmp)
+        home = root / "home"
+        home.mkdir()
+        agentos = make_fake_agentos(root)
+        code, _output = run_args(["--agentos-home", str(agentos), "--check", "--remove"], home)
+        assert_true(code == 2, "--check --remove should fail")
+        code, _output = run_args(["--agentos-home", str(agentos), "--check", "--no-dry-run"], home)
+        assert_true(code == 2, "--check --no-dry-run should fail")
+        code, _output = run_args([], home)
+        assert_true(code == 2, "missing --agentos-home should fail")
+        stderr = io.StringIO()
+        with redirect_stderr(stderr):
+            code = main(["--self-test", "--agentos-home", str(agentos)])
+        assert_true(code == 2, "--self-test with extra flags should fail")
 
 
 def test_invalid_agentos_home_fails() -> None:
