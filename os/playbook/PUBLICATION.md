@@ -1,6 +1,6 @@
 # Publication
 
-Status: publication safety rule v1.
+Status: publication safety rule v2.
 
 Use this when preparing AgentOS for a public GitHub repository.
 
@@ -47,10 +47,40 @@ GitHub's own guidance treats sensitive-data removal as history-rewrite work, not
 5. Stage the migration and run the staged snapshot privacy scan so Git's publishable file set and blob contents match the intended public initial commit.
 6. Optionally build and inspect a clean staged publication candidate as a final dry run.
 7. Optionally run TruffleHog or an LLM privacy review as an advisory second pass.
-8. Create the public GitHub repository from a fresh initial commit.
-9. Delete or archive the old private GitHub repository only after the user explicitly approves that external destructive action.
+8. If publishing from the same local directory, follow the same-directory fresh-history flow before any GitHub replacement or visibility change.
+9. Create the replacement GitHub repository private-first, push only the fresh initial history, and verify an independent clone.
+10. Recreate only sanitized public-safe roadmap issues after the fresh repository is verified.
+11. Delete, archive, replace, or make visible any GitHub repository only after the user explicitly approves that external or destructive action.
 
-Do not start the new public repository or delete/replace the current private repository before steps 1-5 are complete. Use step 6 when doing the final release operation or after changing export behavior.
+Do not initialize fresh publication history, start the replacement GitHub repository, push, change visibility, or delete/replace the current private repository before steps 1-5 are complete. Use step 6 when doing the final release operation or after changing export behavior.
+
+## Same-Directory Fresh-History Flow
+
+Use this flow when the current AgentOS directory should remain the local working home and ignored Personal Overlay files should stay in place.
+
+Keep local Personal Overlay files in place. The publication operation changes Git metadata and remote state; it does not recopy, delete, or move ignored private files under `$root/personal/os/`.
+
+Before moving `$root/.git`, inspect linked worktrees:
+
+```bash
+git worktree list --porcelain
+```
+
+Prune stale worktree metadata with `git worktree prune` before replacing Git metadata. Remove real linked worktrees only with explicit human approval, and do not move `$root/.git` while live linked worktrees still depend on it.
+
+Neutralize old remotes before GitHub name reuse. Remove or rename old remotes in the old metadata before any replacement repository is connected, so no later command can accidentally push old history to the replacement repository or fresh history to the old remote.
+
+Back up the old `$root/.git` metadata instead of deleting it. Store that backup in a local ignored location outside the Publishable File Set. Treat the backup as private state because it can contain old history, reflogs, remote URLs, branch names, and other repository metadata. Do not include it in AgentOS Core, the Publication Candidate, or the replacement repository.
+
+Initialize fresh history in the same working directory only after the migration and privacy gates pass and the old Git metadata is backed up. Use the current working tree as the source, run `git init`, stage only the Publishable File Set, create a fresh initial commit, and confirm `git log` shows no older commits.
+
+Create the replacement GitHub repository private-first. Add its remote explicitly after fresh initialization, then push only the fresh initial branch. Do not reuse old remote configuration.
+
+Before public visibility, clone the replacement repository into an independent temporary directory and run the publication validation and a semantic spot-check there. The clone should contain Core, publishable root files, and the tracked Personal Overlay skeleton only; it should not contain ignored Personal Overlay files, old history, old remotes, or local backup metadata.
+
+After the replacement repository is verified, recreate only sanitized public-safe roadmap issues. Do not import old private issues, comments, pull requests, labels, milestones, settings, or transcripts wholesale. Promote an issue only when its title, body, labels, and links contain no private history, local paths, account details, private repository names, or user-specific live state.
+
+Ask for explicit human approval before moving or deleting `$root/.git`, removing real linked worktrees, deleting or replacing a GitHub repository, creating a replacement GitHub repository, pushing to a remote, changing repository visibility, recreating public issues, or changing repository permissions/settings.
 
 ## Old GitHub State
 
@@ -218,12 +248,12 @@ Manual assembly is not a reliable dry-run mechanism because it is easy to get wr
 
 ## Current Plan
 
-The v1 publication plan is:
+The current publication plan is:
 
 1. Keep one local AgentOS working tree with tracked Core under `$root/os/` and ignored Personal Overlay files under `$root/personal/os/`.
 2. Do the full migration in one focused effort rather than publishing layer-by-layer.
 3. Preserve useful GitHub-side planning state from the current private repository.
-4. Create a new public repository with fresh history from the prechecked publishable file set; optionally use the script-generated sanitized publication candidate as the final inspected source tree.
+4. Create the replacement GitHub repository private-first with fresh history from the prechecked publishable file set; optionally use the script-generated sanitized publication candidate as the final inspected source tree.
 5. Use `.gitignore` and `.gitkeep` so the public repository keeps the Personal Overlay directory shape but not private files.
 
 Deletion, replacement, or public-repo creation waits until migration and validation are complete.

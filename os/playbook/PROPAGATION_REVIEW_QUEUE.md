@@ -25,6 +25,14 @@ Create a queue entry instead of directly editing canonical state when:
 
 Directly edit canonical state only when the user explicitly asks for the exact canonical edit in the current request, or when applying an approved queue entry under the apply rules below. Do not treat a generated workflow's inline yes/no question as a substitute for a queue entry.
 
+## Operational Migrations And Direct Approval
+
+Operational migrations, cleanup runs, and other step-by-step actions may proceed by explicit human approval in the active thread without first creating a queue entry. That approval authorizes the named action sequence; it does not by itself promote lessons, summaries, or inline discussion into canonical AgentOS state.
+
+Do not retroactively create queue entries merely because a user-approved operation already happened. Queue follow-up changes when the operation produces a durable lesson or policy recommendation that would alter Core guidance, personal memory, playbooks, skills, verification, automations, or other canonical state. The queue remains the review path for generated or inferred propagation unless the user explicitly asks for the exact canonical edit to make.
+
+Inline chat approval can approve operational actions and can approve applying a specific queue entry. It should not silently become canonical durable state; capture the resulting policy or memory through the queue, or through the exact canonical edit the user requested.
+
 ## Candidate Producers
 
 These outputs may propose propagation entries, but must not auto-apply them by default:
