@@ -530,6 +530,11 @@ def remove_target(target: Target, dry_run: bool, timestamp: str) -> Result:
 def validate_target_path(path: Path, allow_missing: bool) -> str | None:
     if path.is_symlink():
         return "path is a symlink; refusing to modify managed instruction files through links"
+    for ancestor in path.parents:
+        if ancestor.is_symlink():
+            return f"ancestor directory is a symlink: {ancestor}; refusing to modify managed instruction files through links"
+        if ancestor.exists() and not ancestor.is_dir():
+            return f"ancestor path is not a directory: {ancestor}"
     if path.exists():
         if path.is_dir():
             return "path is a directory, expected a file"
@@ -943,6 +948,20 @@ def test_symlink_targets_fail_closed_and_modes_are_preserved() -> None:
         assert_true(not global_instructions_path(link_home).exists(), "preflight failure should not create global file")
         assert_true(symlink.is_symlink(), "symlink was replaced")
         assert_true(read_text_preserve_newlines(real_target) == "Real target.\n", "symlink target was modified")
+
+        nested_home = root / "nested-home"
+        nested_home.mkdir()
+        outside = root / "outside"
+        outside.mkdir()
+        (nested_home / "linked-adapters").symlink_to(outside, target_is_directory=True)
+        nested_adapter = "<home>/linked-adapters/nested/AGENTS.md"
+        code, output = run_args(
+            ["--agentos-home", str(agentos), "--adapter", nested_adapter, "--no-dry-run"],
+            nested_home,
+        )
+        assert_true(code == 1, "symlink ancestor should fail closed")
+        assert_true("symlink" in output, "symlink ancestor failure should be explicit")
+        assert_true(not (outside / "nested").exists(), "nested directory was created through a symlink ancestor")
 
 
 def test_remediation_command_shell_quotes_dynamic_args() -> None:
