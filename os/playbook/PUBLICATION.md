@@ -54,6 +54,8 @@ GitHub's own guidance treats sensitive-data removal as history-rewrite work, not
 
 Do not initialize fresh publication history, start the replacement GitHub repository, push, change visibility, or delete/replace the current private repository before steps 1-5 are complete. Use step 6 when doing the final release operation or after changing export behavior.
 
+When pushing AgentOS public repository changes from this workspace, use `scripts/agent-push` instead of raw `git push` when that helper is available. This keeps publication checks and push behavior in one reviewed entrypoint. If the helper is missing or unsuitable, pause and ask before pushing.
+
 ## Same-Directory Fresh-History Flow
 
 Use this flow when the current AgentOS directory should remain the local working home and ignored Personal Overlay files should stay in place.
@@ -126,6 +128,7 @@ Run publication validation in the working tree by default:
 ```bash
 python3 os/verification/scripts/validate_agentos.py --publication-precheck
 scripts/check_working_tree_secrets.sh
+scripts/audit_agentos_leak_paths.sh
 ```
 
 The working-tree precheck catches migration mistakes early and tolerates ignored private files under `$root/personal/`.

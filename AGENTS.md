@@ -24,6 +24,7 @@ Before answering questions about Codex, ChatGPT, OpenAI APIs, Cursor, Claude Cod
 ## Working Rules
 
 - Build in small, usable increments.
+- For AgentOS public repository persistence, use `scripts/agent-push` instead of raw `git push` when that helper is available. If the helper is missing or unsuitable, pause and ask before pushing.
 - Prefer plain Markdown for the AgentOS control plane so it can move between tools.
 - Prefer static HTML for substantial human-facing reports, reviews, plans, explainers, and briefs. Use `os/playbook/ARTIFACTS.md` for output-format decisions.
 - Keep global identity and preferences separate from project-specific instructions.
@@ -33,3 +34,5 @@ Before answering questions about Codex, ChatGPT, OpenAI APIs, Cursor, Claude Cod
 ## Publication Safety
 
 Do not make a formerly private AgentOS repository public. Follow `os/playbook/PUBLICATION.md`: migrate private live state into `personal/os/`, generate a sanitized public export, validate the export, and create the public repository from fresh Git history.
+
+Live named agents, live automations, reports, briefs, histories, queues, run logs, and generated outputs default to `personal/os/`. Core `os/agents/` and `os/automations/` are for templates, examples, schemas, and policy only.

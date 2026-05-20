@@ -1,8 +1,8 @@
 repos:
   - repo: local
     hooks:
-      - id: agentos-staged-publication-secrets
-        name: AgentOS staged publication privacy scan
-        entry: bash scripts/check_staged_publication_secrets.sh
+      - id: agentos-validation-push-safety
+        name: AgentOS validation and staged publication scan
+        entry: bash scripts/hooks/pre-commit
         language: system
         pass_filenames: false

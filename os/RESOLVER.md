@@ -53,11 +53,13 @@ Use the narrowest route that can answer the task.
 - Private live skill configuration: Personal Overlay skill config files.
 - A durable live agent role: `personal/os/agents/`.
 - Generic agent scaffolding: `os/agents/`.
+- Live agent histories, queues, reports, briefs, run logs, and generated outputs: `personal/os/agents/` or another narrow Personal Overlay directory.
 - Tool access, connector boundaries, or account safety: `personal/os/connections/`, using Core safety policy under `os/connections/`.
 - Quality check code, schemas, and sanitized fixtures: `os/verification/`.
 - Private run reports and benchmark results: `personal/os/verification/`.
 - Cross-cutting operating policy, artifact policy, portability, publication, or programming preferences: `os/playbook/`.
 - Live schedules, recurring jobs, or automation prompts: `personal/os/automations/`, using Core templates under `os/automations/`.
+- Live automation histories, queues, delivery records, and generated outputs: `personal/os/automations/` or the relevant Personal Overlay agent/memory directory.
 - Public repository publication, fresh-history export, privacy validation, or deletion/replacement of an old private GitHub repository: `os/playbook/PUBLICATION.md`.
 
 If two routes both seem plausible, choose the route where the resulting file will be most stable over time. Prefer linking to neighboring layers over copying the same fact into multiple places.
@@ -95,6 +97,8 @@ File durable updates in the narrowest stable home:
 - Private verification run evidence: `personal/os/verification/`.
 - Cross-cutting operating policy: `os/playbook/`.
 - Live schedule or automation prompt: `personal/os/automations/`.
+
+Core `os/agents/` and `os/automations/` are templates/examples/policy only. Do not file live personal jobs, run histories, queues, reports, briefs, or generated outputs there.
 
 ## Completion Check
 

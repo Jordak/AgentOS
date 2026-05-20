@@ -4,6 +4,8 @@ Status: Core default.
 
 This file describes the publishable automation registry shape. Live automation schedules, prompts, destinations, accounts, and activation state belong in `personal/os/automations/AUTOMATIONS.md`.
 
+Core `os/automations/` is templates/examples/policy only. It must not contain live personal jobs, run histories, delivery queues, report archives, connector destinations, account-specific prompts, or generated outputs.
+
 ## Principle
 
 Automate only work that has been run manually and verified.

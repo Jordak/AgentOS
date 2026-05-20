@@ -10,6 +10,10 @@ AgentOS is a portable Markdown-based operating layer for agentic tools.
 
 AgentOS Core lives under `$root/os/`. Private user-specific state lives under `$root/personal/os/` as a Personal Overlay. Read Core first, then matching Personal Overlay files when present. See `os/playbook/PERSONAL_OVERLAY.md`.
 
+Live named agents, live automations, reports, briefs, histories, queues, run logs, and generated outputs default to `$root/personal/os/`.
+
+Core `os/agents/` and `os/automations/` are for templates, examples, schemas, and policy. They are not live personal job registries or run-history stores.
+
 Do not make a formerly private AgentOS GitHub repository public after private files have existed in its history. Public AgentOS publication uses a sanitized export and a fresh initial commit. See `os/playbook/PUBLICATION.md`.
 
 ## Core Principle
@@ -157,3 +161,11 @@ Do not create automations that act without manual review unless the user explici
 Follow `os/playbook/PUBLICATION.md`.
 
 Do not delete, archive, replace, make public, or recreate a formerly private GitHub repository until the local migration, export script, privacy validation, secret scan, and manual public-export inspection are complete.
+
+For AgentOS public repository persistence, use `scripts/agent-push` instead of raw `git push` when that helper is available. If a worker cannot use the helper, it should pause and ask before pushing.
+
+Before publication or broad Core guidance changes, run the stale-instruction audit:
+
+```bash
+scripts/audit_agentos_leak_paths.sh
+```

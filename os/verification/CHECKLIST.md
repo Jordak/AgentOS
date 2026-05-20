@@ -22,6 +22,12 @@ For AgentOS maintenance validation, use:
 
 This includes structural retrieval fixtures under `os/verification/retrieval/`. They check route evidence, not final model prose.
 
+For Core/Personal Overlay guidance, push-safety, and stale installed-instruction checks, also run:
+
+`scripts/audit_agentos_leak_paths.sh`
+
+This audit checks `os/`, `personal/os/`, installed skill mirrors, and Codex automation mirrors for suspicious Core generated-output paths, live history/queue/report routing, raw Git persistence instructions, and private live-agent adapters that still point into Core.
+
 Safe smoke fixture:
 
 `python3 os/verification/scripts/validate_agentos.py --self-test`

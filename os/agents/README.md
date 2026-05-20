@@ -6,6 +6,8 @@ Use `os/agents/` for publishable reusable agent scaffolding: templates, public-s
 
 Live named agents with personal cadence, private inputs, operating history, reports, or job-specific continuity belong in `personal/os/agents/`.
 
+This directory is not a live agent registry. Core agent folders must be templates, public-safe examples, or policy-only scaffolding.
+
 ## Belongs Here
 
 - Generic agent job templates and public-safe example instructions.
@@ -20,6 +22,7 @@ Live named agents with personal cadence, private inputs, operating history, repo
 - Stable project/career context shared across agents: use `personal/os/context/` for live/private context, or `os/context/` for public-safe templates and Core routing.
 - Durable decisions or lessons that affect the whole OS: use `personal/os/memory/` for live/private decisions, or `os/memory/` for publishable AgentOS architecture decisions.
 - Live named agent definitions, private operating instructions, histories, reports, brief archives, or job-specific continuity: use `personal/os/agents/`.
+- Live queues, run logs, generated outputs, and delivery records: use `personal/os/agents/` or the narrowest matching Personal Overlay directory.
 - Substantial domain work products, datasets, code, notes, decks, or publishable reports that have value outside the agent: use the mapped project from the appropriate source map.
 
 ## Common Tie-Breakers
@@ -34,6 +37,7 @@ Live named agents with personal cadence, private inputs, operating history, repo
 - Use `AGENT_TEMPLATE.md` for new agents unless an existing agent provides a clearer local pattern.
 - Each durable agent should have a job definition, operating instructions, inputs, outputs, boundaries, and verification guidance.
 - Keep live agent histories compact under `personal/os/agents/`. Link to reports rather than duplicating report content into summaries.
+- Do not route installed skill adapters or automations for private live agents into `os/agents/`; point them at `personal/os/agents/` or a Personal Overlay skill config.
 - Do not add a new installed skill adapter for every agent by default. Add one only when the user should invoke the agent from arbitrary projects.
 
 ## Provenance

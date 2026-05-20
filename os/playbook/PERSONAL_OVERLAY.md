@@ -55,6 +55,8 @@ This includes reports, briefs, histories, run logs, weekly reviews, scout output
 
 AgentOS Core may contain sanitized example outputs or templates that demonstrate shape, but not generated artifacts based on real private state.
 
+If an output path is not explicitly public-safe, route it to `personal/os/` first. Promote only sanitized examples or reusable templates into Core after review.
+
 Examples:
 
 - `$root/personal/os/agents/assistant-agent/reports/YYYY-MM-DD.html`
@@ -67,6 +69,8 @@ Examples:
 Named live agents configured around a real person's interests, routines, connected-account assumptions, private output paths, or personal project state belong in the Personal Overlay by default.
 
 AgentOS Core may contain agent templates, contracts, and sanitized examples that demonstrate the structure of a durable role.
+
+Core `os/agents/` is not a live job registry. It must not contain private named agent histories, queues, brief archives, report archives, account-specific instructions, or generated outputs.
 
 Examples:
 
@@ -193,6 +197,8 @@ Live automation files describe real schedules, prompts, destinations, accounts, 
 AgentOS Core may keep automation schemas, safety policy, reusable activation standards, and sanitized examples.
 
 Even when an automation pattern is reusable, the live schedule, destination, account, delivery path, and activation state are personal.
+
+Core `os/automations/` is not a live automation registry. It may describe the registry shape and activation policy, but live jobs, run histories, queues, delivery records, and generated artifacts belong in `personal/os/automations/` or the relevant Personal Overlay agent/memory directory.
 
 Examples:
 

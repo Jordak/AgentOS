@@ -39,6 +39,7 @@ If a skill can send messages, publish, delete, change sharing, upload, overwrite
 Every durable skill should state where outputs go:
 
 - Live agent-owned reports and run histories usually live with the relevant `personal/os/agents/` directory; `os/agents/` is for public-safe templates and examples.
+- Live automation records, delivery queues, and run histories live under `personal/os/automations/` or the relevant Personal Overlay agent/memory directory; `os/automations/` is for templates, examples, and policy.
 - Reusable workflow changes live under `os/skills/`.
 - Live durable decisions and lessons live under `personal/os/memory/`; publishable AgentOS architecture decisions can live under `os/memory/`.
 - Project-specific implementation artifacts live in the mapped project from the appropriate source map.
@@ -69,6 +70,8 @@ A skill's verification guidance should test observable behavior, not internal st
 Canonical AgentOS skills live under `os/skills/`.
 
 Installed harness mirrors are current-machine artifacts, not portable AgentOS state. Do not record machine-local mirror paths or mirror sync status in `os/skills/MANIFEST.md`.
+
+Installed skills that adapt private live agents must route private job definitions, histories, reports, briefs, queues, and generated outputs to `personal/os/agents/`, `personal/os/automations/`, or Personal Overlay skill config. They must not route private live agent state into Core `os/agents/` or `os/automations/`.
 
 Use `os/skills/audit-skill-mirrors/SKILL.md` and its bundled script to audit or sync mirrors for the active machine. If a harness needs intentionally different behavior, prefer a canonical thin adapter skill under `os/skills/` rather than untracked drift in a local mirror.
 

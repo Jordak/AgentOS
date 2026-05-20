@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+python3 "$ROOT/os/verification/scripts/validate_agentos.py"
+
+if git -C "$ROOT" diff --cached --quiet --; then
+  echo "No staged changes; skipping staged publication scan."
+  exit 0
+fi
+
+"$ROOT/scripts/check_staged_publication_secrets.sh"

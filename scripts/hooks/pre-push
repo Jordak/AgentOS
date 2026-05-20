@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+ZERO_SHA="0000000000000000000000000000000000000000"
+LOCAL_SHAS=()
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  if [[ "$local_ref" == refs/tags/* || "$remote_ref" == refs/tags/* ]]; then
+    echo "error: refusing tag push through AgentOS pre-push hook: $local_ref -> $remote_ref" >&2
+    exit 2
+  fi
+  if [[ "$local_sha" == "$ZERO_SHA" ]]; then
+    echo "error: refusing delete push through AgentOS pre-push hook: $remote_ref" >&2
+    exit 2
+  fi
+  if [[ "$remote_sha" != "$ZERO_SHA" ]] && ! git -C "$ROOT" merge-base --is-ancestor "$remote_sha" "$local_sha"; then
+    echo "error: refusing non-fast-forward push through AgentOS pre-push hook: $local_ref -> $remote_ref" >&2
+    exit 2
+  fi
+  LOCAL_SHAS+=("$local_sha")
+done
+
+python3 "$ROOT/os/verification/scripts/validate_agentos.py"
+
+if [[ "${#LOCAL_SHAS[@]}" -eq 0 ]]; then
+  "$ROOT/scripts/check_publication_tree_secrets.sh" HEAD
+else
+  scanned=""
+  for local_sha in "${LOCAL_SHAS[@]}"; do
+    case " $scanned " in
+      *" $local_sha "*) continue ;;
+    esac
+    "$ROOT/scripts/check_publication_tree_secrets.sh" "$local_sha"
+    scanned="$scanned $local_sha"
+  done
+fi
+
+if ! git -C "$ROOT" diff --cached --quiet --; then
+  "$ROOT/scripts/check_staged_publication_secrets.sh"
+fi

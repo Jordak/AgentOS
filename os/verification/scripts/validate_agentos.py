@@ -117,6 +117,9 @@ SECRET_LIKE_PATTERNS = [
     ("Google API key", re.compile(r"\bAIza[0-9A-Za-z_-]{35}\b")),
     ("Slack token", re.compile(r"\bxox[baprs]-[0-9A-Za-z-]{20,}\b")),
 ]
+GENERIC_LOCAL_TOOL_PATH_RE = re.compile(
+    r"^(?:~|\$HOME|\$\{HOME\})[\\/](?:\.agents[\\/]skills|\.codex[\\/]automations)(?:[\\/].*)?$"
+)
 
 
 @dataclass
@@ -138,6 +141,15 @@ class AgentOSValidator:
         self.checked: list[str] = []
 
     def run(self) -> int:
+        self.run_structural_checks()
+        self.run_publication_precheck_checks()
+        return self.report()
+
+    def run_structural_only(self) -> int:
+        self.run_structural_checks()
+        return self.report()
+
+    def run_structural_checks(self) -> None:
         self.check_markdown_path_portability()
         self.check_source_map_path_health()
         self.check_skills_manifest_consistency()
@@ -146,9 +158,12 @@ class AgentOSValidator:
         self.check_resolver_reachability()
         self.check_retrieval_eval_fixtures()
         self.check_benchmark_manifest()
-        return self.report()
 
     def run_publication_precheck(self) -> int:
+        self.run_publication_precheck_checks()
+        return self.report()
+
+    def run_publication_precheck_checks(self) -> None:
         self.check_git_publication_source_set()
         self.check_private_overlay_files_are_ignored()
         self.check_personal_overlay_ignore_rules()
@@ -156,7 +171,6 @@ class AgentOSValidator:
         self.check_core_private_markers()
         self.check_secret_like_tokens()
         self.checked.append("publication precheck")
-        return self.report()
 
     def run_public_export_validation(self, export_root: Path) -> int:
         self.root = export_root.resolve()
@@ -191,6 +205,13 @@ class AgentOSValidator:
         for marker in self.private_marker_patterns:
             redacted = marker.pattern.sub("[private-marker]", redacted)
         return redacted
+
+    def private_marker_match(self, marker: PrivateMarker, text: str) -> re.Match[str] | None:
+        for match in marker.pattern.finditer(text):
+            if marker.label == "shell home or temp path" and GENERIC_LOCAL_TOOL_PATH_RE.match(match.group(0)):
+                continue
+            return match
+        return None
 
     def is_regular_file(self, path: Path) -> bool:
         return not path.is_symlink() and path.is_file()
@@ -591,7 +612,7 @@ class AgentOSValidator:
             rel = path.relative_to(self.root)
             rel_text = rel.as_posix()
             for marker in self.private_marker_patterns:
-                if marker.pattern.search(rel_text):
+                if self.private_marker_match(marker, rel_text):
                     self.add_error(
                         check,
                         self.redact_private_markers(rel_text),
@@ -605,7 +626,7 @@ class AgentOSValidator:
             text = self.read_text(path, check)
             for line_no, line in enumerate(text.splitlines(), start=1):
                 for marker in self.private_marker_patterns:
-                    if marker.pattern.search(line):
+                    if self.private_marker_match(marker, line):
                         self.add_error(
                             check,
                             f"{self.redact_private_markers(self.display_path(path))}:{line_no}",
@@ -1569,11 +1590,16 @@ def run_self_test() -> int:
 
         symlink_root = root / "_publication_symlink_fixture"
         (symlink_root / "os/context").mkdir(parents=True)
+        (symlink_root / "os/agents/current-awareness-agent").mkdir(parents=True)
         (symlink_root / "os/reports").mkdir()
         (symlink_root / "personal").mkdir()
         (symlink_root / ".gitignore").write_text("personal/**\n", encoding="utf-8")
         (symlink_root / "os/INDEX.md").write_text("safe\n", encoding="utf-8")
         (symlink_root / "os/context/CAREER.md").write_text("private-looking filename with sanitized content\n", encoding="utf-8")
+        (symlink_root / "os/agents/current-awareness-agent/JOB.md").write_text(
+            "live agent fixture with sanitized content\n",
+            encoding="utf-8",
+        )
         nested_live_core = symlink_root / "os/context/private-client/NOTES.md"
         nested_live_core.parent.mkdir()
         nested_live_core.write_text("nested high-risk Core file with sanitized content\n", encoding="utf-8")
@@ -1601,11 +1627,7 @@ def run_self_test() -> int:
             check=False,
         )
         symlink_validator = AgentOSValidator(symlink_root)
-        symlink_validator.check_git_publication_source_set()
-        symlink_validator.check_private_overlay_files_are_ignored()
-        symlink_validator.check_personal_overlay_tracking(allow_private_files=True)
-        symlink_validator.check_core_private_markers()
-        symlink_validator.check_secret_like_tokens()
+        symlink_validator.run_publication_precheck_checks()
         symlink_rejected_cleanly = any(
             error.path == "os/linked.md" and "tracked file is a symbolic link" in error.message
             for error in symlink_validator.errors
@@ -1615,6 +1637,11 @@ def run_self_test() -> int:
         )
         live_core_file_rejected = any(
             error.path == "os/context/CAREER.md" and "live personal context file" in error.message
+            for error in symlink_validator.errors
+        )
+        live_agent_path_rejected = any(
+            error.path == "os/agents/current-awareness-agent/JOB.md"
+            and "live personal agents file" in error.message
             for error in symlink_validator.errors
         )
         generated_output_rejected = any(
@@ -1636,6 +1663,17 @@ def run_self_test() -> int:
             and "generated output" in error.message
             for error in symlink_validator.errors
         )
+        default_validator = AgentOSValidator(symlink_root)
+        default_validator.run_structural_checks()
+        default_validator.run_publication_precheck_checks()
+        default_catches_publication_precheck = any(
+            error.path == "os/agents/current-awareness-agent/JOB.md"
+            and "live personal agents file" in error.message
+            for error in default_validator.errors
+        ) and any(
+            error.path == "os/reports/private.md" and "generated output" in error.message
+            for error in default_validator.errors
+        )
 
         matched = (
             all(
@@ -1656,13 +1694,15 @@ def run_self_test() -> int:
             and missing_skeleton_rejected
             and symlink_rejected_cleanly
             and live_core_file_rejected
+            and live_agent_path_rejected
             and generated_output_rejected
             and nested_live_core_rejected
             and core_gitkeep_rejected
             and core_report_gitkeep_rejected
+            and default_catches_publication_precheck
         )
         if matched:
-            print("SELF-TEST PASS: broken path portability, source-map, benchmark, and symlink fixtures were caught.")
+            print("SELF-TEST PASS: structural and publication/privacy fixtures were caught.")
             for error in validator.errors:
                 print(f"EXPECTED {error.format()}")
             for error in symlink_validator.errors:
@@ -1671,7 +1711,7 @@ def run_self_test() -> int:
                 print(f"EXPECTED {error.format()}")
             return 0
 
-        print("SELF-TEST FAIL: expected path portability/source-map/benchmark/symlink fixtures were not caught.")
+        print("SELF-TEST FAIL: expected structural and publication/privacy fixtures were not caught.")
         return 1
 
 
@@ -1692,6 +1732,11 @@ def main(argv: list[str] | None = None) -> int:
         "--publication-precheck",
         action="store_true",
         help="Run publication precheck against the mixed local working tree.",
+    )
+    parser.add_argument(
+        "--structural-only",
+        action="store_true",
+        help="Run only structural AgentOS checks, without publication/privacy precheck checks.",
     )
     parser.add_argument(
         "--public-export",
@@ -1716,6 +1761,8 @@ def main(argv: list[str] | None = None) -> int:
         return validator.run_public_export_validation(export_root)
     if args.publication_precheck:
         return validator.run_publication_precheck()
+    if args.structural_only:
+        return validator.run_structural_only()
 
     return validator.run()
 

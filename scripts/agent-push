@@ -1,0 +1,129 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DRY_RUN=0
+REMOTE="origin"
+BRANCH=""
+
+usage() {
+  cat >&2 <<'USAGE'
+usage: scripts/agent-push [--dry-run] [remote [branch]]
+
+Runs AgentOS validation, scans the HEAD publication tree, optionally scans the
+staged index when staged changes exist, then pushes the current branch by
+default. Force, mirror, all, delete, tag, and raw refspec pushes are refused.
+USAGE
+}
+
+quote_command() {
+  local quoted=()
+  local arg
+  for arg in "$@"; do
+    printf -v arg "%q" "$arg"
+    quoted+=("$arg")
+  done
+  printf "%s\n" "${quoted[*]}"
+}
+
+refuse_dangerous_push_args() {
+  local arg
+  for arg in "$@"; do
+    case "$arg" in
+      -f|--force|--force=*|--force-with-lease|--force-with-lease=*|--force-if-includes|--force-if-includes=*)
+        echo "error: refusing force push argument: $arg" >&2
+        exit 2
+        ;;
+      --mirror|--all|--tags|--follow-tags)
+        echo "error: refusing broad or tag push argument: $arg" >&2
+        exit 2
+        ;;
+      -d|--delete|--delete=*)
+        echo "error: refusing delete push argument: $arg" >&2
+        exit 2
+        ;;
+      +*)
+        echo "error: refusing force refspec: $arg" >&2
+        exit 2
+        ;;
+      :*)
+        echo "error: refusing delete refspec: $arg" >&2
+        exit 2
+        ;;
+      refs/tags/*|tag)
+        echo "error: refusing tag push argument: $arg" >&2
+        exit 2
+        ;;
+    esac
+    if git -C "$ROOT" show-ref --verify --quiet "refs/tags/$arg"; then
+      echo "error: refusing push of local tag name: $arg" >&2
+      exit 2
+    fi
+  done
+}
+
+POSITIONAL=()
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    --dry-run)
+      DRY_RUN=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      POSITIONAL+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ "${#POSITIONAL[@]}" -gt 2 ]]; then
+  usage
+  exit 2
+fi
+POSITIONAL_COUNT="${#POSITIONAL[@]}"
+if [[ "$POSITIONAL_COUNT" -gt 0 ]]; then
+  refuse_dangerous_push_args "${POSITIONAL[@]}"
+fi
+
+CURRENT_BRANCH="$(git -C "$ROOT" symbolic-ref --quiet --short HEAD)" || {
+  echo "error: refusing to push from detached HEAD" >&2
+  exit 2
+}
+
+if [[ "$POSITIONAL_COUNT" -ge 1 ]]; then
+  REMOTE="${POSITIONAL[0]}"
+fi
+if [[ "$POSITIONAL_COUNT" -eq 2 ]]; then
+  BRANCH="${POSITIONAL[1]}"
+else
+  BRANCH="$CURRENT_BRANCH"
+fi
+
+if [[ "$BRANCH" != "$CURRENT_BRANCH" ]]; then
+  echo "error: refusing to push branch '$BRANCH' while current branch is '$CURRENT_BRANCH'" >&2
+  exit 2
+fi
+
+PUSH_ARGS=("$REMOTE" "$BRANCH")
+
+echo "Running AgentOS default validation..."
+python3 "$ROOT/os/verification/scripts/validate_agentos.py"
+
+echo "Scanning HEAD publication tree..."
+"$ROOT/scripts/check_publication_tree_secrets.sh" HEAD
+
+if ! git -C "$ROOT" diff --cached --quiet --; then
+  echo "Scanning staged publication tree..."
+  "$ROOT/scripts/check_staged_publication_secrets.sh"
+fi
+
+if [[ "$DRY_RUN" == "1" ]]; then
+  echo "Dry run: would run $(quote_command git push "${PUSH_ARGS[@]}")"
+  exit 0
+fi
+
+git -C "$ROOT" push "${PUSH_ARGS[@]}"

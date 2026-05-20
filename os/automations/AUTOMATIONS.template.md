@@ -4,6 +4,8 @@ Status: template.
 
 Use this file in a Personal Overlay to record live automations.
 
+Keep live run history, delivery records, queues, and generated outputs in `personal/os/automations/` or the relevant Personal Overlay agent/memory directory. Do not move live automation state into Core `os/automations/`.
+
 ## Active Automations
 
 ### Automation Name
@@ -36,7 +38,7 @@ Inputs:
 
 Output:
 
-- Output artifacts or destinations.
+- Output artifacts or destinations. Prefer `personal/os/...` for local generated artifacts.
 
 Verification:
 

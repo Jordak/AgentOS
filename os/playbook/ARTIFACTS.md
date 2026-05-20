@@ -8,6 +8,8 @@ Use this file to decide the output format for AgentOS artifacts.
 
 Keep the AgentOS control plane in Markdown. Use static HTML as the canonical preferred output for substantial human-facing artifacts.
 
+Generated artifacts default to the Personal Overlay. Reports, briefs, histories, queues, run logs, and substantial generated outputs derived from a real user, private project, connector, account, or live agent belong under `personal/os/` unless the user explicitly asks for a sanitized Core example.
+
 The control plane includes:
 
 - instructions and tool adapters;
@@ -51,6 +53,7 @@ Markdown remains useful as glue around HTML artifacts:
 - Current-awareness briefs: static HTML.
 - Weekly review final reports: static HTML under the appropriate Personal Overlay output directory.
 - Portfolio or project reports: prefer static HTML for substantial durable reports; Markdown is acceptable for quick notes or legacy reports.
+- Core artifact examples: sanitized templates or fixtures only, never live personal reports or run histories.
 
 ## Portability Note
 
