@@ -4,6 +4,8 @@ AgentOS is a portable Markdown control plane for agentic tools. It gives agents 
 
 This public repository contains AgentOS Core: the reusable, public-safe scaffolding. A real local installation may also have a Personal Overlay for private user-specific state.
 
+This project started from the conversation around [aidbagentos.ai](https://aidbagentos.ai/).
+
 ## Core And Overlay
 
 - AgentOS Core lives under `$root/os/`.
