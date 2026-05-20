@@ -20,9 +20,16 @@ Review whether AgentOS state is current, useful, and safely filed.
 
 1. Inspect current Core and Personal Overlay state.
 2. Run relevant local validators.
-3. Identify stale state, missing templates, private-data risks, and useful follow-up work.
-4. Draft a report as a private generated output under `personal/os/memory/weekly-review/`.
-5. Ask the user to approve any durable state changes or external actions.
+3. Run the global-instructions drift check:
+
+   ```bash
+   python3 scripts/install_global_agent_instructions.py --agentos-home <agentos-home> --check
+   ```
+
+   Replace `<agentos-home>` with the resolved path to the current AgentOS checkout. Confirm the canonical `<home>/.agents/AGENTS.md` file and any managed harness adapters still point to the intended AgentOS installation.
+4. Identify stale state, missing templates, private-data risks, and useful follow-up work.
+5. Draft a report as a private generated output under `personal/os/memory/weekly-review/`.
+6. Ask the user to approve any durable state changes or external actions.
 
 ## Safety
 

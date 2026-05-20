@@ -20,6 +20,65 @@ Agents should read `$root/os/` first. Then, when present and relevant, they shou
 
 See `os/playbook/PERSONAL_OVERLAY.md` for the full load and migration rule.
 
+## Quickstart
+
+Install AgentOS wherever you want it to live. Common choices are a folder under the current user's home directory, but AgentOS does not require or assume a default path. In the examples below, replace `<agentos-home>` with the resolved path to your chosen checkout.
+
+Portable path notation:
+
+- macOS/Linux: `<home>/.agents/AGENTS.md`
+- Windows: `<home>\.agents\AGENTS.md`
+
+That file is the canonical global instruction file. Harness-specific instruction files keep their own locations and receive a small managed adapter block that points to the canonical file.
+
+The default adapter targets are:
+
+- Codex: `<home>/.codex/AGENTS.md`
+- Claude Code: `<home>/.claude/CLAUDE.md`
+- Gemini CLI: `<home>/.gemini/GEMINI.md`
+
+By default, the installer updates default adapters only when their harness directory already exists. Use `--all-default-adapters` to create all default adapter files, and repeat `--adapter <path>` for extra harnesses such as OpenClaw, Hermes, Antigravity, or another tool with a known instruction-file path.
+
+### Agent-Assisted Setup
+
+Give this prompt to your agent:
+
+```text
+Install AgentOS for me.
+
+1. Ask me where AgentOS should live. If I do not have a preference, suggest a conventional home-directory path, but do not assume or require one.
+2. Clone https://github.com/Jordak/AgentOS.git into my chosen path.
+3. From that AgentOS checkout, run the installer self-test:
+   python3 scripts/install_global_agent_instructions.py --self-test
+   Confirm the self-test uses temporary directories and does not touch my real home directory.
+4. Run the installer dry-run:
+   python3 scripts/install_global_agent_instructions.py --agentos-home <resolved-agentos-home>
+5. Show me exactly which files would be created, backed up, or changed. Do not run the write command until I explicitly approve.
+6. After I approve, run:
+   python3 scripts/install_global_agent_instructions.py --agentos-home <resolved-agentos-home> --no-dry-run
+7. Run the drift check:
+   python3 scripts/install_global_agent_instructions.py --agentos-home <resolved-agentos-home> --check
+8. Summarize what changed, where backups were written, and whether the check passed.
+```
+
+Use the Python 3 command that works on your machine. On some systems that is `python3`; on others it may be `python` or `py -3`.
+
+### Manual Setup
+
+```bash
+git clone https://github.com/Jordak/AgentOS.git <agentos-home>
+cd <agentos-home>
+python3 scripts/install_global_agent_instructions.py --self-test
+python3 scripts/install_global_agent_instructions.py --agentos-home <agentos-home>
+```
+
+Review the dry-run output. It should tell you which global instruction files would be created, backed up, or changed. Only after you approve those changes, run:
+
+```bash
+python3 scripts/install_global_agent_instructions.py --agentos-home <agentos-home> --no-dry-run
+python3 scripts/install_global_agent_instructions.py --agentos-home <agentos-home> --check
+```
+
 ## How To Start
 
 For an agent or human landing here for the first time:
