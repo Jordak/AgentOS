@@ -1,6 +1,8 @@
 # AgentOS Index
 
-This is the map for AgentOS Core.
+This is the map for AgentOS Core, the public-safe reusable layer under `$root/os/`.
+
+Core files describe templates, policy, routing, verification, and generic examples. They should be usable by a stranger with no private context. Private user-specific state belongs in the optional Personal Overlay under `$root/personal/os/`.
 
 ## Operating Principle
 
@@ -21,7 +23,9 @@ AgentOS is not one giant prompt. Its control plane is a stack of small Markdown 
 
 ## How To Use This Folder
 
-When a task is broad or ambiguous, read `os/RESOLVER.md` after this index, then start with the smallest relevant file. Do not load everything by default.
+Start here after `AGENTS.md`. Read `os/playbook/PERSONAL_OVERLAY.md` before looking for or storing private state. When a task is broad or ambiguous, read `os/RESOLVER.md` after this index, then start with the smallest relevant file. Do not load everything by default.
+
+A public clone may contain only the tracked `personal/` skeleton. That is expected. If matching Personal Overlay files are absent, continue with Core templates and ask the user for missing private facts only when the task requires them.
 
 When updating AgentOS, prefer adding facts to the narrowest file:
 

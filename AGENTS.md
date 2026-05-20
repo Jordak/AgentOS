@@ -1,6 +1,8 @@
 # AgentOS Adapter
 
-This workspace is an AgentOS checkout. Treat it as a portable Markdown control plane that can guide the active agent harness and be reused by other agentic tools.
+This workspace is an AgentOS checkout. Treat it as a portable Markdown control plane for agentic tools.
+
+AgentOS Core is the public-safe, reusable layer under `os/`. The Personal Overlay is ignored local state under `personal/os/` for private identity, context, memory, live automations, live agents, generated reports, histories, queues, and account-specific details.
 
 ## Path Convention
 
@@ -34,6 +36,7 @@ Before answering questions about Codex, ChatGPT, OpenAI APIs, Cursor, Claude Cod
 - Keep global identity and preferences separate from project-specific instructions.
 - Preserve user agency around credentials, account actions, external posts, and write-access connections.
 - When a template asks for personal knowledge that is missing, create a clearly marked placeholder and a short question list.
+- Keep this adapter lean. When adding guidance, link to the narrowest playbook, skill, or layer file unless the instruction applies to nearly every AgentOS task.
 
 ## Publication Safety
 
