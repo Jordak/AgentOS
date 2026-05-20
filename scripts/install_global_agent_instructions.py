@@ -326,7 +326,7 @@ def collect_targets(
     seen: dict[Path, int] = {}
 
     def add_target(target: Target) -> None:
-        key = target.path.resolve()
+        key = absolute_lexical_path(target.path)
         existing_index = seen.get(key)
         if existing_index is None:
             seen[key] = len(targets)
@@ -381,7 +381,7 @@ def resolve_user_path(raw: str, home: Path) -> Path:
         if raw.startswith(prefix):
             rest = raw[len(prefix) :]
             parts = [part for part in re.split(r"[\\/]+", rest) if part]
-            return home.joinpath(*parts)
+            return absolute_lexical_path(home.joinpath(*parts))
     if raw == "~":
         return home
     tilde = "~"
@@ -389,11 +389,15 @@ def resolve_user_path(raw: str, home: Path) -> Path:
         if raw.startswith(prefix):
             rest = raw[len(prefix) :]
             parts = [part for part in re.split(r"[\\/]+", rest) if part]
-            return home.joinpath(*parts)
+            return absolute_lexical_path(home.joinpath(*parts))
     path = Path(os.path.expanduser(raw))
+    return absolute_lexical_path(path)
+
+
+def absolute_lexical_path(path: Path) -> Path:
     if not path.is_absolute():
         path = Path.cwd() / path
-    return path.resolve()
+    return Path(os.path.abspath(os.fspath(path)))
 
 
 def expected_block(target: Target, home: Path, agentos_home: Path) -> str:
@@ -962,6 +966,40 @@ def test_symlink_targets_fail_closed_and_modes_are_preserved() -> None:
         assert_true(code == 1, "symlink ancestor should fail closed")
         assert_true("symlink" in output, "symlink ancestor failure should be explicit")
         assert_true(not (outside / "nested").exists(), "nested directory was created through a symlink ancestor")
+
+        raw_home = root / "raw-home"
+        raw_home.mkdir()
+        raw_outside = root / "raw-outside"
+        raw_outside.mkdir()
+        (raw_home / "adapter-link").symlink_to(raw_outside, target_is_directory=True)
+
+        raw_absolute_adapter = str(raw_home / "adapter-link" / "nested-absolute" / "AGENTS.md")
+        code, output = run_args(
+            ["--agentos-home", str(agentos), "--adapter", raw_absolute_adapter, "--no-dry-run"],
+            raw_home,
+        )
+        assert_true(code == 1, "raw absolute symlink ancestor should fail closed")
+        assert_true("symlink" in output, "raw absolute symlink ancestor failure should be explicit")
+        assert_true(not (raw_outside / "nested-absolute").exists(), "raw absolute adapter wrote through a symlink ancestor")
+
+        previous_cwd = Path.cwd()
+        try:
+            os.chdir(raw_home)
+            code, output = run_args(
+                [
+                    "--agentos-home",
+                    str(agentos),
+                    "--adapter",
+                    "adapter-link/nested-relative/AGENTS.md",
+                    "--no-dry-run",
+                ],
+                raw_home,
+            )
+        finally:
+            os.chdir(previous_cwd)
+        assert_true(code == 1, "raw relative symlink ancestor should fail closed")
+        assert_true("symlink" in output, "raw relative symlink ancestor failure should be explicit")
+        assert_true(not (raw_outside / "nested-relative").exists(), "raw relative adapter wrote through a symlink ancestor")
 
 
 def test_remediation_command_shell_quotes_dynamic_args() -> None:
