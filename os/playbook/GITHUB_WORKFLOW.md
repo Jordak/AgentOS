@@ -53,6 +53,18 @@ scripts/agent-push --force-with-lease origin <feature-branch>
 
 Resolve conflicts during the rebase if prompted. If the rebase becomes unclear, abort it and create a clean branch from `origin/main`, then cherry-pick only the real feature commits.
 
+## Personal Overlay and Worktrees
+
+Git worktrees isolate tracked Core/public edits. They do not isolate or synchronize ignored Personal Overlay state.
+
+When work is routed to `personal/os/`, use `os/playbook/PERSONAL_OVERLAY.md` as the authority. A feature worktree's `personal/os/` directory may contain only the tracked public-safe skeleton. It should not be treated as the live Personal Overlay unless the user explicitly assigned that worktree as a private overlay workspace.
+
+For Personal Overlay reads from a feature worktree, inspect the canonical primary AgentOS checkout's `personal/os/`. For Personal Overlay writes, use the primary checkout only when the task is personal-state work and the agent has clear path ownership.
+
+Personal-only ignored-file edits may happen in the primary checkout even when it is on `main`, because they are not Git commits. If the task also requires a Core/public change, split the work: edit ignored Personal Overlay files in the primary checkout, and make tracked Core changes on a feature branch in an isolated worktree with a pull request.
+
+Do not broad-copy `personal/os/` into feature worktrees, and do not use `git add -f personal/...` unless the user explicitly approves a narrow, public-safe skeleton or template change.
+
 ## Subagent / Feature Branch Delegation
 
 When delegating implementation issues to subagents on feature branches, make worktree isolation explicit, and make issue closure an integration responsibility, not a branch-worker responsibility.
@@ -73,8 +85,11 @@ Standard worker handoff language:
 > or switch another worker's branch. Do not commit directly to `main`. Rebase
 > on `origin/main` instead of merging `main` into your branch. Push with
 > `scripts/agent-push` and comment on the issue with branch, commit,
-> validation, and smoke-trial evidence. Do not close the issue. The integrator
-> will close it after the resolving PR is squash-merged into `main`.
+> validation, and smoke-trial evidence. If you need Personal Overlay state,
+> read it from the canonical primary AgentOS checkout, not from this feature
+> worktree's ignored-file skeleton. Write Personal Overlay files only when
+> explicitly assigned a non-overlapping path. Do not close the issue. The
+> integrator will close it after the resolving PR is squash-merged into `main`.
 
 ## GitHub Issue Closure Discipline
 
