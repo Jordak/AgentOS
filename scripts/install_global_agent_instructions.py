@@ -16,6 +16,7 @@ import argparse
 import io
 import os
 import re
+import shlex
 import shutil
 import sys
 import tempfile
@@ -36,6 +37,7 @@ ADAPTER_END = "<!-- END AgentOS Managed Global Adapter -->"
 class AdapterSpec:
     name: str
     parts: tuple[str, ...]
+    import_style: str = "pointer"
 
     def path_for(self, home: Path) -> Path:
         return home.joinpath(*self.parts)
@@ -46,6 +48,7 @@ class Target:
     name: str
     path: Path
     kind: str
+    import_style: str = "pointer"
     skipped_reason: str | None = None
     error_reason: str | None = None
 
@@ -61,8 +64,8 @@ class Result:
 
 DEFAULT_ADAPTERS = (
     AdapterSpec("codex", (".codex", "AGENTS.md")),
-    AdapterSpec("claude", (".claude", "CLAUDE.md")),
-    AdapterSpec("gemini", (".gemini", "GEMINI.md")),
+    AdapterSpec("claude", (".claude", "CLAUDE.md"), "markdown_import"),
+    AdapterSpec("gemini", (".gemini", "GEMINI.md"), "markdown_import"),
 )
 
 
@@ -207,6 +210,49 @@ def run(args: argparse.Namespace, home: Path, out: TextIO) -> int:
         print("Target planning failed; no files were modified.", file=out)
         return 1
 
+    path_errors = {
+        target.path: path_error
+        for target in targets
+        if not target.skipped_reason
+        for path_error in (validate_target_path(target.path, allow_missing=True),)
+        if path_error
+    }
+    if path_errors:
+        for target in targets:
+            path_error = path_errors.get(target.path)
+            if path_error:
+                results.append(
+                    Result(
+                        ok=False,
+                        status="error",
+                        path=target.path,
+                        message=path_error,
+                    )
+                )
+            elif target.skipped_reason:
+                results.append(
+                    Result(
+                        ok=True,
+                        status="skip",
+                        path=target.path,
+                        message=target.skipped_reason,
+                    )
+                )
+            else:
+                results.append(
+                    Result(
+                        ok=True,
+                        status="not run",
+                        path=target.path,
+                        message="not evaluated because target path preflight failed",
+                    )
+                )
+        for result in results:
+            print(format_result(result), file=out)
+        print("", file=out)
+        print("Target path preflight failed; no files were modified.", file=out)
+        return 1
+
     for target in targets:
         if target.skipped_reason:
             results.append(
@@ -277,22 +323,31 @@ def collect_targets(
     extra_adapters: Iterable[str],
 ) -> list[Target]:
     targets: list[Target] = []
-    seen: dict[Path, Target] = {}
+    seen: dict[Path, int] = {}
 
     def add_target(target: Target) -> None:
         key = target.path.resolve()
-        existing = seen.get(key)
-        if existing is None:
-            seen[key] = target
+        existing_index = seen.get(key)
+        if existing_index is None:
+            seen[key] = len(targets)
             targets.append(target)
             return
+        existing = targets[existing_index]
         if existing.kind == target.kind:
+            if existing.skipped_reason and not target.skipped_reason:
+                targets[existing_index] = Target(
+                    target.name,
+                    target.path,
+                    target.kind,
+                    existing.import_style,
+                )
             return
         targets.append(
             Target(
                 target.name,
                 target.path,
                 target.kind,
+                target.import_style,
                 error_reason=f"target conflicts with {existing.kind} target {existing.path}",
             )
         )
@@ -302,13 +357,14 @@ def collect_targets(
         path = spec.path_for(home)
         parent_exists = path.parent.exists()
         if include_all_default_adapters or parent_exists:
-            add_target(Target(spec.name, path, "adapter"))
+            add_target(Target(spec.name, path, "adapter", spec.import_style))
         else:
             add_target(
                 Target(
                     spec.name,
                     path,
                     "adapter",
+                    spec.import_style,
                     skipped_reason=f"default {spec.name} adapter skipped because {path.parent} does not exist",
                 )
             )
@@ -343,7 +399,7 @@ def resolve_user_path(raw: str, home: Path) -> Path:
 def expected_block(target: Target, home: Path, agentos_home: Path) -> str:
     if target.kind == "global":
         return global_block(agentos_home)
-    return adapter_block(global_instructions_path(home))
+    return adapter_block(global_instructions_path(home), target.import_style)
 
 
 def global_block(agentos_home: Path) -> str:
@@ -372,7 +428,20 @@ Keep global instructions lean. Put detailed project-specific instructions in eac
 """
 
 
-def adapter_block(global_path: Path) -> str:
+def adapter_block(global_path: Path, import_style: str = "pointer") -> str:
+    if import_style == "markdown_import":
+        return f"""{ADAPTER_START}
+AgentOS global instructions are managed at:
+
+@{global_path}
+
+If your harness does not expand Markdown `@path` imports, read this file first:
+
+`{global_path}`
+
+Then continue with the rest of this file.
+{ADAPTER_END}
+"""
     return f"""{ADAPTER_START}
 AgentOS global instructions are managed at:
 
@@ -384,10 +453,11 @@ Read that file first, then continue with the rest of this file.
 
 
 def check_target(target: Target, home: Path, agentos_home: Path) -> Result:
+    path_error = validate_target_path(target.path, allow_missing=True)
+    if path_error:
+        return Result(False, "error", target.path, path_error)
     if not target.path.exists():
         return Result(False, "missing", target.path, "file is missing")
-    if target.path.is_dir():
-        return Result(False, "error", target.path, "path is a directory, expected a file")
     text = read_text_preserve_newlines(target.path)
     start, end = markers_for(target.kind)
     found = find_block(text, start, end)
@@ -407,8 +477,9 @@ def install_target(
     dry_run: bool,
     timestamp: str,
 ) -> Result:
-    if target.path.exists() and target.path.is_dir():
-        return Result(False, "error", target.path, "path is a directory, expected a file")
+    path_error = validate_target_path(target.path, allow_missing=True)
+    if path_error:
+        return Result(False, "error", target.path, path_error)
 
     original = read_optional(target.path)
     block = expected_block(target, home, agentos_home)
@@ -428,17 +499,19 @@ def install_target(
     if dry_run:
         return Result(True, "would update", target.path, "managed block would be inserted or replaced", backup)
 
+    mode = target.path.stat().st_mode & 0o7777
     target.path.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(target.path, backup)
-    write_text_atomic(target.path, desired)
+    write_text_atomic(target.path, desired, mode=mode)
     return Result(True, "updated", target.path, "managed block inserted or replaced", backup)
 
 
 def remove_target(target: Target, dry_run: bool, timestamp: str) -> Result:
+    path_error = validate_target_path(target.path, allow_missing=True)
+    if path_error:
+        return Result(False, "error", target.path, path_error)
     if not target.path.exists():
         return Result(True, "skip", target.path, "file is missing")
-    if target.path.is_dir():
-        return Result(False, "error", target.path, "path is a directory, expected a file")
     original = read_text_preserve_newlines(target.path)
     desired = remove_block(original, *markers_for(target.kind))
     if desired == original:
@@ -448,16 +521,42 @@ def remove_target(target: Target, dry_run: bool, timestamp: str) -> Result:
     if dry_run:
         return Result(True, "would update", target.path, "managed block would be removed", backup)
 
+    mode = target.path.stat().st_mode & 0o7777
     shutil.copy2(target.path, backup)
-    write_text_atomic(target.path, desired)
+    write_text_atomic(target.path, desired, mode=mode)
     return Result(True, "updated", target.path, "managed block removed", backup)
 
 
-def write_text_atomic(path: Path, text: str) -> None:
+def validate_target_path(path: Path, allow_missing: bool) -> str | None:
+    if path.is_symlink():
+        return "path is a symlink; refusing to modify managed instruction files through links"
+    if path.exists():
+        if path.is_dir():
+            return "path is a directory, expected a file"
+        if not path.is_file():
+            return "path is not a regular file"
+    elif not allow_missing:
+        return "file is missing"
+
+    parent = path.parent
+    if parent.exists():
+        if parent.is_symlink():
+            return "parent directory is a symlink; refusing to modify managed instruction files through links"
+        if not parent.is_dir():
+            return "parent path is not a directory"
+    return None
+
+
+def write_text_atomic(path: Path, text: str, mode: int | None = None) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=str(path.parent))
     tmp_path = Path(tmp_name)
     try:
+        if mode is not None:
+            if hasattr(os, "fchmod"):
+                os.fchmod(fd, mode)
+            else:
+                os.chmod(tmp_path, mode)
         with os.fdopen(fd, "w", encoding="utf-8", newline="") as handle:
             handle.write(text)
         os.replace(tmp_path, path)
@@ -571,20 +670,14 @@ def remediation_command(args: argparse.Namespace, agentos_home: Path) -> str:
         "python3",
         "scripts/install_global_agent_instructions.py",
         "--agentos-home",
-        quote_arg(str(agentos_home)),
+        str(agentos_home),
         "--no-dry-run",
     ]
     if args.all_default_adapters:
         command.append("--all-default-adapters")
     for adapter in args.adapter:
-        command.extend(["--adapter", quote_arg(adapter)])
-    return " ".join(command)
-
-
-def quote_arg(value: str) -> str:
-    if re.search(r"\s", value):
-        return '"' + value.replace('"', '\\"') + '"'
-    return value
+        command.extend(["--adapter", adapter])
+    return shlex.join(command)
 
 
 def run_args(args: list[str], home: Path) -> tuple[int, str]:
@@ -619,7 +712,10 @@ def run_self_tests() -> int:
         test_check_pass_and_fail,
         test_remove_preserves_unmanaged_content,
         test_all_default_adapters_and_explicit_adapter,
+        test_explicit_default_adapter_overrides_skipped_default,
         test_crlf_paths_with_spaces_and_duplicate_blocks,
+        test_symlink_targets_fail_closed_and_modes_are_preserved,
+        test_remediation_command_shell_quotes_dynamic_args,
         test_duplicate_adapter_dedupes_and_conflicting_adapter_fails,
         test_tilde_windows_and_relative_adapter_paths,
         test_mode_conflicts,
@@ -764,6 +860,35 @@ def test_all_default_adapters_and_explicit_adapter() -> None:
         ):
             assert_true(path.exists(), f"expected adapter file missing: {path}")
             assert_true(ADAPTER_START in read_text_preserve_newlines(path), f"adapter block missing: {path}")
+        resolved_global = global_instructions_path(home.resolve())
+        claude_text = read_text_preserve_newlines(home / ".claude" / "CLAUDE.md")
+        gemini_text = read_text_preserve_newlines(home / ".gemini" / "GEMINI.md")
+        openclaw_text = read_text_preserve_newlines(home / ".openclaw" / "AGENTS.md")
+        assert_true(f"@{resolved_global}" in claude_text, "Claude adapter import missing")
+        assert_true(f"@{resolved_global}" in gemini_text, "Gemini adapter import missing")
+        assert_true(f"@{resolved_global}" not in openclaw_text, "unknown adapter should not assume import support")
+
+
+def test_explicit_default_adapter_overrides_skipped_default() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-global-installer-") as tmp:
+        root = Path(tmp)
+        home = root / "home"
+        home.mkdir()
+        agentos = make_fake_agentos(root)
+        code, output = run_args(
+            [
+                "--agentos-home",
+                str(agentos),
+                "--adapter",
+                "<home>/.claude/CLAUDE.md",
+                "--no-dry-run",
+            ],
+            home,
+        )
+        assert_true(code == 0, output)
+        claude = home / ".claude" / "CLAUDE.md"
+        assert_true(claude.exists(), "explicit default-path adapter was skipped")
+        assert_true(f"@{global_instructions_path(home.resolve())}" in read_text_preserve_newlines(claude), "known default import style was lost")
 
 
 def test_crlf_paths_with_spaces_and_duplicate_blocks() -> None:
@@ -785,6 +910,54 @@ def test_crlf_paths_with_spaces_and_duplicate_blocks() -> None:
         code, output = run_args(["--agentos-home", str(agentos), "--check"], home)
         assert_true(code == 1, "duplicate blocks should fail check")
         assert_true("duplicated" in output, "duplicate block failure should be explicit")
+
+
+def test_symlink_targets_fail_closed_and_modes_are_preserved() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-global-installer-") as tmp:
+        root = Path(tmp)
+        home = root / "home"
+        home.mkdir()
+        (home / ".codex").mkdir()
+        codex = home / ".codex" / "AGENTS.md"
+        codex.write_text("Existing Codex guidance.\n", encoding="utf-8")
+        os.chmod(codex, 0o644)
+        agentos = make_fake_agentos(root)
+        code, output = run_args(["--agentos-home", str(agentos), "--no-dry-run"], home)
+        assert_true(code == 0, output)
+        mode = codex.stat().st_mode & 0o777
+        assert_true(mode == 0o644, f"existing file mode changed to {oct(mode)}")
+
+        link_home = root / "link-home"
+        link_home.mkdir()
+        (link_home / ".codex").mkdir()
+        real_target = root / "real-AGENTS.md"
+        real_target.write_text("Real target.\n", encoding="utf-8")
+        symlink = link_home / ".codex" / "AGENTS.md"
+        try:
+            symlink.symlink_to(real_target)
+        except OSError:
+            return
+        code, output = run_args(["--agentos-home", str(agentos), "--no-dry-run"], link_home)
+        assert_true(code == 1, "symlink target should fail closed")
+        assert_true("symlink" in output, "symlink failure should be explicit")
+        assert_true(not global_instructions_path(link_home).exists(), "preflight failure should not create global file")
+        assert_true(symlink.is_symlink(), "symlink was replaced")
+        assert_true(read_text_preserve_newlines(real_target) == "Real target.\n", "symlink target was modified")
+
+
+def test_remediation_command_shell_quotes_dynamic_args() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-global-installer-") as tmp:
+        root = Path(tmp)
+        home = root / "home"
+        home.mkdir()
+        agentos = make_fake_agentos(root, "AgentOS;dollar$paren()tick`")
+        adapter = "<home>/.openclaw/AGENTS.md"
+        code, output = run_args(["--agentos-home", str(agentos), "--check", "--adapter", adapter], home)
+        assert_true(code == 1, "check should report missing managed files")
+        command_line = output.strip().splitlines()[-1]
+        parsed = shlex.split(command_line)
+        assert_true(str(agentos.resolve()) in parsed, "quoted AgentOS path did not round-trip")
+        assert_true(adapter in parsed, "quoted adapter path did not round-trip")
 
 
 def test_duplicate_adapter_dedupes_and_conflicting_adapter_fails() -> None:
