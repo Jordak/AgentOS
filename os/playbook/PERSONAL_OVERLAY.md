@@ -1,0 +1,259 @@
+# Personal Overlay
+
+Status: publishing architecture v1.
+
+AgentOS separates publishable scaffolding from private user-specific state with two mirrored roots:
+
+- AgentOS Core root: `$root/os/`
+- Personal Overlay root: `$root/personal/os/`
+
+`$root` means the AgentOS repository root.
+
+## Load Rule
+
+Read AgentOS Core first. Then read matching files under the Personal Overlay when present.
+
+If both roots contain guidance for the same topic, the Personal Overlay may add private detail or override user-specific facts. It should not silently replace Core behavior unless the personal file says that it does.
+
+## Directory Shape
+
+AgentOS Core and the Personal Overlay use the same layer names:
+
+- `identity/`
+- `context/`
+- `memory/`
+- `connections/`
+- `agents/`
+- `skills/`
+- `verification/`
+- `playbook/`
+- `automations/`
+
+The tracked `personal/` tree keeps empty `.gitkeep` files so the public-safe directory shape is visible. Ordinary files under `personal/` are ignored by git.
+
+Do not track `.gitkeep` files in private-specific subdirectories when the directory name itself reveals personal state, project names, account names, live agent names, or private workflow names. Keep only generic skeleton paths in Core; private-specific overlay paths can exist locally while remaining fully ignored.
+
+AgentOS Core defines no remote versioning policy for Personal Overlay files in v1. Treat the Personal Overlay as local ignored state unless the user makes a separate private-backup decision with its own threat model.
+
+## Core Files
+
+Use a normal Markdown filename when a Core file is safe and useful as-is for any user.
+
+Use `.template.md` when the file needs personal facts before it becomes real user state.
+
+Examples:
+
+- `$root/os/playbook/PORTABILITY.md` can be a Core Default.
+- `$root/os/identity/USER.template.md` can describe the shape of a personal identity file.
+- `$root/personal/os/identity/USER.md` can hold the private live identity file.
+
+## Generated Outputs
+
+Generated outputs derived from a real person's private data, project state, memory, interests, accounts, or work context belong in the Personal Overlay by default.
+
+This includes reports, briefs, histories, run logs, weekly reviews, scout outputs, inbox/calendar summaries, resume/career outputs, and agent-owned generated artifacts.
+
+AgentOS Core may contain sanitized example outputs or templates that demonstrate shape, but not generated artifacts based on real private state.
+
+Examples:
+
+- `$root/personal/os/agents/assistant-agent/reports/YYYY-MM-DD.html`
+- `$root/personal/os/agents/current-awareness-agent/briefs/YYYY-MM-DD.html`
+- `$root/personal/os/memory/weekly-review/YYYY-MM-DD.html`
+- `$root/os/agents/example-agent/reports/example.html`
+
+## Agent Instances
+
+Named live agents configured around a real person's interests, routines, connected-account assumptions, private output paths, or personal project state belong in the Personal Overlay by default.
+
+AgentOS Core may contain agent templates, contracts, and sanitized examples that demonstrate the structure of a durable role.
+
+Examples:
+
+- `$root/personal/os/agents/current-awareness-agent/`
+- `$root/personal/os/agents/project-scout-agent/`
+- `$root/personal/os/agents/assistant-agent/`
+- `$root/personal/os/agents/learning-companion-agent/`
+- `$root/os/agents/AGENT_TEMPLATE.md`
+- `$root/os/agents/example-agent/`
+
+## Skills
+
+Reusable skill procedures, safety contracts, and verification workflows may live in AgentOS Core when they are useful without private user-specific state.
+
+Private live inputs for those skills belong in Personal Overlay skill config files.
+
+Personal Overlay skill config may include local paths, account IDs, artifact roots, user-specific defaults, private examples, and current-machine adapter locations.
+
+Core skills that support private configuration should name the optional config path they read, usually:
+
+`$root/personal/os/skills/<skill-name>/CONFIG.md`
+
+Personal Overlay config is Markdown-first. Use clear labels and fenced or inline code for paths and identifiers so agents can read it naturally.
+
+Add a structured sidecar such as `CONFIG.json` or `CONFIG.yaml` only when scripts or validators need deterministic parsing.
+
+Skills that are thin adapters to live private agents or workflows centered on private artifacts belong in the Personal Overlay by default.
+
+Examples:
+
+- `$root/os/skills/research-brief/SKILL.md`
+- `$root/os/skills/audit-skill-mirrors/SKILL.md`
+- `$root/personal/os/skills/audit-skill-mirrors/CONFIG.md`
+- `$root/personal/os/skills/current-awareness-agent/SKILL.md`
+- `$root/personal/os/skills/private-document-maintenance/SKILL.md`
+
+## Context
+
+Live context files usually describe a real person's projects, career, source map, tools, interests, work boundaries, and account-specific constraints. These belong in the Personal Overlay by default.
+
+AgentOS Core may keep context structure, templates, public-safe examples, and generic AgentOS glossary terms.
+
+Sensitive-boundary patterns belong in Core as templates. The live boundary itself belongs in the Personal Overlay.
+
+Examples:
+
+- `$root/os/context/README.md`
+- `$root/os/context/SOURCE_MAP.template.md`
+- `$root/os/context/PROJECTS.template.md`
+- `$root/os/context/TOOLS.template.md`
+- `$root/os/context/WORK_FIREWALL.template.md`
+- `$root/personal/os/context/SOURCE_MAP.md`
+- `$root/personal/os/context/CAREER.md`
+- `$root/personal/os/context/CV.md`
+- `$root/personal/os/context/INTERESTS.md`
+- `$root/personal/os/context/PROJECTS.md`
+- `$root/personal/os/context/WORK.md`
+- `$root/personal/os/context/TOOLS.md`
+- `$root/personal/os/context/WORK_FIREWALL.md`
+
+## Identity
+
+Live identity files describe a real person, their preferences, boundaries, communication style, and unanswered personal questions. These belong in the Personal Overlay by default.
+
+AgentOS Core may keep identity templates and public-safe collaboration guidance that explain what to capture without containing a real person's private details.
+
+Examples:
+
+- `$root/os/identity/README.md`
+- `$root/os/identity/USER.template.md`
+- `$root/os/identity/COMMUNICATION.template.md`
+- `$root/os/identity/BOUNDARIES.template.md`
+- `$root/os/identity/QUESTIONS.template.md`
+- `$root/personal/os/identity/USER.md`
+- `$root/personal/os/identity/COMMUNICATION.md`
+- `$root/personal/os/identity/BOUNDARIES.md`
+- `$root/personal/os/identity/QUESTIONS.md`
+
+## Memory
+
+Live memory files record what changed, what was decided, what should persist, and what needs to be remembered across future runs for a real person or private AgentOS instance. These belong in the Personal Overlay by default.
+
+AgentOS Core may keep memory mechanics, templates, propagation rules, compaction guidance, and Core architecture ADRs.
+
+Decisions about AgentOS Core architecture may live in Core docs or ADRs. Decisions about a real person's personal state, projects, preferences, automations, or private migration history belong in the Personal Overlay.
+
+Examples:
+
+- `$root/os/memory/README.md`
+- `$root/os/memory/COMPACTION_RULES.md`
+- `$root/os/memory/WORKING_MEMORY.template.md`
+- `$root/os/memory/LONG_TERM_MEMORY.template.md`
+- `$root/os/memory/DECISIONS_LOG.template.md`
+- `$root/os/memory/compiled-truth/TEMPLATE.md`
+- `$root/os/memory/propagation-review/QUEUE.template.md`
+- `$root/personal/os/memory/WORKING_MEMORY.md`
+- `$root/personal/os/memory/LONG_TERM_MEMORY.md`
+- `$root/personal/os/memory/DECISIONS_LOG.md`
+- `$root/personal/os/memory/compiled-truth/*.md`
+- `$root/personal/os/memory/propagation-review/QUEUE.md`
+- `$root/personal/os/memory/weekly-review/*.html`
+
+## Connections
+
+Live connection files describe real accounts, connectors, calendars, repositories, permissions, and account-specific safety constraints. These belong in the Personal Overlay by default.
+
+AgentOS Core may keep connection schemas, safety categories, and generic approval patterns.
+
+Core can say to ask before sends, posts, deletes, permission changes, credential handling, MFA, purchases, external writes, and other external consequences. The Personal Overlay says which real accounts and connectors exist and what their account-specific constraints are.
+
+Examples:
+
+- `$root/os/connections/CONNECTIONS.template.md`
+- `$root/os/connections/SAFETY_RULES.md`
+- `$root/personal/os/connections/CONNECTIONS.md`
+- `$root/personal/os/connections/GMAIL.md`
+- `$root/personal/os/connections/GOOGLE_CALENDAR.md`
+- `$root/personal/os/connections/GITHUB.md`
+
+## Automations
+
+Live automation files describe real schedules, prompts, destinations, accounts, delivery paths, activation state, and current runtime choices. These belong in the Personal Overlay by default.
+
+AgentOS Core may keep automation schemas, safety policy, reusable activation standards, and sanitized examples.
+
+Even when an automation pattern is reusable, the live schedule, destination, account, delivery path, and activation state are personal.
+
+Examples:
+
+- `$root/os/automations/AUTOMATIONS.md`
+- `$root/os/automations/AUTOMATIONS.template.md`
+- `$root/personal/os/automations/AUTOMATIONS.md`
+- `$root/personal/os/automations/weekly-agentos-review.md`
+- `$root/personal/os/automations/current-awareness-email-brief.md`
+
+## Verification
+
+Reusable validators, schemas, sanitized fixtures, and sanitized example reports may live in AgentOS Core.
+
+Live verification reports and benchmark results belong in the Personal Overlay by default when they reflect a real private AgentOS instance, private project state, local paths, account availability, or harness-specific run evidence.
+
+Fixtures are Core-safe only when they contain no private facts, local paths, private reports, private project state, or user-specific expectations.
+
+Examples:
+
+- `$root/os/verification/scripts/validate_agentos.py`
+- `$root/os/verification/retrieval/fixtures.json`
+- `$root/os/verification/retrieval/questions.json`
+- `$root/os/verification/playbook-activation/fixtures.json`
+- `$root/os/verification/*/README.md`
+- `$root/personal/os/verification/retrieval/reports/`
+- `$root/personal/os/verification/playbook-activation/reports/`
+- `$root/personal/os/verification/markdown-audit/`
+
+## Root Adapters
+
+Root adapter files such as `AGENTS.md` and `CLAUDE.md` may live in AgentOS Core when they are generic launchers into the Core and optional Personal Overlay.
+
+Core adapters must not contain private identity, private absolute paths, private repository URLs, installed mirror paths, account identifiers, or local machine setup state.
+
+Local adapter install state belongs in the Personal Overlay.
+
+Core adapter pattern:
+
+```md
+Read `$root/os/INDEX.md`.
+If `$root/personal/os/` exists, apply `os/playbook/PERSONAL_OVERLAY.md`.
+```
+
+Examples:
+
+- `$root/AGENTS.md`
+- `$root/CLAUDE.md`
+- `$root/personal/os/playbook/LOCAL_ADAPTERS.md`
+- `$root/personal/os/context/SOURCE_MAP.md`
+- `$root/personal/os/skills/<skill-name>/CONFIG.md`
+
+## Migration Rule
+
+Migrate private files atomically:
+
+1. Move the private live file to the matching path under `$root/personal/os/`.
+2. Add or preserve the Core Default or `.template.md` file under `$root/os/`.
+3. Update references or loader documentation if the file path changed.
+
+Do not leave duplicate private live files in both roots as a long-lived state.
+
+Move private files mostly as-is into the Personal Overlay first. Sanitize or rewrite the Core replacement separately.
+
+Do not mix private-content cleanup with the move unless the cleanup is required to preserve the file's meaning after relocation.

@@ -1,0 +1,17 @@
+title = "AgentOS Gitleaks configuration"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Ignore local private overlay and generated dependency/build folders in working-tree scans."
+paths = [
+  '''^personal/''',
+  '''^output/''',
+  '''^node_modules/''',
+  '''^\.venv/''',
+  '''^venv/''',
+  '''^__pycache__/''',
+  '''^dist/''',
+  '''^build/''',
+]

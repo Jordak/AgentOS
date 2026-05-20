@@ -1,0 +1,4 @@
+title = "AgentOS publication candidate Gitleaks configuration"
+
+[extend]
+useDefault = true

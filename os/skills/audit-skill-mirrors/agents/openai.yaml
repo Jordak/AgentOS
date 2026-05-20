@@ -1,0 +1,4 @@
+interface:
+  display_name: "Audit Skill Mirrors"
+  short_description: "Check and sync current-machine mirrors for AgentOS skills."
+  default_prompt: "Audit AgentOS skills and make sure each canonical skill has a current-machine mirror."

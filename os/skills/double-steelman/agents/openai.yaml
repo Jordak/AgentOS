@@ -1,0 +1,4 @@
+interface:
+  display_name: "Double Steelman"
+  short_description: "Argue every side at its strongest"
+  default_prompt: "Use $double-steelman to help the user decide between two options by arguing each side at its strongest."

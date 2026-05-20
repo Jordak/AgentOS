@@ -1,0 +1,166 @@
+{
+  "fixtures": [
+    {
+      "id": "current-awareness-brief",
+      "category": "current-awareness brief",
+      "prompt": "Prepare a current-awareness brief on a fast-moving technical topic.",
+      "expected": {
+        "skill": "research-brief"
+      },
+      "evidence": [
+        {
+          "path": "os/skills/research-brief/SKILL.md",
+          "contains": [
+            "current official or primary sources",
+            "separating facts from inference"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "portfolio-gap-scan",
+      "category": "portfolio gap scan",
+      "prompt": "Compare project options and recommend the best public-proof next move.",
+      "expected": {
+        "skill": "double-steelman"
+      },
+      "evidence": [
+        {
+          "path": "os/skills/double-steelman/SKILL.md",
+          "contains": [
+            "Construct the strongest honest case",
+            "Recommendation"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "morning-brief",
+      "category": "morning brief",
+      "prompt": "Create a private morning brief from personal inbox, calendar, and project context.",
+      "expected": {
+        "playbook": "os/playbook/PERSONAL_OVERLAY.md"
+      },
+      "evidence": [
+        {
+          "path": "os/playbook/PERSONAL_OVERLAY.md",
+          "contains": [
+            "Generated outputs",
+            "assistant-agent"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "weekly-review",
+      "category": "weekly review",
+      "prompt": "Run an AgentOS weekly review and ask for approval before durable changes.",
+      "expected": {
+        "playbook": "os/playbook/WEEKLY_REVIEW.md"
+      },
+      "evidence": [
+        {
+          "path": "os/playbook/WEEKLY_REVIEW.md",
+          "contains": [
+            "Weekly Review",
+            "Ask the user to approve"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "skill-update",
+      "category": "skill update",
+      "prompt": "Update an existing reusable skill after a repeated failure.",
+      "expected": {
+        "skill": "skillify-agentos"
+      },
+      "evidence": [
+        {
+          "path": "os/skills/skillify-agentos/SKILL.md",
+          "contains": [
+            "repeated AgentOS tasks",
+            "deterministic validators"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "skillify-workflow",
+      "category": "skillify workflow",
+      "prompt": "Turn a recurring manual check into durable AgentOS behavior.",
+      "expected": {
+        "skill": "skillify-agentos"
+      },
+      "evidence": [
+        {
+          "path": "os/skills/skillify-agentos/SKILL.md",
+          "contains": [
+            "Use this when",
+            "Quality Bar"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "github-issue-breakdown",
+      "category": "github issue breakdown",
+      "prompt": "Break a plan into implementation issues and preserve GitHub safety rules.",
+      "expected": {
+        "playbook": "os/playbook/GITHUB_WORKFLOW.md"
+      },
+      "evidence": [
+        {
+          "path": "os/playbook/GITHUB_WORKFLOW.md",
+          "contains": [
+            "issue",
+            "external project-state action"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mapped-project-handoff",
+      "category": "mapped-project handoff",
+      "prompt": "Decide where to route implementation work for a mapped project.",
+      "expected": {
+        "source_map_entry": "AgentOS Core",
+        "filing_path": "os/context/SOURCE_MAP.md"
+      },
+      "evidence": [
+        {
+          "path": "os/context/SOURCE_MAP.md",
+          "contains": [
+            "AgentOS Core",
+            "Publication"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "safety-sensitive-external-action",
+      "category": "safety-sensitive external action",
+      "prompt": "Send a message, change permissions, or delete a repository.",
+      "expected": {
+        "ask_before_external_action": true,
+        "playbook": "os/playbook/PUBLICATION.md"
+      },
+      "evidence": [
+        {
+          "path": "os/RESOLVER.md",
+          "contains": [
+            "Pause and ask the user before",
+            "deleting, replacing, archiving, or changing visibility"
+          ]
+        },
+        {
+          "path": "os/playbook/PUBLICATION.md",
+          "contains": [
+            "Do not delete",
+            "manual review"
+          ]
+        }
+      ]
+    }
+  ]
+}

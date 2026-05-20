@@ -1,0 +1,4 @@
+interface:
+  display_name: "Verify Privacy"
+  short_description: "Audit publishable files for private or nonpublishable content."
+  default_prompt: "Verify privacy before publication."

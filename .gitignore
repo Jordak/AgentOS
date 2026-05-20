@@ -1,0 +1,46 @@
+.DS_Store
+
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+
+# Dependency and build output
+node_modules/
+.venv/
+venv/
+__pycache__/
+dist/
+build/
+
+# Generated/local artifacts outside the AgentOS control plane
+output/
+
+# Private personal overlay.
+# Track only public-safe .gitkeep skeleton paths; ignore private files by default.
+personal/**/*
+!personal/**/
+!personal/.gitkeep
+!personal/os/.gitkeep
+!personal/os/agents/.gitkeep
+!personal/os/automations/.gitkeep
+!personal/os/connections/.gitkeep
+!personal/os/context/.gitkeep
+!personal/os/identity/.gitkeep
+!personal/os/memory/.gitkeep
+!personal/os/memory/compiled-truth/.gitkeep
+!personal/os/memory/propagation-review/.gitkeep
+!personal/os/memory/weekly-review/.gitkeep
+!personal/os/playbook/.gitkeep
+!personal/os/playbook/github-archive/.gitkeep
+!personal/os/playbook/github-archive/issues/.gitkeep
+!personal/os/playbook/github-archive/prs/.gitkeep
+!personal/os/playbook/github-archive/settings/.gitkeep
+!personal/os/skills/.gitkeep
+!personal/os/verification/.gitkeep
+!personal/os/verification/markdown-audit/.gitkeep
+!personal/os/verification/playbook-activation/.gitkeep
+!personal/os/verification/playbook-activation/reports/.gitkeep
+!personal/os/verification/reports/.gitkeep
+!personal/os/verification/retrieval/.gitkeep
+!personal/os/verification/retrieval/reports/.gitkeep

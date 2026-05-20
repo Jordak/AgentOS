@@ -1,0 +1,4 @@
+interface:
+  display_name: "Audit Issues"
+  short_description: "Audit issue tracker state and update issues with evidence."
+  default_prompt: "Audit this project issue tracker, identify stale or implemented issues, and draft or perform evidence-backed tracker updates."

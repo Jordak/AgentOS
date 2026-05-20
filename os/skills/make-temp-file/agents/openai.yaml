@@ -1,0 +1,4 @@
+interface:
+  display_name: "Make Temp File"
+  short_description: "Create temp files with prefix and extension"
+  default_prompt: "Use $make-temp-file to make a temp file for JSON output."
