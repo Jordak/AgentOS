@@ -10,6 +10,42 @@ permissions:
   contents: read
 
 jobs:
+  branch-hygiene:
+    name: Check PR branch hygiene
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out PR head
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Reject merge commits in PR branch
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          git fetch --no-tags --prune origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+          merge_commits="$(git rev-list --merges --oneline "origin/${BASE_REF}..HEAD")"
+          if [ -n "$merge_commits" ]; then
+            echo "::error title=Merge commits found in PR branch::Rebase this branch onto origin/${BASE_REF}; do not merge ${BASE_REF} into the PR branch."
+            echo
+            echo "Merge commits found:"
+            echo "$merge_commits"
+            printf '%s\n' \
+              "" \
+              "Remediation:" \
+              "  git switch <feature-branch>" \
+              "  git branch backup/<feature-branch>-before-rebase" \
+              "  git fetch origin" \
+              "  git rebase origin/${BASE_REF}" \
+              "  # resolve conflicts if prompted, then run:" \
+              "  python3 os/verification/scripts/validate_agentos.py" \
+              "  scripts/agent-push --force-with-lease origin <feature-branch>"
+            exit 1
+          fi
+
   validate:
     name: Validate public boundary
     runs-on: ubuntu-latest

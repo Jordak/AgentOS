@@ -1,6 +1,6 @@
 # GitHub Workflow
 
-Status: operational policy v1.
+Status: operational policy v2.
 
 Use this file when drafting GitHub issues, PRDs, pull request descriptions, branch handoffs, merge/landing notes, or issue closure comments.
 
@@ -32,16 +32,33 @@ This convention helps future agents understand not only what to build, but why t
 
 When implementation work is meant to land in a repository, the durable artifact is integrated code, not a local commit or unmerged branch.
 
-- If the work is on a pushed feature branch and is meant to land, either open a pull request or explicitly merge the branch yourself when the workflow and permissions allow it.
-- Do not leave the branch as the final artifact unless the user asked only for a branch.
+- Treat `main` as protected. Do not commit or push AgentOS Core/public changes directly to `main`.
+- Make Core/public changes on a feature branch in an isolated worktree, open a pull request, wait for required validators, and squash merge the PR through GitHub.
+- Use the harness-provided worktree when one exists. Otherwise create an external Git worktree under `$CODEX_HOME/worktrees/`, not inside the AgentOS repository.
+- If the work is on a pushed feature branch and is meant to land, open a pull request. Do not treat a pushed branch as the final artifact unless the user explicitly asked only for a branch.
 - When updating a feature branch with newer integration-branch changes, prefer rebasing the feature branch onto `main` and force-pushing with lease when the branch is yours to rewrite.
-- Do not merge `main` into a feature branch unless the user or the repository workflow explicitly asks for merge commits.
+- Do not merge `main` into a feature branch. The PR branch hygiene check rejects merge commits in PR branches.
+- Use `scripts/agent-push` for feature-branch pushes. Use `scripts/agent-push --force-with-lease` only after rebasing the current non-main branch.
+
+If `main` was accidentally merged into a feature branch, recover by backing up and rebasing:
+
+```bash
+git switch <feature-branch>
+git branch backup/<feature-branch>-before-rebase
+git fetch origin
+git rebase origin/main
+python3 os/verification/scripts/validate_agentos.py
+scripts/agent-push --force-with-lease origin <feature-branch>
+```
+
+Resolve conflicts during the rebase if prompted. If the rebase becomes unclear, abort it and create a clean branch from `origin/main`, then cherry-pick only the real feature commits.
 
 ## Subagent / Feature Branch Delegation
 
 When delegating implementation issues to subagents on feature branches, make worktree isolation explicit, and make issue closure an integration responsibility, not a branch-worker responsibility.
 
 - Give each subagent its own isolated worktree and feature branch. Prefer `git worktree` checkouts rooted from the current integration branch.
+- Preserve Codex-managed worktrees when Codex creates them; for manual AgentOS worktrees, use `$CODEX_HOME/worktrees/`.
 - Do not have multiple subagents share the same checkout, working tree, index, or feature branch.
 - Record each worker's worktree path, branch name, assigned issue, and owned files or responsibility before starting parallel work.
 - Before integrating results, inspect the worktree list and each worker branch status to confirm workers did not step on each other's branches or local changes.
@@ -53,10 +70,11 @@ When delegating implementation issues to subagents on feature branches, make wor
 Standard worker handoff language:
 
 > Work only in your assigned isolated worktree and feature branch. Do not reuse
-> or switch another worker's branch. Push your feature branch and comment on the
-> issue with branch, commit, validation, and smoke-trial evidence. Do not close
-> the issue. The integrator will close it after the resolving commit lands on
-> `main`.
+> or switch another worker's branch. Do not commit directly to `main`. Rebase
+> on `origin/main` instead of merging `main` into your branch. Push with
+> `scripts/agent-push` and comment on the issue with branch, commit,
+> validation, and smoke-trial evidence. Do not close the issue. The integrator
+> will close it after the resolving PR is squash-merged into `main`.
 
 ## GitHub Issue Closure Discipline
 

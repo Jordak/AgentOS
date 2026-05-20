@@ -9,7 +9,8 @@ usage() {
 usage: scripts/install_agentos_hooks.sh [--force]
 
 Symlinks scripts/hooks/pre-commit and scripts/hooks/pre-push into the Git hooks
-directory. Existing non-AgentOS hooks are left untouched unless --force is used.
+directory. The hooks resolve the active worktree at runtime. Existing
+non-AgentOS hooks are left untouched unless --force is used.
 USAGE
 }
 
