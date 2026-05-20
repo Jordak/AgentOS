@@ -38,8 +38,13 @@ class AdapterSpec:
     name: str
     parts: tuple[str, ...]
     import_style: str = "pointer"
+    override_parts: tuple[str, ...] | None = None
 
     def path_for(self, home: Path) -> Path:
+        if self.override_parts:
+            override = home.joinpath(*self.override_parts)
+            if override.is_file() and override.stat().st_size > 0:
+                return override
         return home.joinpath(*self.parts)
 
 
@@ -63,7 +68,7 @@ class Result:
 
 
 DEFAULT_ADAPTERS = (
-    AdapterSpec("codex", (".codex", "AGENTS.md")),
+    AdapterSpec("codex", (".codex", "AGENTS.md"), "pointer", (".codex", "AGENTS.override.md")),
     AdapterSpec("claude", (".claude", "CLAUDE.md"), "markdown_import"),
     AdapterSpec("gemini", (".gemini", "GEMINI.md"), "markdown_import"),
 )
@@ -79,7 +84,7 @@ def parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--agentos-home",
-        help="Resolved AgentOS checkout path. Required except with --self-test.",
+        help="Resolved AgentOS checkout path. Required except with --self-test or --remove.",
     )
     p.add_argument(
         "--no-dry-run",
@@ -134,25 +139,29 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def run(args: argparse.Namespace, home: Path, out: TextIO) -> int:
+    mode = "check" if args.check else "remove" if args.remove else "install"
     if args.check and args.remove:
         print("error: --check and --remove cannot be combined", file=out)
         return 2
     if args.check and args.no_dry_run:
         print("error: --check is read-only; do not combine it with --no-dry-run", file=out)
         return 2
-    if not args.agentos_home:
+    if not args.agentos_home and mode != "remove":
         print("error: --agentos-home is required", file=out)
         return 2
 
-    agentos_home = Path(args.agentos_home).expanduser()
-    if not agentos_home.is_absolute():
-        agentos_home = Path.cwd() / agentos_home
-    agentos_home = agentos_home.resolve()
+    agentos_home: Path | None = None
+    if args.agentos_home:
+        agentos_home = Path(args.agentos_home).expanduser()
+        if not agentos_home.is_absolute():
+            agentos_home = Path.cwd() / agentos_home
+        agentos_home = agentos_home.resolve()
 
-    validation_error = validate_agentos_home(agentos_home)
-    if validation_error:
-        print(f"error: {validation_error}", file=out)
-        return 2
+        if mode != "remove":
+            validation_error = validate_agentos_home(agentos_home)
+            if validation_error:
+                print(f"error: {validation_error}", file=out)
+                return 2
 
     home = home.expanduser().resolve()
     targets = collect_targets(
@@ -162,7 +171,6 @@ def run(args: argparse.Namespace, home: Path, out: TextIO) -> int:
     )
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
-    mode = "check" if args.check else "remove" if args.remove else "install"
     dry_run = not args.no_dry_run
     if mode == "check":
         print("Checking AgentOS global instruction adapters.", file=out)
@@ -170,7 +178,10 @@ def run(args: argparse.Namespace, home: Path, out: TextIO) -> int:
         print("DRY-RUN: no files will be modified.", file=out)
     else:
         print("Applying AgentOS global instruction adapter changes.", file=out)
-    print(f"AgentOS home: {agentos_home}", file=out)
+    if agentos_home is None:
+        print("AgentOS home: not required for remove mode", file=out)
+    else:
+        print(f"AgentOS home: {agentos_home}", file=out)
     print(f"Canonical global file: {global_instructions_path(home)}", file=out)
     print("", file=out)
 
@@ -253,33 +264,31 @@ def run(args: argparse.Namespace, home: Path, out: TextIO) -> int:
         print("Target path preflight failed; no files were modified.", file=out)
         return 1
 
-    for target in targets:
-        if target.skipped_reason:
-            results.append(
-                Result(
-                    ok=True,
-                    status="skip",
-                    path=target.path,
-                    message=target.skipped_reason,
-                )
-            )
-            continue
-        try:
-            if mode == "check":
-                result = check_target(target, home, agentos_home)
-            elif mode == "remove":
-                result = remove_target(target, dry_run=dry_run, timestamp=timestamp)
-            else:
-                result = install_target(
-                    target,
-                    home,
-                    agentos_home,
-                    dry_run=dry_run,
-                    timestamp=timestamp,
-                )
-        except ManagedBlockError as exc:
-            result = Result(False, "error", target.path, str(exc))
-        results.append(result)
+    if mode != "check" and not dry_run:
+        preflight_results = evaluate_targets(
+            targets,
+            mode,
+            home,
+            agentos_home,
+            dry_run=True,
+            timestamp=timestamp,
+        )
+        preflight_failures = [result for result in preflight_results if not result.ok]
+        if preflight_failures:
+            for result in preflight_results:
+                print(format_result(result), file=out)
+            print("", file=out)
+            print("Target content preflight failed; no files were modified.", file=out)
+            return 1
+
+    results = evaluate_targets(
+        targets,
+        mode,
+        home,
+        agentos_home,
+        dry_run=dry_run,
+        timestamp=timestamp,
+    )
 
     for result in results:
         print(format_result(result), file=out)
@@ -295,6 +304,62 @@ def run(args: argparse.Namespace, home: Path, out: TextIO) -> int:
         return 1
 
     return 0
+
+
+def evaluate_targets(
+    targets: list[Target],
+    mode: str,
+    home: Path,
+    agentos_home: Path | None,
+    dry_run: bool,
+    timestamp: str,
+) -> list[Result]:
+    results: list[Result] = []
+    for target in targets:
+        if target.skipped_reason:
+            results.append(
+                Result(
+                    ok=True,
+                    status="skip",
+                    path=target.path,
+                    message=target.skipped_reason,
+                )
+            )
+            continue
+        results.append(evaluate_target(target, mode, home, agentos_home, dry_run, timestamp))
+    return results
+
+
+def evaluate_target(
+    target: Target,
+    mode: str,
+    home: Path,
+    agentos_home: Path | None,
+    dry_run: bool,
+    timestamp: str,
+) -> Result:
+    try:
+        if mode == "check":
+            if agentos_home is None:
+                return Result(False, "error", target.path, "--agentos-home is required for --check")
+            return check_target(target, home, agentos_home)
+        if mode == "remove":
+            return remove_target(target, dry_run=dry_run, timestamp=timestamp)
+        if agentos_home is None:
+            return Result(False, "error", target.path, "--agentos-home is required for install")
+        return install_target(
+            target,
+            home,
+            agentos_home,
+            dry_run=dry_run,
+            timestamp=timestamp,
+        )
+    except ManagedBlockError as exc:
+        return Result(False, "error", target.path, str(exc))
+    except UnicodeError as exc:
+        return Result(False, "error", target.path, f"could not read file as UTF-8: {exc}")
+    except OSError as exc:
+        return Result(False, "error", target.path, f"filesystem error: {exc}")
 
 
 def validate_agentos_home(agentos_home: Path) -> str | None:
@@ -726,9 +791,12 @@ def run_self_tests() -> int:
         test_idempotent_rerun_and_path_update,
         test_check_pass_and_fail,
         test_remove_preserves_unmanaged_content,
+        test_remove_does_not_require_live_agentos_home,
+        test_codex_override_file_is_effective_adapter_target,
         test_all_default_adapters_and_explicit_adapter,
         test_explicit_default_adapter_overrides_skipped_default,
         test_crlf_paths_with_spaces_and_duplicate_blocks,
+        test_preflight_prevents_partial_writes,
         test_symlink_targets_fail_closed_and_modes_are_preserved,
         test_remediation_command_shell_quotes_dynamic_args,
         test_duplicate_adapter_dedupes_and_conflicting_adapter_fails,
@@ -848,6 +916,39 @@ def test_remove_preserves_unmanaged_content() -> None:
         assert_true(global_instructions_path(home).exists(), "remove deleted global file")
 
 
+def test_remove_does_not_require_live_agentos_home() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-global-installer-") as tmp:
+        root = Path(tmp)
+        home = root / "home"
+        home.mkdir()
+        agentos = make_fake_agentos(root)
+        code, output = run_args(["--agentos-home", str(agentos), "--no-dry-run"], home)
+        assert_true(code == 0, output)
+        agentos.rename(root / "AgentOS-moved")
+        code, output = run_args(["--remove", "--no-dry-run"], home)
+        assert_true(code == 0, output)
+        assert_true(GLOBAL_START not in read_text_preserve_newlines(global_instructions_path(home)), "remove needed live AgentOS home")
+
+
+def test_codex_override_file_is_effective_adapter_target() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-global-installer-") as tmp:
+        root = Path(tmp)
+        home = root / "home"
+        home.mkdir()
+        (home / ".codex").mkdir()
+        override = home / ".codex" / "AGENTS.override.md"
+        override.write_text("Existing override guidance.\n", encoding="utf-8")
+        agentos = make_fake_agentos(root)
+        code, output = run_args(["--agentos-home", str(agentos), "--no-dry-run"], home)
+        assert_true(code == 0, output)
+        override_text = read_text_preserve_newlines(override)
+        assert_true(override_text.startswith(ADAPTER_START), "Codex override adapter block was not prepended")
+        assert_true("Existing override guidance." in override_text, "Codex override content was lost")
+        assert_true(not (home / ".codex" / "AGENTS.md").exists(), "Codex AGENTS.md should not be created when override is effective")
+        code, output = run_args(["--agentos-home", str(agentos), "--check"], home)
+        assert_true(code == 0, output)
+
+
 def test_all_default_adapters_and_explicit_adapter() -> None:
     with tempfile.TemporaryDirectory(prefix="agentos-global-installer-") as tmp:
         root = Path(tmp)
@@ -927,6 +1028,36 @@ def test_crlf_paths_with_spaces_and_duplicate_blocks() -> None:
         assert_true("duplicated" in output, "duplicate block failure should be explicit")
 
 
+def test_preflight_prevents_partial_writes() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-global-installer-") as tmp:
+        root = Path(tmp)
+        home = root / "home"
+        home.mkdir()
+        (home / ".codex").mkdir()
+        codex = home / ".codex" / "AGENTS.md"
+        codex.write_text(
+            adapter_block(global_instructions_path(home))
+            + "\n"
+            + adapter_block(global_instructions_path(home)),
+            encoding="utf-8",
+        )
+        agentos = make_fake_agentos(root)
+        code, output = run_args(["--agentos-home", str(agentos), "--no-dry-run"], home)
+        assert_true(code == 1, "duplicate marker preflight should fail")
+        assert_true("preflight failed; no files were modified" in output, "preflight failure message missing")
+        assert_true(not global_instructions_path(home).exists(), "global file was created before later target failed")
+
+        bad_home = root / "bad-home"
+        bad_home.mkdir()
+        (bad_home / ".codex").mkdir()
+        bad_codex = bad_home / ".codex" / "AGENTS.md"
+        bad_codex.write_bytes(b"\xff\xfe\x00")
+        code, output = run_args(["--agentos-home", str(agentos), "--no-dry-run"], bad_home)
+        assert_true(code == 1, "invalid UTF-8 preflight should fail")
+        assert_true("UTF-8" in output, "invalid UTF-8 failure should be explicit")
+        assert_true(not global_instructions_path(bad_home).exists(), "global file was created before invalid UTF-8 target failed")
+
+
 def test_symlink_targets_fail_closed_and_modes_are_preserved() -> None:
     with tempfile.TemporaryDirectory(prefix="agentos-global-installer-") as tmp:
         root = Path(tmp)
@@ -940,7 +1071,8 @@ def test_symlink_targets_fail_closed_and_modes_are_preserved() -> None:
         code, output = run_args(["--agentos-home", str(agentos), "--no-dry-run"], home)
         assert_true(code == 0, output)
         mode = codex.stat().st_mode & 0o777
-        assert_true(mode == 0o644, f"existing file mode changed to {oct(mode)}")
+        if os.name == "posix":
+            assert_true(mode == 0o644, f"existing file mode changed to {oct(mode)}")
 
         link_home = root / "link-home"
         link_home.mkdir()

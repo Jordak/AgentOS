@@ -26,7 +26,7 @@ Review whether AgentOS state is current, useful, and safely filed.
    python3 scripts/install_global_agent_instructions.py --agentos-home <agentos-home> --check
    ```
 
-   Replace `<agentos-home>` with the resolved path to the current AgentOS checkout. Confirm the canonical `<home>/.agents/AGENTS.md` file and any managed harness adapters still point to the intended AgentOS installation.
+   Replace `<agentos-home>` with the resolved path to the current AgentOS checkout. If setup used `--all-default-adapters` or custom `--adapter <path>` flags, repeat those same flags here so the check covers those managed adapter files. Confirm the canonical `<home>/.agents/AGENTS.md` file and any managed harness adapters still point to the intended AgentOS installation.
 4. Identify stale state, missing templates, private-data risks, and useful follow-up work.
 5. Draft a report as a private generated output under `personal/os/memory/weekly-review/`.
 6. Ask the user to approve any durable state changes or external actions.

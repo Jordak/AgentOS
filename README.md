@@ -35,11 +35,11 @@ That file is the canonical global instruction file. Harness-specific instruction
 
 The default adapter targets are:
 
-- Codex: `<home>/.codex/AGENTS.md`
+- Codex: `<home>/.codex/AGENTS.md`, or `<home>/.codex/AGENTS.override.md` when that override file already exists and is non-empty
 - Claude Code: `<home>/.claude/CLAUDE.md`
 - Gemini CLI: `<home>/.gemini/GEMINI.md`
 
-By default, the installer updates default adapters only when their harness directory already exists. Use `--all-default-adapters` to create all default adapter files, and repeat `--adapter <path>` for extra harnesses such as OpenClaw, Hermes, Antigravity, or another tool with a known instruction-file path.
+By default, the installer updates default adapters only when their harness directory already exists. Use `--all-default-adapters` to create all default adapter files, and repeat `--adapter <path>` for extra harnesses such as OpenClaw, Hermes, Antigravity, or another tool with a known instruction-file path. Reuse the same `--all-default-adapters` and `--adapter <path>` arguments for later `--check` or `--remove` runs; custom adapter discovery is intentionally invocation-scoped.
 
 ### Agent-Assisted Setup
 
@@ -55,11 +55,13 @@ Install AgentOS for me.
    Confirm the self-test uses temporary directories and does not touch my real home directory.
 4. Run the installer dry-run:
    python3 scripts/install_global_agent_instructions.py --agentos-home <resolved-agentos-home>
+   If I ask for extra harness adapters, include the same --adapter <path> flags in this dry-run and every later write/check/remove command.
 5. Show me exactly which files would be created, backed up, or changed. Do not run the write command until I explicitly approve.
 6. After I approve, run:
    python3 scripts/install_global_agent_instructions.py --agentos-home <resolved-agentos-home> --no-dry-run
 7. Run the drift check:
    python3 scripts/install_global_agent_instructions.py --agentos-home <resolved-agentos-home> --check
+   If extra --adapter <path> flags were used above, repeat those exact flags here.
 8. Summarize what changed, where backups were written, and whether the check passed.
 ```
 
@@ -80,6 +82,8 @@ Review the dry-run output. It should tell you which global instruction files wou
 python3 scripts/install_global_agent_instructions.py --agentos-home <agentos-home> --no-dry-run
 python3 scripts/install_global_agent_instructions.py --agentos-home <agentos-home> --check
 ```
+
+If you use `--all-default-adapters` or any custom `--adapter <path>` flags, repeat those same flags on the dry-run, write, check, and remove commands.
 
 ## First Read Sequence
 
