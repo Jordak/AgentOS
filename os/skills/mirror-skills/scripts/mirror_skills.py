@@ -20,6 +20,7 @@ IGNORED_NAMES = {".DS_Store", "__pycache__"}
 @dataclass
 class SkillEntry:
     name: str
+    source_kind: str
     canonical_source: str
     source_path: Path
     source_root: Path
@@ -29,6 +30,7 @@ class SkillEntry:
 @dataclass
 class MirrorResult:
     name: str
+    source_kind: str
     status: str
     canonical_source: str
     mirror_path: str
@@ -75,9 +77,34 @@ def parse_manifest(agentos_root: Path) -> list[SkillEntry]:
         entries.append(
             SkillEntry(
                 name=name,
+                source_kind="core",
                 canonical_source=canonical_source,
                 source_path=source_path,
                 source_root=source_root,
+                mirror_dir=Path(),
+            )
+        )
+
+    return entries
+
+
+def discover_personal_overlay_entries(agentos_root: Path) -> list[SkillEntry]:
+    personal_skills_root = agentos_root / "personal/os/skills"
+    if not personal_skills_root.exists():
+        return []
+
+    entries: list[SkillEntry] = []
+    for skill_file in sorted(personal_skills_root.glob("*/SKILL.md")):
+        skill_dir = skill_file.parent
+        name = skill_dir.name
+        canonical_source = skill_file.relative_to(agentos_root).as_posix()
+        entries.append(
+            SkillEntry(
+                name=name,
+                source_kind="personal-overlay",
+                canonical_source=canonical_source,
+                source_path=skill_file.resolve(),
+                source_root=skill_dir.resolve(),
                 mirror_dir=Path(),
             )
         )
@@ -129,6 +156,7 @@ def compare_entry(entry: SkillEntry) -> MirrorResult:
     if not entry.source_path.exists():
         return MirrorResult(
             name=entry.name,
+            source_kind=entry.source_kind,
             status="source-missing",
             canonical_source=entry.canonical_source,
             mirror_path=str(entry.mirror_dir),
@@ -144,6 +172,7 @@ def compare_entry(entry: SkillEntry) -> MirrorResult:
     if source_unreadable:
         return MirrorResult(
             name=entry.name,
+            source_kind=entry.source_kind,
             status="source-unreadable",
             canonical_source=entry.canonical_source,
             mirror_path=str(entry.mirror_dir),
@@ -156,6 +185,7 @@ def compare_entry(entry: SkillEntry) -> MirrorResult:
     if mirror_unreadable:
         return MirrorResult(
             name=entry.name,
+            source_kind=entry.source_kind,
             status="mirror-unreadable",
             canonical_source=entry.canonical_source,
             mirror_path=str(entry.mirror_dir),
@@ -185,6 +215,7 @@ def compare_entry(entry: SkillEntry) -> MirrorResult:
 
     return MirrorResult(
         name=entry.name,
+        source_kind=entry.source_kind,
         status=status,
         canonical_source=entry.canonical_source,
         mirror_path=str(entry.mirror_dir),
@@ -228,10 +259,16 @@ def remove_empty_dirs(root: Path) -> None:
 def print_table(results: list[MirrorResult]) -> None:
     status_width = max(12, *(len(result.status) for result in results))
     skill_width = max(24, *(len(result.name) for result in results))
-    print(f"{'status':<{status_width}}  {'skill':<{skill_width}}  mirror")
-    print(f"{'-' * status_width}  {'-' * skill_width}  ------")
+    source_width = max(16, *(len(result.source_kind) for result in results))
+    print(f"{'status':<{status_width}}  {'skill':<{skill_width}}  {'source':<{source_width}}  mirror")
+    print(f"{'-' * status_width}  {'-' * skill_width}  {'-' * source_width}  ------")
     for result in results:
-        print(f"{result.status:<{status_width}}  {result.name:<{skill_width}}  {result.mirror_path}")
+        print(
+            f"{result.status:<{status_width}}  "
+            f"{result.name:<{skill_width}}  "
+            f"{result.source_kind:<{source_width}}  "
+            f"{result.mirror_path}"
+        )
         for label, values in [
             ("missing", result.missing_files),
             ("changed", result.changed_files),
@@ -264,6 +301,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Create missing mirrors and copy changed canonical files.",
     )
     parser.add_argument(
+        "--core-only",
+        action="store_true",
+        help="Mirror only Core skills from os/skills/MANIFEST.md, not Personal Overlay skills.",
+    )
+    parser.add_argument(
         "--prune-extra",
         action="store_true",
         help="Delete mirror files that are not present in canonical sources.",
@@ -280,12 +322,25 @@ def main() -> int:
     mirror_root = args.mirror_root.expanduser().resolve()
 
     entries = parse_manifest(agentos_root)
+    if not args.core_only:
+        personal_entries = discover_personal_overlay_entries(agentos_root)
+        core_names = {entry.name for entry in entries}
+        duplicates = sorted(entry.name for entry in personal_entries if entry.name in core_names)
+        if duplicates:
+            duplicate_list = ", ".join(duplicates)
+            raise SystemExit(
+                "Personal Overlay skill name collides with a Core skill: "
+                f"{duplicate_list}. Use a unique private skill name, or put private "
+                "inputs for a Core skill under personal/os/skills/<skill-name>/CONFIG.md."
+            )
+        entries.extend(personal_entries)
     if not entries:
-        raise SystemExit("No manifest skills with Canonical source fields found.")
+        raise SystemExit("No mirrorable Core or Personal Overlay skills found.")
 
     entries = [
         SkillEntry(
             name=entry.name,
+            source_kind=entry.source_kind,
             canonical_source=entry.canonical_source,
             source_path=entry.source_path,
             source_root=entry.source_root,

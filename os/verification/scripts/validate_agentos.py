@@ -3,7 +3,7 @@
 
 The checks in this script intentionally avoid network calls and connector reads.
 They inspect local Markdown files, local path existence, and portable AgentOS
-metadata. Machine-local skill mirrors are checked by the audit-skill-mirrors
+metadata. Machine-local skill mirrors are checked by the mirror-skills
 skill instead of this portable validator.
 """
 
