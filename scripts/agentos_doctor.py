@@ -26,6 +26,17 @@ NEXT_HEADING_RE = re.compile(r"^##\s+", re.MULTILINE)
 PERSONAL_PATH_RE = re.compile(r"`(personal/os/[^`]+)`")
 PRIVATE_CONTENT_SENTINEL = "DO_NOT_LEAK_AGENTOS_DOCTOR_SELF_TEST"
 DEFAULT_TIMEOUT_SECONDS = 30
+INSTALLER_RESULT_STATUSES = (
+    "rollback-error",
+    "would create",
+    "would update",
+    "not run",
+    "missing",
+    "drift",
+    "error",
+    "skip",
+    "ok",
+)
 
 
 @dataclass
@@ -307,12 +318,15 @@ def check_adapters(
     completed = run_subprocess(command, cwd=agentos_home, env=env_with_home(env, process_home))
     check_lines = managed_result_lines(completed.stdout)
     counts = Counter(line_status(line) for line in check_lines)
+    result_statuses = installer_result_statuses(check_lines)
     details = [
         f"Command: {shell_command(command, agentos_home)}",
         f"Managed targets checked: {len(check_lines)}",
     ]
     if counts:
         details.append("Statuses: " + format_counts(counts))
+    if result_statuses:
+        details.append("Result statuses: " + format_counts(result_statuses))
     if verbose:
         details.extend(prefix_lines("installer", completed.stdout, completed.stderr))
 
@@ -333,6 +347,24 @@ def check_adapters(
             details=details,
             recommendations=[
                 "Fix the adapter check command or environment, then re-run this doctor command."
+            ],
+        )
+
+    hard_failure_statuses = {
+        status
+        for status in result_statuses
+        if status not in {"missing", "drift"}
+        and any(line.startswith("[FAIL]") and installer_result_status(line) == status for line in check_lines)
+    }
+    if hard_failure_statuses:
+        details.extend(subprocess_failure_details(completed, verbose))
+        return CheckResult(
+            "adapter drift",
+            "FAIL",
+            "Adapter drift check reported command or configuration errors.",
+            details=details,
+            recommendations=[
+                "Fix the adapter command, target paths, or reported configuration errors before running install remediation."
             ],
         )
 
@@ -656,11 +688,13 @@ def run_subprocess(
             check=False,
         )
     except subprocess.TimeoutExpired as exc:
+        stdout = output_to_text(exc.stdout)
+        stderr = output_to_text(exc.stderr)
         return subprocess.CompletedProcess(
             command,
             124,
-            stdout=exc.stdout or "",
-            stderr=(exc.stderr or "") + f"\nTimed out after {DEFAULT_TIMEOUT_SECONDS} seconds.",
+            stdout=stdout,
+            stderr=stderr + f"\nTimed out after {DEFAULT_TIMEOUT_SECONDS} seconds.",
         )
     except OSError as exc:
         return subprocess.CompletedProcess(command, 127, stdout="", stderr=str(exc))
@@ -681,6 +715,21 @@ def line_status(line: str) -> str:
     if match:
         return match.group(1)
     return "unknown"
+
+
+def installer_result_status(line: str) -> str:
+    match = re.match(r"^\[(?:OK|FAIL)\]\s+(.+?)\s+-\s+", line)
+    if not match:
+        return "unknown"
+    body = match.group(1)
+    for status in INSTALLER_RESULT_STATUSES:
+        if body.startswith(status + " ") or body == status:
+            return status
+    return "unknown"
+
+
+def installer_result_statuses(lines: Iterable[str]) -> Counter[str]:
+    return Counter(installer_result_status(line) for line in lines)
 
 
 def format_counts(counts: Counter[str]) -> str:
@@ -712,6 +761,14 @@ def prefix_lines(label: str, stdout: str, stderr: str) -> list[str]:
         for line in text.splitlines():
             lines.append(f"{label} {stream_name}: {line}")
     return lines
+
+
+def output_to_text(value: str | bytes | None) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return value
 
 
 def subprocess_failure_details(completed: subprocess.CompletedProcess[str], verbose: bool) -> list[str]:
@@ -797,6 +854,8 @@ def run_self_tests() -> int:
         test_invalid_home_is_graceful,
         test_adapter_check_uses_temp_home,
         test_adapter_check_command_failure_is_not_drift,
+        test_adapter_check_preflight_error_is_not_drift,
+        test_subprocess_timeout_output_is_text,
         test_mirror_smoke_uses_temp_dirs,
         test_mirror_command_failure_is_not_sync_advice,
     ]
@@ -913,6 +972,59 @@ def test_adapter_check_command_failure_is_not_drift() -> None:
         joined = "\n".join(result.details + result.recommendations)
         assert_true(result.status == "FAIL", "adapter command failure should fail")
         assert_true("--no-dry-run" not in joined, "command failure should not recommend adapter writes")
+
+
+def test_adapter_check_preflight_error_is_not_drift() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        home = Path(tmp) / "home"
+        make_fake_agentos(root)
+        home.mkdir()
+        result = check_adapters(
+            agentos_home=root,
+            process_home=home,
+            env=minimal_env(home),
+            extra_args=["--adapter", str(root)],
+            verbose=False,
+        )
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "FAIL", "adapter preflight error should fail")
+        assert_true("--no-dry-run" not in joined, "preflight error should not recommend adapter writes")
+        assert_true("error=1" in joined, "preflight result status should be reported")
+
+
+def test_subprocess_timeout_output_is_text() -> None:
+    global DEFAULT_TIMEOUT_SECONDS
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        home = Path(tmp) / "home"
+        make_fake_agentos(root)
+        home.mkdir()
+        installer = root / "scripts" / "install_global_agent_instructions.py"
+        installer.write_text(
+            "import sys, time\n"
+            "print('[FAIL] error example-adapter - partial stdout before timeout')\n"
+            "sys.stdout.flush()\n"
+            "print('partial stderr before timeout', file=sys.stderr)\n"
+            "sys.stderr.flush()\n"
+            "time.sleep(5)\n",
+            encoding="utf-8",
+        )
+        old_timeout = DEFAULT_TIMEOUT_SECONDS
+        DEFAULT_TIMEOUT_SECONDS = 1
+        try:
+            result = check_adapters(
+                agentos_home=root,
+                process_home=home,
+                env=minimal_env(home),
+                extra_args=[],
+                verbose=False,
+            )
+        finally:
+            DEFAULT_TIMEOUT_SECONDS = old_timeout
+        joined = "\n".join(result.details)
+        assert_true(result.status == "FAIL", "timeout should return a failure result")
+        assert_true("Timed out after 1 seconds." in joined, "timeout stderr should be preserved as text")
 
 
 def test_mirror_smoke_uses_temp_dirs() -> None:
