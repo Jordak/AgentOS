@@ -39,6 +39,8 @@ The default adapter targets are:
 - Claude Code: `<home>/.claude/CLAUDE.md`
 - Gemini CLI: `<gemini-cli-home>/.gemini/GEMINI.md`. `<gemini-cli-home>` is `GEMINI_CLI_HOME` when set, otherwise `<home>`. Gemini receives pointer text rather than an `@` import because Gemini restricts memory imports to its context root.
 
+Google has announced that consumer Gemini CLI usage is transitioning to Antigravity CLI, with consumer Gemini CLI service ending June 18, 2026. The Gemini adapter remains for existing Gemini CLI and enterprise/API-key users. For Antigravity CLI, pass an explicit `--adapter <path>` once you have confirmed Antigravity's current instruction-file path from its docs.
+
 By default, the installer updates default adapters only when their harness directory already exists. Use `--all-default-adapters` to create all default adapter files, and repeat `--adapter <path>` for extra harnesses such as OpenClaw, Hermes, Antigravity, or another tool with a known instruction-file path. Reuse the same `--all-default-adapters` and `--adapter <path>` arguments for later `--check` or `--remove` runs; custom adapter discovery is intentionally invocation-scoped.
 
 ### Agent-Assisted Setup
