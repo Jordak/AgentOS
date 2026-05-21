@@ -81,6 +81,8 @@ python3 scripts/agentos_doctor.py
 
 The doctor discovers `$root` from the current directory, or accepts `--agentos-home <root>`. It reports the resolved AgentOS home, checks adapter drift through `scripts/install_global_agent_instructions.py --check`, audits skill mirrors through mirror-skills without syncing, checks the starter Personal Overlay paths listed above, and reports best-effort automation presence. It prints presence, absence, counts, and paths only; it must not print Personal Overlay file contents.
 
+If the installer or adapter check used `--all-default-adapters` or any custom `--adapter <path>` flags, repeat those exact flags on the doctor command so the read-only adapter drift result covers the same harness files.
+
 Doctor is not the installer and not mirror sync:
 
 - Use `scripts/agentos_doctor.py` for read-only setup health and exact next steps.

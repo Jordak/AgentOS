@@ -324,6 +324,18 @@ def check_adapters(
             details=details,
         )
 
+    if completed.returncode in {124, 127} or not check_lines:
+        details.extend(subprocess_failure_details(completed, verbose))
+        return CheckResult(
+            "adapter drift",
+            "FAIL",
+            "Adapter drift check could not complete.",
+            details=details,
+            recommendations=[
+                "Fix the adapter check command or environment, then re-run this doctor command."
+            ],
+        )
+
     dry_run_command = [
         sys.executable,
         str(script),
@@ -372,13 +384,26 @@ def check_skill_mirrors(
         "--json",
     ]
     completed = run_subprocess(command, cwd=agentos_home, env=env)
+    base_details = [
+        f"Command: {shell_command(command, agentos_home)}",
+        f"Exit code: {completed.returncode}",
+    ]
+    if not completed.stdout.strip():
+        base_details.extend(subprocess_failure_details(completed, verbose))
+        return CheckResult(
+            "skill mirrors",
+            "FAIL",
+            "Mirror-skills audit did not return JSON output.",
+            details=base_details,
+            recommendations=[
+                "Fix the mirror-skills command or reported skill configuration, then re-run this doctor command."
+            ],
+        )
+
     try:
-        results = json.loads(completed.stdout or "[]")
+        results = json.loads(completed.stdout)
     except json.JSONDecodeError:
-        details = [
-            f"Command: {shell_command(command, agentos_home)}",
-            f"Exit code: {completed.returncode}",
-        ]
+        details = list(base_details)
         if verbose:
             details.extend(prefix_lines("mirror-skills", completed.stdout, completed.stderr))
         else:
@@ -390,10 +415,23 @@ def check_skill_mirrors(
             details=details,
         )
 
+    if not isinstance(results, list) or not all(isinstance(result, dict) for result in results):
+        details = list(base_details)
+        details.append("JSON output shape was not a list of mirror result objects.")
+        if verbose:
+            details.extend(prefix_lines("mirror-skills", completed.stdout, completed.stderr))
+        return CheckResult(
+            "skill mirrors",
+            "FAIL",
+            "Mirror-skills audit returned unexpected JSON output.",
+            details=details,
+        )
+
     statuses = Counter(str(result.get("status", "unknown")) for result in results)
     source_kinds = Counter(str(result.get("source_kind", "unknown")) for result in results)
     details = [
         f"Command: {shell_command(command, agentos_home)}",
+        f"Exit code: {completed.returncode}",
         f"Mirror root: {mirror_root}",
         f"Skills audited: {len(results)}",
         "Source kinds: " + format_counts(source_kinds),
@@ -480,6 +518,17 @@ def check_personal_overlay(agentos_home: Path, verbose: bool) -> CheckResult:
         details.append("Missing starter paths: " + ", ".join(missing_starters))
     if verbose and existing_starters:
         details.append("Present starter paths: " + ", ".join(existing_starters))
+
+    if starter_error:
+        return CheckResult(
+            "Personal Overlay",
+            "WARN",
+            "Could not determine documented starter Personal Overlay files.",
+            details=details,
+            recommendations=[
+                "Restore or repair os/playbook/GETTING_STARTED.md so the Starter Files section can be audited."
+            ],
+        )
 
     if missing_starters:
         return CheckResult(
@@ -663,6 +712,20 @@ def prefix_lines(label: str, stdout: str, stderr: str) -> list[str]:
     return lines
 
 
+def subprocess_failure_details(completed: subprocess.CompletedProcess[str], verbose: bool) -> list[str]:
+    details = [f"Subprocess exit code: {completed.returncode}"]
+    if verbose:
+        details.extend(prefix_lines("subprocess", completed.stdout, completed.stderr))
+        return details
+
+    stderr_lines = [line for line in completed.stderr.splitlines() if line.strip()]
+    if stderr_lines:
+        details.append("Subprocess stderr: " + " / ".join(stderr_lines[:3]))
+    else:
+        details.append("Subprocess produced no stderr; re-run with --verbose for exact diagnostics.")
+    return details
+
+
 def shell_command(command: list[str], agentos_home: Path) -> str:
     rendered = []
     for part in command:
@@ -727,9 +790,12 @@ def exit_code_for(results: Iterable[CheckResult]) -> int:
 def run_self_tests() -> int:
     tests = [
         test_home_discovery_and_personal_overlay_privacy,
+        test_personal_overlay_source_error_warns,
         test_invalid_home_is_graceful,
         test_adapter_check_uses_temp_home,
+        test_adapter_check_command_failure_is_not_drift,
         test_mirror_smoke_uses_temp_dirs,
+        test_mirror_command_failure_is_not_sync_advice,
     ]
     for test in tests:
         try:
@@ -760,6 +826,19 @@ def test_home_discovery_and_personal_overlay_privacy() -> None:
         rendered = render_report_for_test(report, verbose=False)
         assert_true(PRIVATE_CONTENT_SENTINEL not in rendered, "private contents leaked")
         assert_true("personal/os/identity/COMMUNICATION.md" in rendered, "missing starter path not reported")
+
+
+def test_personal_overlay_source_error_warns() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        make_fake_agentos(root)
+        (root / "os" / "playbook" / "GETTING_STARTED.md").write_text(
+            "# Getting Started\n\n## Renamed Starter Checklist\n\n- `personal/os/identity/USER.md`\n",
+            encoding="utf-8",
+        )
+        result = check_personal_overlay(root, verbose=False)
+        assert_true(result.status == "WARN", "unreadable starter checklist should warn")
+        assert_true("Could not determine" in result.summary, "starter source warning summary missing")
 
 
 def test_invalid_home_is_graceful() -> None:
@@ -797,6 +876,29 @@ def test_adapter_check_uses_temp_home() -> None:
         assert_true(str(Path.home()) not in joined, "adapter check leaked real HOME")
 
 
+def test_adapter_check_command_failure_is_not_drift() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        home = Path(tmp) / "home"
+        make_fake_agentos(root)
+        home.mkdir()
+        installer = root / "scripts" / "install_global_agent_instructions.py"
+        installer.write_text(
+            "import sys\nprint('installer exploded', file=sys.stderr)\nsys.exit(127)\n",
+            encoding="utf-8",
+        )
+        result = check_adapters(
+            agentos_home=root,
+            process_home=home,
+            env=minimal_env(home),
+            extra_args=[],
+            verbose=False,
+        )
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "FAIL", "adapter command failure should fail")
+        assert_true("--no-dry-run" not in joined, "command failure should not recommend adapter writes")
+
+
 def test_mirror_smoke_uses_temp_dirs() -> None:
     with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
         root = Path(tmp) / "AgentOS"
@@ -815,7 +917,24 @@ def test_mirror_smoke_uses_temp_dirs() -> None:
         completed = run_subprocess(command, cwd=root, env=minimal_env(Path(tmp) / "home"))
         assert_true(completed.returncode == 0, completed.stderr or completed.stdout)
         result = check_skill_mirrors(root, mirror_root, minimal_env(Path(tmp) / "home"), verbose=False)
+        joined = "\n".join(result.details)
         assert_true(result.status == "PASS", "mirror audit should pass after temp sync")
+        assert_true("core=1" in joined, "core skill source kind not audited")
+        assert_true("personal-overlay=1" in joined, "Personal Overlay skill source kind not audited")
+
+
+def test_mirror_command_failure_is_not_sync_advice() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        mirror_root = Path(tmp) / "mirrors"
+        make_fake_agentos(root)
+        duplicate = root / "personal" / "os" / "skills" / "example-skill" / "SKILL.md"
+        duplicate.parent.mkdir(parents=True)
+        duplicate.write_text("# Duplicate Private Skill\n", encoding="utf-8")
+        result = check_skill_mirrors(root, mirror_root, minimal_env(Path(tmp) / "home"), verbose=False)
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "FAIL", "mirror command failure should fail")
+        assert_true("--sync" not in joined, "command failure should not recommend mirror sync")
 
 
 def render_report_for_test(report: DoctorReport, verbose: bool) -> str:
@@ -872,6 +991,11 @@ def make_fake_agentos(root: Path) -> None:
     copy_script(mirror_source, root / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py")
     (root / "os" / "skills" / "example-skill").mkdir(parents=True)
     (root / "os" / "skills" / "example-skill" / "SKILL.md").write_text("# Example Skill\n", encoding="utf-8")
+    (root / "personal" / "os" / "skills" / "private-skill").mkdir(parents=True)
+    (root / "personal" / "os" / "skills" / "private-skill" / "SKILL.md").write_text(
+        "# Private Skill\n",
+        encoding="utf-8",
+    )
     (root / "os" / "skills" / "MANIFEST.md").write_text(
         """# Skills Manifest
 

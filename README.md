@@ -43,7 +43,7 @@ Install AgentOS for me.
    If extra --adapter <path> flags were used above, repeat those exact flags here.
 8. Run the read-only setup health check:
    python3 scripts/agentos_doctor.py --agentos-home <resolved-agentos-home>
-   Treat warnings as next-step recommendations, not permission to change files.
+   If extra --all-default-adapters or --adapter <path> flags were used above, repeat those exact flags here. Treat warnings as next-step recommendations, not permission to change files.
 9. Summarize what changed, where backups were written, whether the adapter check passed, and what the doctor recommends.
 10. Ask me whether I want AgentOS skills to be discoverable from my harnesses. If I do, use the mirror-skills workflow to check Core skills and Personal Overlay skills, show me the audit result, and ask before syncing any files outside this checkout.
 11. Ask me if I want to hear how to get the most out of AgentOS.
@@ -70,6 +70,7 @@ python3 scripts/agentos_doctor.py --agentos-home <agentos-home>
 ```
 
 If you use `--all-default-adapters` or any custom `--adapter <path>` flags, repeat those same flags on the dry-run, write, check, and remove commands.
+Repeat those same flags on `scripts/agentos_doctor.py` runs too, because the doctor passes them through to its read-only adapter drift check.
 
 </details>
 
@@ -84,6 +85,8 @@ python3 scripts/agentos_doctor.py
 ```
 
 The doctor discovers the AgentOS checkout from the current directory, or you can pass `--agentos-home <agentos-home>`. It always prints the resolved home, runs the installer drift check in read-only `--check` mode, audits skill mirrors through mirror-skills without syncing them, checks documented starter Personal Overlay paths from [os/playbook/GETTING_STARTED.md](os/playbook/GETTING_STARTED.md), and reports best-effort automation presence. It does not remediate, install, sync, delete, or print private file contents.
+
+When your setup uses `--all-default-adapters` or custom `--adapter <path>` targets, pass those same flags to the doctor so the adapter drift result covers the same harness instruction files as your installer check.
 
 Use the tools this way:
 
