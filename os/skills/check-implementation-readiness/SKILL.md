@@ -1,6 +1,6 @@
 ---
 name: check-implementation-readiness
-description: Use before implementing feature-sized work: implement, build, add, redesign, substantially refactor, or start an issue/PRD/spec where the outcome changes behavior, workflow, data model, public docs policy, validation policy, or reusable AgentOS structure. Checks durable design consensus, creates or proposes follow-up artifacts for deferred questions, and returns Ready to Implement, Needs Design Consensus, or Gate Skipped.
+description: "Use before implementing feature-sized work: implement, build, add, redesign, substantially refactor, or start an issue/PRD/spec where the outcome changes behavior, workflow, data model, public docs policy, validation policy, or reusable AgentOS structure. Checks durable design consensus, creates or proposes follow-up artifacts for deferred questions, and returns Ready to Implement, Needs Design Consensus, or Gate Skipped."
 ---
 
 # Check Implementation Readiness
