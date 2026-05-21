@@ -148,10 +148,10 @@ def adapter_args(args: argparse.Namespace, cwd: Path) -> list[str]:
 def normalize_adapter_arg(adapter: str, cwd: Path) -> str:
     if adapter == "<home>" or adapter.startswith("<home>/") or adapter.startswith("<home>\\"):
         return adapter
-    adapter_path = Path(os.path.expanduser(adapter))
-    if not adapter_path.is_absolute():
-        adapter_path = cwd / adapter_path
-    return str(adapter_path.resolve())
+    expanded = os.path.expanduser(adapter)
+    if not os.path.isabs(expanded):
+        expanded = os.path.join(os.fspath(cwd), expanded)
+    return os.path.abspath(expanded)
 
 
 def run_doctor(
@@ -985,6 +985,7 @@ def run_self_tests() -> int:
         test_invalid_home_is_graceful,
         test_adapter_check_uses_temp_home,
         test_relative_adapter_args_resolve_from_invocation_cwd,
+        test_relative_adapter_args_preserve_symlink_ancestors,
         test_home_adapter_args_are_preserved,
         test_adapter_check_command_failure_is_not_drift,
         test_adapter_check_preflight_error_is_not_drift,
@@ -1104,7 +1105,38 @@ def test_relative_adapter_args_resolve_from_invocation_cwd() -> None:
         invocation.mkdir()
         args = argparse.Namespace(all_default_adapters=False, adapter=["custom/AGENTS.md"])
         resolved = adapter_args(args, invocation)
-        assert_true(resolved == ["--adapter", str((invocation / "custom" / "AGENTS.md").resolve())], "relative adapter path was not cwd-resolved")
+        assert_true(resolved == ["--adapter", os.path.abspath(invocation / "custom" / "AGENTS.md")], "relative adapter path was not cwd-resolved")
+
+
+def test_relative_adapter_args_preserve_symlink_ancestors() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        home = Path(tmp) / "home"
+        invocation = Path(tmp) / "invocation"
+        linked_target = Path(tmp) / "linked-target"
+        make_fake_agentos(root)
+        home.mkdir()
+        invocation.mkdir()
+        linked_target.mkdir()
+        symlink = invocation / "linked-adapters"
+        symlink.symlink_to(linked_target, target_is_directory=True)
+
+        args = argparse.Namespace(all_default_adapters=False, adapter=["linked-adapters/AGENTS.md"])
+        extra_args = adapter_args(args, invocation)
+        expected = os.path.abspath(invocation / "linked-adapters" / "AGENTS.md")
+        assert_true(extra_args == ["--adapter", expected], "adapter path should stay lexical through symlink ancestors")
+
+        result = check_adapters(
+            agentos_home=root,
+            process_home=home,
+            env=minimal_env(home),
+            extra_args=extra_args,
+            verbose=True,
+        )
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "FAIL", "symlink ancestor should be reported as a hard adapter failure")
+        assert_true("symlink" in joined, "symlink failure should be preserved from installer output")
+        assert_true("--no-dry-run" not in joined, "symlink failure should not recommend adapter writes")
 
 
 def test_home_adapter_args_are_preserved() -> None:
