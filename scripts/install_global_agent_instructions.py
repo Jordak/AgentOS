@@ -946,6 +946,12 @@ def effective_global_instructions(home: Path, agentos_home: Path) -> str:
 
 def inline_global_adapter_block(home: Path, agentos_home: Path) -> str:
     canonical = effective_global_instructions(home, agentos_home).rstrip()
+    for marker in (ADAPTER_START, ADAPTER_END):
+        if marker in canonical:
+            raise ManagedBlockError(
+                "canonical global instructions contain an adapter managed block marker; "
+                "remove or rephrase that marker before mirroring into inline adapters"
+            )
     return f"""{ADAPTER_START}
 {canonical}
 {ADAPTER_END}
@@ -1485,6 +1491,21 @@ def test_inline_adapters_mirror_effective_global_file() -> None:
         assert_true(GLOBAL_START in gemini_text, "inline Gemini adapter did not mirror managed global block")
         code, output = run_args(["--agentos-home", str(agentos), "--check"], home)
         assert_true(code == 0, output)
+
+        marker_home = root / "marker-home"
+        marker_home.mkdir()
+        (marker_home / ".codex").mkdir()
+        marker_global = global_instructions_path(marker_home)
+        marker_global.parent.mkdir()
+        marker_global.write_text(f"Literal marker example: {ADAPTER_START}\n", encoding="utf-8")
+        code, output = run_args(["--agentos-home", str(agentos), "--no-dry-run"], marker_home)
+        assert_true(code == 1, "inline adapter marker literal should fail before writing")
+        assert_true("adapter managed block marker" in output, "inline marker failure should explain remediation")
+        assert_true(
+            read_text_preserve_newlines(marker_global) == f"Literal marker example: {ADAPTER_START}\n",
+            "marker failure modified the canonical global file",
+        )
+        assert_true(not (marker_home / ".codex" / "AGENTS.md").exists(), "marker failure created a Codex adapter")
 
 
 def test_codex_override_file_is_effective_adapter_target() -> None:
