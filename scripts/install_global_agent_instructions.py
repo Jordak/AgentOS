@@ -137,7 +137,7 @@ class RollbackError:
 DEFAULT_ADAPTERS = (
     AdapterSpec("codex", (".codex", "AGENTS.md"), "pointer", (".codex", "AGENTS.override.md")),
     AdapterSpec("claude", (".claude", "CLAUDE.md"), "markdown_import"),
-    AdapterSpec("gemini", (".gemini", "GEMINI.md"), "pointer"),
+    AdapterSpec("gemini", (".gemini", "GEMINI.md"), "markdown_import"),
 )
 
 
@@ -1254,7 +1254,7 @@ def run_self_tests() -> int:
         test_gemini_cli_home_targets_profile_root,
         test_all_default_adapters_and_explicit_adapter,
         test_explicit_default_adapter_overrides_skipped_default,
-        test_import_adapters_escape_spaces_and_gemini_uses_pointer,
+        test_import_adapters_escape_spaces,
         test_prompt_rendered_paths_reject_prompt_breakout_chars,
         test_inaccessible_targets_fail_structured,
         test_crlf_paths_with_spaces_and_duplicate_blocks,
@@ -1560,8 +1560,7 @@ def test_all_default_adapters_and_explicit_adapter() -> None:
         gemini_text = read_text_preserve_newlines(home / ".gemini" / "GEMINI.md")
         openclaw_text = read_text_preserve_newlines(home / ".openclaw" / "AGENTS.md")
         assert_true(f"@{resolved_global}" in claude_text, "Claude adapter import missing")
-        assert_true(f"@{resolved_global}" not in gemini_text, "Gemini adapter should not use cross-root import syntax")
-        assert_true(str(resolved_global) in gemini_text, "Gemini pointer adapter missing canonical path")
+        assert_true(f"@{resolved_global}" in gemini_text, "Gemini adapter import missing")
         assert_true(f"@{resolved_global}" not in openclaw_text, "unknown adapter should not assume import support")
 
 
@@ -1587,7 +1586,7 @@ def test_explicit_default_adapter_overrides_skipped_default() -> None:
         assert_true(f"@{global_instructions_path(home.resolve())}" in read_text_preserve_newlines(claude), "known default import style was lost")
 
 
-def test_import_adapters_escape_spaces_and_gemini_uses_pointer() -> None:
+def test_import_adapters_escape_spaces() -> None:
     with tempfile.TemporaryDirectory(prefix="agentos global installer ") as tmp:
         root = Path(tmp)
         home = root / "home with spaces"
@@ -1601,8 +1600,7 @@ def test_import_adapters_escape_spaces_and_gemini_uses_pointer() -> None:
         claude_text = read_text_preserve_newlines(home / ".claude" / "CLAUDE.md")
         gemini_text = read_text_preserve_newlines(home / ".gemini" / "GEMINI.md")
         assert_true(f"@{escaped_global}" in claude_text, "Claude import path did not escape spaces")
-        assert_true(f"@{escaped_global}" not in gemini_text, "Gemini should not use cross-root import syntax")
-        assert_true(str(global_instructions_path(home.resolve())) in gemini_text, "Gemini pointer path missing")
+        assert_true(f"@{escaped_global}" in gemini_text, "Gemini import path did not escape spaces")
 
 
 def test_prompt_rendered_paths_reject_prompt_breakout_chars() -> None:

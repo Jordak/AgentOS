@@ -37,7 +37,7 @@ The default adapter targets are:
 
 - Codex: `<codex-home>/AGENTS.md`. If a non-empty `<codex-home>/AGENTS.override.md` exists, the installer keeps both files current because Codex reads the override first and falls back to `AGENTS.md` when the override is removed. `<codex-home>` is `CODEX_HOME` when set, otherwise `<home>/.codex`.
 - Claude Code: `<claude-config-dir>/CLAUDE.md`. `<claude-config-dir>` is `CLAUDE_CONFIG_DIR` when set, otherwise `<home>/.claude`.
-- Gemini CLI: `<gemini-cli-home>/.gemini/GEMINI.md`. `<gemini-cli-home>` is `GEMINI_CLI_HOME` when set, otherwise `<home>`. Gemini receives pointer text rather than an `@` import because Gemini restricts memory imports to its context root.
+- Gemini CLI: `<gemini-cli-home>/.gemini/GEMINI.md`. `<gemini-cli-home>` is `GEMINI_CLI_HOME` when set, otherwise `<home>`. Gemini's current context-file docs say `GEMINI.md` imports support absolute paths, so the default Gemini adapter imports the canonical global file.
 
 Google has announced that consumer Gemini CLI usage is transitioning to Antigravity CLI, with consumer Gemini CLI service ending June 18, 2026. The Gemini adapter remains for existing Gemini CLI and enterprise/API-key users. For Antigravity CLI, pass an explicit `--adapter <path>` once you have confirmed Antigravity's current instruction-file path from its docs.
 
