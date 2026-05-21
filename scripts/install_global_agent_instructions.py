@@ -803,7 +803,7 @@ def adapter_block(global_path: Path, import_style: str = "pointer") -> str:
         return f"""{ADAPTER_START}
 AgentOS global instructions are managed at:
 
-@{global_path}
+@{markdown_import_path(global_path)}
 
 If your harness does not expand Markdown `@path` imports, read this file first:
 
@@ -820,6 +820,10 @@ AgentOS global instructions are managed at:
 Read that file first, then continue with the rest of this file.
 {ADAPTER_END}
 """
+
+
+def markdown_import_path(path: Path) -> str:
+    return re.sub(r"([ \t])", r"\\\1", str(path))
 
 
 def check_target(target: Target, home: Path, agentos_home: Path) -> Result:
@@ -1120,6 +1124,7 @@ def run_self_tests() -> int:
         test_gemini_cli_home_targets_profile_root,
         test_all_default_adapters_and_explicit_adapter,
         test_explicit_default_adapter_overrides_skipped_default,
+        test_import_adapters_escape_spaces_in_paths,
         test_crlf_paths_with_spaces_and_duplicate_blocks,
         test_preflight_prevents_partial_writes,
         test_symlink_targets_fail_closed_and_modes_are_preserved,
@@ -1423,6 +1428,23 @@ def test_explicit_default_adapter_overrides_skipped_default() -> None:
         claude = home / ".claude" / "CLAUDE.md"
         assert_true(claude.exists(), "explicit default-path adapter was skipped")
         assert_true(f"@{global_instructions_path(home.resolve())}" in read_text_preserve_newlines(claude), "known default import style was lost")
+
+
+def test_import_adapters_escape_spaces_in_paths() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos global installer ") as tmp:
+        root = Path(tmp)
+        home = root / "home with spaces"
+        home.mkdir()
+        (home / ".claude").mkdir()
+        (home / ".gemini").mkdir()
+        agentos = make_fake_agentos(root)
+        code, output = run_args(["--agentos-home", str(agentos), "--no-dry-run"], home)
+        assert_true(code == 0, output)
+        escaped_global = markdown_import_path(global_instructions_path(home.resolve()))
+        claude_text = read_text_preserve_newlines(home / ".claude" / "CLAUDE.md")
+        gemini_text = read_text_preserve_newlines(home / ".gemini" / "GEMINI.md")
+        assert_true(f"@{escaped_global}" in claude_text, "Claude import path did not escape spaces")
+        assert_true(f"@{escaped_global}" in gemini_text, "Gemini import path did not escape spaces")
 
 
 def test_crlf_paths_with_spaces_and_duplicate_blocks() -> None:
