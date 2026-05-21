@@ -490,13 +490,31 @@ def check_skill_mirrors(
             details=details,
         )
 
+    hard_statuses = {"source-missing", "source-unreadable", "mirror-unreadable", "unknown"}
+    if any(status in hard_statuses for status in statuses):
+        recommendations = [
+            "Fix the reported source, readability, or audit-shape errors before syncing mirrors.",
+            "Inspect the audit: python3 os/skills/mirror-skills/scripts/mirror_skills.py "
+            f"--agentos-root {agentos_home} --mirror-root {mirror_root}",
+        ]
+        return CheckResult(
+            "skill mirrors",
+            "FAIL",
+            "Mirror-skills audit found source, readability, or output-shape errors.",
+            details=details,
+            recommendations=recommendations,
+        )
+
     recommendations = [
         "Inspect the audit: python3 os/skills/mirror-skills/scripts/mirror_skills.py "
         f"--agentos-root {agentos_home} --mirror-root {mirror_root}",
-        "After approving current-machine mirror writes: python3 "
-        "os/skills/mirror-skills/scripts/mirror_skills.py "
-        f"--agentos-root {agentos_home} --mirror-root {mirror_root} --sync",
     ]
+    if statuses.get("missing") or statuses.get("stale"):
+        recommendations.append(
+            "After approving current-machine mirror writes: python3 "
+            "os/skills/mirror-skills/scripts/mirror_skills.py "
+            f"--agentos-root {agentos_home} --mirror-root {mirror_root} --sync"
+        )
     if statuses.get("extra-files"):
         recommendations.append(
             "Extra mirror files are not deleted by default; inspect them before considering --prune-extra."
@@ -858,6 +876,7 @@ def run_self_tests() -> int:
         test_subprocess_timeout_output_is_text,
         test_mirror_smoke_uses_temp_dirs,
         test_mirror_command_failure_is_not_sync_advice,
+        test_mirror_source_failure_is_not_sync_advice,
     ]
     for test in tests:
         try:
@@ -1063,6 +1082,29 @@ def test_mirror_command_failure_is_not_sync_advice() -> None:
         joined = "\n".join(result.details + result.recommendations)
         assert_true(result.status == "FAIL", "mirror command failure should fail")
         assert_true("--sync" not in joined, "command failure should not recommend mirror sync")
+
+
+def test_mirror_source_failure_is_not_sync_advice() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        mirror_root = Path(tmp) / "mirrors"
+        make_fake_agentos(root)
+        manifest = root / "os" / "skills" / "MANIFEST.md"
+        manifest.write_text(
+            manifest.read_text(encoding="utf-8")
+            + """
+
+### `missing-source-skill`
+
+- Canonical source: `os/skills/missing-source-skill/SKILL.md`.
+""",
+            encoding="utf-8",
+        )
+        result = check_skill_mirrors(root, mirror_root, minimal_env(Path(tmp) / "home"), verbose=False)
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "FAIL", "missing canonical source should fail")
+        assert_true("source-missing=1" in joined, "source-missing status should be reported")
+        assert_true("--sync" not in joined, "source failure should not recommend mirror sync")
 
 
 def render_report_for_test(report: DoctorReport, verbose: bool) -> str:
