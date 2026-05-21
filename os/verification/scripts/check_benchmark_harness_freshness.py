@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import tempfile
 from dataclasses import dataclass
@@ -16,6 +17,7 @@ from typing import Any
 DEFAULT_MANIFEST = Path("os/verification/BENCHMARKS.json")
 DEFAULT_HISTORY = Path("os/verification/BENCHMARK_HISTORY.md")
 BENCHMARK_HISTORY_HEADER = ("Date", "Commit/PR", "Suite", "Result Summary", "Interpretation", "Caveats")
+RESULT_RATIO_RE = re.compile(r"(?<![\d/])(\d+)/(\d+)(?![\d/])")
 
 HARNESS_UNAVAILABLE_PATTERNS = (
     "is not installed",
@@ -304,8 +306,11 @@ def latest_history_entry(entries: list[HistoryEntry], suite: str) -> HistoryEntr
 
 
 def history_matches_behavior(entry: HistoryEntry, record: RunRecord) -> bool:
-    expected_ratio = f"{record.behavioral_pass}/{record.behavioral_total}"
-    return expected_ratio in entry.result_summary
+    expected = (record.behavioral_pass, record.behavioral_total)
+    return any(
+        (int(match.group(1)), int(match.group(2))) == expected
+        for match in RESULT_RATIO_RE.finditer(entry.result_summary)
+    )
 
 
 def check_target(
@@ -427,12 +432,18 @@ def run_self_test(root: Path) -> int:
         wrong_result_history = [
             HistoryEntry(date=date(2026, 5, 16), suite="self-test", result_summary="Failed 0/8")
         ]
+        partial_ratio_history = [
+            HistoryEntry(date=date(2026, 5, 16), suite="self-test", result_summary="Passed 18/80")
+        ]
         current_history = [HistoryEntry(date=date(2026, 5, 16), suite="self-test", result_summary="Passed 8/8")]
         if check_target(fixture_root, full_target, now, stale_history) == 0:
             print("SELF-TEST FAIL: stale curated history was accepted")
             return 1
         if check_target(fixture_root, full_target, now, wrong_result_history) == 0:
             print("SELF-TEST FAIL: mismatched curated history result was accepted")
+            return 1
+        if check_target(fixture_root, full_target, now, partial_ratio_history) == 0:
+            print("SELF-TEST FAIL: partial-ratio curated history result was accepted")
             return 1
         if check_target(fixture_root, full_target, now, current_history) != 0:
             print("SELF-TEST FAIL: current curated history was rejected")
