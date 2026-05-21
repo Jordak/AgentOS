@@ -570,6 +570,8 @@ def starter_personal_paths(getting_started: Path) -> tuple[list[str], str | None
         if rel not in seen:
             seen.add(rel)
             paths.append(rel)
+    if not paths:
+        return [], "Starter Files section did not list any personal/os/ starter paths."
     return paths, None
 
 
@@ -791,6 +793,7 @@ def run_self_tests() -> int:
     tests = [
         test_home_discovery_and_personal_overlay_privacy,
         test_personal_overlay_source_error_warns,
+        test_personal_overlay_empty_starter_list_warns,
         test_invalid_home_is_graceful,
         test_adapter_check_uses_temp_home,
         test_adapter_check_command_failure_is_not_drift,
@@ -839,6 +842,19 @@ def test_personal_overlay_source_error_warns() -> None:
         result = check_personal_overlay(root, verbose=False)
         assert_true(result.status == "WARN", "unreadable starter checklist should warn")
         assert_true("Could not determine" in result.summary, "starter source warning summary missing")
+
+
+def test_personal_overlay_empty_starter_list_warns() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        make_fake_agentos(root)
+        (root / "os" / "playbook" / "GETTING_STARTED.md").write_text(
+            "# Getting Started\n\n## Starter Files\n\nNo starter paths yet.\n",
+            encoding="utf-8",
+        )
+        result = check_personal_overlay(root, verbose=False)
+        assert_true(result.status == "WARN", "empty starter checklist should warn")
+        assert_true("Could not determine" in result.summary, "empty starter warning summary missing")
 
 
 def test_invalid_home_is_graceful() -> None:
