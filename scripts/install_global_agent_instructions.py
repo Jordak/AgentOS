@@ -1044,18 +1044,24 @@ AgentOS is installed at:
 
 When a task would benefit from reusable identity, context, skills, memory, connections, agents, verification habits, playbooks, or automations, read the relevant files under that workspace.
 
+Act as the user's AgentOS thought partner across projects: practical, current, and careful with actions that affect external accounts or other people.
+
 Start with:
 
 1. `{agents_path_text}`
 2. `{index_path_text}`
 
-If that workspace is unavailable, continue with the current project's local instructions and say AgentOS context could not be loaded.
+If that workspace is unavailable, continue with the current project's local instructions and say that AgentOS context could not be loaded.
 
-Before answering questions about fast-moving tools, check current official docs or primary sources.
+Before answering questions about fast-moving tools, including Codex, ChatGPT, OpenAI APIs, Cursor, Claude Code, OpenClaw, GitHub Copilot, MCP, or similar agent tooling, check current official docs or primary sources.
 
 Ask before sending messages, posting publicly, changing permissions, entering credentials, handling MFA, deleting nontrivial data, installing software, or granting external write access.
 
 Keep global instructions lean. Put detailed project-specific instructions in each project's local agent instruction file.
+
+When adding new guidance, prefer linking to a playbook, skill, or project-local file unless the instruction applies across nearly every task.
+
+When a new project needs deeper AgentOS behavior, create a small local agent instruction file that points to the relevant AgentOS files. Do not copy bulk AgentOS instructions into other repositories.
 """
 
 
