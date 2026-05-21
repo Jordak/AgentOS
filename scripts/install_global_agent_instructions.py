@@ -123,7 +123,7 @@ class RollbackError:
 DEFAULT_ADAPTERS = (
     AdapterSpec("codex", (".codex", "AGENTS.md"), "pointer", (".codex", "AGENTS.override.md")),
     AdapterSpec("claude", (".claude", "CLAUDE.md"), "markdown_import"),
-    AdapterSpec("gemini", (".gemini", "GEMINI.md"), "markdown_import"),
+    AdapterSpec("gemini", (".gemini", "GEMINI.md"), "pointer"),
 )
 
 
@@ -229,6 +229,17 @@ def run(
                 return 2
 
     home = home.expanduser().resolve()
+    if mode != "remove":
+        for label, path in (("home", home), ("AgentOS home", agentos_home)):
+            if path is None:
+                continue
+            render_error = validate_prompt_safe_path(path)
+            if render_error:
+                print(
+                    f"error: {label} path cannot be rendered safely in managed instructions: {render_error}",
+                    file=out,
+                )
+                return 2
     targets = collect_targets(
         home=home,
         codex_home=codex_home,
@@ -614,6 +625,19 @@ def validate_agentos_home(agentos_home: Path) -> str | None:
     return None
 
 
+def validate_prompt_safe_path(path: Path) -> str | None:
+    text = str(path)
+    for char in text:
+        code = ord(char)
+        if char == "`":
+            return "contains a backtick"
+        if char in {"\n", "\r"}:
+            return "contains a newline"
+        if code < 32 or code == 127:
+            return f"contains control character U+{code:04X}"
+    return None
+
+
 def global_instructions_path(home: Path) -> Path:
     return home / ".agents" / "AGENTS.md"
 
@@ -773,19 +797,22 @@ def expected_block(target: Target, home: Path, agentos_home: Path) -> str:
 
 
 def global_block(agentos_home: Path) -> str:
+    agentos_home_text = prompt_path(agentos_home)
+    agents_path_text = prompt_path(agentos_home / "AGENTS.md")
+    index_path_text = prompt_path(agentos_home / "os" / "INDEX.md")
     return f"""{GLOBAL_START}
 # Global Agent Instructions
 
 AgentOS is installed at:
 
-`{agentos_home}`
+`{agentos_home_text}`
 
 When a task would benefit from reusable identity, context, skills, memory, connections, agents, verification habits, playbooks, or automations, read the relevant files under that workspace.
 
 Start with:
 
-1. `{agentos_home / "AGENTS.md"}`
-2. `{agentos_home / "os" / "INDEX.md"}`
+1. `{agents_path_text}`
+2. `{index_path_text}`
 
 If that workspace is unavailable, continue with the current project's local instructions and say AgentOS context could not be loaded.
 
@@ -799,6 +826,7 @@ Keep global instructions lean. Put detailed project-specific instructions in eac
 
 
 def adapter_block(global_path: Path, import_style: str = "pointer") -> str:
+    global_path_text = prompt_path(global_path)
     if import_style == "markdown_import":
         return f"""{ADAPTER_START}
 AgentOS global instructions are managed at:
@@ -807,7 +835,7 @@ AgentOS global instructions are managed at:
 
 If your harness does not expand Markdown `@path` imports, read this file first:
 
-`{global_path}`
+`{global_path_text}`
 
 Then continue with the rest of this file.
 {ADAPTER_END}
@@ -815,15 +843,22 @@ Then continue with the rest of this file.
     return f"""{ADAPTER_START}
 AgentOS global instructions are managed at:
 
-`{global_path}`
+`{global_path_text}`
 
 Read that file first, then continue with the rest of this file.
 {ADAPTER_END}
 """
 
 
+def prompt_path(path: Path) -> str:
+    path_error = validate_prompt_safe_path(path)
+    if path_error:
+        raise ManagedBlockError(f"path cannot be rendered safely in managed instructions: {path_error}")
+    return str(path)
+
+
 def markdown_import_path(path: Path) -> str:
-    return re.sub(r"([ \t])", r"\\\1", str(path))
+    return re.sub(r"([ \t])", r"\\\1", prompt_path(path))
 
 
 def check_target(target: Target, home: Path, agentos_home: Path) -> Result:
@@ -1124,7 +1159,8 @@ def run_self_tests() -> int:
         test_gemini_cli_home_targets_profile_root,
         test_all_default_adapters_and_explicit_adapter,
         test_explicit_default_adapter_overrides_skipped_default,
-        test_import_adapters_escape_spaces_in_paths,
+        test_import_adapters_escape_spaces_and_gemini_uses_pointer,
+        test_prompt_rendered_paths_reject_prompt_breakout_chars,
         test_crlf_paths_with_spaces_and_duplicate_blocks,
         test_preflight_prevents_partial_writes,
         test_symlink_targets_fail_closed_and_modes_are_preserved,
@@ -1404,7 +1440,8 @@ def test_all_default_adapters_and_explicit_adapter() -> None:
         gemini_text = read_text_preserve_newlines(home / ".gemini" / "GEMINI.md")
         openclaw_text = read_text_preserve_newlines(home / ".openclaw" / "AGENTS.md")
         assert_true(f"@{resolved_global}" in claude_text, "Claude adapter import missing")
-        assert_true(f"@{resolved_global}" in gemini_text, "Gemini adapter import missing")
+        assert_true(f"@{resolved_global}" not in gemini_text, "Gemini adapter should not use cross-root import syntax")
+        assert_true(str(resolved_global) in gemini_text, "Gemini pointer adapter missing canonical path")
         assert_true(f"@{resolved_global}" not in openclaw_text, "unknown adapter should not assume import support")
 
 
@@ -1430,7 +1467,7 @@ def test_explicit_default_adapter_overrides_skipped_default() -> None:
         assert_true(f"@{global_instructions_path(home.resolve())}" in read_text_preserve_newlines(claude), "known default import style was lost")
 
 
-def test_import_adapters_escape_spaces_in_paths() -> None:
+def test_import_adapters_escape_spaces_and_gemini_uses_pointer() -> None:
     with tempfile.TemporaryDirectory(prefix="agentos global installer ") as tmp:
         root = Path(tmp)
         home = root / "home with spaces"
@@ -1444,7 +1481,27 @@ def test_import_adapters_escape_spaces_in_paths() -> None:
         claude_text = read_text_preserve_newlines(home / ".claude" / "CLAUDE.md")
         gemini_text = read_text_preserve_newlines(home / ".gemini" / "GEMINI.md")
         assert_true(f"@{escaped_global}" in claude_text, "Claude import path did not escape spaces")
-        assert_true(f"@{escaped_global}" in gemini_text, "Gemini import path did not escape spaces")
+        assert_true(f"@{escaped_global}" not in gemini_text, "Gemini should not use cross-root import syntax")
+        assert_true(str(global_instructions_path(home.resolve())) in gemini_text, "Gemini pointer path missing")
+
+
+def test_prompt_rendered_paths_reject_prompt_breakout_chars() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-global-installer-") as tmp:
+        root = Path(tmp)
+        unsafe_agentos = make_fake_agentos(root, "AgentOS\nINJECTED")
+        home = root / "home"
+        home.mkdir()
+        code, output = run_args(["--agentos-home", str(unsafe_agentos), "--no-dry-run"], home)
+        assert_true(code == 2, "unsafe AgentOS home path should fail before writing")
+        assert_true("cannot be rendered safely" in output, "unsafe AgentOS home path failure should be explicit")
+        assert_true(not global_instructions_path(home).exists(), "unsafe AgentOS home path wrote global instructions")
+
+        unsafe_home = root / "home`bad"
+        unsafe_home.mkdir()
+        agentos = make_fake_agentos(root)
+        code, output = run_args(["--agentos-home", str(agentos), "--no-dry-run"], unsafe_home)
+        assert_true(code == 2, "unsafe home path should fail before writing")
+        assert_true("cannot be rendered safely" in output, "unsafe home path failure should be explicit")
 
 
 def test_crlf_paths_with_spaces_and_duplicate_blocks() -> None:
@@ -1670,7 +1727,7 @@ def test_remediation_command_shell_quotes_dynamic_args() -> None:
         root = Path(tmp)
         home = root / "home"
         home.mkdir()
-        agentos = make_fake_agentos(root, "AgentOS;dollar$paren()tick`")
+        agentos = make_fake_agentos(root, "AgentOS;dollar$paren()")
         adapter = "<home>/.openclaw/AGENTS.md"
         code, output = run_args(["--agentos-home", str(agentos), "--check", "--adapter", adapter], home)
         assert_true(code == 1, "check should report missing managed files")
@@ -1738,18 +1795,25 @@ def test_tilde_windows_and_relative_adapter_paths() -> None:
         assert_true((home / ".hermes" / "AGENTS.md").exists(), "tilde adapter did not use fake home")
         assert_true((home / ".openclaw" / "AGENTS.md").exists(), "Windows-style <home> adapter missing")
 
-        code, output = run_args(
-            [
-                "--agentos-home",
-                str(agentos),
-                "--adapter",
-                "relative-adapter/AGENTS.md",
-            ],
-            home,
-        )
-        assert_true(code == 0, output)
-        assert_true(str(Path.cwd() / "relative-adapter" / "AGENTS.md") in output, "relative adapter was not resolved")
-        assert_true(not (Path.cwd() / "relative-adapter").exists(), "relative dry-run created a directory")
+        cwd = root / "cwd"
+        cwd.mkdir()
+        original_cwd = Path.cwd()
+        try:
+            os.chdir(cwd)
+            code, output = run_args(
+                [
+                    "--agentos-home",
+                    str(agentos),
+                    "--adapter",
+                    "relative-adapter/AGENTS.md",
+                ],
+                home,
+            )
+            assert_true(code == 0, output)
+            assert_true(str(cwd / "relative-adapter" / "AGENTS.md") in output, "relative adapter was not resolved")
+            assert_true(not (cwd / "relative-adapter").exists(), "relative dry-run created a directory")
+        finally:
+            os.chdir(original_cwd)
 
 
 def test_mode_conflicts() -> None:

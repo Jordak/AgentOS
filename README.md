@@ -37,7 +37,7 @@ The default adapter targets are:
 
 - Codex: `<codex-home>/AGENTS.md`. If a non-empty `<codex-home>/AGENTS.override.md` exists, the installer keeps both files current because Codex reads the override first and falls back to `AGENTS.md` when the override is removed. `<codex-home>` is `CODEX_HOME` when set, otherwise `<home>/.codex`.
 - Claude Code: `<home>/.claude/CLAUDE.md`
-- Gemini CLI: `<gemini-cli-home>/.gemini/GEMINI.md`. `<gemini-cli-home>` is `GEMINI_CLI_HOME` when set, otherwise `<home>`.
+- Gemini CLI: `<gemini-cli-home>/.gemini/GEMINI.md`. `<gemini-cli-home>` is `GEMINI_CLI_HOME` when set, otherwise `<home>`. Gemini receives pointer text rather than an `@` import because Gemini restricts memory imports to its context root.
 
 By default, the installer updates default adapters only when their harness directory already exists. Use `--all-default-adapters` to create all default adapter files, and repeat `--adapter <path>` for extra harnesses such as OpenClaw, Hermes, Antigravity, or another tool with a known instruction-file path. Reuse the same `--all-default-adapters` and `--adapter <path>` arguments for later `--check` or `--remove` runs; custom adapter discovery is intentionally invocation-scoped.
 
