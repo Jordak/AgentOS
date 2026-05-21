@@ -18,11 +18,12 @@ Use this after AgentOS is installed and the global instruction adapters are curr
 Ask enough to make the next agent session better:
 
 1. What should future agents know about who you are and how you like to collaborate?
-2. What projects, repositories, documents, or source systems matter most right now?
-3. What recurring workflows do you want agents to help with?
-4. What tools, accounts, or connectors do agents need to treat carefully?
-5. What boundaries should agents never cross without explicit approval?
-6. What should agents remember between sessions?
+2. Do you plan to use AgentOS for work, personal life, or both?
+3. What projects, repositories, documents, or source systems matter most right now?
+4. What recurring workflows do you want agents to help with?
+5. What tools, accounts, or connectors do agents need to treat carefully?
+6. What boundaries should agents never cross without explicit approval?
+7. What should agents remember between sessions?
 
 After the interview, summarize proposed writes before making them. Include the target path, why it belongs there, and whether the content is private.
 
@@ -77,7 +78,7 @@ Ask the user's agent:
 ```text
 Use AgentOS to get to know me.
 
-Read AGENTS.md, os/INDEX.md, os/playbook/PERSONAL_OVERLAY.md, and os/playbook/GETTING_STARTED.md. Interview me about identity, projects, tools, recurring workflows, safety boundaries, and what future agents should remember. Then propose the first Personal Overlay files to create. Do not write private state until I approve the paths and contents.
+Read AGENTS.md, os/INDEX.md, os/playbook/PERSONAL_OVERLAY.md, and os/playbook/GETTING_STARTED.md. Interview me about identity, whether I plan to use AgentOS for work, personal life, or both, projects, tools, recurring workflows, safety boundaries, and what future agents should remember. Then propose the first Personal Overlay files to create. Do not write private state until I approve the paths and contents.
 ```
 
 Or:

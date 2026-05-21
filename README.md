@@ -77,7 +77,7 @@ AgentOS works best when you treat it as a living operating layer, not a one-time
 
 Useful first moves:
 
-- Ask your agent to get to know you, your projects, your tools, your recurring workflows, and your safety boundaries, then propose approved facts to write into the [Personal Overlay](os/playbook/PERSONAL_OVERLAY.md) under `$root/personal/os/`.
+- Ask your agent to get to know you, whether you plan to use AgentOS for work, personal life, or both, your projects, your tools, your recurring workflows, and your safety boundaries, then propose approved facts to write into the [Personal Overlay](os/playbook/PERSONAL_OVERLAY.md) under `$root/personal/os/`.
 - When a task reveals a reusable workflow, ask whether it should become a skill, playbook entry, memory entry, verification check, or Personal Overlay note.
 - Keep private state in `$root/personal/os/`; keep public-safe templates, policies, and examples in [AgentOS Core](os/INDEX.md) under `$root/os/`.
 - Ask your agent to occasionally check whether the global instruction adapters still point at the right AgentOS installation, especially after moving the checkout or changing agent harnesses.
@@ -89,7 +89,7 @@ For a guided first pass, use the [getting started playbook](os/playbook/GETTING_
 ```text
 Help me get the most out of AgentOS.
 
-Read os/playbook/GETTING_STARTED.md and guide me through the first-pass setup. Interview me about my projects, preferences, recurring workflows, tools, and safety boundaries. Recommend the first Personal Overlay files or AgentOS updates that would make future agent sessions more useful. Do not write private state until I approve the proposed files and locations. Ask whether I want a recurring check for AgentOS repository updates and adapter drift, meaning local instruction files no longer pointing at the intended AgentOS checkout.
+Read os/playbook/GETTING_STARTED.md and guide me through the first-pass setup. Interview me about whether I plan to use AgentOS for work, personal life, or both, plus my projects, preferences, recurring workflows, tools, and safety boundaries. Recommend the first Personal Overlay files or AgentOS updates that would make future agent sessions more useful. Do not write private state until I approve the proposed files and locations. Ask whether I want a recurring check for AgentOS repository updates and adapter drift, meaning local instruction files no longer pointing at the intended AgentOS checkout.
 ```
 
 ## First Read Sequence
