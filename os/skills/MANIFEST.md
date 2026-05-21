@@ -49,7 +49,7 @@ Each skill entry records:
 - Output artifact: readiness report with exactly one verdict, `Ready to Implement`, `Needs Design Consensus`, or `Gate Skipped`, plus optional durable follow-up artifacts and approved source-design updates.
 - Filing rule: canonical policy lives in `os/playbook/IMPLEMENT_FEATURES.md`; local design artifacts default to the mapped project's design-doc convention or `docs/design/issue-<number>-implementation-readiness.md`; private/personal design notes belong in the Personal Overlay; approved GitHub updates stay in GitHub.
 - Safety posture: do not treat a missing readiness marker as silently ready; infer and confirm with the user before implementation proceeds; ask before external tracker writes unless explicitly authorized; do not leave meaningful deferred questions only in chat, model memory, or unpersisted reports.
-- Verification coverage: confirms the target was classified as gated or exempt, the durable source and readiness marker were checked, unmarked readiness was not silently accepted, deferred follow-up artifacts were created or proposed where required, and external writes were approved; run `python3 os/verification/scripts/validate_agentos.py` after skill or manifest changes.
+- Verification coverage: confirms the target was classified as gated, exempt, or explicitly bypassed, the durable source and readiness marker were checked, unmarked readiness was not silently accepted, deferred follow-up artifacts were created where required, and external writes were approved; run `python3 os/verification/scripts/validate_agentos.py` after skill or manifest changes.
 - Upgrade notes: Core reusable gate for feature-sized implementation work.
 
 ### `mirror-skills`

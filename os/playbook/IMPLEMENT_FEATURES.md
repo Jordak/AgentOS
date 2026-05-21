@@ -81,7 +81,7 @@ When a design-interview workflow is available and useful for resolving blocking 
 
 ### Gate Skipped
 
-Use this when the work is small, mechanical, or obvious enough to be exempt from the gate. Record why the gate was skipped so future agents can distinguish intentional bypass from omission.
+Use this when the work is small, mechanical, or obvious enough to be exempt from the gate, or when the user explicitly chooses to bypass the gate after the agent reports the missing or incomplete readiness evidence. Record why the gate was skipped and, for bypasses, summarize what readiness evidence was missing so future agents can distinguish intentional bypass from omission.
 
 ## Deferred Follow-ups
 
@@ -110,9 +110,9 @@ Proceed only when a durable PR design source has `Design readiness: ready to imp
 
 If a durable design source exists but has no readiness marker, infer readiness from durable evidence such as the issue, PR body, or local design doc, then confirm with the user before proceeding.
 
-If only chat or a current user request exists, treat the review target as `Needs Design Consensus` until the design is promoted into a durable source, unless the user explicitly chooses to bypass the gate.
+If only chat or a current user request exists, treat the review target as `Needs Design Consensus` until the design is promoted into a durable source. If the user explicitly chooses to bypass the gate, record a `Gate Skipped` verdict with the bypass reason and missing-readiness summary.
 
-If the user proceeds despite missing or incomplete readiness, record the bypass in the review-loop ledger and final report.
+If the user proceeds despite missing or incomplete readiness, record the `Gate Skipped` bypass in the review-loop ledger and final report.
 
 If the loop later detects design creep, treat the bypass as evidence that the PR may need redesign rather than more local fixes.
 

@@ -1,6 +1,6 @@
 ---
 name: check-implementation-readiness
-description: "Use before implementing feature-sized work: implement, build, add, redesign, substantially refactor, or start an issue/PRD/spec where the outcome changes behavior, workflow, data model, public docs policy, validation policy, or reusable AgentOS structure. Checks durable design consensus, creates or proposes follow-up artifacts for deferred questions, and returns Ready to Implement, Needs Design Consensus, or Gate Skipped."
+description: "Use before implementing feature-sized work: implement, build, add, redesign, substantially refactor, or start an issue/PRD/spec where the outcome changes behavior, workflow, data model, public docs policy, validation policy, or reusable AgentOS structure. Checks durable design consensus, creates required follow-up artifacts for deferred questions, and returns Ready to Implement, Needs Design Consensus, or Gate Skipped."
 ---
 
 # Check Implementation Readiness
@@ -49,10 +49,10 @@ Safety:
 ## Workflow Phases
 
 1. Establish the target.
-   Identify the implementation request, issue, PRD, design doc, PR, branch, or local plan. Apply the playbook's trigger scope and exemptions. If exempt, return `Gate Skipped` with the reason.
+   Identify the implementation request, issue, PRD, design doc, PR, branch, or local plan. Apply the playbook's trigger scope and exemptions. If exempt, return `Gate Skipped` with the reason. If the user explicitly bypasses the gate after missing or incomplete readiness is reported, return `Gate Skipped` with the bypass reason and missing-readiness summary.
 
 2. Locate the durable design source.
-   Prefer the linked GitHub issue, PRD, ADR, local design doc, or planning note named by the request or repository. For PR review work, inspect the linked issue, PR body, and any referenced design source. If only chat context exists, the verdict is `Needs Design Consensus` until that context is promoted into a durable artifact.
+   Prefer the linked GitHub issue, PRD, ADR, local design doc, or planning note named by the request or repository. For PR review work, inspect the linked issue, PR body, and any referenced design source. If only chat context exists, the verdict is `Needs Design Consensus` until that context is promoted into a durable artifact or the user explicitly chooses a `Gate Skipped` bypass.
 
 3. Check readiness.
    Evaluate the source against the playbook's design-source standard and readiness-marker rules. Content wins over the marker.
@@ -61,10 +61,10 @@ Safety:
    If the source lacks `Design readiness:`, infer readiness from the content. Tell the user the inferred verdict, reasons, implementation boundary, and marker or edit you plan to make. Wait for confirmation before implementation proceeds. If edits are authorized, add or propose the marker after confirmation.
 
 5. Handle open questions.
-   Classify open questions as blocking or deferred using the playbook's rules. When an optional design-interview workflow is available and useful for the blocking question, use it; for simple questions or when no such workflow is available, ask targeted questions directly. Ask before GitHub issue creation or updates unless tracker writes were explicitly authorized. If GitHub writes are not authorized, create or propose the local artifact destination named by the playbook unless the project has a better convention or the user redirects. Update or propose updating the current design source with a `Deferred Follow-ups` section linking to created artifacts.
+   Classify open questions as blocking or deferred using the playbook's rules. When an optional design-interview workflow is available and useful for the blocking question, use it; for simple questions or when no such workflow is available, ask targeted questions directly. Ask before GitHub issue creation or updates unless tracker writes were explicitly authorized. If GitHub writes are not authorized, create the local artifact named by the playbook unless the project has a better convention or the user redirects. If required durable follow-up artifacts are not created, the verdict remains `Needs Design Consensus`. Update or propose updating the current design source with a `Deferred Follow-ups` section linking to created artifacts.
 
 6. Report the verdict.
-   Include the source reviewed, satisfied and missing readiness fields, implementation boundary, non-goals, created or proposed follow-up artifacts, and whether external writes happened, were proposed, or were skipped.
+   Include the source reviewed, satisfied and missing readiness fields, implementation boundary, non-goals, created follow-up artifacts, proposed source-design updates, and whether external writes happened, were proposed, or were skipped.
 
 ## Filing Rules
 
@@ -91,6 +91,6 @@ Before finishing:
 3. Confirm the verdict is `Ready to Implement`, `Needs Design Consensus`, or `Gate Skipped`.
 4. Confirm the design source's marker and content were both checked.
 5. Confirm unmarked readiness was not silently accepted.
-6. Confirm deferred follow-up artifacts were created or proposed where required.
+6. Confirm deferred follow-up artifacts were created where required.
 7. Confirm external tracker writes were approved before they happened.
 8. If this skill or its manifest entry changed, run `python3 os/verification/scripts/validate_agentos.py`.

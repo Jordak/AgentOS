@@ -831,6 +831,12 @@ class AgentOSValidator:
                             f"{self.display_path(path)}:{line_no}",
                             f"{skill_name}: quoted frontmatter field {key!r} is not closed",
                         )
+                    elif self.quoted_scalar_has_unescaped_inner_quote(value):
+                        self.add_error(
+                            check,
+                            f"{self.display_path(path)}:{line_no}",
+                            f"{skill_name}: quoted frontmatter field {key!r} contains an unescaped inner quote",
+                        )
                     continue
                 if re.search(r":\s", value):
                     self.add_error(
@@ -844,6 +850,33 @@ class AgentOSValidator:
                     self.add_error(check, path, f"{skill_name}: missing frontmatter field {field_name!r}")
 
         self.checked.append(check)
+
+    def quoted_scalar_has_unescaped_inner_quote(self, value: str) -> bool:
+        quote = value[0]
+        inner = value[1:-1]
+        if quote == '"':
+            for index, character in enumerate(inner):
+                if character != '"':
+                    continue
+                backslashes = 0
+                cursor = index - 1
+                while cursor >= 0 and inner[cursor] == "\\":
+                    backslashes += 1
+                    cursor -= 1
+                if backslashes % 2 == 0:
+                    return True
+            return False
+
+        index = 0
+        while index < len(inner):
+            if inner[index] != "'":
+                index += 1
+                continue
+            if index + 1 < len(inner) and inner[index + 1] == "'":
+                index += 2
+                continue
+            return True
+        return False
 
     def skill_manifest_entries(self, manifest: str) -> dict[str, str]:
         matches = list(SKILL_HEADING_RE.finditer(manifest))
@@ -1452,6 +1485,17 @@ def run_self_test() -> int:
             "# Bad Frontmatter\n",
             encoding="utf-8",
         )
+        bad_quoted_skill = root / "os/skills/bad-quoted-frontmatter/SKILL.md"
+        bad_quoted_skill.parent.mkdir(parents=True)
+        bad_quoted_skill.write_text(
+            "---\n"
+            "name: bad-quoted-frontmatter\n"
+            "description: \"Bad \"quoted\" example\"\n"
+            "---\n"
+            "\n"
+            "# Bad Quoted Frontmatter\n",
+            encoding="utf-8",
+        )
         (root / ".git").mkdir()
         (root / ".gitignore").write_text(
             "/" + "Users" + "/private-client/cache\n!personal/**/*.md\n",
@@ -1528,6 +1572,7 @@ def run_self_test() -> int:
             "uses a parent-relative AgentOS path",
             "listed local path does not exist",
             "plain frontmatter field 'description' contains ': '; quote the value",
+            "quoted frontmatter field 'description' contains an unescaped inner quote",
             "benchmark script missing from manifest",
             "public export must not contain git history",
             "private marker matched",
