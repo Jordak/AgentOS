@@ -256,6 +256,25 @@ def remove_empty_dirs(root: Path) -> None:
             pass
 
 
+def filter_entries(entries: list[SkillEntry], requested_names: list[str]) -> list[SkillEntry]:
+    if not requested_names:
+        return entries
+
+    requested = list(dict.fromkeys(requested_names))
+    available = {entry.name for entry in entries}
+    missing = [name for name in requested if name not in available]
+    if missing:
+        missing_list = ", ".join(missing)
+        available_list = ", ".join(sorted(available))
+        raise SystemExit(
+            "Requested skill is not canonical in the selected scope: "
+            f"{missing_list}. Available canonical skills: {available_list}"
+        )
+
+    requested_set = set(requested)
+    return [entry for entry in entries if entry.name in requested_set]
+
+
 def print_table(results: list[MirrorResult]) -> None:
     status_width = max(12, *(len(result.status) for result in results))
     skill_width = max(24, *(len(result.name) for result in results))
@@ -306,6 +325,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Mirror only Core skills from os/skills/MANIFEST.md, not Personal Overlay skills.",
     )
     parser.add_argument(
+        "--skill",
+        action="append",
+        default=[],
+        help="Limit audit or sync to one canonical skill. May be repeated.",
+    )
+    parser.add_argument(
         "--prune-extra",
         action="store_true",
         help="Delete mirror files that are not present in canonical sources.",
@@ -336,6 +361,7 @@ def main() -> int:
         entries.extend(personal_entries)
     if not entries:
         raise SystemExit("No mirrorable Core or Personal Overlay skills found.")
+    entries = filter_entries(entries, args.skill)
 
     entries = [
         SkillEntry(

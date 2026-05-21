@@ -61,8 +61,20 @@ Each skill entry records:
 - Output artifact: mirror audit report and optional current-machine mirror files under a configured mirror root.
 - Filing rule: keep canonical skill behavior in `os/skills/`; keep machine-local mirror state out of this manifest; mirror audit output stays in chat unless the user asks for a local report.
 - Safety posture: default to audit-only; ask before writing outside the workspace unless the active harness has already approved the exact mirror root and write scope; do not delete extra mirror files unless the user explicitly asks for pruning.
-- Verification coverage: run the mirror audit script in audit mode; run a `--sync` smoke test against a temporary mirror root; verify Personal Overlay skill discovery and collision handling; run skill validation and the AgentOS validator when available.
+- Verification coverage: run the mirror audit script in audit mode; run a `--sync` smoke test against a temporary mirror root; verify scoped `--skill` audit and sync behavior; verify Personal Overlay skill discovery and collision handling; run skill validation and the AgentOS validator when available.
 - Upgrade notes: private live mirror roots and validator paths belong in `personal/os/skills/mirror-skills/CONFIG.md`.
+
+### `reverse-mirror-skills`
+
+- Canonical source: `os/skills/reverse-mirror-skills/SKILL.md`
+- Contract status: full.
+- Mutability: mixed: read-only in audit/recommendation mode; local-write after approval when importing a skill into Core or the Personal Overlay, updating manifest metadata, backing up or archiving local skills, generating active-harness metadata, or refreshing current-machine mirrors.
+- Tools and connectors: local filesystem tools, `git`, `os/skills/MANIFEST.md`, `os/skills/SKILL_CONTRACT.md`, `os/playbook/PERSONAL_OVERLAY.md`, the `mirror-skills` workflow, optional skill validation helpers, and GitHub only when the user explicitly asks to create tracking issues.
+- Output artifact: prioritized recommendation table for local skills and optional canonical skill files, Core manifest entry, backup/archive directories, refreshed mirror files, and user-approved follow-up issues.
+- Filing rule: reusable public-safe imports live under `os/skills/` and get manifest entries; private user-specific imports live under `personal/os/skills/` and do not get Core manifest entries; local mirror backups stay under the mirror root archive; Personal Overlay backups stay under the Personal Overlay skills archive; audit output stays in chat unless the user asks for a local report.
+- Safety posture: treat local skills as potentially private until reviewed; require approval before import, overwrite, archive, delete, permanent delete, mirror sync, or issue creation; default local deletion to archive/move; do not overwrite canonical skills automatically; do not record machine-local mirror state in the manifest.
+- Verification coverage: validate the skill with `quick_validate.py` when available; run `python3 os/verification/scripts/validate_agentos.py`; run scoped `mirror-skills` audit/sync smoke checks; manually confirm no bundled reverse mirror script, no future Personal Overlay governance dependency, no specific-person reference, backup behavior, bulk approval behavior, and protected-main behavior.
+- Upgrade notes: complements `mirror-skills` by reviewing local harness skills before promoting approved ones into AgentOS; revisit after the deferred Personal Overlay skills governance design lands.
 
 ### `double-steelman`
 
