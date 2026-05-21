@@ -30,6 +30,16 @@
     "status": "covered"
   },
   {
+    "id": "feature-implementation-readiness",
+    "source_path": "os/playbook/AGENTOS_PLAYBOOK.md",
+    "trigger": "Use IMPLEMENT_FEATURES.md before starting feature-sized implementation work or treating a feature issue as ready for coding.",
+    "guidance_path": "os/playbook/IMPLEMENT_FEATURES.md",
+    "fixture_ids": [
+      "feature-implementation-readiness"
+    ],
+    "status": "covered"
+  },
+  {
     "id": "propagation-review",
     "source_path": "os/playbook/AGENTOS_PLAYBOOK.md",
     "trigger": "Use PROPAGATION_REVIEW_QUEUE.md when agent outputs propose durable AgentOS state changes.",
