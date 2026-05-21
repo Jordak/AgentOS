@@ -7,7 +7,7 @@ AgentOS separates publishable scaffolding from private user-specific state with 
 - AgentOS Core root: `$root/os/`
 - Personal Overlay root: `$root/personal/os/`
 
-`$root` means the AgentOS repository root.
+`$root` means the location where AgentOS is installed.
 
 ## Load Rule
 

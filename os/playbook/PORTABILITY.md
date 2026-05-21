@@ -48,6 +48,32 @@ Common adapter surfaces:
 - Discoverable skill mirrors.
 - Automation definitions.
 
+## Global Instruction Installer
+
+The public README asks users to let an agent run the installer, but the adapter mechanics live here.
+
+Install AgentOS wherever the user wants it to live. Common choices are folders under the current user's home directory, but AgentOS does not require or assume a default path. Use the resolved checkout path as `<agentos-home>`.
+
+Prefer a local directory that is not cloud-synced. Avoid placing AgentOS inside folders managed by iCloud Drive, OneDrive, Dropbox, Google Drive, or similar sync tools; AgentOS can contain local-only Personal Overlay state, Git metadata, generated reports, and agent-written files that are better kept in a normal local development directory.
+
+Portable path notation:
+
+- macOS/Linux: `<home>/.agents/AGENTS.md`
+- Windows: `<home>\.agents\AGENTS.md`
+
+That file is the canonical global instruction file. Harness-specific instruction files keep their own locations and receive a managed adapter block that either points to, imports, or mirrors the canonical instructions depending on what that harness can load reliably.
+
+Default adapter targets:
+
+- Codex: `<codex-home>/AGENTS.md`. If a non-empty `<codex-home>/AGENTS.override.md` exists, the installer keeps both files current because Codex reads the override first and falls back to `AGENTS.md` when the override is removed. `<codex-home>` is `CODEX_HOME` when set, otherwise `<home>/.codex`. Codex's current docs say it reads one global file from `CODEX_HOME`, so the default Codex adapter mirrors the effective canonical global instructions.
+- Claude Code: `<claude-config-dir>/CLAUDE.md`. `<claude-config-dir>` is `CLAUDE_CONFIG_DIR` when set, otherwise `<home>/.claude`.
+- Gemini CLI: `<gemini-cli-home>/.gemini/GEMINI.md`. `<gemini-cli-home>` is `GEMINI_CLI_HOME` when set, otherwise `<home>`. Current Gemini imports are constrained by the importing file's context root, so the default Gemini adapter mirrors the effective canonical global instructions instead of importing `<home>/.agents/AGENTS.md`. To avoid re-rooting imports, the installer refuses to manage the Gemini adapter when the canonical global file contains active Gemini-style `@...` imports outside Markdown code.
+
+> [!NOTE]
+> Google has announced that consumer Gemini CLI usage is transitioning to Antigravity CLI, with consumer Gemini CLI service ending June 18, 2026. The Gemini adapter remains for existing Gemini CLI and enterprise/API-key users. For Antigravity CLI, pass an explicit `--adapter <path>` once you have confirmed Antigravity's current instruction-file path from its docs.
+
+By default, the installer updates default adapters only when their harness directory already exists. Use `--all-default-adapters` to create all default adapter files, and repeat `--adapter <path>` for extra harnesses such as OpenClaw, Hermes, Antigravity, or another tool with a known instruction-file path. Reuse the same `--all-default-adapters` and `--adapter <path>` arguments for later `--check` or `--remove` runs; custom adapter discovery is intentionally invocation-scoped.
+
 Claude Code adapter:
 
 - Workspace instructions: `CLAUDE.md`

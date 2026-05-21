@@ -1,51 +1,28 @@
 # AgentOS
 
-AgentOS is a portable Markdown control plane for agentic tools. It gives agents a stable way to find operating instructions, routing rules, reusable skills, memory templates, safety policies, verification checks, and publication workflow without requiring any one agent harness or private account.
+AgentOS is a portable Markdown control plane for agentic tools. It gives agents a stable way to find operating instructions, routing rules, reusable skills, memory templates, safety policies, verification checks, and publication workflows without requiring any one agent harness or private account.
 
-This public repository contains AgentOS Core: the reusable, public-safe scaffolding. A real local installation may also have a Personal Overlay for private user-specific state.
+This public repository contains AgentOS Core: the reusable, public-safe scaffolding described in [os/INDEX.md](os/INDEX.md). A real local installation is meant to grow a Personal Overlay for private user-specific state.
 
 This project started as an implementation of [aidbagentos.ai](https://aidbagentos.ai/).
 
 ## Core And Overlay
 
-- AgentOS Core lives under `$root/os/`.
-- The Personal Overlay lives under `$root/personal/os/`.
-- `$root` means the AgentOS repository root.
+- AgentOS Core lives under `$root/os/`; start with [os/INDEX.md](os/INDEX.md).
+- The Personal Overlay lives under `$root/personal/os/`; read the [Personal Overlay playbook](os/playbook/PERSONAL_OVERLAY.md) for the load rule.
+- `$root` means the location where AgentOS is installed.
 
 Core files are meant to be shareable. They describe templates, policy, validation, routing, and generic examples. They should not contain a real person's private identity, account data, live agent histories, generated briefs, run logs, or private project state.
 
-Personal Overlay files are local ignored state. They can hold the real user's identity, context, memory, connections, live automations, live agent definitions, reports, histories, queues, and generated outputs. The tracked `personal/` tree contains only public-safe empty `.gitkeep` files so the generic shape is visible.
+Personal Overlay files are local-only state. They can hold the real user's identity, context, memory, connections, live automations, live agent definitions, reports, histories, queues, and generated outputs. The public repository contains only empty placeholders under `personal/` so agents can see where local private files should go. Normal AgentOS publication excludes anything you write there; see [os/playbook/PUBLICATION.md](os/playbook/PUBLICATION.md).
 
-Agents should read `$root/os/` first. Then, when present and relevant, they should read matching files under `$root/personal/os/`. A public clone is still usable without private context; the Personal Overlay is optional.
+Agents should read Core first. Then, when present and relevant, they should read matching files under the Personal Overlay. A fresh public clone can explain the system, but AgentOS becomes useful as your operating layer after an agent helps you fill in approved private context under `$root/personal/os/`.
 
-See `os/playbook/PERSONAL_OVERLAY.md` for the full load and migration rule.
+See [os/playbook/PERSONAL_OVERLAY.md](os/playbook/PERSONAL_OVERLAY.md) for the full load and migration rule.
 
 ## Quickstart
 
-Install AgentOS wherever you want it to live. Common choices are a folder under the current user's home directory, but AgentOS does not require or assume a default path. In the examples below, replace `<agentos-home>` with the resolved path to your chosen checkout.
-
-Prefer a local directory that is not cloud-synced. Avoid placing AgentOS inside folders managed by iCloud Drive, OneDrive, Dropbox, Google Drive, or similar sync tools; AgentOS can contain ignored private overlay state, Git metadata, generated reports, and agent-written files that are better kept in a normal local development directory.
-
-Portable path notation:
-
-- macOS/Linux: `<home>/.agents/AGENTS.md`
-- Windows: `<home>\.agents\AGENTS.md`
-
-That file is the canonical global instruction file. Harness-specific instruction files keep their own locations and receive a managed adapter block that either points to, imports, or mirrors the canonical instructions depending on what that harness can load reliably.
-
-The default adapter targets are:
-
-- Codex: `<codex-home>/AGENTS.md`. If a non-empty `<codex-home>/AGENTS.override.md` exists, the installer keeps both files current because Codex reads the override first and falls back to `AGENTS.md` when the override is removed. `<codex-home>` is `CODEX_HOME` when set, otherwise `<home>/.codex`. Codex's current docs say it reads one global file from `CODEX_HOME`, so the default Codex adapter mirrors the effective canonical global instructions.
-- Claude Code: `<claude-config-dir>/CLAUDE.md`. `<claude-config-dir>` is `CLAUDE_CONFIG_DIR` when set, otherwise `<home>/.claude`.
-- Gemini CLI: `<gemini-cli-home>/.gemini/GEMINI.md`. `<gemini-cli-home>` is `GEMINI_CLI_HOME` when set, otherwise `<home>`. Current Gemini imports are constrained by the importing file's context root, so the default Gemini adapter mirrors the effective canonical global instructions instead of importing `<home>/.agents/AGENTS.md`. To avoid re-rooting imports, the installer refuses to manage the Gemini adapter when the canonical global file contains active Gemini-style `@...` imports outside Markdown code.
-
-Google has announced that consumer Gemini CLI usage is transitioning to Antigravity CLI, with consumer Gemini CLI service ending June 18, 2026. The Gemini adapter remains for existing Gemini CLI and enterprise/API-key users. For Antigravity CLI, pass an explicit `--adapter <path>` once you have confirmed Antigravity's current instruction-file path from its docs.
-
-By default, the installer updates default adapters only when their harness directory already exists. Use `--all-default-adapters` to create all default adapter files, and repeat `--adapter <path>` for extra harnesses such as OpenClaw, Hermes, Antigravity, or another tool with a known instruction-file path. Reuse the same `--all-default-adapters` and `--adapter <path>` arguments for later `--check` or `--remove` runs; custom adapter discovery is intentionally invocation-scoped.
-
-### Agent-Assisted Setup
-
-Give this prompt to your agent:
+Copy this prompt into your agent:
 
 ```text
 Install AgentOS for me.
@@ -57,7 +34,7 @@ Install AgentOS for me.
    Confirm the self-test uses temporary directories and does not touch my real home directory.
 4. Run the installer dry-run:
    python3 scripts/install_global_agent_instructions.py --agentos-home <resolved-agentos-home>
-   If CODEX_HOME, CLAUDE_CONFIG_DIR, or GEMINI_CLI_HOME is set, confirm the dry-run targets those harness homes. If I ask for extra harness adapters, include the same --adapter <path> flags in this dry-run and every later write/check/remove command.
+   Ask me which agent harnesses I use, meaning the tools I use to run agents, such as Codex, Claude Code, Google Antigravity, OpenClaw, Hermes, or something else. If CODEX_HOME, CLAUDE_CONFIG_DIR, or GEMINI_CLI_HOME is set, confirm the dry-run targets those harness homes. For harnesses outside the defaults, ask me for the current instruction-file path before adding any --adapter <path> flags. Include the same --adapter <path> flags in this dry-run and every later write/check/remove command.
 5. Show me exactly which files would be created, backed up, or changed. Do not run the write command until I explicitly approve.
 6. After I approve, run:
    python3 scripts/install_global_agent_instructions.py --agentos-home <resolved-agentos-home> --no-dry-run
@@ -65,11 +42,14 @@ Install AgentOS for me.
    python3 scripts/install_global_agent_instructions.py --agentos-home <resolved-agentos-home> --check
    If extra --adapter <path> flags were used above, repeat those exact flags here.
 8. Summarize what changed, where backups were written, and whether the check passed.
+9. Ask me whether I want AgentOS skills to be discoverable from my harnesses. If I do, use the mirror-skills workflow to check Core skills and Personal Overlay skills, show me the audit result, and ask before syncing any files outside this checkout.
+10. Ask me if I want to hear how to get the most out of AgentOS.
 ```
 
 Use the Python 3 command that works on your machine. On some systems that is `python3`; on others it may be `python` or `py -3`.
 
-### Manual Setup
+<details>
+<summary>Manual setup commands</summary>
 
 ```bash
 git clone https://github.com/Jordak/AgentOS.git <agentos-home>
@@ -87,54 +67,51 @@ python3 scripts/install_global_agent_instructions.py --agentos-home <agentos-hom
 
 If you use `--all-default-adapters` or any custom `--adapter <path>` flags, repeat those same flags on the dry-run, write, check, and remove commands.
 
+</details>
+
+For installer adapter details, see the [portability playbook](os/playbook/PORTABILITY.md). The [glossary](os/context/GLOSSARY.md) defines AgentOS terms such as harness, adapter, Core, Personal Overlay, and drift.
+
+## Getting The Most Out Of AgentOS
+
+AgentOS works best when you treat it as a living operating layer, not a one-time prompt paste. Let agents load the smallest relevant files, then ask them to improve the system when a repeated workflow, preference, boundary, or lesson should become durable.
+
+Useful first moves:
+
+- Ask your agent to get to know you, your projects, your tools, your recurring workflows, and your safety boundaries, then propose approved facts to write into the [Personal Overlay](os/playbook/PERSONAL_OVERLAY.md) under `$root/personal/os/`.
+- When a task reveals a reusable workflow, ask whether it should become a skill, playbook entry, memory entry, verification check, or Personal Overlay note.
+- Keep private state in `$root/personal/os/`; keep public-safe templates, policies, and examples in [AgentOS Core](os/INDEX.md) under `$root/os/`.
+- Ask your agent to occasionally check whether the global instruction adapters still point at the right AgentOS installation, especially after moving the checkout or changing agent harnesses.
+- Ask your agent to run the mirror-skills workflow when you want AgentOS skills to be discoverable from your harness.
+- Ask your agent to set up a recurring reminder or automation to check this repository for AgentOS updates, if your agent harness supports automations.
+
+For a guided first pass, use the [getting started playbook](os/playbook/GETTING_STARTED.md), or ask your agent:
+
+```text
+Help me get the most out of AgentOS.
+
+Read os/playbook/GETTING_STARTED.md and guide me through the first-pass setup. Interview me about my projects, preferences, recurring workflows, tools, and safety boundaries. Recommend the first Personal Overlay files or AgentOS updates that would make future agent sessions more useful. Do not write private state until I approve the proposed files and locations. Ask whether I want a recurring check for AgentOS repository updates and adapter drift, meaning local instruction files no longer pointing at the intended AgentOS checkout.
+```
+
 ## First Read Sequence
 
 For an agent or human using an AgentOS checkout for the first time:
 
-1. Read `AGENTS.md`.
-2. Read `os/INDEX.md`.
-3. Read `os/playbook/PERSONAL_OVERLAY.md` before storing or looking for private state.
-4. For broad routing, authority, safety, or filing questions, read `os/RESOLVER.md`.
+1. Read [AGENTS.md](AGENTS.md).
+2. Read [os/INDEX.md](os/INDEX.md).
+3. Read [os/playbook/PERSONAL_OVERLAY.md](os/playbook/PERSONAL_OVERLAY.md) before storing or looking for private state.
+4. For broad routing, authority, safety, or filing questions, read [os/RESOLVER.md](os/RESOLVER.md).
 5. Use the narrowest relevant Core file for the task.
-
-## Publication Safety
-
-Do not make a formerly private AgentOS repository public after private files have existed in its history.
-
-The publication path is to validate the migrated working tree, confirm private overlay files are ignored, run staged and tree privacy scans against the publishable file set, and create a fresh-history public repository. Keep old private Git history out of the public repository.
-
-See `os/playbook/PUBLICATION.md` for the publication workflow.
 
 ## Entry Points
 
-- `AGENTS.md`: agent adapter entry point.
-- `CLAUDE.md`: Claude Code adapter.
-- `DOMAIN.md`: domain language for the publishing architecture.
-- `os/INDEX.md`: Core map.
-- `os/RESOLVER.md`: routing, authority, safety, and filing tie-breakers.
-- `os/playbook/AGENTOS_PLAYBOOK.md`: operating manual.
-- `os/playbook/PERSONAL_OVERLAY.md`: Core/Overlay load and migration rules.
-- `os/playbook/PUBLICATION.md`: fresh-history publication workflow.
-
-## Validation
-
-Run the local validator:
-
-```bash
-python3 os/verification/scripts/validate_agentos.py
-```
-
-The default validator reads local files only and runs structural checks plus deterministic publication/privacy checks.
-
-For shell-backed publication safety scans, run:
-
-```bash
-scripts/check_staged_publication_secrets.sh
-scripts/check_publication_tree_secrets.sh HEAD
-```
-
-Use `scripts/check_working_tree_secrets.sh` as an advisory day-to-day scan of the mixed working tree. Install the included hooks to validate and scan commits and pushes:
-
-```bash
-scripts/install_agentos_hooks.sh
-```
+- [AGENTS.md](AGENTS.md): agent adapter entry point.
+- [CLAUDE.md](CLAUDE.md): Claude Code adapter.
+- [DOMAIN.md](DOMAIN.md): domain language for the publishing architecture.
+- [os/INDEX.md](os/INDEX.md): Core map.
+- [os/RESOLVER.md](os/RESOLVER.md): routing, authority, safety, and filing tie-breakers.
+- [os/playbook/AGENTOS_PLAYBOOK.md](os/playbook/AGENTOS_PLAYBOOK.md): operating manual.
+- [os/playbook/GETTING_STARTED.md](os/playbook/GETTING_STARTED.md): guided first-pass setup.
+- [os/playbook/PERSONAL_OVERLAY.md](os/playbook/PERSONAL_OVERLAY.md): Core/Overlay load and migration rules.
+- [os/playbook/PORTABILITY.md](os/playbook/PORTABILITY.md): harness adapter and portability guidance.
+- [os/verification/README.md](os/verification/README.md): maintainer validation guidance.
+- [os/playbook/PUBLICATION.md](os/playbook/PUBLICATION.md): publication safety workflow.
