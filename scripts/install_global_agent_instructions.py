@@ -137,7 +137,7 @@ class RollbackError:
 DEFAULT_ADAPTERS = (
     AdapterSpec("codex", (".codex", "AGENTS.md"), "pointer", (".codex", "AGENTS.override.md")),
     AdapterSpec("claude", (".claude", "CLAUDE.md"), "markdown_import"),
-    AdapterSpec("gemini", (".gemini", "GEMINI.md"), "markdown_import"),
+    AdapterSpec("gemini", (".gemini", "GEMINI.md"), "inline_global"),
 )
 
 
@@ -857,15 +857,16 @@ def path_exists_for_planning(path: Path) -> tuple[bool, str | None]:
 def expected_block(target: Target, home: Path, agentos_home: Path) -> str:
     if target.kind == "global":
         return global_block(agentos_home)
+    if target.import_style == "inline_global":
+        return inline_global_adapter_block(agentos_home)
     return adapter_block(global_instructions_path(home), target.import_style)
 
 
-def global_block(agentos_home: Path) -> str:
+def global_instructions_body(agentos_home: Path) -> str:
     agentos_home_text = prompt_path(agentos_home)
     agents_path_text = prompt_path(agentos_home / "AGENTS.md")
     index_path_text = prompt_path(agentos_home / "os" / "INDEX.md")
-    return f"""{GLOBAL_START}
-# Global Agent Instructions
+    return f"""# Global Agent Instructions
 
 AgentOS is installed at:
 
@@ -885,7 +886,20 @@ Before answering questions about fast-moving tools, check current official docs 
 Ask before sending messages, posting publicly, changing permissions, entering credentials, handling MFA, deleting nontrivial data, installing software, or granting external write access.
 
 Keep global instructions lean. Put detailed project-specific instructions in each project's local agent instruction file.
+"""
+
+
+def global_block(agentos_home: Path) -> str:
+    return f"""{GLOBAL_START}
+{global_instructions_body(agentos_home).rstrip()}
 {GLOBAL_END}
+"""
+
+
+def inline_global_adapter_block(agentos_home: Path) -> str:
+    return f"""{ADAPTER_START}
+{global_instructions_body(agentos_home).rstrip()}
+{ADAPTER_END}
 """
 
 
@@ -1560,7 +1574,9 @@ def test_all_default_adapters_and_explicit_adapter() -> None:
         gemini_text = read_text_preserve_newlines(home / ".gemini" / "GEMINI.md")
         openclaw_text = read_text_preserve_newlines(home / ".openclaw" / "AGENTS.md")
         assert_true(f"@{resolved_global}" in claude_text, "Claude adapter import missing")
-        assert_true(f"@{resolved_global}" in gemini_text, "Gemini adapter import missing")
+        assert_true("# Global Agent Instructions" in gemini_text, "Gemini adapter did not inline global instructions")
+        assert_true(str(agentos.resolve()) in gemini_text, "Gemini inline adapter missing AgentOS path")
+        assert_true(f"@{resolved_global}" not in gemini_text, "Gemini adapter should not import outside its context root")
         assert_true(f"@{resolved_global}" not in openclaw_text, "unknown adapter should not assume import support")
 
 
@@ -1600,7 +1616,9 @@ def test_import_adapters_escape_spaces() -> None:
         claude_text = read_text_preserve_newlines(home / ".claude" / "CLAUDE.md")
         gemini_text = read_text_preserve_newlines(home / ".gemini" / "GEMINI.md")
         assert_true(f"@{escaped_global}" in claude_text, "Claude import path did not escape spaces")
-        assert_true(f"@{escaped_global}" in gemini_text, "Gemini import path did not escape spaces")
+        assert_true("# Global Agent Instructions" in gemini_text, "Gemini adapter did not inline global instructions")
+        assert_true(str(agentos.resolve()) in gemini_text, "Gemini inline adapter missing AgentOS path")
+        assert_true(f"@{escaped_global}" not in gemini_text, "Gemini adapter should not import a path with spaces")
 
 
 def test_prompt_rendered_paths_reject_prompt_breakout_chars() -> None:
