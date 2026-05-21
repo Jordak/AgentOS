@@ -1,15 +1,11 @@
 ---
 name: check-implementation-readiness
-description: Check whether a feature-sized issue, PRD, local design doc, or implementation request has durable design consensus before an agent starts coding; create or propose follow-up artifacts for deferred questions and return Ready to Implement, Needs Design Consensus, or Gate Skipped.
+description: Use before implementing feature-sized work: implement, build, add, redesign, substantially refactor, or start an issue/PRD/spec where the outcome changes behavior, workflow, data model, public docs policy, validation policy, or reusable AgentOS structure. Checks durable design consensus, creates or proposes follow-up artifacts for deferred questions, and returns Ready to Implement, Needs Design Consensus, or Gate Skipped.
 ---
 
 # Check Implementation Readiness
 
-Use this skill before implementing feature-sized work. It runs the policy in `os/playbook/IMPLEMENT_FEATURES.md`, which is the canonical source for the readiness standard.
-
-## Goal
-
-Prevent implementation from starting before the design source is durable, complete for the requested scope, and either explicitly marked ready or confirmed by the user after inference.
+Read `os/playbook/IMPLEMENT_FEATURES.md` first. That playbook owns the readiness policy, including exemptions, design-source requirements, marker rules, verdict definitions, deferred follow-up rules, and review-loop preflight behavior. This skill runs that policy.
 
 ## Contract
 
@@ -37,7 +33,7 @@ Tools and connectors:
 
 - Local filesystem, `rg`, and mapped project files.
 - GitHub connector or `gh` when checking or updating issue/PR design sources.
-- `os/playbook/IMPLEMENT_FEATURES.md` for the policy.
+- The implementation-readiness playbook for policy.
 - `os/playbook/GITHUB_WORKFLOW.md` for GitHub issue and PR writing conventions.
 - `os/playbook/ARTIFACTS.md` when producing substantial human-facing design artifacts.
 
@@ -49,90 +45,31 @@ Safety:
 - Do not leave meaningful deferred questions only in chat, model memory, or an unpersisted report.
 - Do not formally depend on non-Core or current-machine skills.
 
-## Verdicts
-
-Return exactly one of these verdicts.
-
-### Ready to Implement
-
-Use when the design is complete for the current scope and has no blocking open questions. Meaningful deferred questions must be explicitly out of scope and captured in durable follow-up artifacts before this verdict is final.
-
-### Needs Design Consensus
-
-Use when the design source is missing, not durable, marked as needing consensus, missing required design content, or has blocking open questions or unclear scope boundaries.
-
-### Gate Skipped
-
-Use when the work is exempt because it is small, mechanical, or obvious: typo fixes, formatting-only edits, small wording changes, narrow bug fixes with clear expected behavior, or mechanical refactors with no behavior change.
-
 ## Workflow Phases
 
-1. Establish the target:
-   - Identify the implementation request, issue, PRD, design doc, PR, branch, or local plan.
-   - Determine whether the task is feature-sized or gate-exempt under `os/playbook/IMPLEMENT_FEATURES.md`.
-   - If exempt, return `Gate Skipped` with the reason.
+1. Establish the target.
+   Identify the implementation request, issue, PRD, design doc, PR, branch, or local plan. Apply the playbook's trigger scope and exemptions. If exempt, return `Gate Skipped` with the reason.
 
-2. Locate the durable design source:
-   - Prefer the linked GitHub issue, PRD, ADR, local design doc, or planning note.
-   - For PR review work, inspect the linked issue, PR body, and any referenced design source.
-   - If only chat context exists, the verdict is `Needs Design Consensus` until that context is promoted into a durable artifact.
+2. Locate the durable design source.
+   Prefer the linked GitHub issue, PRD, ADR, local design doc, or planning note named by the request or repository. For PR review work, inspect the linked issue, PR body, and any referenced design source. If only chat context exists, the verdict is `Needs Design Consensus` until that context is promoted into a durable artifact.
 
-3. Check design completeness:
-   - Confirm the source covers problem or motivation, current behavior or context, desired behavior, chosen design, alternatives considered, non-goals, acceptance criteria, validation plan, open questions, deferred follow-ups, and readiness marker.
-   - Exact headings are not required when prose clearly contains the needed information.
-   - Content wins over the marker.
+3. Check readiness.
+   Evaluate the source against the playbook's design-source standard and readiness-marker rules. Content wins over the marker.
 
-4. Handle missing readiness markers:
-   - If the source lacks `Design readiness:`, infer readiness from the content.
-   - Tell the user the inferred verdict, the reasons, the implementation boundary, and the marker or edit you plan to make.
-   - Wait for confirmation before implementation proceeds.
-   - If edits are authorized, add or propose the marker after confirmation.
+4. Confirm unmarked inference.
+   If the source lacks `Design readiness:`, infer readiness from the content. Tell the user the inferred verdict, reasons, implementation boundary, and marker or edit you plan to make. Wait for confirmation before implementation proceeds. If edits are authorized, add or propose the marker after confirmation.
 
-5. Handle open questions:
-   - Classify open questions as blocking or deferred.
-   - Blocking questions produce `Needs Design Consensus`.
-   - Meaningful deferred questions must be out of scope and captured in durable follow-up artifacts. Related questions can be grouped into one follow-up artifact.
-   - Ask before GitHub issue creation or updates unless tracker writes were explicitly authorized.
-   - If GitHub writes are not authorized, create or propose a local artifact such as `docs/design/issue-<number>-implementation-readiness.md`, unless the project has a better convention or the user redirects.
-   - Update or propose updating the current design source with a `Deferred Follow-ups` section linking to created artifacts.
+5. Handle open questions.
+   Classify open questions as blocking or deferred using the playbook's rules. Ask before GitHub issue creation or updates unless tracker writes were explicitly authorized. If GitHub writes are not authorized, create or propose the local artifact destination named by the playbook unless the project has a better convention or the user redirects. Update or propose updating the current design source with a `Deferred Follow-ups` section linking to created artifacts.
 
-6. Report the verdict:
-   - Include the source reviewed.
-   - Include satisfied and missing readiness fields.
-   - Include the implementation boundary and non-goals.
-   - Include created or proposed follow-up artifacts.
-   - Include whether external writes happened, were proposed, or were skipped.
-
-## Confirmation Shape
-
-When inferring readiness from an unmarked source, use a short structured confirmation:
-
-```text
-I do not see a Design readiness marker. I infer this is Ready to Implement because <reasons>.
-
-Implementation boundary: only implement <scope>; do not address <non-goals/deferred items>.
-
-With your confirmation, I will add `Design readiness: ready to implement` to <artifact> and proceed.
-```
-
-For incomplete sources:
-
-```text
-I do not see a Design readiness marker. I infer this Needs Design Consensus because <missing or unclear items>.
-
-Before implementation, resolve:
-1. <question>
-2. <question>
-
-I can help turn those answers into the design source.
-```
+6. Report the verdict.
+   Include the source reviewed, satisfied and missing readiness fields, implementation boundary, non-goals, created or proposed follow-up artifacts, and whether external writes happened, were proposed, or were skipped.
 
 ## Filing Rules
 
-- Canonical policy lives in `os/playbook/IMPLEMENT_FEATURES.md`.
-- Local design artifacts for AgentOS Core and mapped projects default to `docs/design/issue-<number>-implementation-readiness.md` unless a project convention exists.
+- Follow the implementation-readiness playbook for follow-up artifact destinations.
+- Approved GitHub issue updates and follow-up issues stay in GitHub.
 - Private or personal design notes belong in the Personal Overlay.
-- GitHub issue updates and follow-up issues stay in GitHub when approved.
 - Do not store current-machine mirror state or private live inputs in Core.
 
 ## Quality Bar
@@ -148,7 +85,7 @@ I can help turn those answers into the design source.
 
 Before finishing:
 
-1. Confirm `os/playbook/IMPLEMENT_FEATURES.md` was read for the policy.
+1. Confirm the playbook was read for the policy.
 2. Confirm the target was correctly classified as gated or exempt.
 3. Confirm the verdict is `Ready to Implement`, `Needs Design Consensus`, or `Gate Skipped`.
 4. Confirm the design source's marker and content were both checked.
