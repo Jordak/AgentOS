@@ -793,6 +793,21 @@ def collect_targets(
                         add_target(Target(f"{spec.name}:sibling", sibling, "adapter", spec.import_style))
     for raw in extra_adapters:
         path = resolve_user_path(raw, home)
+        codex_targets = explicit_codex_adapter_targets(
+            path,
+            home,
+            codex_home,
+            claude_config_dir,
+            gemini_cli_home,
+            mode,
+        )
+        if codex_targets:
+            for target_path in codex_targets:
+                target_name = f"adapter:{raw}"
+                if not adapter_paths_equal(path, target_path):
+                    target_name = f"{target_name}:sibling"
+                add_target(Target(target_name, target_path, "adapter", "inline_global"))
+            continue
         add_target(
             Target(
                 f"adapter:{raw}",
@@ -804,6 +819,47 @@ def collect_targets(
     return targets
 
 
+def explicit_codex_adapter_targets(
+    path: Path,
+    home: Path,
+    codex_home: Path | None,
+    claude_config_dir: Path | None,
+    gemini_cli_home: Path | None,
+    mode: str,
+) -> tuple[Path, ...]:
+    path_abs = absolute_lexical_path(path)
+    codex_spec = next((spec for spec in DEFAULT_ADAPTERS if spec.name == "codex"), None)
+    if codex_spec is None or codex_spec.override_parts is None:
+        return ()
+    for known_paths in explicit_adapter_style_path_sets(
+        codex_spec,
+        home,
+        codex_home,
+        claude_config_dir,
+        gemini_cli_home,
+    ):
+        if not any(adapter_paths_equal(known_path, path_abs) for known_path in known_paths):
+            continue
+        base_path, override_path = known_paths
+        if adapter_paths_equal(path_abs, override_path):
+            return known_paths
+        if should_target_codex_override_sibling(override_path, mode):
+            return known_paths
+        return (base_path,)
+    return ()
+
+
+def should_target_codex_override_sibling(override_path: Path, mode: str) -> bool:
+    if mode == "remove":
+        return override_path.exists() or override_path.is_symlink()
+    path_error = validate_target_path(override_path, allow_missing=True)
+    if path_error and (override_path.exists() or override_path.is_symlink()):
+        return True
+    if mode == "install":
+        return path_is_nonempty_file(override_path)
+    return path_is_nonempty_file(override_path) or should_check_sibling_target(override_path, mode)
+
+
 def explicit_adapter_import_style(
     path: Path,
     home: Path,
@@ -813,28 +869,57 @@ def explicit_adapter_import_style(
 ) -> str:
     path_abs = absolute_lexical_path(path)
     for spec in DEFAULT_ADAPTERS:
-        for known_path in explicit_adapter_style_paths(
-            spec,
-            home,
-            codex_home,
-            claude_config_dir,
-            gemini_cli_home,
+        for known_path in flatten_path_sets(
+            explicit_adapter_style_path_sets(
+                spec,
+                home,
+                codex_home,
+                claude_config_dir,
+                gemini_cli_home,
+            )
         ):
-            if target_paths_conflict(known_path, path_abs):
+            if adapter_paths_equal(known_path, path_abs):
                 return spec.import_style
     return "pointer"
 
 
-def explicit_adapter_style_paths(
+def adapter_paths_equal(left: Path, right: Path) -> bool:
+    return absolute_lexical_path(left) == absolute_lexical_path(right)
+
+
+def explicit_adapter_style_path_sets(
     spec: AdapterSpec,
     home: Path,
     codex_home: Path | None,
     claude_config_dir: Path | None,
     gemini_cli_home: Path | None,
-) -> tuple[Path, ...]:
-    paths = list(spec.all_paths_for(home, codex_home, claude_config_dir, gemini_cli_home))
-    paths.extend(spec.all_paths_for(home, None, None, None))
-    return tuple(dict.fromkeys(absolute_lexical_path(path) for path in paths))
+) -> tuple[tuple[Path, ...], ...]:
+    path_sets = [
+        spec.all_paths_for(home, codex_home, claude_config_dir, gemini_cli_home),
+        spec.all_paths_for(home, None, None, None),
+    ]
+    seen: set[tuple[Path, ...]] = set()
+    result: list[tuple[Path, ...]] = []
+    for path_set in path_sets:
+        normalized = tuple(absolute_lexical_path(path) for path in path_set)
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        result.append(normalized)
+    return tuple(result)
+
+
+def flatten_path_sets(path_sets: Iterable[tuple[Path, ...]]) -> tuple[Path, ...]:
+    paths: list[Path] = []
+    seen: set[Path] = set()
+    for path_set in path_sets:
+        for path in path_set:
+            path_abs = absolute_lexical_path(path)
+            if path_abs in seen:
+                continue
+            seen.add(path_abs)
+            paths.append(path_abs)
+    return tuple(paths)
 
 
 def managed_paths_for_spec(
@@ -1361,6 +1446,7 @@ def run_self_tests() -> int:
         test_inline_adapters_mirror_effective_global_file,
         test_codex_override_file_is_effective_adapter_target,
         test_explicit_default_profile_adapters_keep_style_with_env_profiles,
+        test_explicit_default_codex_siblings_follow_inactive_profile_targets,
         test_claude_config_dir_targets_profile_root,
         test_gemini_cli_home_targets_profile_root,
         test_all_default_adapters_and_explicit_adapter,
@@ -1708,6 +1794,120 @@ def test_explicit_default_profile_adapters_keep_style_with_env_profiles() -> Non
             gemini_cli_home=(root / "inactive-gemini-profile").resolve(),
         )
         assert_true(code == 0, output)
+
+
+def test_explicit_default_codex_siblings_follow_inactive_profile_targets() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-global-installer-") as tmp:
+        root = Path(tmp)
+        home = root / "home"
+        home.mkdir()
+        (home / ".codex").mkdir()
+        agentos_one = make_fake_agentos(root, "AgentOS-one")
+        agentos_two = make_fake_agentos(root, "AgentOS-two")
+        inactive_codex_home = (root / "inactive-codex-profile").resolve()
+        base = home / ".codex" / "AGENTS.md"
+        override = home / ".codex" / "AGENTS.override.md"
+
+        code, output = run_args(
+            [
+                "--agentos-home",
+                str(agentos_one),
+                "--adapter",
+                "<home>/.codex/AGENTS.override.md",
+                "--no-dry-run",
+            ],
+            home,
+        )
+        assert_true(code == 0, output)
+        assert_true(ADAPTER_START in read_text_preserve_newlines(base), "Codex base was not prepared")
+        assert_true(ADAPTER_START in read_text_preserve_newlines(override), "Codex override was not prepared")
+
+        code, output = run_args_with_adapter_homes(
+            [
+                "--agentos-home",
+                str(agentos_two),
+                "--adapter",
+                "<home>/.codex/AGENTS.md",
+                "--no-dry-run",
+            ],
+            home,
+            codex_home=inactive_codex_home,
+        )
+        assert_true(code == 0, output)
+        assert_true(str(agentos_two) in read_text_preserve_newlines(base), "explicit default Codex base was not updated")
+        assert_true(str(agentos_two) in read_text_preserve_newlines(override), "explicit default Codex override sibling was not updated")
+
+        override.write_text(
+            read_text_preserve_newlines(override).replace(str(agentos_two), str(agentos_one)),
+            encoding="utf-8",
+        )
+        code, output = run_args_with_adapter_homes(
+            [
+                "--agentos-home",
+                str(agentos_two),
+                "--check",
+                "--adapter",
+                "<home>/.codex/AGENTS.md",
+            ],
+            home,
+            codex_home=inactive_codex_home,
+        )
+        assert_true(code == 1, "check should fail on stale explicit Codex override sibling")
+        assert_true(str(override) in output, "stale explicit Codex override sibling was not checked")
+
+        code, output = run_args_with_adapter_homes(
+            [
+                "--agentos-home",
+                str(agentos_two),
+                "--adapter",
+                "<home>/.codex/AGENTS.md",
+                "--no-dry-run",
+            ],
+            home,
+            codex_home=inactive_codex_home,
+        )
+        assert_true(code == 0, output)
+        code, output = run_args_with_adapter_homes(
+            [
+                "--remove",
+                "--adapter",
+                "<home>/.codex/AGENTS.md",
+                "--no-dry-run",
+            ],
+            home,
+            codex_home=inactive_codex_home,
+        )
+        assert_true(code == 0, output)
+        assert_true(ADAPTER_START not in read_text_preserve_newlines(base), "explicit Codex base remove left base block")
+        assert_true(ADAPTER_START not in read_text_preserve_newlines(override), "explicit Codex base remove left override sibling block")
+
+        code, output = run_args_with_adapter_homes(
+            [
+                "--agentos-home",
+                str(agentos_two),
+                "--adapter",
+                "<home>/.codex/AGENTS.override.md",
+                "--no-dry-run",
+            ],
+            home,
+            codex_home=inactive_codex_home,
+        )
+        assert_true(code == 0, output)
+        assert_true(ADAPTER_START in read_text_preserve_newlines(base), "explicit Codex override did not prepare base sibling")
+        assert_true(ADAPTER_START in read_text_preserve_newlines(override), "explicit Codex override was not managed")
+        code, output = run_args_with_adapter_homes(
+            [
+                "--remove",
+                "--adapter",
+                "<home>/.codex/AGENTS.override.md",
+                "--no-dry-run",
+            ],
+            home,
+            codex_home=inactive_codex_home,
+        )
+        assert_true(code == 0, output)
+        assert_true(ADAPTER_START not in read_text_preserve_newlines(base), "explicit Codex override remove left base sibling block")
+        assert_true(ADAPTER_START not in read_text_preserve_newlines(override), "explicit Codex override remove left override block")
 
 
 def test_gemini_cli_home_targets_profile_root() -> None:
