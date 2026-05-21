@@ -20,9 +20,76 @@ Agents should read `$root/os/` first. Then, when present and relevant, they shou
 
 See `os/playbook/PERSONAL_OVERLAY.md` for the full load and migration rule.
 
-## How To Start
+## Quickstart
 
-For an agent or human landing here for the first time:
+Install AgentOS wherever you want it to live. Common choices are a folder under the current user's home directory, but AgentOS does not require or assume a default path. In the examples below, replace `<agentos-home>` with the resolved path to your chosen checkout.
+
+Prefer a local directory that is not cloud-synced. Avoid placing AgentOS inside folders managed by iCloud Drive, OneDrive, Dropbox, Google Drive, or similar sync tools; AgentOS can contain ignored private overlay state, Git metadata, generated reports, and agent-written files that are better kept in a normal local development directory.
+
+Portable path notation:
+
+- macOS/Linux: `<home>/.agents/AGENTS.md`
+- Windows: `<home>\.agents\AGENTS.md`
+
+That file is the canonical global instruction file. Harness-specific instruction files keep their own locations and receive a managed adapter block that either points to, imports, or mirrors the canonical instructions depending on what that harness can load reliably.
+
+The default adapter targets are:
+
+- Codex: `<codex-home>/AGENTS.md`. If a non-empty `<codex-home>/AGENTS.override.md` exists, the installer keeps both files current because Codex reads the override first and falls back to `AGENTS.md` when the override is removed. `<codex-home>` is `CODEX_HOME` when set, otherwise `<home>/.codex`. Codex's current docs say it reads one global file from `CODEX_HOME`, so the default Codex adapter mirrors the effective canonical global instructions.
+- Claude Code: `<claude-config-dir>/CLAUDE.md`. `<claude-config-dir>` is `CLAUDE_CONFIG_DIR` when set, otherwise `<home>/.claude`.
+- Gemini CLI: `<gemini-cli-home>/.gemini/GEMINI.md`. `<gemini-cli-home>` is `GEMINI_CLI_HOME` when set, otherwise `<home>`. Current Gemini imports are constrained by the importing file's context root, so the default Gemini adapter mirrors the effective canonical global instructions instead of importing `<home>/.agents/AGENTS.md`. To avoid re-rooting imports, the installer refuses to manage the Gemini adapter when the canonical global file contains active Gemini-style `@...` imports outside Markdown code.
+
+Google has announced that consumer Gemini CLI usage is transitioning to Antigravity CLI, with consumer Gemini CLI service ending June 18, 2026. The Gemini adapter remains for existing Gemini CLI and enterprise/API-key users. For Antigravity CLI, pass an explicit `--adapter <path>` once you have confirmed Antigravity's current instruction-file path from its docs.
+
+By default, the installer updates default adapters only when their harness directory already exists. Use `--all-default-adapters` to create all default adapter files, and repeat `--adapter <path>` for extra harnesses such as OpenClaw, Hermes, Antigravity, or another tool with a known instruction-file path. Reuse the same `--all-default-adapters` and `--adapter <path>` arguments for later `--check` or `--remove` runs; custom adapter discovery is intentionally invocation-scoped.
+
+### Agent-Assisted Setup
+
+Give this prompt to your agent:
+
+```text
+Install AgentOS for me.
+
+1. Ask me where AgentOS should live. If I do not have a preference, suggest a conventional local development path that is not inside iCloud Drive, OneDrive, Dropbox, Google Drive, or another cloud-synced folder. Do not assume or require a default path.
+2. Clone https://github.com/Jordak/AgentOS.git into my chosen path.
+3. From that AgentOS checkout, run the installer self-test:
+   python3 scripts/install_global_agent_instructions.py --self-test
+   Confirm the self-test uses temporary directories and does not touch my real home directory.
+4. Run the installer dry-run:
+   python3 scripts/install_global_agent_instructions.py --agentos-home <resolved-agentos-home>
+   If CODEX_HOME, CLAUDE_CONFIG_DIR, or GEMINI_CLI_HOME is set, confirm the dry-run targets those harness homes. If I ask for extra harness adapters, include the same --adapter <path> flags in this dry-run and every later write/check/remove command.
+5. Show me exactly which files would be created, backed up, or changed. Do not run the write command until I explicitly approve.
+6. After I approve, run:
+   python3 scripts/install_global_agent_instructions.py --agentos-home <resolved-agentos-home> --no-dry-run
+7. Run the drift check:
+   python3 scripts/install_global_agent_instructions.py --agentos-home <resolved-agentos-home> --check
+   If extra --adapter <path> flags were used above, repeat those exact flags here.
+8. Summarize what changed, where backups were written, and whether the check passed.
+```
+
+Use the Python 3 command that works on your machine. On some systems that is `python3`; on others it may be `python` or `py -3`.
+
+### Manual Setup
+
+```bash
+git clone https://github.com/Jordak/AgentOS.git <agentos-home>
+cd <agentos-home>
+python3 scripts/install_global_agent_instructions.py --self-test
+python3 scripts/install_global_agent_instructions.py --agentos-home <agentos-home>
+```
+
+Review the dry-run output. It should tell you which global instruction files would be created, backed up, or changed. Only after you approve those changes, run:
+
+```bash
+python3 scripts/install_global_agent_instructions.py --agentos-home <agentos-home> --no-dry-run
+python3 scripts/install_global_agent_instructions.py --agentos-home <agentos-home> --check
+```
+
+If you use `--all-default-adapters` or any custom `--adapter <path>` flags, repeat those same flags on the dry-run, write, check, and remove commands.
+
+## First Read Sequence
+
+For an agent or human using an AgentOS checkout for the first time:
 
 1. Read `AGENTS.md`.
 2. Read `os/INDEX.md`.
