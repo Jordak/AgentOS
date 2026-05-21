@@ -313,7 +313,9 @@ def latest_history_entries(entries: list[HistoryEntry], suite: str) -> list[Hist
 def history_matches_behavior(entry: HistoryEntry, record: RunRecord) -> bool:
     for match in RESULT_RATIO_RE.finditer(entry.result_summary):
         ratio = (int(match.group(1)), int(match.group(2)))
-        context = entry.result_summary[max(0, match.start() - 24):match.start()]
+        before = entry.result_summary[max(0, match.start() - 24):match.start()]
+        after = entry.result_summary[match.end():match.end() + 24]
+        context = f"{before} {after}"
         if FAIL_LABEL_RE.search(context):
             if ratio == (record.behavioral_fail, record.behavioral_total):
                 return True
@@ -456,6 +458,9 @@ def run_self_test(root: Path) -> int:
         failing_result_history = [
             HistoryEntry(date=date(2026, 5, 16), suite="self-test", result_summary="Failed 0/8")
         ]
+        trailing_fail_label_history = [
+            HistoryEntry(date=date(2026, 5, 16), suite="self-test", result_summary="0/8 failed")
+        ]
         future_history = [HistoryEntry(date=date(2026, 5, 18), suite="self-test", result_summary="Passed 8/8")]
         same_date_rerun_history = [
             HistoryEntry(date=date(2026, 5, 16), suite="self-test", result_summary="Failed 0/8"),
@@ -473,6 +478,9 @@ def run_self_test(root: Path) -> int:
             return 1
         if check_target(fixture_root, full_target, now, failing_result_history) != 0:
             print("SELF-TEST FAIL: matching failing curated history result was rejected")
+            return 1
+        if check_target(fixture_root, full_target, now, trailing_fail_label_history) != 0:
+            print("SELF-TEST FAIL: trailing fail-label curated history result was rejected")
             return 1
         if check_target(fixture_root, full_target, now, future_history) == 0:
             print("SELF-TEST FAIL: future-dated curated history was accepted")
