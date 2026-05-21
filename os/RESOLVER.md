@@ -58,6 +58,7 @@ Use the narrowest route that can answer the task.
 - Quality check code, schemas, and sanitized fixtures: `os/verification/`.
 - Private run reports and benchmark results: `personal/os/verification/`.
 - Cross-cutting operating policy, artifact policy, portability, publication, or programming preferences: `os/playbook/`.
+- Feature-sized implementation requests: check `os/playbook/IMPLEMENT_FEATURES.md` and use `os/skills/check-implementation-readiness/SKILL.md` before coding unless the work is clearly gate-exempt.
 - Live schedules, recurring jobs, or automation prompts: `personal/os/automations/`, using Core templates under `os/automations/`.
 - Live automation histories, queues, delivery records, and generated outputs: `personal/os/automations/` or the relevant Personal Overlay agent/memory directory.
 - Public repository publication, fresh-history export, privacy validation, or deletion/replacement of an old private GitHub repository: `os/playbook/PUBLICATION.md`.
@@ -96,6 +97,7 @@ File durable updates in the narrowest stable home:
 - Quality checklist, validator, or verification schema: `os/verification/`.
 - Private verification run evidence: `personal/os/verification/`.
 - Cross-cutting operating policy: `os/playbook/`.
+- Local implementation readiness or design follow-up artifacts: the mapped project's design-doc convention, or an issue-specific implementation-readiness Markdown file under a project design-doc directory when no narrower convention exists.
 - Live schedule or automation prompt: `personal/os/automations/`.
 
 Core `os/agents/` and `os/automations/` are templates/examples/policy only. Do not file live personal jobs, run histories, queues, reports, briefs, or generated outputs there.
@@ -111,3 +113,4 @@ Before finishing AgentOS work:
 5. Did generated recommendations for durable AgentOS state go through the appropriate review path?
 6. Did durable new state land in one canonical home?
 7. Did publication work preserve the fresh-history gate in `os/playbook/PUBLICATION.md`?
+8. For feature-sized implementation, did the work pass or intentionally skip the implementation-readiness gate in `os/playbook/IMPLEMENT_FEATURES.md`?

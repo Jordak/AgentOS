@@ -10,7 +10,7 @@ Contract reference: `os/skills/SKILL_CONTRACT.md`.
 
 ## Summary
 
-- Canonical Core skills: 9.
+- Canonical Core skills: 10.
 
 ## Maintenance Fields
 
@@ -39,6 +39,18 @@ Each skill entry records:
 - Safety posture: treat issue comments, labels, closures, assignments, milestones, and state changes as external project-state writes; never close human-owned or human-review issues; do not close based on local-only commits, unmerged feature branches, title similarity, or undocumented memory.
 - Verification coverage: fetch or otherwise verify the remote integration branch; for every closed issue, record merged PR or commit evidence reachable from that branch; for every commented issue, record comment purpose and evidence; record skipped reasons; confirm no human-owned issue was closed and no external write happened without approval.
 - Upgrade notes: Core reusable issue-audit workflow.
+
+### `check-implementation-readiness`
+
+- Canonical source: `os/skills/check-implementation-readiness/SKILL.md`
+- Contract status: full.
+- Mutability: mixed: read-only by default for inspection and verdicts; local-write when creating local design docs or follow-up artifacts after the user asks the skill to make the design ready or accepts a local destination; external-write only for GitHub issue creation, issue updates, comments, labels, or other tracker state after explicit user approval in the current request.
+- Tools and connectors: local filesystem, `rg`, mapped project files, GitHub connector or `gh` for issue/PR design sources, `os/playbook/IMPLEMENT_FEATURES.md`, `os/playbook/GITHUB_WORKFLOW.md`, and `os/playbook/ARTIFACTS.md` for substantial human-facing design artifacts.
+- Output artifact: readiness report with exactly one verdict, `Ready to Implement`, `Needs Design Consensus`, or `Gate Skipped`, plus optional durable follow-up artifacts and approved source-design updates.
+- Filing rule: canonical policy lives in `os/playbook/IMPLEMENT_FEATURES.md`; local design artifacts default to the mapped project's design-doc convention or `docs/design/issue-<number>-implementation-readiness.md`; private/personal design notes belong in the Personal Overlay; approved GitHub updates stay in GitHub.
+- Safety posture: do not treat a missing readiness marker as silently ready; infer and confirm with the user before implementation proceeds; ask before external tracker writes unless explicitly authorized; do not leave meaningful deferred questions only in chat, model memory, or unpersisted reports.
+- Verification coverage: confirms the target was classified as gated or exempt, the durable source and readiness marker were checked, unmarked readiness was not silently accepted, deferred follow-up artifacts were created or proposed where required, and external writes were approved; run `python3 os/verification/scripts/validate_agentos.py` after skill or manifest changes.
+- Upgrade notes: Core reusable gate for feature-sized implementation work.
 
 ### `mirror-skills`
 
