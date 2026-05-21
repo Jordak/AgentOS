@@ -141,11 +141,17 @@ def adapter_args(args: argparse.Namespace, cwd: Path) -> list[str]:
     if args.all_default_adapters:
         passthrough.append("--all-default-adapters")
     for adapter in args.adapter:
-        adapter_path = Path(os.path.expanduser(adapter))
-        if not adapter_path.is_absolute():
-            adapter_path = cwd / adapter_path
-        passthrough.extend(["--adapter", str(adapter_path.resolve())])
+        passthrough.extend(["--adapter", normalize_adapter_arg(adapter, cwd)])
     return passthrough
+
+
+def normalize_adapter_arg(adapter: str, cwd: Path) -> str:
+    if adapter == "<home>" or adapter.startswith("<home>/") or adapter.startswith("<home>\\"):
+        return adapter
+    adapter_path = Path(os.path.expanduser(adapter))
+    if not adapter_path.is_absolute():
+        adapter_path = cwd / adapter_path
+    return str(adapter_path.resolve())
 
 
 def run_doctor(
@@ -181,7 +187,7 @@ def run_doctor(
             )
         )
         results.append(check_skill_mirrors(agentos_home, primary_agentos_home, mirror_root, env, verbose))
-        results.append(check_personal_overlay(primary_agentos_home, verbose))
+        results.append(check_personal_overlay(agentos_home, primary_agentos_home, verbose))
         results.append(check_automations(agentos_home, primary_agentos_home, process_home, verbose))
     else:
         results.append(
@@ -574,8 +580,8 @@ def check_skill_mirrors(
     )
 
 
-def check_personal_overlay(agentos_home: Path, verbose: bool) -> CheckResult:
-    personal_root = agentos_home / "personal" / "os"
+def check_personal_overlay(agentos_home: Path, primary_agentos_home: Path, verbose: bool) -> CheckResult:
+    personal_root = primary_agentos_home / "personal" / "os"
     getting_started = agentos_home / "os" / "playbook" / "GETTING_STARTED.md"
     starter_paths, starter_error = starter_personal_paths(getting_started)
     if not personal_root.exists():
@@ -979,6 +985,7 @@ def run_self_tests() -> int:
         test_invalid_home_is_graceful,
         test_adapter_check_uses_temp_home,
         test_relative_adapter_args_resolve_from_invocation_cwd,
+        test_home_adapter_args_are_preserved,
         test_adapter_check_command_failure_is_not_drift,
         test_adapter_check_preflight_error_is_not_drift,
         test_subprocess_timeout_output_is_text,
@@ -993,6 +1000,7 @@ def run_self_tests() -> int:
         test_codex_agentos_automation_evidence_passes,
         test_automation_files_without_registry_warns,
         test_primary_agentos_home_supplies_personal_overlay,
+        test_primary_overlay_uses_worktree_starter_checklist,
         test_warn_exit_code_is_zero_by_default,
         test_strict_warn_exit_code_is_nonzero,
     ]
@@ -1036,7 +1044,7 @@ def test_personal_overlay_source_error_warns() -> None:
             "# Getting Started\n\n## Renamed Starter Checklist\n\n- `personal/os/identity/USER.md`\n",
             encoding="utf-8",
         )
-        result = check_personal_overlay(root, verbose=False)
+        result = check_personal_overlay(root, root, verbose=False)
         assert_true(result.status == "WARN", "unreadable starter checklist should warn")
         assert_true("Could not determine" in result.summary, "starter source warning summary missing")
 
@@ -1049,7 +1057,7 @@ def test_personal_overlay_empty_starter_list_warns() -> None:
             "# Getting Started\n\n## Starter Files\n\nNo starter paths yet.\n",
             encoding="utf-8",
         )
-        result = check_personal_overlay(root, verbose=False)
+        result = check_personal_overlay(root, root, verbose=False)
         assert_true(result.status == "WARN", "empty starter checklist should warn")
         assert_true("Could not determine" in result.summary, "empty starter warning summary missing")
 
@@ -1097,6 +1105,28 @@ def test_relative_adapter_args_resolve_from_invocation_cwd() -> None:
         args = argparse.Namespace(all_default_adapters=False, adapter=["custom/AGENTS.md"])
         resolved = adapter_args(args, invocation)
         assert_true(resolved == ["--adapter", str((invocation / "custom" / "AGENTS.md").resolve())], "relative adapter path was not cwd-resolved")
+
+
+def test_home_adapter_args_are_preserved() -> None:
+    invocation = Path("agentos-doctor-invocation")
+    windows_home_adapter = "<home>" + "\\" + ".openclaw" + "\\" + "AGENTS.md"
+    args = argparse.Namespace(
+        all_default_adapters=False,
+        adapter=["<home>", "<home>/.openclaw/AGENTS.md", windows_home_adapter],
+    )
+    resolved = adapter_args(args, invocation)
+    assert_true(
+        resolved
+        == [
+            "--adapter",
+            "<home>",
+            "--adapter",
+            "<home>/.openclaw/AGENTS.md",
+            "--adapter",
+            windows_home_adapter,
+        ],
+        "<home> adapter notation should pass through to installer",
+    )
 
 
 def test_adapter_check_command_failure_is_not_drift() -> None:
@@ -1334,7 +1364,7 @@ def test_primary_agentos_home_supplies_personal_overlay() -> None:
             path = primary / rel
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text("# private starter\n", encoding="utf-8")
-        result = check_personal_overlay(primary, verbose=False)
+        result = check_personal_overlay(primary, primary, verbose=False)
         assert_true(result.status == "PASS", "primary Personal Overlay starter files should be used")
         report = run_doctor(
             requested_agentos_home=worktree,
@@ -1347,6 +1377,33 @@ def test_primary_agentos_home_supplies_personal_overlay() -> None:
         )
         assert_true(report.agentos_home == worktree.resolve(), "worktree should remain Core home")
         assert_true(report.primary_agentos_home == primary.resolve(), "primary home should be recorded")
+
+
+def test_primary_overlay_uses_worktree_starter_checklist() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        worktree = Path(tmp) / "worktree"
+        primary = Path(tmp) / "primary"
+        make_fake_agentos(worktree)
+        make_fake_agentos(primary)
+        (worktree / "os" / "playbook" / "GETTING_STARTED.md").write_text(
+            """# Getting Started
+
+## Starter Files
+
+- `personal/os/identity/USER.md`: durable identity.
+- `personal/os/identity/COMMUNICATION.md`: communication.
+- `personal/os/context/SOURCE_MAP.md`: source map.
+""",
+            encoding="utf-8",
+        )
+        for rel in ("personal/os/identity/USER.md", "personal/os/identity/COMMUNICATION.md"):
+            path = primary / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("# private starter\n", encoding="utf-8")
+        result = check_personal_overlay(worktree, primary, verbose=False)
+        joined = "\n".join(result.details)
+        assert_true(result.status == "WARN", "worktree checklist missing primary file should warn")
+        assert_true("personal/os/context/SOURCE_MAP.md" in joined, "worktree starter path should be audited")
 
 
 def test_warn_exit_code_is_zero_by_default() -> None:
