@@ -75,10 +75,11 @@ Use the narrowest path that can answer the request.
 - Connected tools and safety: `personal/os/connections/`
 - Live agent roles: `personal/os/agents/`
 - Generic agent templates: `os/agents/`
-- Quality checks: `os/verification/`
+- Quality checks: `os/verification/README.md`
 - Private run evidence: `personal/os/verification/`
 - Live schedules and recurring jobs: `personal/os/automations/`
 - Tool portability: `os/playbook/PORTABILITY.md`
+- Guided first-pass setup: `os/playbook/GETTING_STARTED.md`
 - Personal overlay load and migration rule: `os/playbook/PERSONAL_OVERLAY.md`
 - Public repository publication workflow: `os/playbook/PUBLICATION.md`
 - Output artifact policy: `os/playbook/ARTIFACTS.md`

@@ -2,7 +2,7 @@
 
 This is the map for AgentOS Core, the public-safe reusable layer under `$root/os/`.
 
-Core files describe templates, policy, routing, verification, and generic examples. They should be usable by a stranger with no private context. Private user-specific state belongs in the optional Personal Overlay under `$root/personal/os/`.
+Core files describe templates, policy, routing, verification, and generic examples. They should be usable by a stranger with no private context. Private user-specific state belongs in the Personal Overlay under `$root/personal/os/`.
 
 ## Operating Principle
 
@@ -37,10 +37,11 @@ When updating AgentOS, prefer adding facts to the narrowest file:
 - Tool access or permission -> `personal/os/connections/`
 - Specific live agent behavior -> `personal/os/agents/`
 - Generic agent template -> `os/agents/`
-- Quality checks -> `os/verification/`
+- Quality checks -> `os/verification/README.md`
 - System overview -> `os/playbook/`
 - Scheduled or event work -> `personal/os/automations/`
 - Personal overlay load and migration rule -> `os/playbook/PERSONAL_OVERLAY.md`
+- Guided first-pass setup -> `os/playbook/GETTING_STARTED.md`
 - Public repository publication workflow -> `os/playbook/PUBLICATION.md`
 - GitHub branch, worktree, pull request, and merge workflow -> `os/playbook/GITHUB_WORKFLOW.md`
 - Lookup, routing, authority, safety, and filing tie-breakers -> `os/RESOLVER.md`
