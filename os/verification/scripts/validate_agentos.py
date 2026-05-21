@@ -1277,7 +1277,7 @@ class AgentOSValidator:
                     f"{self.display_path(history_path)}:{row_no}",
                     "suite must be a compact suite id",
                 )
-            if not BENCHMARK_HISTORY_RESULT_RE.search(f"{result} {caveats}"):
+            if not BENCHMARK_HISTORY_RESULT_RE.search(result):
                 self.add_error(
                     check,
                     f"{self.display_path(history_path)}:{row_no}",
@@ -1586,6 +1586,7 @@ def run_self_test() -> int:
             "| 2999-01-01 | PR #3 | retrieval | Passed 8/8 | Future date fixture. | dry-run only |\n"
             "| 2026-05-17 | PR #4 | retrieval | Passed | Missing ratio fixture. | dry-run only |\n"
             "| 2026-05-17 | PR #5 | retrieval | Passed 8/8 | Root cause was fixture routing and benchmark command changed. | dry-run only |\n"
+            "| 2026-05-17 | PR #6 | retrieval | Green | Status misplaced in caveats. | Passed 8/8 |\n"
             "\n"
             "`raw_response`: fixture payload copied from a saved report.\n"
             "Stored under personal/os/verification/retrieval/reports/example.\n"
