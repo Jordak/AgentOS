@@ -88,6 +88,8 @@ The doctor discovers the AgentOS checkout from the current directory, or you can
 
 When your setup uses `--all-default-adapters` or custom `--adapter <path>` targets, pass those same flags to the doctor so the adapter drift result covers the same harness instruction files as your installer check.
 
+When running the doctor from an isolated feature worktree, pass `--primary-agentos-home <primary-agentos-home>` so Personal Overlay starter files, private skills, and live automation registry checks read from the canonical checkout that owns ignored private state.
+
 Use the tools this way:
 
 - `scripts/agentos_doctor.py`: read-only health report and exact next-step recommendations.

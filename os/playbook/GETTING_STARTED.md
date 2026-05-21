@@ -83,6 +83,8 @@ The doctor discovers `$root` from the current directory, or accepts `--agentos-h
 
 If the installer or adapter check used `--all-default-adapters` or any custom `--adapter <path>` flags, repeat those exact flags on the doctor command so the read-only adapter drift result covers the same harness files.
 
+If the command is running from an isolated feature worktree, pass `--primary-agentos-home <primary-agentos-home>` so Personal Overlay starter files, private skills, and automation registry checks use the canonical checkout that owns ignored private state.
+
 Doctor is not the installer and not mirror sync:
 
 - Use `scripts/agentos_doctor.py` for read-only setup health and exact next steps.

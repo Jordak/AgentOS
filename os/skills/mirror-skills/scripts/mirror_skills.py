@@ -88,8 +88,8 @@ def parse_manifest(agentos_root: Path) -> list[SkillEntry]:
     return entries
 
 
-def discover_personal_overlay_entries(agentos_root: Path) -> list[SkillEntry]:
-    personal_skills_root = agentos_root / "personal/os/skills"
+def discover_personal_overlay_entries(agentos_root: Path, personal_overlay_root: Path | None = None) -> list[SkillEntry]:
+    personal_skills_root = (personal_overlay_root or (agentos_root / "personal/os")).resolve() / "skills"
     if not personal_skills_root.exists():
         return []
 
@@ -97,7 +97,10 @@ def discover_personal_overlay_entries(agentos_root: Path) -> list[SkillEntry]:
     for skill_file in sorted(personal_skills_root.glob("*/SKILL.md")):
         skill_dir = skill_file.parent
         name = skill_dir.name
-        canonical_source = skill_file.relative_to(agentos_root).as_posix()
+        try:
+            canonical_source = skill_file.relative_to(agentos_root).as_posix()
+        except ValueError:
+            canonical_source = str(skill_file)
         entries.append(
             SkillEntry(
                 name=name,
@@ -355,6 +358,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Limit audit or sync to one canonical skill. May be repeated.",
     )
     parser.add_argument(
+        "--personal-overlay-root",
+        type=Path,
+        default=None,
+        help="Personal Overlay root to scan for private skills. Default: <agentos-root>/personal/os.",
+    )
+    parser.add_argument(
         "--prune-extra",
         action="store_true",
         help="Delete mirror files that are not present in canonical sources.",
@@ -373,7 +382,8 @@ def main() -> int:
     core_entries = parse_manifest(agentos_root)
     personal_entries: list[SkillEntry] = []
     if not args.core_only:
-        personal_entries = discover_personal_overlay_entries(agentos_root)
+        personal_overlay_root = args.personal_overlay_root.expanduser().resolve() if args.personal_overlay_root else None
+        personal_entries = discover_personal_overlay_entries(agentos_root, personal_overlay_root)
     entries = select_entries(core_entries, personal_entries, args.skill)
     if not entries:
         raise SystemExit("No mirrorable Core or Personal Overlay skills found.")

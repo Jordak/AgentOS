@@ -51,6 +51,7 @@ class CheckResult:
 @dataclass
 class DoctorReport:
     agentos_home: Path
+    primary_agentos_home: Path
     mirror_root: Path
     results: list[CheckResult]
 
@@ -68,6 +69,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=Path.home() / ".agents" / "skills",
         help="Current-machine skill mirror root to audit. Default: the user's .agents/skills directory.",
+    )
+    parser.add_argument(
+        "--primary-agentos-home",
+        type=Path,
+        default=None,
+        help="Primary AgentOS checkout that owns the canonical Personal Overlay. Defaults to --agentos-home.",
     )
     parser.add_argument(
         "--all-default-adapters",
@@ -104,6 +111,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.self_test:
         if (
             args.agentos_home is not None
+            or args.primary_agentos_home is not None
             or args.mirror_root != Path.home() / ".agents" / "skills"
             or args.all_default_adapters
             or args.adapter
@@ -116,28 +124,33 @@ def main(argv: list[str] | None = None) -> int:
 
     report = run_doctor(
         requested_agentos_home=args.agentos_home,
+        requested_primary_agentos_home=args.primary_agentos_home,
         cwd=Path.cwd(),
         mirror_root=args.mirror_root,
         verbose=args.verbose,
         process_home=Path.home(),
         env=os.environ,
-        adapter_args=adapter_args(args),
+        adapter_args=adapter_args(args, Path.cwd()),
     )
     print_report(report, verbose=args.verbose)
     return exit_code_for(report.results, strict=args.strict)
 
 
-def adapter_args(args: argparse.Namespace) -> list[str]:
+def adapter_args(args: argparse.Namespace, cwd: Path) -> list[str]:
     passthrough: list[str] = []
     if args.all_default_adapters:
         passthrough.append("--all-default-adapters")
     for adapter in args.adapter:
-        passthrough.extend(["--adapter", adapter])
+        adapter_path = Path(os.path.expanduser(adapter))
+        if not adapter_path.is_absolute():
+            adapter_path = cwd / adapter_path
+        passthrough.extend(["--adapter", str(adapter_path.resolve())])
     return passthrough
 
 
 def run_doctor(
     requested_agentos_home: Path | None,
+    requested_primary_agentos_home: Path | None,
     cwd: Path,
     mirror_root: Path,
     verbose: bool,
@@ -146,11 +159,16 @@ def run_doctor(
     adapter_args: list[str] | None = None,
 ) -> DoctorReport:
     agentos_home, discovery_result = resolve_agentos_home(requested_agentos_home, cwd)
+    primary_agentos_home = expand_path(requested_primary_agentos_home, cwd) if requested_primary_agentos_home else agentos_home
     mirror_root = expand_path(mirror_root, cwd)
     adapter_args = adapter_args or []
 
     results = [discovery_result, check_agentos_home(agentos_home)]
     home_is_usable = results[-1].status != "FAIL"
+    if home_is_usable and primary_agentos_home != agentos_home:
+        primary_result = check_primary_agentos_home(primary_agentos_home)
+        results.append(primary_result)
+        home_is_usable = primary_result.status != "FAIL"
 
     if home_is_usable:
         results.append(
@@ -162,9 +180,9 @@ def run_doctor(
                 verbose=verbose,
             )
         )
-        results.append(check_skill_mirrors(agentos_home, mirror_root, env, verbose))
-        results.append(check_personal_overlay(agentos_home, verbose))
-        results.append(check_automations(agentos_home, process_home, verbose))
+        results.append(check_skill_mirrors(agentos_home, primary_agentos_home, mirror_root, env, verbose))
+        results.append(check_personal_overlay(primary_agentos_home, verbose))
+        results.append(check_automations(agentos_home, primary_agentos_home, process_home, verbose))
     else:
         results.append(
             CheckResult(
@@ -198,7 +216,12 @@ def run_doctor(
             )
         )
 
-    return DoctorReport(agentos_home=agentos_home, mirror_root=mirror_root, results=results)
+    return DoctorReport(
+        agentos_home=agentos_home,
+        primary_agentos_home=primary_agentos_home,
+        mirror_root=mirror_root,
+        results=results,
+    )
 
 
 def resolve_agentos_home(requested: Path | None, cwd: Path) -> tuple[Path, CheckResult]:
@@ -294,6 +317,20 @@ def check_agentos_home(agentos_home: Path) -> CheckResult:
         "PASS",
         "Required AgentOS Core entry files are present.",
         details=[f"Required files checked: {len(REQUIRED_AGENTOS_FILES)}"],
+    )
+
+
+def check_primary_agentos_home(primary_agentos_home: Path) -> CheckResult:
+    result = check_agentos_home(primary_agentos_home)
+    if result.status == "FAIL":
+        result.name = "primary home structure"
+        result.summary = "The primary AgentOS home does not look like an AgentOS checkout."
+        return result
+    return CheckResult(
+        "primary home structure",
+        "PASS",
+        "Primary AgentOS home is usable for Personal Overlay reads.",
+        details=[f"Primary AgentOS home: {primary_agentos_home}"],
     )
 
 
@@ -399,6 +436,7 @@ def check_adapters(
 
 def check_skill_mirrors(
     agentos_home: Path,
+    primary_agentos_home: Path,
     mirror_root: Path,
     env: Mapping[str, str],
     verbose: bool,
@@ -419,6 +457,8 @@ def check_skill_mirrors(
         str(agentos_home),
         "--mirror-root",
         str(mirror_root),
+        "--personal-overlay-root",
+        str(primary_agentos_home / "personal" / "os"),
         "--json",
     ]
     completed = run_subprocess(command, cwd=agentos_home, env=env)
@@ -497,7 +537,7 @@ def check_skill_mirrors(
         )
 
     hard_statuses = {"source-missing", "source-unreadable", "mirror-unreadable", "unknown"}
-    audit_command = mirror_command(agentos_home, mirror_root)
+    audit_command = mirror_command(agentos_home, primary_agentos_home, mirror_root)
     if any(status in hard_statuses for status in statuses):
         recommendations = [
             "Fix the reported source, readability, or audit-shape errors before syncing mirrors.",
@@ -630,7 +670,7 @@ def starter_personal_paths(getting_started: Path) -> tuple[list[str], str | None
     return paths, None
 
 
-def mirror_command(agentos_home: Path, mirror_root: Path) -> list[str]:
+def mirror_command(agentos_home: Path, primary_agentos_home: Path, mirror_root: Path) -> list[str]:
     return [
         sys.executable,
         str(agentos_home / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py"),
@@ -638,12 +678,14 @@ def mirror_command(agentos_home: Path, mirror_root: Path) -> list[str]:
         str(agentos_home),
         "--mirror-root",
         str(mirror_root),
+        "--personal-overlay-root",
+        str(primary_agentos_home / "personal" / "os"),
     ]
 
 
-def check_automations(agentos_home: Path, process_home: Path, verbose: bool) -> CheckResult:
+def check_automations(agentos_home: Path, primary_agentos_home: Path, process_home: Path, verbose: bool) -> CheckResult:
     core_registry = agentos_home / "os" / "automations" / "AUTOMATIONS.md"
-    personal_automations = agentos_home / "personal" / "os" / "automations"
+    personal_automations = primary_agentos_home / "personal" / "os" / "automations"
     personal_registry = personal_automations / "AUTOMATIONS.md"
     codex_automations = process_home / ".codex" / "automations"
     personal_file_count = count_non_gitkeep_files(personal_automations)
@@ -902,6 +944,8 @@ def root_relative(root: Path, path: Path) -> str:
 def print_report(report: DoctorReport, verbose: bool) -> None:
     print("AgentOS doctor (read-only)")
     print(f"AgentOS home: {report.agentos_home}")
+    if report.primary_agentos_home != report.agentos_home:
+        print(f"Primary AgentOS home: {report.primary_agentos_home}")
     print(f"Skill mirror root: {report.mirror_root}")
     print("No files were modified.")
     print("")
@@ -934,6 +978,7 @@ def run_self_tests() -> int:
         test_personal_overlay_empty_starter_list_warns,
         test_invalid_home_is_graceful,
         test_adapter_check_uses_temp_home,
+        test_relative_adapter_args_resolve_from_invocation_cwd,
         test_adapter_check_command_failure_is_not_drift,
         test_adapter_check_preflight_error_is_not_drift,
         test_subprocess_timeout_output_is_text,
@@ -941,11 +986,13 @@ def run_self_tests() -> int:
         test_mirror_command_failure_is_not_sync_advice,
         test_mirror_source_failure_is_not_sync_advice,
         test_mirror_recommendations_quote_paths,
+        test_primary_agentos_home_supplies_private_skill_mirrors,
         test_automation_no_evidence_warns,
         test_automation_registry_evidence_passes,
         test_unrelated_codex_automation_does_not_pass,
         test_codex_agentos_automation_evidence_passes,
         test_automation_files_without_registry_warns,
+        test_primary_agentos_home_supplies_personal_overlay,
         test_warn_exit_code_is_zero_by_default,
         test_strict_warn_exit_code_is_nonzero,
     ]
@@ -968,6 +1015,7 @@ def test_home_discovery_and_personal_overlay_privacy() -> None:
         nested = root / "os" / "playbook"
         report = run_doctor(
             requested_agentos_home=None,
+            requested_primary_agentos_home=None,
             cwd=nested,
             mirror_root=Path(tmp) / "mirrors",
             verbose=False,
@@ -1012,6 +1060,7 @@ def test_invalid_home_is_graceful() -> None:
         root.mkdir()
         report = run_doctor(
             requested_agentos_home=root,
+            requested_primary_agentos_home=None,
             cwd=root,
             mirror_root=Path(tmp) / "mirrors",
             verbose=False,
@@ -1039,6 +1088,15 @@ def test_adapter_check_uses_temp_home() -> None:
         joined = "\n".join(result.details)
         assert_true(str(home) in joined, "adapter check did not use temp HOME")
         assert_true(str(Path.home()) not in joined, "adapter check leaked real HOME")
+
+
+def test_relative_adapter_args_resolve_from_invocation_cwd() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        invocation = Path(tmp) / "invocation"
+        invocation.mkdir()
+        args = argparse.Namespace(all_default_adapters=False, adapter=["custom/AGENTS.md"])
+        resolved = adapter_args(args, invocation)
+        assert_true(resolved == ["--adapter", str((invocation / "custom" / "AGENTS.md").resolve())], "relative adapter path was not cwd-resolved")
 
 
 def test_adapter_check_command_failure_is_not_drift() -> None:
@@ -1134,7 +1192,7 @@ def test_mirror_smoke_uses_temp_dirs() -> None:
         ]
         completed = run_subprocess(command, cwd=root, env=minimal_env(Path(tmp) / "home"))
         assert_true(completed.returncode == 0, completed.stderr or completed.stdout)
-        result = check_skill_mirrors(root, mirror_root, minimal_env(Path(tmp) / "home"), verbose=False)
+        result = check_skill_mirrors(root, root, mirror_root, minimal_env(Path(tmp) / "home"), verbose=False)
         joined = "\n".join(result.details)
         assert_true(result.status == "PASS", "mirror audit should pass after temp sync")
         assert_true("core=1" in joined, "core skill source kind not audited")
@@ -1149,7 +1207,7 @@ def test_mirror_command_failure_is_not_sync_advice() -> None:
         duplicate = root / "personal" / "os" / "skills" / "example-skill" / "SKILL.md"
         duplicate.parent.mkdir(parents=True)
         duplicate.write_text("# Duplicate Private Skill\n", encoding="utf-8")
-        result = check_skill_mirrors(root, mirror_root, minimal_env(Path(tmp) / "home"), verbose=False)
+        result = check_skill_mirrors(root, root, mirror_root, minimal_env(Path(tmp) / "home"), verbose=False)
         joined = "\n".join(result.details + result.recommendations)
         assert_true(result.status == "FAIL", "mirror command failure should fail")
         assert_true("--sync" not in joined, "command failure should not recommend mirror sync")
@@ -1171,7 +1229,7 @@ def test_mirror_source_failure_is_not_sync_advice() -> None:
 """,
             encoding="utf-8",
         )
-        result = check_skill_mirrors(root, mirror_root, minimal_env(Path(tmp) / "home"), verbose=False)
+        result = check_skill_mirrors(root, root, mirror_root, minimal_env(Path(tmp) / "home"), verbose=False)
         joined = "\n".join(result.details + result.recommendations)
         assert_true(result.status == "FAIL", "missing canonical source should fail")
         assert_true("source-missing=1" in joined, "source-missing status should be reported")
@@ -1183,18 +1241,30 @@ def test_mirror_recommendations_quote_paths() -> None:
         root = Path(tmp) / "AgentOS With Spaces"
         mirror_root = Path(tmp) / "mirrors with spaces"
         make_fake_agentos(root)
-        result = check_skill_mirrors(root, mirror_root, minimal_env(Path(tmp) / "home"), verbose=False)
+        result = check_skill_mirrors(root, root, mirror_root, minimal_env(Path(tmp) / "home"), verbose=False)
         joined = "\n".join(result.recommendations)
         assert_true(result.status == "WARN", "missing mirrors should warn")
         assert_true("mirrors with spaces'" in joined, "mirror path should be shell quoted")
         assert_true("AgentOS With Spaces'" in joined, "AgentOS path should be shell quoted")
 
 
+def test_primary_agentos_home_supplies_private_skill_mirrors() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        worktree = Path(tmp) / "worktree"
+        primary = Path(tmp) / "primary"
+        mirror_root = Path(tmp) / "mirrors"
+        make_fake_agentos(worktree)
+        make_fake_agentos(primary)
+        result = check_skill_mirrors(worktree, primary, mirror_root, minimal_env(Path(tmp) / "home"), verbose=False)
+        joined = "\n".join(result.details)
+        assert_true("personal-overlay=1" in joined, "primary Personal Overlay skill was not audited")
+
+
 def test_automation_no_evidence_warns() -> None:
     with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
         root = Path(tmp) / "AgentOS"
         make_fake_agentos(root)
-        result = check_automations(root, Path(tmp) / "home", verbose=False)
+        result = check_automations(root, root, Path(tmp) / "home", verbose=False)
         joined = "\n".join(result.details)
         assert_true(result.status == "WARN", "missing recurring check evidence should warn")
         assert_true("Recurring AgentOS check evidence: not found" in joined, "missing evidence should be explicit")
@@ -1206,7 +1276,7 @@ def test_automation_registry_evidence_passes() -> None:
         make_fake_agentos(root)
         registry = root / "personal" / "os" / "automations" / "AUTOMATIONS.md"
         registry.write_text("AgentOS repository update and adapter drift check automation.\n", encoding="utf-8")
-        result = check_automations(root, Path(tmp) / "home", verbose=False)
+        result = check_automations(root, root, Path(tmp) / "home", verbose=False)
         joined = "\n".join(result.details)
         assert_true(result.status == "PASS", "registry evidence should pass")
         assert_true("Recurring AgentOS check evidence: found" in joined, "found evidence should be explicit")
@@ -1220,7 +1290,7 @@ def test_unrelated_codex_automation_does_not_pass() -> None:
         codex_automation = home / ".codex" / "automations" / "daily-weather.txt"
         codex_automation.parent.mkdir(parents=True)
         codex_automation.write_text("Daily weather reminder.\n", encoding="utf-8")
-        result = check_automations(root, home, verbose=False)
+        result = check_automations(root, root, home, verbose=False)
         joined = "\n".join(result.details)
         assert_true(result.status == "WARN", "unrelated Codex automation should not pass")
         assert_true("Codex automation mirror dir: present (1 files)" in joined, "Codex presence should remain visible")
@@ -1235,7 +1305,7 @@ def test_codex_agentos_automation_evidence_passes() -> None:
         codex_automation = home / ".codex" / "automations" / "agentos-drift-check.txt"
         codex_automation.parent.mkdir(parents=True)
         codex_automation.write_text("AgentOS adapter drift check.\n", encoding="utf-8")
-        result = check_automations(root, home, verbose=False)
+        result = check_automations(root, root, home, verbose=False)
         joined = "\n".join(result.details)
         assert_true(result.status == "PASS", "AgentOS Codex automation evidence should pass")
         assert_true("Codex AgentOS check evidence: found" in joined, "Codex evidence should be explicit")
@@ -1249,9 +1319,34 @@ def test_automation_files_without_registry_warns() -> None:
             "AgentOS drift check draft.\n",
             encoding="utf-8",
         )
-        result = check_automations(root, Path(tmp) / "home", verbose=False)
+        result = check_automations(root, root, Path(tmp) / "home", verbose=False)
         assert_true(result.status == "WARN", "automation files without registry should warn")
         assert_true("registry" in result.summary, "warning should mention missing registry")
+
+
+def test_primary_agentos_home_supplies_personal_overlay() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        worktree = Path(tmp) / "worktree"
+        primary = Path(tmp) / "primary"
+        make_fake_agentos(worktree)
+        make_fake_agentos(primary)
+        for rel in ("personal/os/identity/USER.md", "personal/os/identity/COMMUNICATION.md"):
+            path = primary / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("# private starter\n", encoding="utf-8")
+        result = check_personal_overlay(primary, verbose=False)
+        assert_true(result.status == "PASS", "primary Personal Overlay starter files should be used")
+        report = run_doctor(
+            requested_agentos_home=worktree,
+            requested_primary_agentos_home=primary,
+            cwd=worktree,
+            mirror_root=Path(tmp) / "mirrors",
+            verbose=False,
+            process_home=Path(tmp) / "home",
+            env=minimal_env(Path(tmp) / "home"),
+        )
+        assert_true(report.agentos_home == worktree.resolve(), "worktree should remain Core home")
+        assert_true(report.primary_agentos_home == primary.resolve(), "primary home should be recorded")
 
 
 def test_warn_exit_code_is_zero_by_default() -> None:
@@ -1268,6 +1363,7 @@ def render_report_for_test(report: DoctorReport, verbose: bool) -> str:
     lines = [
         "AgentOS doctor (read-only)",
         f"AgentOS home: {report.agentos_home}",
+        f"Primary AgentOS home: {report.primary_agentos_home}",
         f"Skill mirror root: {report.mirror_root}",
     ]
     for result in report.results:
