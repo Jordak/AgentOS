@@ -70,7 +70,7 @@ Safety:
 5. Apply the AgentOS skill contract. New or materially changed skills must name inputs, output artifact, mutability, tools/connectors, safety, phases, quality bar, verification, and filing rules.
 6. Update maintenance surfaces:
    - `os/skills/MANIFEST.md` for any skill add/update;
-   - `os/skills/audit-skill-mirrors/SKILL.md` when current-machine mirror
+   - `os/skills/mirror-skills/SKILL.md` when current-machine mirror
      audit or sync behavior changes;
    - `os/RESOLVER.md` only when lookup, routing, authority, safety, or filing
      tie-breakers change;
@@ -100,7 +100,7 @@ Keep the behavior as Markdown guidance when:
 ## File Conventions
 
 - Canonical skills live under `os/skills/`.
-- Skill contract metadata lives in `os/skills/MANIFEST.md`; current-machine mirror checks live in `os/skills/audit-skill-mirrors/`.
+- Skill contract metadata lives in `os/skills/MANIFEST.md`; current-machine mirror checks live in `os/skills/mirror-skills/`.
 - Resolver changes live in `os/RESOLVER.md` or the narrow directory resolver.
 - Deterministic local checks live in `os/verification/scripts/validate_agentos.py` unless a separate script is clearly warranted.
 - Retrieval and smoke fixtures live under `os/verification/retrieval/`.

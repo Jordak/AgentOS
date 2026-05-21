@@ -40,17 +40,17 @@ Each skill entry records:
 - Verification coverage: fetch or otherwise verify the remote integration branch; for every closed issue, record merged PR or commit evidence reachable from that branch; for every commented issue, record comment purpose and evidence; record skipped reasons; confirm no human-owned issue was closed and no external write happened without approval.
 - Upgrade notes: Core reusable issue-audit workflow.
 
-### `audit-skill-mirrors`
+### `mirror-skills`
 
-- Canonical source: `os/skills/audit-skill-mirrors/SKILL.md`
+- Canonical source: `os/skills/mirror-skills/SKILL.md`
 - Contract status: full.
 - Mutability: mixed: read-only in audit mode; local-write in sync mode when creating or updating current-machine skill mirrors.
-- Tools and connectors: local filesystem, `os/skills/MANIFEST.md`, optional Personal Overlay config, and `os/skills/audit-skill-mirrors/scripts/audit_skill_mirrors.py`.
+- Tools and connectors: local filesystem, `os/skills/MANIFEST.md`, optional Personal Overlay config, and `os/skills/mirror-skills/scripts/mirror_skills.py`.
 - Output artifact: mirror audit report and optional current-machine mirror files under a configured mirror root.
 - Filing rule: keep canonical skill behavior in `os/skills/`; keep machine-local mirror state out of this manifest; mirror audit output stays in chat unless the user asks for a local report.
-- Safety posture: ask before writing outside the workspace unless the active harness has already approved the mirror root; do not delete extra mirror files unless the user explicitly asks for pruning.
-- Verification coverage: run the mirror audit script in audit mode; run a `--sync` smoke test against a temporary mirror root; run skill validation and the AgentOS validator when available.
-- Upgrade notes: private live mirror roots and validator paths belong in `personal/os/skills/audit-skill-mirrors/CONFIG.md`.
+- Safety posture: default to audit-only; ask before writing outside the workspace unless the active harness has already approved the exact mirror root and write scope; do not delete extra mirror files unless the user explicitly asks for pruning.
+- Verification coverage: run the mirror audit script in audit mode; run a `--sync` smoke test against a temporary mirror root; verify Personal Overlay skill discovery and collision handling; run skill validation and the AgentOS validator when available.
+- Upgrade notes: private live mirror roots and validator paths belong in `personal/os/skills/mirror-skills/CONFIG.md`.
 
 ### `double-steelman`
 

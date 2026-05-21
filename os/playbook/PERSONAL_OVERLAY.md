@@ -114,8 +114,8 @@ Skills that are thin adapters to live private agents or workflows centered on pr
 Examples:
 
 - `$root/os/skills/research-brief/SKILL.md`
-- `$root/os/skills/audit-skill-mirrors/SKILL.md`
-- `$root/personal/os/skills/audit-skill-mirrors/CONFIG.md`
+- `$root/os/skills/mirror-skills/SKILL.md`
+- `$root/personal/os/skills/mirror-skills/CONFIG.md`
 - `$root/personal/os/skills/current-awareness-agent/SKILL.md`
 - `$root/personal/os/skills/private-document-maintenance/SKILL.md`
 
