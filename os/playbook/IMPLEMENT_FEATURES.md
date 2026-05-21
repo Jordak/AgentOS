@@ -77,6 +77,8 @@ Use this when the design source is missing, not durable, marked as needing conse
 
 Resolve this by asking targeted questions, updating the durable design source, and creating any needed follow-up artifacts before coding begins.
 
+When a design-interview workflow is available and useful for resolving blocking questions, use it. Popular harness-provided examples include `grill-me` and `grill-with-docs` when present. These are conveniences, not Core requirements; targeted questions are the portable fallback.
+
 ### Gate Skipped
 
 Use this when the work is small, mechanical, or obvious enough to be exempt from the gate. Record why the gate was skipped so future agents can distinguish intentional bypass from omission.
@@ -102,11 +104,13 @@ Follow `os/playbook/GITHUB_WORKFLOW.md` for issue and PR writing conventions, br
 
 ## Review-loop Preflight
 
-Review-loop workflows should check implementation readiness before spawning reviewers.
+Review-loop workflows should run the same readiness gate before spawning reviewers.
 
-If the PR's design source has `Design readiness: ready to implement`, proceed with the review loop.
+Proceed only when a durable PR design source has `Design readiness: ready to implement` and still satisfies the design-source standard for the PR scope. Content wins over the marker.
 
-If no durable readiness marker exists, infer readiness from the issue, PR body, local design doc, or user request and confirm with the user before proceeding.
+If a durable design source exists but has no readiness marker, infer readiness from durable evidence such as the issue, PR body, or local design doc, then confirm with the user before proceeding.
+
+If only chat or a current user request exists, treat the review target as `Needs Design Consensus` until the design is promoted into a durable source, unless the user explicitly chooses to bypass the gate.
 
 If the user proceeds despite missing or incomplete readiness, record the bypass in the review-loop ledger and final report.
 

@@ -33,7 +33,7 @@ Tools and connectors:
 
 - Local filesystem, `rg`, and mapped project files.
 - GitHub connector or `gh` when checking or updating issue/PR design sources.
-- Optional harness-exposed design-interview workflows such as `grill-me`, `grill-with-docs`, or an equivalent, when present.
+- Optional harness-exposed design-interview workflows when present.
 - The implementation-readiness playbook for policy.
 - `os/playbook/GITHUB_WORKFLOW.md` for GitHub issue and PR writing conventions.
 - `os/playbook/ARTIFACTS.md` when producing substantial human-facing design artifacts.
@@ -61,7 +61,7 @@ Safety:
    If the source lacks `Design readiness:`, infer readiness from the content. Tell the user the inferred verdict, reasons, implementation boundary, and marker or edit you plan to make. Wait for confirmation before implementation proceeds. If edits are authorized, add or propose the marker after confirmation.
 
 5. Handle open questions.
-   Classify open questions as blocking or deferred using the playbook's rules. If a design-interview workflow such as `grill-me`, `grill-with-docs`, or an equivalent is available, use it to resolve blocking questions; otherwise ask targeted questions directly. Ask before GitHub issue creation or updates unless tracker writes were explicitly authorized. If GitHub writes are not authorized, create or propose the local artifact destination named by the playbook unless the project has a better convention or the user redirects. Update or propose updating the current design source with a `Deferred Follow-ups` section linking to created artifacts.
+   Classify open questions as blocking or deferred using the playbook's rules. When an optional design-interview workflow is available and useful for the blocking question, use it; for simple questions or when no such workflow is available, ask targeted questions directly. Ask before GitHub issue creation or updates unless tracker writes were explicitly authorized. If GitHub writes are not authorized, create or propose the local artifact destination named by the playbook unless the project has a better convention or the user redirects. Update or propose updating the current design source with a `Deferred Follow-ups` section linking to created artifacts.
 
 6. Report the verdict.
    Include the source reviewed, satisfied and missing readiness fields, implementation boundary, non-goals, created or proposed follow-up artifacts, and whether external writes happened, were proposed, or were skipped.
