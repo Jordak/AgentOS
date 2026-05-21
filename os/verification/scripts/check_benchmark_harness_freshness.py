@@ -52,6 +52,7 @@ class RunRecord:
 class HistoryEntry:
     date: date
     suite: str
+    result_summary: str
 
 
 def default_root() -> Path:
@@ -120,7 +121,7 @@ def load_history_entries(path: Path) -> list[HistoryEntry]:
             entry_date = date.fromisoformat(cells[0])
         except ValueError as error:
             raise ValueError(f"history entry date is invalid: {cells[0]}") from error
-        entries.append(HistoryEntry(date=entry_date, suite=cells[2]))
+        entries.append(HistoryEntry(date=entry_date, suite=cells[2], result_summary=cells[3]))
 
     if not entries:
         raise ValueError("history table must contain at least one entry")
@@ -297,6 +298,16 @@ def latest_history_date(entries: list[HistoryEntry], suite: str) -> date | None:
     return max(matching) if matching else None
 
 
+def latest_history_entry(entries: list[HistoryEntry], suite: str) -> HistoryEntry | None:
+    matching = [entry for entry in entries if entry.suite == suite]
+    return max(matching, key=lambda entry: entry.date) if matching else None
+
+
+def history_matches_behavior(entry: HistoryEntry, record: RunRecord) -> bool:
+    expected_ratio = f"{record.behavioral_pass}/{record.behavioral_total}"
+    return expected_ratio in entry.result_summary
+
+
 def check_target(
     root: Path,
     target: BenchmarkTarget,
@@ -345,21 +356,28 @@ def check_target(
     failed = days > target.max_age_days
 
     if history_entries is not None:
-        history_date = latest_history_date(history_entries, target.name)
+        history_entry = latest_history_entry(history_entries, target.name)
         behavior_date = latest_behavior.generated_at.date()
-        if history_date is None:
+        if history_entry is None:
             print(f"WARN  {target.name}: no curated Core benchmark history entry found")
             failed = True
-        elif history_date < behavior_date:
+        elif history_entry.date < behavior_date:
             print(
-                f"WARN  {target.name}: latest curated Core history entry {history_date.isoformat()} "
+                f"WARN  {target.name}: latest curated Core history entry {history_entry.date.isoformat()} "
                 f"predates latest behavioral run {behavior_date.isoformat()}"
+            )
+            failed = True
+        elif not history_matches_behavior(history_entry, latest_behavior):
+            print(
+                f"WARN  {target.name}: latest curated Core history entry {history_entry.date.isoformat()} "
+                f"does not summarize latest behavioral result "
+                f"{latest_behavior.behavioral_pass}/{latest_behavior.behavioral_total}"
             )
             failed = True
         else:
             print(
                 f"OK    {target.name}: curated Core history includes entry dated "
-                f"{history_date.isoformat()}"
+                f"{history_entry.date.isoformat()} with latest behavioral result"
             )
 
     return 1 if failed else 0
@@ -379,7 +397,7 @@ def run_self_test(root: Path) -> int:
             fixture_root,
             target,
             now,
-            [HistoryEntry(date=date(2026, 5, 16), suite="self-test")],
+            [HistoryEntry(date=date(2026, 5, 16), suite="self-test", result_summary="Passed 8/8")],
         )
         if missing_with_history == 0:
             print("SELF-TEST FAIL: missing reports with history were accepted")
@@ -405,10 +423,16 @@ def run_self_test(root: Path) -> int:
             encoding="utf-8",
         )
         full_target = BenchmarkTarget("self-test", reports_dir, "*/run.json", ("summary",), 8, 14)
-        stale_history = [HistoryEntry(date=date(2026, 5, 15), suite="self-test")]
-        current_history = [HistoryEntry(date=date(2026, 5, 16), suite="self-test")]
+        stale_history = [HistoryEntry(date=date(2026, 5, 15), suite="self-test", result_summary="Passed 8/8")]
+        wrong_result_history = [
+            HistoryEntry(date=date(2026, 5, 16), suite="self-test", result_summary="Failed 0/8")
+        ]
+        current_history = [HistoryEntry(date=date(2026, 5, 16), suite="self-test", result_summary="Passed 8/8")]
         if check_target(fixture_root, full_target, now, stale_history) == 0:
             print("SELF-TEST FAIL: stale curated history was accepted")
+            return 1
+        if check_target(fixture_root, full_target, now, wrong_result_history) == 0:
+            print("SELF-TEST FAIL: mismatched curated history result was accepted")
             return 1
         if check_target(fixture_root, full_target, now, current_history) != 0:
             print("SELF-TEST FAIL: current curated history was rejected")

@@ -17,6 +17,7 @@ import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass
+from datetime import date as calendar_date
 from pathlib import Path
 
 sys.dont_write_bytecode = True
@@ -1245,9 +1246,18 @@ class AgentOSValidator:
             return
 
         for row_no, row in rows:
-            date, commit_ref, suite, result, interpretation, caveats = row
-            if not BENCHMARK_HISTORY_DATE_RE.fullmatch(date):
+            entry_date, commit_ref, suite, result, interpretation, caveats = row
+            if not BENCHMARK_HISTORY_DATE_RE.fullmatch(entry_date):
                 self.add_error(check, f"{self.display_path(history_path)}:{row_no}", "date must use YYYY-MM-DD")
+            else:
+                try:
+                    calendar_date.fromisoformat(entry_date)
+                except ValueError:
+                    self.add_error(
+                        check,
+                        f"{self.display_path(history_path)}:{row_no}",
+                        "date must be a valid calendar date",
+                    )
             if not commit_ref:
                 self.add_error(check, f"{self.display_path(history_path)}:{row_no}", "commit/PR reference is required")
             if not BENCHMARK_HISTORY_SUITE_RE.fullmatch(suite):
@@ -1552,6 +1562,7 @@ def run_self_test() -> int:
             "| Date | Commit/PR | Suite | Result Summary | Interpretation | Caveats |\n"
             "| --- | --- | --- | --- | --- | --- |\n"
             "| 2026-05-17 | PR #1 | retrieval | Passed 8/8 | Looks stable. | dry-run only |\n"
+            "| 2026-99-99 | PR #2 | retrieval | Passed 8/8 | Invalid date fixture. | dry-run only |\n"
             "\n"
             "`raw_response`: fixture payload copied from a saved report.\n"
             "Stored under personal/os/verification/retrieval/reports/example.\n"
@@ -1649,6 +1660,7 @@ def run_self_test() -> int:
             "listed local path does not exist",
             "benchmark script missing from manifest",
             "benchmark history contains raw dump marker",
+            "date must be a valid calendar date",
             "benchmark history must not include Personal Overlay paths",
             "benchmark history must not include transcript-style dialogue lines",
             "benchmark history must not include fenced JSON report payloads",
