@@ -606,7 +606,7 @@ def check_personal_overlay(agentos_home: Path, primary_agentos_home: Path, verbo
             details=[root_relative(agentos_home, personal_root)],
         )
 
-    existing_starters = [rel for rel in starter_paths if (agentos_home / rel).is_file()]
+    existing_starters = [rel for rel in starter_paths if (primary_agentos_home / rel).is_file()]
     missing_starters = [rel for rel in starter_paths if rel not in existing_starters]
     private_file_count = count_non_gitkeep_files(personal_root)
     details = [
@@ -1364,7 +1364,7 @@ def test_primary_agentos_home_supplies_personal_overlay() -> None:
             path = primary / rel
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text("# private starter\n", encoding="utf-8")
-        result = check_personal_overlay(primary, primary, verbose=False)
+        result = check_personal_overlay(worktree, primary, verbose=False)
         assert_true(result.status == "PASS", "primary Personal Overlay starter files should be used")
         report = run_doctor(
             requested_agentos_home=worktree,
