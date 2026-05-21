@@ -131,8 +131,12 @@ BENCHMARK_HISTORY_RESULT_RE = re.compile(
     r"\b(?:pass(?:ed|es)?|fail(?:ed|s)?|hit@|hit-rate|not scored|dry-run only|no real harness run)\b",
     re.IGNORECASE,
 )
+BENCHMARK_HISTORY_RESULT_RATIO_RE = re.compile(r"(?<![\d/])\d+/\d+(?![\d/])")
 BENCHMARK_HISTORY_RAW_FIELD_RE = re.compile(
-    r"(?i)(?:^|[^A-Za-z0-9_-])(?:stdout|stderr|raw_response|command|root)(?:[^A-Za-z0-9_-]|$)"
+    r"(?i)(?:^|[^A-Za-z0-9_-])(?:stdout|stderr|raw_response)(?:[^A-Za-z0-9_-]|$)"
+)
+BENCHMARK_HISTORY_KEY_FIELD_RE = re.compile(
+    r"(?i)(?:^|[`\"'{\s])(?:command|root)\s*(?:[:=]|`)"
 )
 BENCHMARK_HISTORY_TRANSCRIPT_LINE_RE = re.compile(
     r"(?im)^\s*>?\s*(?:user|assistant|system|developer|tool|codex):\s+\S"
@@ -1209,7 +1213,7 @@ class AgentOSValidator:
                     f"{self.display_path(history_path)}:{line_no}",
                     "benchmark history must not include Personal Overlay paths",
                 )
-            marker_match = BENCHMARK_HISTORY_RAW_FIELD_RE.search(line)
+            marker_match = BENCHMARK_HISTORY_RAW_FIELD_RE.search(line) or BENCHMARK_HISTORY_KEY_FIELD_RE.search(line)
             if marker_match:
                 self.add_error(
                     check,
@@ -1233,7 +1237,7 @@ class AgentOSValidator:
                     f"{self.display_path(history_path)}:{line_no}",
                     "benchmark history must not include fenced JSON report payloads",
                 )
-            elif BENCHMARK_HISTORY_RAW_FIELD_RE.search(body):
+            elif BENCHMARK_HISTORY_RAW_FIELD_RE.search(body) or BENCHMARK_HISTORY_KEY_FIELD_RE.search(body):
                 self.add_error(
                     check,
                     f"{self.display_path(history_path)}:{line_no}",
@@ -1251,13 +1255,20 @@ class AgentOSValidator:
                 self.add_error(check, f"{self.display_path(history_path)}:{row_no}", "date must use YYYY-MM-DD")
             else:
                 try:
-                    calendar_date.fromisoformat(entry_date)
+                    parsed_date = calendar_date.fromisoformat(entry_date)
                 except ValueError:
                     self.add_error(
                         check,
                         f"{self.display_path(history_path)}:{row_no}",
                         "date must be a valid calendar date",
                     )
+                else:
+                    if parsed_date > calendar_date.today():
+                        self.add_error(
+                            check,
+                            f"{self.display_path(history_path)}:{row_no}",
+                            "date must not be in the future",
+                        )
             if not commit_ref:
                 self.add_error(check, f"{self.display_path(history_path)}:{row_no}", "commit/PR reference is required")
             if not BENCHMARK_HISTORY_SUITE_RE.fullmatch(suite):
@@ -1271,6 +1282,15 @@ class AgentOSValidator:
                     check,
                     f"{self.display_path(history_path)}:{row_no}",
                     "result summary must include pass/fail, hit-rate, dry-run, or no-real-run status",
+                )
+            if (
+                re.search(r"\b(?:pass(?:ed|es)?|fail(?:ed|s)?|hit@|hit-rate)\b", result, re.IGNORECASE)
+                and not BENCHMARK_HISTORY_RESULT_RATIO_RE.search(result)
+            ):
+                self.add_error(
+                    check,
+                    f"{self.display_path(history_path)}:{row_no}",
+                    "scored result summaries must include a numeric ratio",
                 )
             if "not scored" in result.lower() and not any(
                 note in caveats.lower()
@@ -1563,6 +1583,9 @@ def run_self_test() -> int:
             "| --- | --- | --- | --- | --- | --- |\n"
             "| 2026-05-17 | PR #1 | retrieval | Passed 8/8 | Looks stable. | dry-run only |\n"
             "| 2026-99-99 | PR #2 | retrieval | Passed 8/8 | Invalid date fixture. | dry-run only |\n"
+            "| 2999-01-01 | PR #3 | retrieval | Passed 8/8 | Future date fixture. | dry-run only |\n"
+            "| 2026-05-17 | PR #4 | retrieval | Passed | Missing ratio fixture. | dry-run only |\n"
+            "| 2026-05-17 | PR #5 | retrieval | Passed 8/8 | Root cause was fixture routing and benchmark command changed. | dry-run only |\n"
             "\n"
             "`raw_response`: fixture payload copied from a saved report.\n"
             "Stored under personal/os/verification/retrieval/reports/example.\n"
@@ -1661,6 +1684,8 @@ def run_self_test() -> int:
             "benchmark script missing from manifest",
             "benchmark history contains raw dump marker",
             "date must be a valid calendar date",
+            "date must not be in the future",
+            "scored result summaries must include a numeric ratio",
             "benchmark history must not include Personal Overlay paths",
             "benchmark history must not include transcript-style dialogue lines",
             "benchmark history must not include fenced JSON report payloads",
@@ -1804,7 +1829,7 @@ def run_self_test() -> int:
             for error in validator.errors
         )
         benchmark_history_case_separator_rejected = any(
-            error.path == "os/verification/BENCHMARK_HISTORY.md:11"
+            error.path == "os/verification/BENCHMARK_HISTORY.md:15"
             and "benchmark history must not include Personal Overlay paths" in error.message
             for error in validator.errors
         )

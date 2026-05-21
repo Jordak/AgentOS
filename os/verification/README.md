@@ -19,7 +19,7 @@ The default validator reads local files only and runs structural checks plus det
 AgentOS uses a hybrid benchmark-evidence model:
 
 - Private raw reports stay in the Personal Overlay, usually under `personal/os/verification/<suite>/reports/`. Saved runs may include `report.md`, `run.json`, harness diagnostics, local paths, and other private run evidence.
-- Core benchmark history lives in `os/verification/BENCHMARK_HISTORY.md`. It contains only curated public-safe fields: date, commit/PR reference, suite, pass/fail or hit-rate summary, interpretation, and caveats such as `dry-run only` or `no real harness run`.
+- Core benchmark history lives in `os/verification/BENCHMARK_HISTORY.md`. It contains only curated public-safe fields: date, commit/PR reference, suite, pass/total, fail/total, or hit-rate ratio summary, interpretation, and caveats such as `dry-run only` or `no real harness run`.
 
 Do not paste raw report dumps, transcripts, local machine paths, account/session details, private prompts, or generated report payloads into Core history. If a private run produces an insight worth preserving publicly, summarize the result by hand and keep the raw evidence in the Personal Overlay.
 

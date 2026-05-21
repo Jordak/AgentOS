@@ -9,7 +9,7 @@ Keep entries to these fields only:
 - Date
 - Commit/PR
 - Suite
-- Result Summary
+- Result Summary, using a pass/total, fail/total, or hit-rate ratio for scored benchmark outcomes
 - Interpretation
 - Caveats
 

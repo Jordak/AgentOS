@@ -18,6 +18,8 @@ DEFAULT_MANIFEST = Path("os/verification/BENCHMARKS.json")
 DEFAULT_HISTORY = Path("os/verification/BENCHMARK_HISTORY.md")
 BENCHMARK_HISTORY_HEADER = ("Date", "Commit/PR", "Suite", "Result Summary", "Interpretation", "Caveats")
 RESULT_RATIO_RE = re.compile(r"(?<![\d/])(\d+)/(\d+)(?![\d/])")
+FAIL_LABEL_RE = re.compile(r"\bfail(?:ed|s)?\b", re.IGNORECASE)
+PASS_LABEL_RE = re.compile(r"\b(?:pass(?:ed|es)?|hit@|hit-rate)\b", re.IGNORECASE)
 
 HARNESS_UNAVAILABLE_PATTERNS = (
     "is not installed",
@@ -309,11 +311,18 @@ def latest_history_entries(entries: list[HistoryEntry], suite: str) -> list[Hist
 
 
 def history_matches_behavior(entry: HistoryEntry, record: RunRecord) -> bool:
-    expected = (record.behavioral_pass, record.behavioral_total)
-    return any(
-        (int(match.group(1)), int(match.group(2))) == expected
-        for match in RESULT_RATIO_RE.finditer(entry.result_summary)
-    )
+    for match in RESULT_RATIO_RE.finditer(entry.result_summary):
+        ratio = (int(match.group(1)), int(match.group(2)))
+        context = entry.result_summary[max(0, match.start() - 24):match.start()]
+        if FAIL_LABEL_RE.search(context):
+            if ratio == (record.behavioral_fail, record.behavioral_total):
+                return True
+        elif PASS_LABEL_RE.search(context):
+            if ratio == (record.behavioral_pass, record.behavioral_total):
+                return True
+        elif ratio == (record.behavioral_pass, record.behavioral_total):
+            return True
+    return False
 
 
 def check_target(
@@ -368,6 +377,12 @@ def check_target(
         behavior_date = latest_behavior.generated_at.date()
         if not latest_entries:
             print(f"WARN  {target.name}: no curated Core benchmark history entry found")
+            failed = True
+        elif latest_entries[0].date > now.date():
+            print(
+                f"WARN  {target.name}: latest curated Core history entry {latest_entries[0].date.isoformat()} "
+                f"is dated after current date {now.date().isoformat()}"
+            )
             failed = True
         elif latest_entries[0].date < behavior_date:
             print(
@@ -433,11 +448,15 @@ def run_self_test(root: Path) -> int:
         full_target = BenchmarkTarget("self-test", reports_dir, "*/run.json", ("summary",), 8, 14)
         stale_history = [HistoryEntry(date=date(2026, 5, 15), suite="self-test", result_summary="Passed 8/8")]
         wrong_result_history = [
-            HistoryEntry(date=date(2026, 5, 16), suite="self-test", result_summary="Failed 0/8")
+            HistoryEntry(date=date(2026, 5, 16), suite="self-test", result_summary="Failed 1/8")
         ]
         partial_ratio_history = [
             HistoryEntry(date=date(2026, 5, 16), suite="self-test", result_summary="Passed 18/80")
         ]
+        failing_result_history = [
+            HistoryEntry(date=date(2026, 5, 16), suite="self-test", result_summary="Failed 0/8")
+        ]
+        future_history = [HistoryEntry(date=date(2026, 5, 18), suite="self-test", result_summary="Passed 8/8")]
         same_date_rerun_history = [
             HistoryEntry(date=date(2026, 5, 16), suite="self-test", result_summary="Failed 0/8"),
             HistoryEntry(date=date(2026, 5, 16), suite="self-test", result_summary="Passed 8/8"),
@@ -451,6 +470,12 @@ def run_self_test(root: Path) -> int:
             return 1
         if check_target(fixture_root, full_target, now, partial_ratio_history) == 0:
             print("SELF-TEST FAIL: partial-ratio curated history result was accepted")
+            return 1
+        if check_target(fixture_root, full_target, now, failing_result_history) != 0:
+            print("SELF-TEST FAIL: matching failing curated history result was rejected")
+            return 1
+        if check_target(fixture_root, full_target, now, future_history) == 0:
+            print("SELF-TEST FAIL: future-dated curated history was accepted")
             return 1
         if check_target(fixture_root, full_target, now, same_date_rerun_history) != 0:
             print("SELF-TEST FAIL: same-date matching curated history result was rejected")
