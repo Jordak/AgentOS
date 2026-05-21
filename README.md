@@ -41,9 +41,12 @@ Install AgentOS for me.
 7. Run the drift check:
    python3 scripts/install_global_agent_instructions.py --agentos-home <resolved-agentos-home> --check
    If extra --adapter <path> flags were used above, repeat those exact flags here.
-8. Summarize what changed, where backups were written, and whether the check passed.
-9. Ask me whether I want AgentOS skills to be discoverable from my harnesses. If I do, use the mirror-skills workflow to check Core skills and Personal Overlay skills, show me the audit result, and ask before syncing any files outside this checkout.
-10. Ask me if I want to hear how to get the most out of AgentOS.
+8. Run the read-only setup health check:
+   python3 scripts/agentos_doctor.py --agentos-home <resolved-agentos-home>
+   Treat warnings as next-step recommendations, not permission to change files.
+9. Summarize what changed, where backups were written, whether the adapter check passed, and what the doctor recommends.
+10. Ask me whether I want AgentOS skills to be discoverable from my harnesses. If I do, use the mirror-skills workflow to check Core skills and Personal Overlay skills, show me the audit result, and ask before syncing any files outside this checkout.
+11. Ask me if I want to hear how to get the most out of AgentOS.
 ```
 
 Use the Python 3 command that works on your machine. On some systems that is `python3`; on others it may be `python` or `py -3`.
@@ -63,6 +66,7 @@ Review the dry-run output. It should tell you which global instruction files wou
 ```bash
 python3 scripts/install_global_agent_instructions.py --agentos-home <agentos-home> --no-dry-run
 python3 scripts/install_global_agent_instructions.py --agentos-home <agentos-home> --check
+python3 scripts/agentos_doctor.py --agentos-home <agentos-home>
 ```
 
 If you use `--all-default-adapters` or any custom `--adapter <path>` flags, repeat those same flags on the dry-run, write, check, and remove commands.
@@ -70,6 +74,22 @@ If you use `--all-default-adapters` or any custom `--adapter <path>` flags, repe
 </details>
 
 For installer adapter details, see the [portability playbook](os/playbook/PORTABILITY.md). The [glossary](os/context/GLOSSARY.md) defines AgentOS terms such as harness, adapter, Core, Personal Overlay, and drift.
+
+## Setup Health Check
+
+Run the AgentOS doctor when you want a read-only report on local setup health:
+
+```bash
+python3 scripts/agentos_doctor.py
+```
+
+The doctor discovers the AgentOS checkout from the current directory, or you can pass `--agentos-home <agentos-home>`. It always prints the resolved home, runs the installer drift check in read-only `--check` mode, audits skill mirrors through mirror-skills without syncing them, checks documented starter Personal Overlay paths from [os/playbook/GETTING_STARTED.md](os/playbook/GETTING_STARTED.md), and reports best-effort automation presence. It does not remediate, install, sync, delete, or print private file contents.
+
+Use the tools this way:
+
+- `scripts/agentos_doctor.py`: read-only health report and exact next-step recommendations.
+- `scripts/install_global_agent_instructions.py`: dry-run, install, check, or remove global instruction adapters after review.
+- `os/skills/mirror-skills/scripts/mirror_skills.py`: audit skill mirrors by default; sync only after approving current-machine writes.
 
 ## Getting The Most Out Of AgentOS
 

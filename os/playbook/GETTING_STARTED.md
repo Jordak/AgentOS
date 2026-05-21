@@ -71,6 +71,22 @@ Useful first Personal Overlay files include:
 
 Use the matching Core templates under `os/` when the user wants structure but has not supplied private facts yet.
 
+## Setup Doctor
+
+Use the AgentOS doctor when the user wants a read-only setup health check:
+
+```bash
+python3 scripts/agentos_doctor.py
+```
+
+The doctor discovers `$root` from the current directory, or accepts `--agentos-home <root>`. It reports the resolved AgentOS home, checks adapter drift through `scripts/install_global_agent_instructions.py --check`, audits skill mirrors through mirror-skills without syncing, checks the starter Personal Overlay paths listed above, and reports best-effort automation presence. It prints presence, absence, counts, and paths only; it must not print Personal Overlay file contents.
+
+Doctor is not the installer and not mirror sync:
+
+- Use `scripts/agentos_doctor.py` for read-only setup health and exact next steps.
+- Use `scripts/install_global_agent_instructions.py` when the user has approved creating, updating, checking, or removing global instruction adapters.
+- Use `os/skills/mirror-skills/scripts/mirror_skills.py` when the user wants to audit or, after approval, sync harness-discoverable skill mirrors.
+
 ## Skill Mirrors
 
 AgentOS Core skills live under `os/skills/`. Private skills can live under `personal/os/skills/<skill-name>/SKILL.md`.
@@ -114,5 +130,5 @@ Or:
 ```text
 Audit my AgentOS setup.
 
-Check whether the global instruction adapters point at this AgentOS checkout, whether AgentOS skills are discoverable from my harness, and whether my Personal Overlay has starter identity, context, memory, tool, and boundary files. Report gaps and ask before making changes.
+Run `python3 scripts/agentos_doctor.py` from my AgentOS checkout. Check whether the global instruction adapters point at this AgentOS checkout, whether AgentOS skills are discoverable from my harness, whether my Personal Overlay has starter identity, context, memory, tool, and boundary files, and whether automation state appears configured. Report gaps and ask before making changes.
 ```
