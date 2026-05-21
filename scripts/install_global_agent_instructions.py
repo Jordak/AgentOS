@@ -411,8 +411,11 @@ def run(
     if failures:
         print("", file=out)
         if mode == "check":
-            print("Drift detected. Remediation:", file=out)
-            print(remediation_command(args, agentos_home), file=out)
+            if any(result.status == "error" for result in failures):
+                print("Check failed. Resolve the errors above before running an install remediation.", file=out)
+            else:
+                print("Drift detected. Remediation:", file=out)
+                print(remediation_command(args, agentos_home), file=out)
         elif rolled_back:
             if rollback_errors:
                 print(
@@ -1094,70 +1097,49 @@ def inline_global_adapter_block(home: Path, agentos_home: Path, reject_gemini_im
 """
 
 
-GEMINI_IMPORT_LIKE_RE = re.compile(
-    r"(?<![\w.-])@(?P<path>(?:\.{1,2}[\\/]|[\\/]|\x7e[\\/]|[A-Za-z0-9_.-]+[\\/]|[A-Za-z0-9_.-]+\.md(?:[^\s`]*)?)[^\s`]*)"
-)
-
-
 def find_gemini_import_like_reference(text: str) -> tuple[int, str] | None:
-    in_fence = False
-    fence_char = ""
-    fence_length = 0
-    for line_number, line in enumerate(text.splitlines(), start=1):
-        fence = markdown_fence_marker(line)
-        if fence is not None:
-            char, length = fence
-            if not in_fence:
-                in_fence = True
-                fence_char = char
-                fence_length = length
-            elif char == fence_char and length >= fence_length:
-                in_fence = False
+    code_regions = find_gemini_code_regions(text)
+    index = 0
+    while index < len(text):
+        at_index = text.find("@", index)
+        if at_index == -1:
+            return None
+        if at_index > 0 and not gemini_import_whitespace(text[at_index - 1]):
+            index = at_index + 1
             continue
-        if in_fence or line.startswith("    ") or line.startswith("\t"):
-            continue
-        active_text = strip_inline_code_spans(line)
-        match = GEMINI_IMPORT_LIKE_RE.search(active_text)
-        if match:
-            return line_number, "@" + match.group("path")
+        end = at_index + 1
+        while end < len(text) and not gemini_import_whitespace(text[end]):
+            end += 1
+        import_path = text[at_index + 1 : end]
+        if import_path and is_gemini_import_path(import_path) and not position_in_regions(at_index, code_regions):
+            return text.count("\n", 0, at_index) + 1, "@" + import_path
+        index = max(end + 1, at_index + 1)
     return None
 
 
-def markdown_fence_marker(line: str) -> tuple[str, int] | None:
-    stripped = line.lstrip()
-    if not stripped:
-        return None
-    char = stripped[0]
-    if char not in {"`", "~"}:
-        return None
-    length = 0
-    for current in stripped:
-        if current != char:
-            break
-        length += 1
-    if length < 3:
-        return None
-    return char, length
+def find_gemini_code_regions(text: str) -> list[tuple[int, int]]:
+    regions: list[tuple[int, int]] = []
+    for match in re.finditer(r"(`+)([\s\S]*?)\1", text):
+        regions.append((match.start(), match.end()))
+    return regions
 
 
-def strip_inline_code_spans(line: str) -> str:
-    result: list[str] = []
-    index = 0
-    while index < len(line):
-        if line[index] != "`":
-            result.append(line[index])
-            index += 1
-            continue
-        tick_count = 1
-        while index + tick_count < len(line) and line[index + tick_count] == "`":
-            tick_count += 1
-        closing = line.find("`" * tick_count, index + tick_count)
-        if closing == -1:
-            result.append(line[index])
-            index += 1
-            continue
-        index = closing + tick_count
-    return "".join(result)
+def position_in_regions(position: int, regions: list[tuple[int, int]]) -> bool:
+    return any(start <= position < end for start, end in regions)
+
+
+def gemini_import_whitespace(char: str) -> bool:
+    return char in {" ", "\t", "\n", "\r"}
+
+
+def is_gemini_import_path(import_path: str) -> bool:
+    first = import_path[0]
+    return first in {".", "/"} or is_ascii_letter(first)
+
+
+def is_ascii_letter(char: str) -> bool:
+    code = ord(char)
+    return 65 <= code <= 90 or 97 <= code <= 122
 
 
 def adapter_block(global_path: Path, import_style: str = "pointer") -> str:
@@ -1201,6 +1183,7 @@ def check_target(target: Target, home: Path, agentos_home: Path) -> Result:
     if path_error:
         return Result(False, "error", target.path, path_error)
     if not target.path.exists():
+        expected_block(target, home, agentos_home)
         return Result(False, "missing", target.path, "file is missing")
     text = read_text_preserve_newlines(target.path)
     start, end = markers_for(target.kind)
@@ -1716,19 +1699,32 @@ def test_inline_adapters_mirror_effective_global_file() -> None:
 def test_gemini_inline_adapter_rejects_active_canonical_imports() -> None:
     with tempfile.TemporaryDirectory(prefix="agentos-global-installer-") as tmp:
         root = Path(tmp)
-        home = root / "home"
-        home.mkdir()
-        (home / ".gemini").mkdir()
-        global_file = global_instructions_path(home)
-        global_file.parent.mkdir()
-        global_original = "Existing global guidance.\n@./shared.md\n"
-        global_file.write_text(global_original, encoding="utf-8")
         agentos = make_fake_agentos(root)
-        code, output = run_args(["--agentos-home", str(agentos), "--no-dry-run"], home)
-        assert_true(code == 1, "Gemini adapter should reject canonical imports that would be re-rooted")
-        assert_true("Gemini-style import syntax" in output, "Gemini import failure should explain the blocked syntax")
-        assert_true(read_text_preserve_newlines(global_file) == global_original, "Gemini import failure modified canonical global file")
-        assert_true(not (home / ".gemini" / "GEMINI.md").exists(), "Gemini import failure created adapter")
+        unsafe_imports = ("@./shared.md", "@README", "@package.json")
+        for index, import_text in enumerate(unsafe_imports):
+            home = root / f"home-{index}"
+            home.mkdir()
+            (home / ".gemini").mkdir()
+            global_file = global_instructions_path(home)
+            global_file.parent.mkdir()
+            global_original = f"Existing global guidance.\nSee {import_text} for more.\n"
+            global_file.write_text(global_original, encoding="utf-8")
+            code, output = run_args(["--agentos-home", str(agentos), "--no-dry-run"], home)
+            assert_true(code == 1, f"Gemini adapter should reject canonical import {import_text}")
+            assert_true("Gemini-style import syntax" in output, "Gemini import failure should explain the blocked syntax")
+            assert_true(read_text_preserve_newlines(global_file) == global_original, "Gemini import failure modified canonical global file")
+            assert_true(not (home / ".gemini" / "GEMINI.md").exists(), "Gemini import failure created adapter")
+
+        check_home = root / "check-home"
+        check_home.mkdir()
+        (check_home / ".gemini").mkdir()
+        check_global = global_instructions_path(check_home)
+        check_global.parent.mkdir()
+        check_global.write_text("Existing global guidance.\nSee @README for more.\n", encoding="utf-8")
+        code, output = run_args(["--agentos-home", str(agentos), "--check"], check_home)
+        assert_true(code == 1, "check should fail on missing Gemini adapter when canonical imports require cleanup")
+        assert_true("Gemini-style import syntax" in output, "check did not surface Gemini import cleanup error")
+        assert_true("--no-dry-run" not in output, "check printed reinstall remediation that cannot succeed")
 
         code_safe_home = root / "code-safe-home"
         code_safe_home.mkdir()
@@ -1739,8 +1735,7 @@ def test_gemini_inline_adapter_rejects_active_canonical_imports() -> None:
             "Inline code `@./shared.md` is only documentation.\n"
             "```\n"
             "@../fenced.md\n"
-            "```\n"
-            "    @./indented.md\n",
+            "```\n",
             encoding="utf-8",
         )
         code, output = run_args(["--agentos-home", str(agentos), "--no-dry-run"], code_safe_home)
