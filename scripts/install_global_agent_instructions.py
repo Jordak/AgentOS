@@ -726,7 +726,18 @@ def collect_targets(
     for spec in DEFAULT_ADAPTERS:
         managed_paths = managed_paths_for_spec(spec, home, codex_home, claude_config_dir, gemini_cli_home)
         for path in managed_paths:
-            parent_exists = path.parent.exists()
+            parent_exists, parent_error = path_exists_for_planning(path.parent)
+            if parent_error:
+                add_target(
+                    Target(
+                        spec.name,
+                        path,
+                        "adapter",
+                        spec.import_style,
+                        error_reason=parent_error,
+                    )
+                )
+                continue
             if include_all_default_adapters or parent_exists:
                 add_target(Target(spec.name, path, "adapter", spec.import_style))
             else:
@@ -831,6 +842,16 @@ def absolute_lexical_path(path: Path) -> Path:
     if not path.is_absolute():
         path = Path.cwd() / path
     return Path(os.path.abspath(os.fspath(path)))
+
+
+def path_exists_for_planning(path: Path) -> tuple[bool, str | None]:
+    try:
+        path.lstat()
+    except FileNotFoundError:
+        return False, None
+    except OSError as exc:
+        return False, f"filesystem probe failed: {exc}"
+    return True, None
 
 
 def expected_block(target: Target, home: Path, agentos_home: Path) -> str:
@@ -1615,11 +1636,23 @@ def test_inaccessible_targets_fail_structured() -> None:
         return
     with tempfile.TemporaryDirectory(prefix="agentos-global-installer-") as tmp:
         root = Path(tmp)
+        blocked_agentos_parent = (root / "blocked-agentos-parent").resolve()
+        blocked_agentos_parent.mkdir()
+        blocked_agentos = make_fake_agentos(blocked_agentos_parent)
         home = root / "home"
         home.mkdir()
         unreadable_codex = home / ".codex"
         unreadable_codex.mkdir()
         agentos = make_fake_agentos(root)
+        os.chmod(blocked_agentos_parent, 0)
+        try:
+            code, output = run_args(["--agentos-home", str(blocked_agentos)], home)
+        finally:
+            os.chmod(blocked_agentos_parent, 0o700)
+        assert_true(code == 2, "unreadable AgentOS home should fail")
+        assert_true("error:" in output, "unreadable AgentOS home failure should be structured")
+        assert_true("filesystem probe failed" in output, "unreadable AgentOS home failure should mention probe failure")
+
         os.chmod(unreadable_codex, 0)
         try:
             code, output = run_args(["--agentos-home", str(agentos)], home)
@@ -1649,6 +1682,32 @@ def test_inaccessible_targets_fail_structured() -> None:
         assert_true(code == 1, "unreadable explicit adapter directory should fail")
         assert_true("[FAIL]" in output, "unreadable explicit adapter failure should be structured")
         assert_true("filesystem probe failed" in output, "unreadable explicit adapter failure should mention probe failure")
+
+        for label, kwargs in (
+            ("CODEX_HOME", {"codex_home": (root / "blocked-codex-parent" / "codex").resolve()}),
+            (
+                "CLAUDE_CONFIG_DIR",
+                {"claude_config_dir": (root / "blocked-claude-parent" / "claude-config").resolve()},
+            ),
+            (
+                "GEMINI_CLI_HOME",
+                {"gemini_cli_home": (root / "blocked-gemini-parent" / "gemini").resolve()},
+            ),
+        ):
+            blocked_parent = next(iter(kwargs.values())).parent
+            blocked_parent.mkdir()
+            os.chmod(blocked_parent, 0)
+            try:
+                code, output = run_args_with_adapter_homes(
+                    ["--agentos-home", str(agentos)],
+                    home,
+                    **kwargs,
+                )
+            finally:
+                os.chmod(blocked_parent, 0o700)
+            assert_true(code == 1, f"unreadable {label} adapter home should fail")
+            assert_true("[FAIL]" in output, f"unreadable {label} failure should be structured")
+            assert_true("filesystem probe failed" in output, f"unreadable {label} failure should mention probe failure")
 
 
 def test_crlf_paths_with_spaces_and_duplicate_blocks() -> None:
