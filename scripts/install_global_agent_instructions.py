@@ -44,33 +44,43 @@ class AdapterSpec:
         self,
         home: Path,
         codex_home: Path | None = None,
+        claude_config_dir: Path | None = None,
         gemini_cli_home: Path | None = None,
     ) -> Path:
-        root = self.root_for(home, codex_home, gemini_cli_home)
+        root = self.root_for(home, codex_home, claude_config_dir, gemini_cli_home)
         if self.override_parts:
-            override = root.joinpath(*self.parts_for_root(self.override_parts, codex_home, gemini_cli_home))
+            override = root.joinpath(*self.parts_for_root(self.override_parts, codex_home, claude_config_dir, gemini_cli_home))
             override_error = validate_target_path(override, allow_missing=True)
             if override_error:
                 return override
-            if override.exists() and override.stat().st_size > 0:
+            if path_is_nonempty_file(override):
                 return override
-        return root.joinpath(*self.parts_for_root(self.parts, codex_home, gemini_cli_home))
+        return root.joinpath(*self.parts_for_root(self.parts, codex_home, claude_config_dir, gemini_cli_home))
 
     def all_paths_for(
         self,
         home: Path,
         codex_home: Path | None = None,
+        claude_config_dir: Path | None = None,
         gemini_cli_home: Path | None = None,
     ) -> tuple[Path, ...]:
-        root = self.root_for(home, codex_home, gemini_cli_home)
-        paths = [root.joinpath(*self.parts_for_root(self.parts, codex_home, gemini_cli_home))]
+        root = self.root_for(home, codex_home, claude_config_dir, gemini_cli_home)
+        paths = [root.joinpath(*self.parts_for_root(self.parts, codex_home, claude_config_dir, gemini_cli_home))]
         if self.override_parts:
-            paths.append(root.joinpath(*self.parts_for_root(self.override_parts, codex_home, gemini_cli_home)))
+            paths.append(root.joinpath(*self.parts_for_root(self.override_parts, codex_home, claude_config_dir, gemini_cli_home)))
         return tuple(paths)
 
-    def root_for(self, home: Path, codex_home: Path | None, gemini_cli_home: Path | None) -> Path:
+    def root_for(
+        self,
+        home: Path,
+        codex_home: Path | None,
+        claude_config_dir: Path | None,
+        gemini_cli_home: Path | None,
+    ) -> Path:
         if self.name == "codex" and codex_home is not None:
             return codex_home
+        if self.name == "claude" and claude_config_dir is not None:
+            return claude_config_dir
         if self.name == "gemini" and gemini_cli_home is not None:
             return gemini_cli_home
         return home
@@ -79,9 +89,12 @@ class AdapterSpec:
         self,
         parts: tuple[str, ...],
         codex_home: Path | None,
+        claude_config_dir: Path | None,
         gemini_cli_home: Path | None,
     ) -> tuple[str, ...]:
         if self.name == "codex" and codex_home is not None and parts[:1] == (".codex",):
+            return parts[1:]
+        if self.name == "claude" and claude_config_dir is not None and parts[:1] == (".claude",):
             return parts[1:]
         return parts
 
@@ -193,6 +206,7 @@ def main(argv: list[str] | None = None) -> int:
         home=Path.home(),
         out=sys.stdout,
         codex_home=codex_home_from_env(),
+        claude_config_dir=claude_config_dir_from_env(),
         gemini_cli_home=gemini_cli_home_from_env(),
     )
 
@@ -202,6 +216,7 @@ def run(
     home: Path,
     out: TextIO,
     codex_home: Path | None = None,
+    claude_config_dir: Path | None = None,
     gemini_cli_home: Path | None = None,
 ) -> int:
     mode = "check" if args.check else "remove" if args.remove else "install"
@@ -243,6 +258,7 @@ def run(
     targets = collect_targets(
         home=home,
         codex_home=codex_home,
+        claude_config_dir=claude_config_dir,
         gemini_cli_home=gemini_cli_home,
         mode=mode,
         include_all_default_adapters=args.all_default_adapters,
@@ -264,6 +280,8 @@ def run(
     print(f"Canonical global file: {global_instructions_path(home)}", file=out)
     if codex_home is not None:
         print(f"Codex home: {codex_home}", file=out)
+    if claude_config_dir is not None:
+        print(f"Claude config dir: {claude_config_dir}", file=out)
     if gemini_cli_home is not None:
         print(f"Gemini CLI home: {gemini_cli_home}", file=out)
     print("", file=out)
@@ -570,6 +588,13 @@ def codex_home_from_env() -> Path | None:
     return absolute_lexical_path(Path(os.path.expanduser(raw)))
 
 
+def claude_config_dir_from_env() -> Path | None:
+    raw = os.environ.get("CLAUDE_CONFIG_DIR")
+    if not raw:
+        return None
+    return absolute_lexical_path(Path(os.path.expanduser(raw)))
+
+
 def gemini_cli_home_from_env() -> Path | None:
     raw = os.environ.get("GEMINI_CLI_HOME")
     if not raw:
@@ -635,6 +660,9 @@ def validate_prompt_safe_path(path: Path) -> str | None:
             return "contains a newline"
         if code < 32 or code == 127:
             return f"contains control character U+{code:04X}"
+    for marker in (GLOBAL_START, GLOBAL_END, ADAPTER_START, ADAPTER_END):
+        if marker in text:
+            return "contains an AgentOS managed block marker"
     return None
 
 
@@ -645,6 +673,7 @@ def global_instructions_path(home: Path) -> Path:
 def collect_targets(
     home: Path,
     codex_home: Path | None,
+    claude_config_dir: Path | None,
     gemini_cli_home: Path | None,
     mode: str,
     include_all_default_adapters: bool,
@@ -682,7 +711,7 @@ def collect_targets(
 
     add_target(Target("global", global_instructions_path(home), "global"))
     for spec in DEFAULT_ADAPTERS:
-        managed_paths = managed_paths_for_spec(spec, home, codex_home, gemini_cli_home)
+        managed_paths = managed_paths_for_spec(spec, home, codex_home, claude_config_dir, gemini_cli_home)
         for path in managed_paths:
             parent_exists = path.parent.exists()
             if include_all_default_adapters or parent_exists:
@@ -698,7 +727,7 @@ def collect_targets(
                     )
                 )
         if mode in {"check", "remove"} and spec.override_parts:
-            for sibling in spec.all_paths_for(home, codex_home, gemini_cli_home):
+            for sibling in spec.all_paths_for(home, codex_home, claude_config_dir, gemini_cli_home):
                 if sibling in managed_paths:
                     continue
                 sibling_error = validate_target_path(sibling, allow_missing=True)
@@ -736,12 +765,13 @@ def managed_paths_for_spec(
     spec: AdapterSpec,
     home: Path,
     codex_home: Path | None,
+    claude_config_dir: Path | None,
     gemini_cli_home: Path | None,
 ) -> tuple[Path, ...]:
-    active_path = spec.path_for(home, codex_home, gemini_cli_home)
+    active_path = spec.path_for(home, codex_home, claude_config_dir, gemini_cli_home)
     paths: list[Path] = [active_path]
     if spec.name == "codex" and spec.override_parts:
-        all_paths = spec.all_paths_for(home, codex_home, gemini_cli_home)
+        all_paths = spec.all_paths_for(home, codex_home, claude_config_dir, gemini_cli_home)
         base_path = all_paths[0]
         if active_path != base_path:
             paths.insert(0, base_path)
@@ -937,28 +967,38 @@ def remove_target(target: Target, dry_run: bool, timestamp: str) -> Result:
 
 
 def validate_target_path(path: Path, allow_missing: bool) -> str | None:
-    if path.is_symlink():
-        return "path is a symlink; refusing to modify managed instruction files through links"
-    for ancestor in path.parents:
-        if ancestor.is_symlink():
-            return f"ancestor directory is a symlink: {ancestor}; refusing to modify managed instruction files through links"
-        if ancestor.exists() and not ancestor.is_dir():
-            return f"ancestor path is not a directory: {ancestor}"
-    if path.exists():
-        if path.is_dir():
-            return "path is a directory, expected a file"
-        if not path.is_file():
-            return "path is not a regular file"
-    elif not allow_missing:
-        return "file is missing"
+    try:
+        if path.is_symlink():
+            return "path is a symlink; refusing to modify managed instruction files through links"
+        for ancestor in path.parents:
+            if ancestor.is_symlink():
+                return f"ancestor directory is a symlink: {ancestor}; refusing to modify managed instruction files through links"
+            if ancestor.exists() and not ancestor.is_dir():
+                return f"ancestor path is not a directory: {ancestor}"
+        if path.exists():
+            if path.is_dir():
+                return "path is a directory, expected a file"
+            if not path.is_file():
+                return "path is not a regular file"
+        elif not allow_missing:
+            return "file is missing"
 
-    parent = path.parent
-    if parent.exists():
-        if parent.is_symlink():
-            return "parent directory is a symlink; refusing to modify managed instruction files through links"
-        if not parent.is_dir():
-            return "parent path is not a directory"
+        parent = path.parent
+        if parent.exists():
+            if parent.is_symlink():
+                return "parent directory is a symlink; refusing to modify managed instruction files through links"
+            if not parent.is_dir():
+                return "parent path is not a directory"
+    except OSError as exc:
+        return f"filesystem probe failed: {exc}"
     return None
+
+
+def path_is_nonempty_file(path: Path) -> bool:
+    try:
+        return path.exists() and path.is_file() and path.stat().st_size > 0
+    except OSError:
+        return False
 
 
 def write_text_atomic(path: Path, text: str, mode: int | None = None) -> None:
@@ -1122,11 +1162,19 @@ def run_args_with_adapter_homes(
     args: list[str],
     home: Path,
     codex_home: Path | None = None,
+    claude_config_dir: Path | None = None,
     gemini_cli_home: Path | None = None,
 ) -> tuple[int, str]:
     parsed = parser().parse_args(args)
     output = io.StringIO()
-    code = run(parsed, home=home, out=output, codex_home=codex_home, gemini_cli_home=gemini_cli_home)
+    code = run(
+        parsed,
+        home=home,
+        out=output,
+        codex_home=codex_home,
+        claude_config_dir=claude_config_dir,
+        gemini_cli_home=gemini_cli_home,
+    )
     return code, output.getvalue()
 
 
@@ -1156,11 +1204,13 @@ def run_self_tests() -> int:
         test_remove_preserves_unmanaged_content,
         test_remove_does_not_require_live_agentos_home,
         test_codex_override_file_is_effective_adapter_target,
+        test_claude_config_dir_targets_profile_root,
         test_gemini_cli_home_targets_profile_root,
         test_all_default_adapters_and_explicit_adapter,
         test_explicit_default_adapter_overrides_skipped_default,
         test_import_adapters_escape_spaces_and_gemini_uses_pointer,
         test_prompt_rendered_paths_reject_prompt_breakout_chars,
+        test_inaccessible_targets_fail_structured,
         test_crlf_paths_with_spaces_and_duplicate_blocks,
         test_preflight_prevents_partial_writes,
         test_symlink_targets_fail_closed_and_modes_are_preserved,
@@ -1408,6 +1458,30 @@ def test_gemini_cli_home_targets_profile_root() -> None:
         assert_true(code == 0, output)
 
 
+def test_claude_config_dir_targets_profile_root() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-global-installer-") as tmp:
+        root = Path(tmp)
+        home = root / "home"
+        home.mkdir()
+        claude_config_dir = root / "claude-config"
+        claude_config_dir.mkdir()
+        agentos = make_fake_agentos(root)
+        code, output = run_args_with_adapter_homes(
+            ["--agentos-home", str(agentos), "--no-dry-run"],
+            home,
+            claude_config_dir=claude_config_dir.resolve(),
+        )
+        assert_true(code == 0, output)
+        assert_true((claude_config_dir / "CLAUDE.md").exists(), "CLAUDE_CONFIG_DIR adapter was not created")
+        assert_true(not (home / ".claude").exists(), "default Claude home was used despite CLAUDE_CONFIG_DIR")
+        code, output = run_args_with_adapter_homes(
+            ["--agentos-home", str(agentos), "--check"],
+            home,
+            claude_config_dir=claude_config_dir.resolve(),
+        )
+        assert_true(code == 0, output)
+
+
 def test_all_default_adapters_and_explicit_adapter() -> None:
     with tempfile.TemporaryDirectory(prefix="agentos-global-installer-") as tmp:
         root = Path(tmp)
@@ -1502,6 +1576,54 @@ def test_prompt_rendered_paths_reject_prompt_breakout_chars() -> None:
         code, output = run_args(["--agentos-home", str(agentos), "--no-dry-run"], unsafe_home)
         assert_true(code == 2, "unsafe home path should fail before writing")
         assert_true("cannot be rendered safely" in output, "unsafe home path failure should be explicit")
+
+        marker_agentos = make_fake_agentos(root, f"AgentOS {GLOBAL_END}")
+        marker_home = root / "marker-home"
+        marker_home.mkdir()
+        code, output = run_args(["--agentos-home", str(marker_agentos), "--no-dry-run"], marker_home)
+        assert_true(code == 2, "managed marker in AgentOS home path should fail before writing")
+        assert_true("managed block marker" in output, "managed marker path failure should be explicit")
+
+
+def test_inaccessible_targets_fail_structured() -> None:
+    if os.name != "posix":
+        return
+    with tempfile.TemporaryDirectory(prefix="agentos-global-installer-") as tmp:
+        root = Path(tmp)
+        home = root / "home"
+        home.mkdir()
+        unreadable_codex = home / ".codex"
+        unreadable_codex.mkdir()
+        agentos = make_fake_agentos(root)
+        os.chmod(unreadable_codex, 0)
+        try:
+            code, output = run_args(["--agentos-home", str(agentos)], home)
+        finally:
+            os.chmod(unreadable_codex, 0o700)
+        assert_true(code == 1, "unreadable default adapter directory should fail")
+        assert_true("[FAIL]" in output, "unreadable default adapter failure should be structured")
+        assert_true("filesystem probe failed" in output, "unreadable default adapter failure should mention probe failure")
+
+        explicit_home = root / "explicit-home"
+        explicit_home.mkdir()
+        unreadable_explicit = explicit_home / "blocked"
+        unreadable_explicit.mkdir()
+        os.chmod(unreadable_explicit, 0)
+        try:
+            code, output = run_args(
+                [
+                    "--agentos-home",
+                    str(agentos),
+                    "--adapter",
+                    str(unreadable_explicit / "AGENTS.md"),
+                ],
+                explicit_home,
+            )
+        finally:
+            os.chmod(unreadable_explicit, 0o700)
+        assert_true(code == 1, "unreadable explicit adapter directory should fail")
+        assert_true("[FAIL]" in output, "unreadable explicit adapter failure should be structured")
+        assert_true("filesystem probe failed" in output, "unreadable explicit adapter failure should mention probe failure")
 
 
 def test_crlf_paths_with_spaces_and_duplicate_blocks() -> None:

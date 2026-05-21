@@ -36,7 +36,7 @@ That file is the canonical global instruction file. Harness-specific instruction
 The default adapter targets are:
 
 - Codex: `<codex-home>/AGENTS.md`. If a non-empty `<codex-home>/AGENTS.override.md` exists, the installer keeps both files current because Codex reads the override first and falls back to `AGENTS.md` when the override is removed. `<codex-home>` is `CODEX_HOME` when set, otherwise `<home>/.codex`.
-- Claude Code: `<home>/.claude/CLAUDE.md`
+- Claude Code: `<claude-config-dir>/CLAUDE.md`. `<claude-config-dir>` is `CLAUDE_CONFIG_DIR` when set, otherwise `<home>/.claude`.
 - Gemini CLI: `<gemini-cli-home>/.gemini/GEMINI.md`. `<gemini-cli-home>` is `GEMINI_CLI_HOME` when set, otherwise `<home>`. Gemini receives pointer text rather than an `@` import because Gemini restricts memory imports to its context root.
 
 Google has announced that consumer Gemini CLI usage is transitioning to Antigravity CLI, with consumer Gemini CLI service ending June 18, 2026. The Gemini adapter remains for existing Gemini CLI and enterprise/API-key users. For Antigravity CLI, pass an explicit `--adapter <path>` once you have confirmed Antigravity's current instruction-file path from its docs.
@@ -57,7 +57,7 @@ Install AgentOS for me.
    Confirm the self-test uses temporary directories and does not touch my real home directory.
 4. Run the installer dry-run:
    python3 scripts/install_global_agent_instructions.py --agentos-home <resolved-agentos-home>
-   If CODEX_HOME or GEMINI_CLI_HOME is set, confirm the dry-run targets those harness homes. If I ask for extra harness adapters, include the same --adapter <path> flags in this dry-run and every later write/check/remove command.
+   If CODEX_HOME, CLAUDE_CONFIG_DIR, or GEMINI_CLI_HOME is set, confirm the dry-run targets those harness homes. If I ask for extra harness adapters, include the same --adapter <path> flags in this dry-run and every later write/check/remove command.
 5. Show me exactly which files would be created, backed up, or changed. Do not run the write command until I explicitly approve.
 6. After I approve, run:
    python3 scripts/install_global_agent_instructions.py --agentos-home <resolved-agentos-home> --no-dry-run
