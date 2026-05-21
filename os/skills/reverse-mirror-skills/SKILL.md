@@ -51,6 +51,8 @@ Safety:
 - Default `delete-local` behavior archives or moves the local skill; permanent deletion requires explicit permanent-deletion wording.
 - Back up a local mirror skill before any local mirror change.
 - Back up an existing Personal Overlay skill before overwriting it.
+- Use timestamped backup directories that include time of day, such as `<mirror-root>/.archive/YYYY-MM-DD-HHMMSS/<skill-name>/` for local mirrors and `personal/os/skills/.archive/YYYY-MM-DD-HHMMSS/<skill-name>/` for Personal Overlay skills.
+- Do not clean up, delete, or prune local mirror or Personal Overlay backups until the user explicitly confirms the applied actions were intended and approves backup cleanup.
 - Follow the protected-main workflow for Core changes.
 - Do not record machine-local mirror paths or mirror state in `os/skills/MANIFEST.md`.
 - Do not record provenance unless it changes future maintenance behavior.
@@ -100,9 +102,10 @@ Filing Rules:
 6. Apply approved actions:
    - Use ordinary file operations. Do not rely on a bundled reverse mirror script.
    - For Core imports, work in an isolated feature branch or worktree and update `os/skills/<skill-name>/` plus `os/skills/MANIFEST.md`.
-   - For Personal Overlay imports, write to the canonical primary checkout's `personal/os/skills/<skill-name>/`, backing up before overwrite.
+   - For Personal Overlay imports, write to the canonical primary checkout's `personal/os/skills/<skill-name>/`, backing up any existing target before overwrite to `personal/os/skills/.archive/YYYY-MM-DD-HHMMSS/<skill-name>/`.
    - For `delete-local`, archive by default to `<mirror-root>/.archive/YYYY-MM-DD-HHMMSS/<skill-name>/`.
    - Before any local mirror change, back up the affected local skill to a timestamped archive path under the mirror root.
+   - After applying approved actions, keep all backup/archive directories until the user confirms the results and approves cleanup.
    - Preserve existing harness metadata files under `agents/`; generate or refresh active-harness metadata when local conventions call for it.
 
 7. Normalize imported skills:
@@ -148,7 +151,8 @@ If a skill seems private but could become broadly reusable after sanitization, r
 - Core imports are contract-complete, manifest-listed, portable, and privacy-reviewed.
 - Personal Overlay imports keep private behavior out of Core and out of the Core manifest.
 - Local mirrors are refreshed only through `mirror-skills` after canonical changes.
-- Backups are created before local mirror changes and Personal Overlay overwrites.
+- Timestamped backups are created before local mirror changes and Personal Overlay overwrites.
+- Backup cleanup happens only after explicit user confirmation.
 
 ## Verification
 
@@ -161,3 +165,4 @@ Before finishing:
 5. Run a scoped `mirror-skills` regression check on at least one existing Core skill.
 6. Confirm `os/skills/MANIFEST.md` includes `reverse-mirror-skills` and no machine-local mirror state.
 7. Confirm no Personal Overlay import, local archive/delete, GitHub issue write, or permanent deletion happened without explicit approval.
+8. Confirm any local mirror or Personal Overlay backup cleanup was separately approved, or report remaining backup paths.
