@@ -256,12 +256,27 @@ def remove_empty_dirs(root: Path) -> None:
             pass
 
 
-def filter_entries(entries: list[SkillEntry], requested_names: list[str]) -> list[SkillEntry]:
+def select_entries(
+    core_entries: list[SkillEntry],
+    personal_entries: list[SkillEntry],
+    requested_names: list[str],
+) -> list[SkillEntry]:
+    core_names = {entry.name for entry in core_entries}
+    personal_names = {entry.name for entry in personal_entries}
+
     if not requested_names:
-        return entries
+        duplicates = sorted(personal_names & core_names)
+        if duplicates:
+            duplicate_list = ", ".join(duplicates)
+            raise SystemExit(
+                "Personal Overlay skill name collides with a Core skill: "
+                f"{duplicate_list}. Use a unique private skill name, or put private "
+                "inputs for a Core skill under personal/os/skills/<skill-name>/CONFIG.md."
+            )
+        return [*core_entries, *personal_entries]
 
     requested = list(dict.fromkeys(requested_names))
-    available = {entry.name for entry in entries}
+    available = core_names | personal_names
     missing = [name for name in requested if name not in available]
     if missing:
         missing_list = ", ".join(missing)
@@ -271,8 +286,17 @@ def filter_entries(entries: list[SkillEntry], requested_names: list[str]) -> lis
             f"{missing_list}. Available canonical skills: {available_list}"
         )
 
+    duplicates = sorted(set(requested) & core_names & personal_names)
+    if duplicates:
+        duplicate_list = ", ".join(duplicates)
+        raise SystemExit(
+            "Requested skill collides between Core and Personal Overlay: "
+            f"{duplicate_list}. Use a unique private skill name, or put private "
+            "inputs for a Core skill under personal/os/skills/<skill-name>/CONFIG.md."
+        )
+
     requested_set = set(requested)
-    return [entry for entry in entries if entry.name in requested_set]
+    return [entry for entry in [*core_entries, *personal_entries] if entry.name in requested_set]
 
 
 def print_table(results: list[MirrorResult]) -> None:
@@ -346,22 +370,13 @@ def main() -> int:
     agentos_root = args.agentos_root.resolve() if args.agentos_root else find_agentos_root(Path.cwd().resolve())
     mirror_root = args.mirror_root.expanduser().resolve()
 
-    entries = parse_manifest(agentos_root)
+    core_entries = parse_manifest(agentos_root)
+    personal_entries: list[SkillEntry] = []
     if not args.core_only:
         personal_entries = discover_personal_overlay_entries(agentos_root)
-        core_names = {entry.name for entry in entries}
-        duplicates = sorted(entry.name for entry in personal_entries if entry.name in core_names)
-        if duplicates:
-            duplicate_list = ", ".join(duplicates)
-            raise SystemExit(
-                "Personal Overlay skill name collides with a Core skill: "
-                f"{duplicate_list}. Use a unique private skill name, or put private "
-                "inputs for a Core skill under personal/os/skills/<skill-name>/CONFIG.md."
-            )
-        entries.extend(personal_entries)
+    entries = select_entries(core_entries, personal_entries, args.skill)
     if not entries:
         raise SystemExit("No mirrorable Core or Personal Overlay skills found.")
-    entries = filter_entries(entries, args.skill)
 
     entries = [
         SkillEntry(

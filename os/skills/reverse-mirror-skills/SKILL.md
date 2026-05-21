@@ -71,7 +71,8 @@ Filing Rules:
    - Confirm the local skill mirror root. Use the current-machine default unless the user provides another root.
 
 2. Inventory all local skills:
-   - List every directory under the local mirror root that contains `SKILL.md`.
+   - List direct child skill directories under the local mirror root that contain `SKILL.md`.
+   - Exclude dot/control directories such as `.archive` and any backup/archive roots from live-skill discovery.
    - For each skill, inspect the directory name, `SKILL.md`, any files under `agents/`, and filenames under `scripts/`, `references/`, and `assets/`.
    - Use targeted `rg` searches for obvious private, local-path, account, live-agent, generated-output, or credential markers when Core promotion is plausible.
    - Deep-read bundled scripts, references, or assets when a skill is a likely Core candidate, high risk, duplicate, stale, or approved for import.
@@ -92,7 +93,8 @@ Filing Rules:
 5. Normalize approval:
    - Bulk approval is allowed.
    - Convert the user's approval into an explicit action plan before mutating files.
-   - For each action, name the skill, action, destination if importing, source path, target or archive path, whether Core manifest changes, backup paths, and whether `mirror-skills` will run afterward.
+   - For each action, name the skill, action, destination if importing, source path, target or archive path, whether Core manifest changes, backup paths, whether `mirror-skills` will run afterward, and which AgentOS root `mirror-skills` should use.
+   - For Personal Overlay imports, use the primary checkout's AgentOS root for the follow-up `mirror-skills` run, or pass that root explicitly through the `mirror-skills` workflow, so feature-worktree skeleton overlays are not treated as authoritative.
    - If approval is vague or the action plan is ambiguous, pause and confirm.
 
 6. Apply approved actions:
@@ -114,6 +116,7 @@ Filing Rules:
    - Run skill validation when available for imported or changed skill directories.
    - Run `python3 os/verification/scripts/validate_agentos.py` after Core changes.
    - Run the `mirror-skills` workflow scoped to the imported or changed skill names after approval.
+   - For Personal Overlay imports made from a feature worktree, run `mirror-skills` from the primary checkout or with the primary checkout as the AgentOS root.
    - Report validation status, mirror status, and backup paths.
 
 ## Recommendation Rules
