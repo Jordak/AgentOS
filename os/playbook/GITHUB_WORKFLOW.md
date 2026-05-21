@@ -28,6 +28,20 @@ Use snapshot language to avoid staleness in issues. Prefer phrases like "As of t
 
 This convention helps future agents understand not only what to build, but why the old shape was insufficient.
 
+## GitHub CLI Auth In Sandboxed Harnesses
+
+Some agent harnesses run shell commands in a sandbox that cannot read the system keyring correctly. In that context, `gh auth status` may report "the token is invalid" even when the user's GitHub CLI credential is valid in the normal shell.
+
+When an authenticated `gh` command is needed and sandboxed `gh auth status` reports an invalid token:
+
+- Do not immediately ask the user to reauthenticate.
+- First retry the exact auth check or GitHub CLI command with the harness's approved elevation path so `gh` can access the system keyring.
+- Treat the credential as actually broken only if the elevated `gh auth status -h github.com` also fails.
+- Never use `gh auth status --show-token`, `gh auth token`, or other token-printing commands unless the user explicitly asks and the risk is necessary.
+- Prefer GitHub connector reads when they are sufficient, but use elevated `gh` for CLI-only actions such as PR creation when connector permissions are read-only.
+
+Concrete example: in Codex Desktop, an unelevated `gh auth status` can report an invalid token while elevated `gh auth status -h github.com` succeeds with a keyring-backed token. The correct repair is to rerun the needed `gh` operation with keyring access, not to send the user through a redundant `gh auth login` flow.
+
 ## Branch and Integration Discipline
 
 When implementation work is meant to land in a repository, the durable artifact is integrated code, not a local commit or unmerged branch.

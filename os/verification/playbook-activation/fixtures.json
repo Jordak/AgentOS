@@ -27,6 +27,15 @@
     "rationale": "GitHub handoffs, PR descriptions, merge expectations, and issue closure notes should activate the GitHub workflow policy."
   },
   {
+    "id": "github-cli-sandbox-auth",
+    "category": "github",
+    "task": "A sandboxed agent command says `gh auth status` has an invalid token, but the user says `gh auth login` keeps reporting they are already logged in and GitHub actions work after the auth flow. Decide what to do before asking the user to reauthenticate.",
+    "must_access": [
+      "os/playbook/GITHUB_WORKFLOW.md"
+    ],
+    "rationale": "Sandboxed GitHub CLI auth failures should activate the GitHub workflow policy so the agent retries with keyring access before blaming the user's credential."
+  },
+  {
     "id": "generated-findings-propagation",
     "category": "memory",
     "task": "A generated review found durable AgentOS updates for context, skills, verification, and automations. Turn those findings into the proper reviewable proposals without applying the canonical edits yet.",
