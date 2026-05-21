@@ -18,6 +18,7 @@ import os
 import re
 import shlex
 import shutil
+import stat
 import sys
 import tempfile
 from contextlib import redirect_stderr
@@ -640,13 +641,25 @@ def validate_agentos_home(agentos_home: Path) -> str | None:
         agentos_home / "os" / "INDEX.md",
         agentos_home / "os" / "playbook" / "PERSONAL_OVERLAY.md",
     )
-    if not agentos_home.exists():
+    try:
+        home_stat = agentos_home.lstat()
+        if not stat.S_ISDIR(home_stat.st_mode):
+            return f"AgentOS home is not a directory: {agentos_home}"
+        missing: list[str] = []
+        for path in required:
+            try:
+                path_stat = path.lstat()
+            except FileNotFoundError:
+                missing.append(str(path))
+                continue
+            if not stat.S_ISREG(path_stat.st_mode):
+                missing.append(str(path))
+        if missing:
+            return "AgentOS home is missing required files: " + ", ".join(missing)
+    except FileNotFoundError:
         return f"AgentOS home does not exist: {agentos_home}"
-    if not agentos_home.is_dir():
-        return f"AgentOS home is not a directory: {agentos_home}"
-    missing = [str(path) for path in required if not path.is_file()]
-    if missing:
-        return "AgentOS home is missing required files: " + ", ".join(missing)
+    except OSError as exc:
+        return f"AgentOS home filesystem probe failed: {exc}"
     return None
 
 
@@ -968,26 +981,38 @@ def remove_target(target: Target, dry_run: bool, timestamp: str) -> Result:
 
 def validate_target_path(path: Path, allow_missing: bool) -> str | None:
     try:
-        if path.is_symlink():
-            return "path is a symlink; refusing to modify managed instruction files through links"
         for ancestor in path.parents:
-            if ancestor.is_symlink():
+            try:
+                ancestor_stat = ancestor.lstat()
+            except FileNotFoundError:
+                continue
+            if stat.S_ISLNK(ancestor_stat.st_mode):
                 return f"ancestor directory is a symlink: {ancestor}; refusing to modify managed instruction files through links"
-            if ancestor.exists() and not ancestor.is_dir():
+            if not stat.S_ISDIR(ancestor_stat.st_mode):
                 return f"ancestor path is not a directory: {ancestor}"
-        if path.exists():
-            if path.is_dir():
+
+        try:
+            path_stat = path.lstat()
+        except FileNotFoundError:
+            if not allow_missing:
+                return "file is missing"
+        else:
+            if stat.S_ISLNK(path_stat.st_mode):
+                return "path is a symlink; refusing to modify managed instruction files through links"
+            if stat.S_ISDIR(path_stat.st_mode):
                 return "path is a directory, expected a file"
-            if not path.is_file():
+            if not stat.S_ISREG(path_stat.st_mode):
                 return "path is not a regular file"
-        elif not allow_missing:
-            return "file is missing"
 
         parent = path.parent
-        if parent.exists():
-            if parent.is_symlink():
+        try:
+            parent_stat = parent.lstat()
+        except FileNotFoundError:
+            pass
+        else:
+            if stat.S_ISLNK(parent_stat.st_mode):
                 return "parent directory is a symlink; refusing to modify managed instruction files through links"
-            if not parent.is_dir():
+            if not stat.S_ISDIR(parent_stat.st_mode):
                 return "parent path is not a directory"
     except OSError as exc:
         return f"filesystem probe failed: {exc}"
@@ -1615,7 +1640,7 @@ def test_inaccessible_targets_fail_structured() -> None:
                     "--agentos-home",
                     str(agentos),
                     "--adapter",
-                    str(unreadable_explicit / "AGENTS.md"),
+                    str((unreadable_explicit / "AGENTS.md").resolve()),
                 ],
                 explicit_home,
             )
