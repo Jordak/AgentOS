@@ -40,21 +40,33 @@ class AdapterSpec:
     import_style: str = "pointer"
     override_parts: tuple[str, ...] | None = None
 
-    def path_for(self, home: Path) -> Path:
+    def path_for(self, home: Path, codex_home: Path | None = None) -> Path:
+        root = self.root_for(home, codex_home)
         if self.override_parts:
-            override = home.joinpath(*self.override_parts)
-            try:
-                if override.is_file() and override.stat().st_size > 0:
-                    return override
-            except OSError:
+            override = root.joinpath(*self.parts_for_root(self.override_parts, codex_home))
+            override_error = validate_target_path(override, allow_missing=True)
+            if override_error:
                 return override
-        return home.joinpath(*self.parts)
+            if override.exists() and override.stat().st_size > 0:
+                return override
+        return root.joinpath(*self.parts_for_root(self.parts, codex_home))
 
-    def all_paths_for(self, home: Path) -> tuple[Path, ...]:
-        paths = [home.joinpath(*self.parts)]
+    def all_paths_for(self, home: Path, codex_home: Path | None = None) -> tuple[Path, ...]:
+        root = self.root_for(home, codex_home)
+        paths = [root.joinpath(*self.parts_for_root(self.parts, codex_home))]
         if self.override_parts:
-            paths.append(home.joinpath(*self.override_parts))
+            paths.append(root.joinpath(*self.parts_for_root(self.override_parts, codex_home)))
         return tuple(paths)
+
+    def root_for(self, home: Path, codex_home: Path | None) -> Path:
+        if self.name == "codex" and codex_home is not None:
+            return codex_home
+        return home
+
+    def parts_for_root(self, parts: tuple[str, ...], codex_home: Path | None) -> tuple[str, ...]:
+        if self.name == "codex" and codex_home is not None and parts[:1] == (".codex",):
+            return parts[1:]
+        return parts
 
 
 @dataclass(frozen=True)
@@ -74,6 +86,15 @@ class Result:
     path: Path
     message: str
     backup: Path | None = None
+
+
+@dataclass
+class FileSnapshot:
+    path: Path
+    existed: bool
+    data: bytes | None
+    mode: int | None
+    missing_parents: tuple[Path, ...]
 
 
 DEFAULT_ADAPTERS = (
@@ -144,10 +165,10 @@ def main(argv: list[str] | None = None) -> int:
             print("error: --self-test cannot be combined with other options", file=sys.stderr)
             return 2
         return run_self_tests()
-    return run(args, home=Path.home(), out=sys.stdout)
+    return run(args, home=Path.home(), out=sys.stdout, codex_home=codex_home_from_env())
 
 
-def run(args: argparse.Namespace, home: Path, out: TextIO) -> int:
+def run(args: argparse.Namespace, home: Path, out: TextIO, codex_home: Path | None = None) -> int:
     mode = "check" if args.check else "remove" if args.remove else "install"
     if args.check and args.remove:
         print("error: --check and --remove cannot be combined", file=out)
@@ -175,6 +196,7 @@ def run(args: argparse.Namespace, home: Path, out: TextIO) -> int:
     home = home.expanduser().resolve()
     targets = collect_targets(
         home=home,
+        codex_home=codex_home,
         mode=mode,
         include_all_default_adapters=args.all_default_adapters,
         extra_adapters=args.adapter,
@@ -193,6 +215,8 @@ def run(args: argparse.Namespace, home: Path, out: TextIO) -> int:
     else:
         print(f"AgentOS home: {agentos_home}", file=out)
     print(f"Canonical global file: {global_instructions_path(home)}", file=out)
+    if codex_home is not None:
+        print(f"Codex home: {codex_home}", file=out)
     print("", file=out)
 
     results: list[Result] = []
@@ -291,14 +315,25 @@ def run(args: argparse.Namespace, home: Path, out: TextIO) -> int:
             print("Target content preflight failed; no files were modified.", file=out)
             return 1
 
-    results = evaluate_targets(
-        targets,
-        mode,
-        home,
-        agentos_home,
-        dry_run=dry_run,
-        timestamp=timestamp,
-    )
+    rolled_back = False
+    if mode != "check" and not dry_run:
+        results, rolled_back = apply_targets_transactionally(
+            targets,
+            mode,
+            home,
+            agentos_home,
+            preflight_results,
+            timestamp=timestamp,
+        )
+    else:
+        results = evaluate_targets(
+            targets,
+            mode,
+            home,
+            agentos_home,
+            dry_run=dry_run,
+            timestamp=timestamp,
+        )
 
     for result in results:
         print(format_result(result), file=out)
@@ -309,6 +344,8 @@ def run(args: argparse.Namespace, home: Path, out: TextIO) -> int:
         if mode == "check":
             print("Drift detected. Remediation:", file=out)
             print(remediation_command(args, agentos_home), file=out)
+        elif rolled_back:
+            print("Some targets failed. Earlier changes were rolled back.", file=out)
         else:
             print("Some targets failed. Files reporting failure were not modified.", file=out)
         return 1
@@ -338,6 +375,122 @@ def evaluate_targets(
             continue
         results.append(evaluate_target(target, mode, home, agentos_home, dry_run, timestamp))
     return results
+
+
+def apply_targets_transactionally(
+    targets: list[Target],
+    mode: str,
+    home: Path,
+    agentos_home: Path | None,
+    preflight_results: list[Result],
+    timestamp: str,
+) -> tuple[list[Result], bool]:
+    results: list[Result] = []
+    snapshots: list[FileSnapshot] = []
+
+    for index, target in enumerate(targets):
+        if target.skipped_reason:
+            results.append(
+                Result(
+                    ok=True,
+                    status="skip",
+                    path=target.path,
+                    message=target.skipped_reason,
+                )
+            )
+            continue
+
+        preflight = preflight_results[index]
+        try:
+            snapshots.append(capture_snapshot(target.path))
+            if preflight.backup is not None:
+                snapshots.append(capture_snapshot(preflight.backup))
+        except OSError as exc:
+            results.append(Result(False, "error", target.path, f"filesystem error before write: {exc}"))
+            rollback_snapshots(snapshots)
+            append_not_run_results(results, targets[index + 1 :])
+            return results, True
+
+        result = evaluate_target(
+            target,
+            mode,
+            home,
+            agentos_home,
+            dry_run=False,
+            timestamp=timestamp,
+        )
+        results.append(result)
+        if not result.ok:
+            rollback_snapshots(snapshots)
+            append_not_run_results(results, targets[index + 1 :])
+            return results, True
+
+    return results, False
+
+
+def append_not_run_results(results: list[Result], remaining_targets: list[Target]) -> None:
+    for target in remaining_targets:
+        if target.skipped_reason:
+            results.append(Result(True, "skip", target.path, target.skipped_reason))
+        else:
+            results.append(Result(True, "not run", target.path, "not evaluated because an earlier write failed"))
+
+
+def capture_snapshot(path: Path) -> FileSnapshot:
+    missing_parents = tuple(missing_parent_dirs(path))
+    if path.exists() and path.is_file() and not path.is_symlink():
+        return FileSnapshot(
+            path=path,
+            existed=True,
+            data=path.read_bytes(),
+            mode=path.stat().st_mode & 0o7777,
+            missing_parents=missing_parents,
+        )
+    return FileSnapshot(path=path, existed=False, data=None, mode=None, missing_parents=missing_parents)
+
+
+def missing_parent_dirs(path: Path) -> list[Path]:
+    missing: list[Path] = []
+    parent = path.parent
+    while not parent.exists():
+        missing.append(parent)
+        if parent.parent == parent:
+            break
+        parent = parent.parent
+    return missing
+
+
+def rollback_snapshots(snapshots: list[FileSnapshot]) -> None:
+    for snapshot in reversed(snapshots):
+        try:
+            restore_snapshot(snapshot)
+        except OSError:
+            pass
+
+
+def restore_snapshot(snapshot: FileSnapshot) -> None:
+    if snapshot.existed:
+        if snapshot.data is None:
+            return
+        write_bytes_atomic(snapshot.path, snapshot.data, mode=snapshot.mode)
+    else:
+        if snapshot.path.exists() or snapshot.path.is_symlink():
+            if snapshot.path.is_dir() and not snapshot.path.is_symlink():
+                snapshot.path.rmdir()
+            else:
+                snapshot.path.unlink()
+    for parent in snapshot.missing_parents:
+        try:
+            parent.rmdir()
+        except OSError:
+            break
+
+
+def codex_home_from_env() -> Path | None:
+    raw = os.environ.get("CODEX_HOME")
+    if not raw:
+        return None
+    return absolute_lexical_path(Path(os.path.expanduser(raw)))
 
 
 def evaluate_target(
@@ -394,6 +547,7 @@ def global_instructions_path(home: Path) -> Path:
 
 def collect_targets(
     home: Path,
+    codex_home: Path | None,
     mode: str,
     include_all_default_adapters: bool,
     extra_adapters: Iterable[str],
@@ -430,7 +584,7 @@ def collect_targets(
 
     add_target(Target("global", global_instructions_path(home), "global"))
     for spec in DEFAULT_ADAPTERS:
-        path = spec.path_for(home)
+        path = spec.path_for(home, codex_home)
         parent_exists = path.parent.exists()
         if include_all_default_adapters or parent_exists:
             add_target(Target(spec.name, path, "adapter", spec.import_style))
@@ -445,8 +599,20 @@ def collect_targets(
                 )
             )
         if mode in {"check", "remove"} and spec.override_parts:
-            for sibling in spec.all_paths_for(home):
+            for sibling in spec.all_paths_for(home, codex_home):
                 if sibling == path:
+                    continue
+                sibling_error = validate_target_path(sibling, allow_missing=True)
+                if sibling_error:
+                    add_target(
+                        Target(
+                            f"{spec.name}:sibling",
+                            sibling,
+                            "adapter",
+                            spec.import_style,
+                            error_reason=sibling_error,
+                        )
+                    )
                     continue
                 if should_check_sibling_target(sibling, mode):
                     if mode == "check":
@@ -666,6 +832,10 @@ def validate_target_path(path: Path, allow_missing: bool) -> str | None:
 
 
 def write_text_atomic(path: Path, text: str, mode: int | None = None) -> None:
+    write_bytes_atomic(path, text.encode("utf-8"), mode=mode)
+
+
+def write_bytes_atomic(path: Path, data: bytes, mode: int | None = None) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=str(path.parent))
     tmp_path = Path(tmp_name)
@@ -675,8 +845,8 @@ def write_text_atomic(path: Path, text: str, mode: int | None = None) -> None:
                 os.fchmod(fd, mode)
             else:
                 os.chmod(tmp_path, mode)
-        with os.fdopen(fd, "w", encoding="utf-8", newline="") as handle:
-            handle.write(text)
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(data)
         os.replace(tmp_path, path)
     finally:
         if tmp_path.exists():
@@ -808,6 +978,13 @@ def run_args(args: list[str], home: Path) -> tuple[int, str]:
     parsed = parser().parse_args(args)
     output = io.StringIO()
     code = run(parsed, home=home, out=output)
+    return code, output.getvalue()
+
+
+def run_args_with_codex_home(args: list[str], home: Path, codex_home: Path | None) -> tuple[int, str]:
+    parsed = parser().parse_args(args)
+    output = io.StringIO()
+    code = run(parsed, home=home, out=output, codex_home=codex_home)
     return code, output.getvalue()
 
 
@@ -1020,7 +1197,37 @@ def test_codex_override_file_is_effective_adapter_target() -> None:
         (unsafe_home / ".codex" / "AGENTS.md").symlink_to(unsafe_sibling_target)
         code, output = run_args(["--agentos-home", str(agentos), "--check"], unsafe_home)
         assert_true(code == 1, "unsafe inactive Codex sibling should fail check")
-        assert_true("inactive adapter sibling" in output, "unsafe inactive sibling check should be explicit")
+        assert_true("symlink" in output, "unsafe inactive sibling check should be explicit")
+
+        linked_codex_home = root / "linked-codex-home"
+        linked_codex_home.mkdir()
+        linked_codex_target = root / "linked-codex-target"
+        linked_codex_target.mkdir()
+        (linked_codex_target / "AGENTS.override.md").write_text("Outside override.\n", encoding="utf-8")
+        (linked_codex_home / ".codex").symlink_to(linked_codex_target, target_is_directory=True)
+        code, output = run_args(["--agentos-home", str(agentos), "--check"], linked_codex_home)
+        assert_true(code == 1, "symlinked Codex home should fail check")
+        assert_true("symlink" in output, "symlinked Codex home failure should be explicit")
+
+        profile_home = root / "profile-home"
+        profile_home.mkdir()
+        codex_profile = root / "codex-profile"
+        codex_profile.mkdir()
+        agentos_profile = make_fake_agentos(root, "AgentOS-profile")
+        code, output = run_args_with_codex_home(
+            ["--agentos-home", str(agentos_profile), "--no-dry-run"],
+            profile_home,
+            codex_profile.resolve(),
+        )
+        assert_true(code == 0, output)
+        assert_true((codex_profile / "AGENTS.md").exists(), "CODEX_HOME adapter was not created")
+        assert_true(not (profile_home / ".codex").exists(), "default Codex home was used despite CODEX_HOME")
+        code, output = run_args_with_codex_home(
+            ["--agentos-home", str(agentos_profile), "--check"],
+            profile_home,
+            codex_profile.resolve(),
+        )
+        assert_true(code == 0, output)
 
 
 def test_all_default_adapters_and_explicit_adapter() -> None:
@@ -1130,6 +1337,29 @@ def test_preflight_prevents_partial_writes() -> None:
         assert_true(code == 1, "invalid UTF-8 preflight should fail")
         assert_true("UTF-8" in output, "invalid UTF-8 failure should be explicit")
         assert_true(not global_instructions_path(bad_home).exists(), "global file was created before invalid UTF-8 target failed")
+
+        if os.name == "posix":
+            write_fail_home = root / "write-fail-home"
+            write_fail_home.mkdir()
+            blocked_adapter_dir = write_fail_home / "blocked-adapter"
+            blocked_adapter_dir.mkdir()
+            os.chmod(blocked_adapter_dir, 0o500)
+            try:
+                code, output = run_args(
+                    [
+                        "--agentos-home",
+                        str(agentos),
+                        "--adapter",
+                        str((blocked_adapter_dir / "AGENTS.md").resolve()),
+                        "--no-dry-run",
+                    ],
+                    write_fail_home,
+                )
+            finally:
+                os.chmod(blocked_adapter_dir, 0o700)
+            assert_true(code == 1, "later write failure should fail")
+            assert_true("rolled back" in output, "write failure should report rollback")
+            assert_true(not global_instructions_path(write_fail_home).exists(), "global file remained after rollback")
 
 
 def test_symlink_targets_fail_closed_and_modes_are_preserved() -> None:

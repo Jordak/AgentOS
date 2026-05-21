@@ -35,7 +35,7 @@ That file is the canonical global instruction file. Harness-specific instruction
 
 The default adapter targets are:
 
-- Codex: `<home>/.codex/AGENTS.md`, or `<home>/.codex/AGENTS.override.md` when that override file already exists and is non-empty
+- Codex: `<codex-home>/AGENTS.md`, or `<codex-home>/AGENTS.override.md` when that override file already exists and is non-empty. `<codex-home>` is `CODEX_HOME` when set, otherwise `<home>/.codex`.
 - Claude Code: `<home>/.claude/CLAUDE.md`
 - Gemini CLI: `<home>/.gemini/GEMINI.md`
 
@@ -55,7 +55,7 @@ Install AgentOS for me.
    Confirm the self-test uses temporary directories and does not touch my real home directory.
 4. Run the installer dry-run:
    python3 scripts/install_global_agent_instructions.py --agentos-home <resolved-agentos-home>
-   If I ask for extra harness adapters, include the same --adapter <path> flags in this dry-run and every later write/check/remove command.
+   If CODEX_HOME is set, confirm the dry-run targets that Codex home. If I ask for extra harness adapters, include the same --adapter <path> flags in this dry-run and every later write/check/remove command.
 5. Show me exactly which files would be created, backed up, or changed. Do not run the write command until I explicitly approve.
 6. After I approve, run:
    python3 scripts/install_global_agent_instructions.py --agentos-home <resolved-agentos-home> --no-dry-run
