@@ -643,13 +643,15 @@ def check_automations(agentos_home: Path, process_home: Path, verbose: bool) -> 
     personal_file_count = count_non_gitkeep_files(personal_automations)
     codex_file_count = count_non_gitkeep_files(codex_automations)
     registry_mentions_checks = personal_registry_mentions_agentos_checks(personal_registry)
-    recurring_check_evidence = registry_mentions_checks or codex_file_count > 0
+    codex_mentions_checks = codex_automations_mention_agentos_checks(codex_automations)
+    recurring_check_evidence = registry_mentions_checks or codex_mentions_checks
 
     details = [
         "Core automation registry: " + ("present" if core_registry.is_file() else "missing"),
         "Personal automation registry: " + ("present" if personal_registry.is_file() else "missing"),
         f"Personal automation files: {personal_file_count}",
         "Codex automation mirror dir: " + presence_with_count(codex_automations),
+        "Codex AgentOS check evidence: " + ("found" if codex_mentions_checks else "not found"),
         "Recurring AgentOS check evidence: " + ("found" if recurring_check_evidence else "not found"),
     ]
     if verbose:
@@ -706,6 +708,25 @@ def personal_registry_mentions_agentos_checks(path: Path) -> bool:
         return False
     lowered = text.lower()
     return "agentos" in lowered and any(term in lowered for term in ("drift", "update", "repository"))
+
+
+def codex_automations_mention_agentos_checks(root: Path) -> bool:
+    if not root.exists() or not root.is_dir():
+        return False
+    for path in root.rglob("*"):
+        if not path.is_file() or path.name == ".gitkeep":
+            continue
+        candidate = path.name.lower()
+        try:
+            candidate += "\n" + path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        except UnicodeDecodeError:
+            continue
+        lowered = candidate.lower()
+        if "agentos" in lowered and any(term in lowered for term in ("drift", "update", "repository")):
+            return True
+    return False
 
 
 def count_non_gitkeep_files(root: Path) -> int:
@@ -916,6 +937,8 @@ def run_self_tests() -> int:
         test_mirror_recommendations_quote_paths,
         test_automation_no_evidence_warns,
         test_automation_registry_evidence_passes,
+        test_unrelated_codex_automation_does_not_pass,
+        test_codex_agentos_automation_evidence_passes,
         test_automation_files_without_registry_warns,
     ]
     for test in tests:
@@ -1179,6 +1202,35 @@ def test_automation_registry_evidence_passes() -> None:
         joined = "\n".join(result.details)
         assert_true(result.status == "PASS", "registry evidence should pass")
         assert_true("Recurring AgentOS check evidence: found" in joined, "found evidence should be explicit")
+
+
+def test_unrelated_codex_automation_does_not_pass() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        home = Path(tmp) / "home"
+        make_fake_agentos(root)
+        codex_automation = home / ".codex" / "automations" / "daily-weather.txt"
+        codex_automation.parent.mkdir(parents=True)
+        codex_automation.write_text("Daily weather reminder.\n", encoding="utf-8")
+        result = check_automations(root, home, verbose=False)
+        joined = "\n".join(result.details)
+        assert_true(result.status == "WARN", "unrelated Codex automation should not pass")
+        assert_true("Codex automation mirror dir: present (1 files)" in joined, "Codex presence should remain visible")
+        assert_true("Codex AgentOS check evidence: not found" in joined, "unrelated Codex file should not be evidence")
+
+
+def test_codex_agentos_automation_evidence_passes() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        home = Path(tmp) / "home"
+        make_fake_agentos(root)
+        codex_automation = home / ".codex" / "automations" / "agentos-drift-check.txt"
+        codex_automation.parent.mkdir(parents=True)
+        codex_automation.write_text("AgentOS adapter drift check.\n", encoding="utf-8")
+        result = check_automations(root, home, verbose=False)
+        joined = "\n".join(result.details)
+        assert_true(result.status == "PASS", "AgentOS Codex automation evidence should pass")
+        assert_true("Codex AgentOS check evidence: found" in joined, "Codex evidence should be explicit")
 
 
 def test_automation_files_without_registry_warns() -> None:
