@@ -17,7 +17,6 @@ import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass
-from datetime import date as calendar_date
 from pathlib import Path
 
 sys.dont_write_bytecode = True
@@ -123,22 +122,14 @@ SECRET_LIKE_PATTERNS = [
 GENERIC_LOCAL_TOOL_PATH_RE = re.compile(
     r"^(?:~|\$HOME|\$\{HOME\})[\\/](?:\.agents[\\/]skills|\.codex[\\/]automations)(?:[\\/].*)?$"
 )
-BENCHMARK_HISTORY_PATH = Path("os/verification/BENCHMARK_HISTORY.md")
-BENCHMARK_HISTORY_HEADER = ("Date", "Commit/PR", "Suite", "Result Summary", "Interpretation", "Caveats")
-BENCHMARK_HISTORY_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-BENCHMARK_HISTORY_SUITE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]*$")
-BENCHMARK_HISTORY_RESULT_RE = re.compile(
-    r"\b(?:pass(?:ed|es)?|fail(?:ed|s)?|hit@|hit-rate|not scored|dry-run only|no real harness run)\b",
-    re.IGNORECASE,
-)
-BENCHMARK_HISTORY_RESULT_RATIO_RE = re.compile(r"(?<![\d/])\d+/\d+(?![\d/])")
-BENCHMARK_HISTORY_RAW_FIELD_RE = re.compile(
+BENCHMARK_STATUS_PATH = Path("os/verification/BENCHMARK_STATUS.md")
+BENCHMARK_STATUS_RAW_FIELD_RE = re.compile(
     r"(?i)(?:^|[^A-Za-z0-9_-])(?:stdout|stderr|raw_response)(?:[^A-Za-z0-9_-]|$)"
 )
-BENCHMARK_HISTORY_KEY_FIELD_RE = re.compile(
+BENCHMARK_STATUS_KEY_FIELD_RE = re.compile(
     r"(?i)(?:^|[`\"'{\s])(?:command|root)\s*(?:[:=]|`)"
 )
-BENCHMARK_HISTORY_TRANSCRIPT_LINE_RE = re.compile(
+BENCHMARK_STATUS_TRANSCRIPT_LINE_RE = re.compile(
     r"(?im)^\s*>?\s*(?:user|assistant|system|developer|tool|codex):\s+\S"
 )
 FENCED_BLOCK_RE = re.compile(r"(?ms)^```([A-Za-z0-9_-]*)[^\n]*\n(.*?)^```")
@@ -180,7 +171,7 @@ class AgentOSValidator:
         self.check_resolver_reachability()
         self.check_retrieval_eval_fixtures()
         self.check_benchmark_manifest()
-        self.check_benchmark_history()
+        self.check_benchmark_status()
 
     def run_publication_precheck(self) -> int:
         self.run_publication_precheck_checks()
@@ -191,7 +182,7 @@ class AgentOSValidator:
         self.check_private_overlay_files_are_ignored()
         self.check_personal_overlay_ignore_rules()
         self.check_personal_overlay_tracking(allow_private_files=True)
-        self.check_benchmark_history()
+        self.check_benchmark_status()
         self.check_core_private_markers()
         self.check_secret_like_tokens()
         self.checked.append("publication precheck")
@@ -202,7 +193,7 @@ class AgentOSValidator:
         self.check_public_export_allowlist()
         self.check_personal_overlay_ignore_file_rules()
         self.check_personal_overlay_tracking(allow_private_files=False)
-        self.check_benchmark_history()
+        self.check_benchmark_status()
         self.check_core_private_markers()
         self.check_secret_like_tokens()
         self.check_no_private_generated_outputs()
@@ -1196,12 +1187,12 @@ class AgentOSValidator:
 
         self.checked.append(check)
 
-    def check_benchmark_history(self) -> None:
-        check = "benchmark history hygiene"
+    def check_benchmark_status(self) -> None:
+        check = "benchmark status hygiene"
         if check in self.checked:
             return
-        history_path = self.root / BENCHMARK_HISTORY_PATH
-        text = self.read_text(history_path, check)
+        status_path = self.root / BENCHMARK_STATUS_PATH
+        text = self.read_text(status_path, check)
         if not text:
             return
 
@@ -1210,21 +1201,21 @@ class AgentOSValidator:
             if "personal/" in normalized_line:
                 self.add_error(
                     check,
-                    f"{self.display_path(history_path)}:{line_no}",
-                    "benchmark history must not include Personal Overlay paths",
+                    f"{self.display_path(status_path)}:{line_no}",
+                    "benchmark status must not include Personal Overlay paths",
                 )
-            marker_match = BENCHMARK_HISTORY_RAW_FIELD_RE.search(line) or BENCHMARK_HISTORY_KEY_FIELD_RE.search(line)
+            marker_match = BENCHMARK_STATUS_RAW_FIELD_RE.search(line) or BENCHMARK_STATUS_KEY_FIELD_RE.search(line)
             if marker_match:
                 self.add_error(
                     check,
-                    f"{self.display_path(history_path)}:{line_no}",
-                    f"benchmark history contains raw dump marker: {marker_match.group(0).strip()}",
+                    f"{self.display_path(status_path)}:{line_no}",
+                    f"benchmark status contains raw dump marker: {marker_match.group(0).strip()}",
                 )
-            if BENCHMARK_HISTORY_TRANSCRIPT_LINE_RE.search(line):
+            if BENCHMARK_STATUS_TRANSCRIPT_LINE_RE.search(line):
                 self.add_error(
                     check,
-                    f"{self.display_path(history_path)}:{line_no}",
-                    "benchmark history must not include transcript-style dialogue lines",
+                    f"{self.display_path(status_path)}:{line_no}",
+                    "benchmark status must not include transcript-style dialogue lines",
                 )
 
         for match in FENCED_BLOCK_RE.finditer(text):
@@ -1234,137 +1225,17 @@ class AgentOSValidator:
             if language == "json":
                 self.add_error(
                     check,
-                    f"{self.display_path(history_path)}:{line_no}",
-                    "benchmark history must not include fenced JSON report payloads",
+                    f"{self.display_path(status_path)}:{line_no}",
+                    "benchmark status must not include fenced JSON report payloads",
                 )
-            elif BENCHMARK_HISTORY_RAW_FIELD_RE.search(body) or BENCHMARK_HISTORY_KEY_FIELD_RE.search(body):
+            elif BENCHMARK_STATUS_RAW_FIELD_RE.search(body) or BENCHMARK_STATUS_KEY_FIELD_RE.search(body):
                 self.add_error(
                     check,
-                    f"{self.display_path(history_path)}:{line_no}",
-                    "benchmark history fenced blocks must not contain raw report payload fields",
+                    f"{self.display_path(status_path)}:{line_no}",
+                    "benchmark status fenced blocks must not contain raw report payload fields",
                 )
-
-        rows = self.benchmark_history_rows(check, history_path, text)
-        if not rows:
-            self.checked.append(check)
-            return
-
-        for row_no, row in rows:
-            entry_date, commit_ref, suite, result, interpretation, caveats = row
-            if not BENCHMARK_HISTORY_DATE_RE.fullmatch(entry_date):
-                self.add_error(check, f"{self.display_path(history_path)}:{row_no}", "date must use YYYY-MM-DD")
-            else:
-                try:
-                    parsed_date = calendar_date.fromisoformat(entry_date)
-                except ValueError:
-                    self.add_error(
-                        check,
-                        f"{self.display_path(history_path)}:{row_no}",
-                        "date must be a valid calendar date",
-                    )
-                else:
-                    if parsed_date > calendar_date.today():
-                        self.add_error(
-                            check,
-                            f"{self.display_path(history_path)}:{row_no}",
-                            "date must not be in the future",
-                        )
-            if not commit_ref:
-                self.add_error(check, f"{self.display_path(history_path)}:{row_no}", "commit/PR reference is required")
-            if not BENCHMARK_HISTORY_SUITE_RE.fullmatch(suite):
-                self.add_error(
-                    check,
-                    f"{self.display_path(history_path)}:{row_no}",
-                    "suite must be a compact suite id",
-                )
-            if not BENCHMARK_HISTORY_RESULT_RE.search(result):
-                self.add_error(
-                    check,
-                    f"{self.display_path(history_path)}:{row_no}",
-                    "result summary must include pass/fail, hit-rate, dry-run, or no-real-run status",
-                )
-            if (
-                re.search(r"\b(?:pass(?:ed|es)?|fail(?:ed|s)?|hit@|hit-rate)\b", result, re.IGNORECASE)
-                and not BENCHMARK_HISTORY_RESULT_RATIO_RE.search(result)
-            ):
-                self.add_error(
-                    check,
-                    f"{self.display_path(history_path)}:{row_no}",
-                    "scored result summaries must include a numeric ratio",
-                )
-            if "not scored" in result.lower() and not any(
-                note in caveats.lower()
-                for note in ["no real harness run", "dry-run only", "format checkpoint"]
-            ):
-                self.add_error(
-                    check,
-                    f"{self.display_path(history_path)}:{row_no}",
-                    "not-scored entries need an explicit caveat",
-                )
-            if not interpretation:
-                self.add_error(check, f"{self.display_path(history_path)}:{row_no}", "interpretation is required")
-            if not caveats:
-                self.add_error(check, f"{self.display_path(history_path)}:{row_no}", "caveats are required")
 
         self.checked.append(check)
-
-    def benchmark_history_rows(self, check: str, history_path: Path, text: str) -> list[tuple[int, list[str]]]:
-        lines = text.splitlines()
-        header_index: int | None = None
-        for index, line in enumerate(lines):
-            cells = self.markdown_table_cells(line)
-            if tuple(cells) == BENCHMARK_HISTORY_HEADER:
-                header_index = index
-                break
-        if header_index is None:
-            self.add_error(check, history_path, "missing benchmark history table with required curated fields")
-            return []
-
-        separator_index = header_index + 1
-        if separator_index >= len(lines) or not self.is_markdown_separator_row(lines[separator_index]):
-            self.add_error(check, f"{self.display_path(history_path)}:{header_index + 2}", "history table separator is missing")
-            return []
-
-        rows: list[tuple[int, list[str]]] = []
-        for index in range(separator_index + 1, len(lines)):
-            line = lines[index]
-            if not line.strip():
-                if rows:
-                    break
-                continue
-            cells = self.markdown_table_cells(line)
-            if not cells:
-                if rows:
-                    break
-                continue
-            if len(cells) != len(BENCHMARK_HISTORY_HEADER):
-                self.add_error(
-                    check,
-                    f"{self.display_path(history_path)}:{index + 1}",
-                    "history table rows must use exactly the curated fields",
-                )
-                continue
-            if any(not cell for cell in cells):
-                self.add_error(
-                    check,
-                    f"{self.display_path(history_path)}:{index + 1}",
-                    "history table cells must not be empty",
-                )
-            rows.append((index + 1, cells))
-
-        if not rows:
-            self.add_error(check, history_path, "benchmark history table must contain at least one entry")
-        return rows
-
-    def markdown_table_cells(self, line: str) -> list[str]:
-        stripped = line.strip()
-        if not stripped.startswith("|") or not stripped.endswith("|"):
-            return []
-        return [cell.strip() for cell in stripped.strip("|").split("|")]
-
-    def is_markdown_separator_row(self, line: str) -> bool:
-        cells = self.markdown_table_cells(line)
-        return bool(cells) and all(re.fullmatch(r":?-{3,}:?", cell) for cell in cells)
 
     def validate_manifest_path_field(
         self,
@@ -1575,18 +1446,11 @@ def run_self_test() -> int:
             ),
             encoding="utf-8",
         )
-        benchmark_history = root / BENCHMARK_HISTORY_PATH
-        benchmark_history.write_text(
-            "# AgentOS Benchmark History\n\n"
-            "## Entries\n\n"
-            "| Date | Commit/PR | Suite | Result Summary | Interpretation | Caveats |\n"
-            "| --- | --- | --- | --- | --- | --- |\n"
-            "| 2026-05-17 | PR #1 | retrieval | Passed 8/8 | Looks stable. | dry-run only |\n"
-            "| 2026-99-99 | PR #2 | retrieval | Passed 8/8 | Invalid date fixture. | dry-run only |\n"
-            "| 2999-01-01 | PR #3 | retrieval | Passed 8/8 | Future date fixture. | dry-run only |\n"
-            "| 2026-05-17 | PR #4 | retrieval | Passed | Missing ratio fixture. | dry-run only |\n"
-            "| 2026-05-17 | PR #5 | retrieval | Passed 8/8 | Root cause was fixture routing and benchmark command changed. | dry-run only |\n"
-            "| 2026-05-17 | PR #6 | retrieval | Green | Status misplaced in caveats. | Passed 8/8 |\n"
+        benchmark_status = root / BENCHMARK_STATUS_PATH
+        benchmark_status.write_text(
+            "# AgentOS Benchmark Status\n\n"
+            "Status: public-safe current snapshot.\n\n"
+            "Current snapshot: retrieval checks look stable in the current public-safe summary.\n"
             "\n"
             "`raw_response`: fixture payload copied from a saved report.\n"
             "Stored under personal/os/verification/retrieval/reports/example.\n"
@@ -1667,7 +1531,7 @@ def run_self_test() -> int:
         validator.check_markdown_path_portability()
         validator.check_source_map_path_health()
         validator.check_benchmark_manifest()
-        validator.check_benchmark_history()
+        validator.check_benchmark_status()
         validator.check_no_git_directory()
         validator.check_public_export_allowlist()
         validator.check_personal_overlay_ignore_file_rules()
@@ -1683,13 +1547,10 @@ def run_self_test() -> int:
             "uses a parent-relative AgentOS path",
             "listed local path does not exist",
             "benchmark script missing from manifest",
-            "benchmark history contains raw dump marker",
-            "date must be a valid calendar date",
-            "date must not be in the future",
-            "scored result summaries must include a numeric ratio",
-            "benchmark history must not include Personal Overlay paths",
-            "benchmark history must not include transcript-style dialogue lines",
-            "benchmark history must not include fenced JSON report payloads",
+            "benchmark status contains raw dump marker",
+            "benchmark status must not include Personal Overlay paths",
+            "benchmark status must not include transcript-style dialogue lines",
+            "benchmark status must not include fenced JSON report payloads",
             "public export must not contain git history",
             "private marker matched",
             "missing required Personal Overlay ignore rule",
@@ -1829,26 +1690,24 @@ def run_self_test() -> int:
             and "required Personal Overlay skeleton .gitkeep is missing" in error.message
             for error in validator.errors
         )
-        benchmark_history_case_separator_rejected = any(
-            error.path == "os/verification/BENCHMARK_HISTORY.md:15"
-            and "benchmark history must not include Personal Overlay paths" in error.message
+        benchmark_status_case_separator_rejected = any(
+            error.path == "os/verification/BENCHMARK_STATUS.md:9"
+            and "benchmark status must not include Personal Overlay paths" in error.message
             for error in validator.errors
         )
 
         symlink_root = root / "_publication_symlink_fixture"
         (symlink_root / "os/context").mkdir(parents=True)
         (symlink_root / "os/agents/current-awareness-agent").mkdir(parents=True)
-        (symlink_root / BENCHMARK_HISTORY_PATH.parent).mkdir(parents=True, exist_ok=True)
+        (symlink_root / BENCHMARK_STATUS_PATH.parent).mkdir(parents=True, exist_ok=True)
         (symlink_root / "os/reports").mkdir()
         (symlink_root / "personal").mkdir()
         (symlink_root / ".gitignore").write_text("personal/**\n", encoding="utf-8")
         (symlink_root / "os/INDEX.md").write_text("safe\n", encoding="utf-8")
-        (symlink_root / BENCHMARK_HISTORY_PATH).write_text(
-            "# AgentOS Benchmark History\n\n"
-            "## Entries\n\n"
-            "| Date | Commit/PR | Suite | Result Summary | Interpretation | Caveats |\n"
-            "| --- | --- | --- | --- | --- | --- |\n"
-            "| 2026-05-17 | PR #1 | retrieval | Passed 8/8 | Looks stable. | dry-run only |\n",
+        (symlink_root / BENCHMARK_STATUS_PATH).write_text(
+            "# AgentOS Benchmark Status\n\n"
+            "Status: public-safe current snapshot.\n\n"
+            "Current snapshot: retrieval checks look stable in the current public-safe summary.\n",
             encoding="utf-8",
         )
         (symlink_root / "os/context/CAREER.md").write_text("private-looking filename with sanitized content\n", encoding="utf-8")
@@ -1932,9 +1791,9 @@ def run_self_test() -> int:
         )
         publication_precheck_validator = AgentOSValidator(root)
         publication_precheck_validator.run_publication_precheck_checks()
-        publication_precheck_catches_benchmark_history = any(
-            error.path.startswith("os/verification/BENCHMARK_HISTORY.md:")
-            and "benchmark history" in error.message
+        publication_precheck_catches_benchmark_status = any(
+            error.path.startswith("os/verification/BENCHMARK_STATUS.md:")
+            and "benchmark status" in error.message
             for error in publication_precheck_validator.errors
         )
         public_export_validator = AgentOSValidator(root)
@@ -1943,13 +1802,13 @@ def run_self_test() -> int:
         public_export_validator.check_public_export_allowlist()
         public_export_validator.check_personal_overlay_ignore_file_rules()
         public_export_validator.check_personal_overlay_tracking(allow_private_files=False)
-        public_export_validator.check_benchmark_history()
+        public_export_validator.check_benchmark_status()
         public_export_validator.check_core_private_markers()
         public_export_validator.check_secret_like_tokens()
         public_export_validator.check_no_private_generated_outputs()
-        public_export_catches_benchmark_history = any(
-            error.path.startswith("os/verification/BENCHMARK_HISTORY.md:")
-            and "benchmark history" in error.message
+        public_export_catches_benchmark_status = any(
+            error.path.startswith("os/verification/BENCHMARK_STATUS.md:")
+            and "benchmark status" in error.message
             for error in public_export_validator.errors
         )
 
@@ -1970,7 +1829,7 @@ def run_self_test() -> int:
             and configured_marker_redacted
             and built_in_marker_redacted
             and missing_skeleton_rejected
-            and benchmark_history_case_separator_rejected
+            and benchmark_status_case_separator_rejected
             and symlink_rejected_cleanly
             and live_core_file_rejected
             and live_agent_path_rejected
@@ -1979,8 +1838,8 @@ def run_self_test() -> int:
             and core_gitkeep_rejected
             and core_report_gitkeep_rejected
             and default_catches_publication_precheck
-            and publication_precheck_catches_benchmark_history
-            and public_export_catches_benchmark_history
+            and publication_precheck_catches_benchmark_status
+            and public_export_catches_benchmark_status
         )
         if matched:
             print("SELF-TEST PASS: structural and publication/privacy fixtures were caught.")

@@ -23,10 +23,10 @@ Review whether AgentOS state is current, useful, and safely filed.
 3. Check saved benchmark freshness when local raw reports exist:
 
    ```bash
-   python3 os/verification/scripts/check_benchmark_harness_freshness.py --check-history
+   python3 os/verification/scripts/check_benchmark_harness_freshness.py
    ```
 
-   Use `os/verification/BENCHMARK_HISTORY.md` only for curated public-safe summaries. Keep raw benchmark reports, diagnostics, and generated run files in the Personal Overlay.
+   Use `os/verification/BENCHMARK_STATUS.md` only for the current public-safe Core snapshot. Raw benchmark reports, diagnostics, generated run files, and optional run history stay outside Core.
 4. Run the global-instructions drift check:
 
    ```bash

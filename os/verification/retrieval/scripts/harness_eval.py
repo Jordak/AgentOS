@@ -22,7 +22,7 @@ from typing import Any
 CONFIDENCE_VALUES = {"low", "medium", "high"}
 KNOWN_HARNESSES = ("codex", "claude")
 DEFAULT_DISALLOWED_EXACT_PATHS = (
-    "os/verification/BENCHMARK_HISTORY.md",
+    "os/verification/BENCHMARK_STATUS.md",
     "os/verification/retrieval/questions.json",
 )
 DEFAULT_DISALLOWED_PATH_PREFIXES = (
@@ -812,7 +812,7 @@ def run_self_test(root: Path, questions_path: Path) -> int:
         synthetic_source_path.write_text(quote + "\n", encoding="utf-8")
         synthetic_question = {**question, "expected_paths": [source_path]}
         disallowed_evidence_paths = (
-            "os/verification/BENCHMARK_HISTORY.md",
+            "os/verification/BENCHMARK_STATUS.md",
             "personal/os/context/SOURCE_MAP.md",
             "personal/os/verification/reports/private.md",
             "personal/os/verification/markdown-audit/private.md",

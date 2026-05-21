@@ -5,21 +5,15 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
 import tempfile
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 
 DEFAULT_MANIFEST = Path("os/verification/BENCHMARKS.json")
-DEFAULT_HISTORY = Path("os/verification/BENCHMARK_HISTORY.md")
-BENCHMARK_HISTORY_HEADER = ("Date", "Commit/PR", "Suite", "Result Summary", "Interpretation", "Caveats")
-RESULT_RATIO_RE = re.compile(r"(?<![\d/])(\d+)/(\d+)(?![\d/])")
-FAIL_LABEL_RE = re.compile(r"\bfail(?:ed|s)?\b", re.IGNORECASE)
-PASS_LABEL_RE = re.compile(r"\b(?:pass(?:ed|es)?|hit@|hit-rate)\b", re.IGNORECASE)
 
 HARNESS_UNAVAILABLE_PATTERNS = (
     "is not installed",
@@ -52,13 +46,6 @@ class RunRecord:
     harness_unavailable: int
 
 
-@dataclass(frozen=True)
-class HistoryEntry:
-    date: date
-    suite: str
-    result_summary: str
-
-
 def default_root() -> Path:
     return Path(__file__).resolve().parents[3]
 
@@ -76,60 +63,6 @@ def parse_timestamp(raw: str) -> datetime:
     if parsed.tzinfo is None:
         return parsed.replace(tzinfo=timezone.utc)
     return parsed.astimezone(timezone.utc)
-
-
-def markdown_table_cells(line: str) -> list[str]:
-    stripped = line.strip()
-    if not stripped.startswith("|") or not stripped.endswith("|"):
-        return []
-    return [cell.strip() for cell in stripped.strip("|").split("|")]
-
-
-def is_markdown_separator_row(line: str) -> bool:
-    cells = markdown_table_cells(line)
-    return bool(cells) and all(cell.strip(":").strip("-") == "" and "---" in cell for cell in cells)
-
-
-def load_history_entries(path: Path) -> list[HistoryEntry]:
-    try:
-        lines = path.read_text(encoding="utf-8").splitlines()
-    except FileNotFoundError as error:
-        raise ValueError(f"history file not found: {path}") from error
-    except UnicodeDecodeError as error:
-        raise ValueError(f"history file is not valid UTF-8 text: {error.reason}") from error
-
-    header_index: int | None = None
-    for index, line in enumerate(lines):
-        if tuple(markdown_table_cells(line)) == BENCHMARK_HISTORY_HEADER:
-            header_index = index
-            break
-    if header_index is None:
-        raise ValueError("history table with required curated fields was not found")
-    if header_index + 1 >= len(lines) or not is_markdown_separator_row(lines[header_index + 1]):
-        raise ValueError("history table separator is missing")
-
-    entries: list[HistoryEntry] = []
-    for line in lines[header_index + 2:]:
-        if not line.strip():
-            if entries:
-                break
-            continue
-        cells = markdown_table_cells(line)
-        if not cells:
-            if entries:
-                break
-            continue
-        if len(cells) != len(BENCHMARK_HISTORY_HEADER):
-            raise ValueError("history table rows must use exactly the curated fields")
-        try:
-            entry_date = date.fromisoformat(cells[0])
-        except ValueError as error:
-            raise ValueError(f"history entry date is invalid: {cells[0]}") from error
-        entries.append(HistoryEntry(date=entry_date, suite=cells[2], result_summary=cells[3]))
-
-    if not entries:
-        raise ValueError("history table must contain at least one entry")
-    return entries
 
 
 def nested_get(value: dict[str, Any], path: tuple[str, ...]) -> dict[str, Any] | None:
@@ -297,54 +230,14 @@ def load_targets_from_manifest(
     return targets
 
 
-def latest_history_date(entries: list[HistoryEntry], suite: str) -> date | None:
-    matching = [entry.date for entry in entries if entry.suite == suite]
-    return max(matching) if matching else None
-
-
-def latest_history_entries(entries: list[HistoryEntry], suite: str) -> list[HistoryEntry]:
-    matching = [entry for entry in entries if entry.suite == suite]
-    if not matching:
-        return []
-    latest_date = max(entry.date for entry in matching)
-    return [entry for entry in matching if entry.date == latest_date]
-
-
-def history_matches_behavior(entry: HistoryEntry, record: RunRecord) -> bool:
-    for match in RESULT_RATIO_RE.finditer(entry.result_summary):
-        ratio = (int(match.group(1)), int(match.group(2)))
-        before = entry.result_summary[max(0, match.start() - 24):match.start()]
-        after = entry.result_summary[match.end():match.end() + 24]
-        context = f"{before} {after}"
-        if FAIL_LABEL_RE.search(context):
-            if ratio == (record.behavioral_fail, record.behavioral_total):
-                return True
-        elif PASS_LABEL_RE.search(context):
-            if ratio == (record.behavioral_pass, record.behavioral_total):
-                return True
-        elif ratio == (record.behavioral_pass, record.behavioral_total):
-            return True
-    return False
-
-
 def check_target(
     root: Path,
     target: BenchmarkTarget,
     now: datetime,
-    history_entries: list[HistoryEntry] | None = None,
 ) -> int:
     records = run_records(target)
     if not records:
         print(f"WARN  {target.name}: no saved harness benchmark reports found")
-        if history_entries is not None:
-            history_date = latest_history_date(history_entries, target.name)
-            if history_date is None:
-                print(f"WARN  {target.name}: no curated Core benchmark history entry found")
-            else:
-                print(
-                    f"INFO  {target.name}: curated Core history includes entry dated "
-                    f"{history_date.isoformat()}, but raw reports are unavailable"
-                )
         return 1
 
     latest = records[0]
@@ -374,37 +267,6 @@ def check_target(
     )
     failed = days > target.max_age_days
 
-    if history_entries is not None:
-        latest_entries = latest_history_entries(history_entries, target.name)
-        behavior_date = latest_behavior.generated_at.date()
-        if not latest_entries:
-            print(f"WARN  {target.name}: no curated Core benchmark history entry found")
-            failed = True
-        elif latest_entries[0].date > now.date():
-            print(
-                f"WARN  {target.name}: latest curated Core history entry {latest_entries[0].date.isoformat()} "
-                f"is dated after current date {now.date().isoformat()}"
-            )
-            failed = True
-        elif latest_entries[0].date < behavior_date:
-            print(
-                f"WARN  {target.name}: latest curated Core history entry {latest_entries[0].date.isoformat()} "
-                f"predates latest behavioral run {behavior_date.isoformat()}"
-            )
-            failed = True
-        elif not any(history_matches_behavior(entry, latest_behavior) for entry in latest_entries):
-            print(
-                f"WARN  {target.name}: latest curated Core history entry {latest_entries[0].date.isoformat()} "
-                f"does not summarize latest behavioral result "
-                f"{latest_behavior.behavioral_pass}/{latest_behavior.behavioral_total}"
-            )
-            failed = True
-        else:
-            print(
-                f"OK    {target.name}: curated Core history includes entry dated "
-                f"{latest_entries[0].date.isoformat()} with latest behavioral result"
-            )
-
     return 1 if failed else 0
 
 
@@ -417,15 +279,6 @@ def run_self_test(root: Path) -> int:
         result = check_target(fixture_root, target, now)
         if result == 0:
             print("SELF-TEST FAIL: missing reports were accepted")
-            return 1
-        missing_with_history = check_target(
-            fixture_root,
-            target,
-            now,
-            [HistoryEntry(date=date(2026, 5, 16), suite="self-test", result_summary="Passed 8/8")],
-        )
-        if missing_with_history == 0:
-            print("SELF-TEST FAIL: missing reports with history were accepted")
             return 1
 
         reports_dir = fixture_root / "reports"
@@ -448,64 +301,15 @@ def run_self_test(root: Path) -> int:
             encoding="utf-8",
         )
         full_target = BenchmarkTarget("self-test", reports_dir, "*/run.json", ("summary",), 8, 14)
-        stale_history = [HistoryEntry(date=date(2026, 5, 15), suite="self-test", result_summary="Passed 8/8")]
-        wrong_result_history = [
-            HistoryEntry(date=date(2026, 5, 16), suite="self-test", result_summary="Failed 1/8")
-        ]
-        partial_ratio_history = [
-            HistoryEntry(date=date(2026, 5, 16), suite="self-test", result_summary="Passed 18/80")
-        ]
-        failing_result_history = [
-            HistoryEntry(date=date(2026, 5, 16), suite="self-test", result_summary="Failed 0/8")
-        ]
-        trailing_fail_label_history = [
-            HistoryEntry(date=date(2026, 5, 16), suite="self-test", result_summary="0/8 failed")
-        ]
-        future_history = [HistoryEntry(date=date(2026, 5, 18), suite="self-test", result_summary="Passed 8/8")]
-        same_date_rerun_history = [
-            HistoryEntry(date=date(2026, 5, 16), suite="self-test", result_summary="Failed 0/8"),
-            HistoryEntry(date=date(2026, 5, 16), suite="self-test", result_summary="Passed 8/8"),
-        ]
-        current_history = [HistoryEntry(date=date(2026, 5, 16), suite="self-test", result_summary="Passed 8/8")]
-        if check_target(fixture_root, full_target, now, stale_history) == 0:
-            print("SELF-TEST FAIL: stale curated history was accepted")
+        if check_target(fixture_root, full_target, now) != 0:
+            print("SELF-TEST FAIL: current saved report was rejected")
             return 1
-        if check_target(fixture_root, full_target, now, wrong_result_history) == 0:
-            print("SELF-TEST FAIL: mismatched curated history result was accepted")
-            return 1
-        if check_target(fixture_root, full_target, now, partial_ratio_history) == 0:
-            print("SELF-TEST FAIL: partial-ratio curated history result was accepted")
-            return 1
-        if check_target(fixture_root, full_target, now, failing_result_history) != 0:
-            print("SELF-TEST FAIL: matching failing curated history result was rejected")
-            return 1
-        if check_target(fixture_root, full_target, now, trailing_fail_label_history) != 0:
-            print("SELF-TEST FAIL: trailing fail-label curated history result was rejected")
-            return 1
-        if check_target(fixture_root, full_target, now, future_history) == 0:
-            print("SELF-TEST FAIL: future-dated curated history was accepted")
-            return 1
-        if check_target(fixture_root, full_target, now, same_date_rerun_history) != 0:
-            print("SELF-TEST FAIL: same-date matching curated history result was rejected")
-            return 1
-        if check_target(fixture_root, full_target, now, current_history) != 0:
-            print("SELF-TEST FAIL: current curated history was rejected")
+        stale_now = datetime(2026, 6, 17, tzinfo=timezone.utc)
+        if check_target(fixture_root, full_target, stale_now) == 0:
+            print("SELF-TEST FAIL: stale saved report was accepted")
             return 1
 
-        history_file = fixture_root / "BENCHMARK_HISTORY.md"
-        history_file.write_text(
-            "# Fixture\n\n"
-            "| Date | Commit/PR | Suite | Result Summary | Interpretation | Caveats |\n"
-            "| --- | --- | --- | --- | --- | --- |\n"
-            "| 2026-05-16 | PR #1 | self-test | Passed 8/8 | Stable. | dry-run only |\n",
-            encoding="utf-8",
-        )
-        loaded = load_history_entries(history_file)
-        if latest_history_date(loaded, "self-test") != date(2026, 5, 16):
-            print("SELF-TEST FAIL: curated history parser did not load the fixture")
-            return 1
-
-        print("SELF-TEST PASS: missing reports and stale history trigger freshness warnings")
+        print("SELF-TEST PASS: missing reports and stale raw runs trigger freshness warnings")
         return 0
 
 
@@ -513,8 +317,6 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Check saved AgentOS harness benchmark freshness.")
     parser.add_argument("--root", type=Path, default=default_root())
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
-    parser.add_argument("--history", type=Path, default=DEFAULT_HISTORY)
-    parser.add_argument("--check-history", action="store_true", help="Warn when Core history lags raw runs.")
     parser.add_argument("--max-age-days", type=int, default=None, help="Override manifest max-age-days.")
     parser.add_argument("--now", help="Override current UTC timestamp for tests, ISO-8601.")
     parser.add_argument("--self-test", action="store_true")
@@ -534,17 +336,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"ERROR benchmark freshness manifest invalid: {error}", file=sys.stderr)
         return 2
 
-    history_entries = None
-    if args.check_history:
-        history_path = resolve_root_path(root, args.history).resolve()
-        try:
-            history_entries = load_history_entries(history_path)
-        except ValueError as error:
-            print(f"ERROR benchmark history invalid: {error}", file=sys.stderr)
-            return 2
-
     failures = [
-        check_target(root, target, now, history_entries)
+        check_target(root, target, now)
         for target in targets
     ]
     return 1 if any(failures) else 0

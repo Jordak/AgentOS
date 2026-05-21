@@ -24,7 +24,7 @@ Task completion, final-answer quality, write success, read-only sandbox failures
 - `coverage.json`: actionable playbook activation rules and fixture inventory status. Coverage entries are validated against fixture `must_access` paths before reports are produced.
 - `scripts/benchmark_playbook_activation.py`: dry-run, transcript grading, report writing, and self-test.
 - `personal/os/verification/playbook-activation/reports/`: saved report directories with `report.md` and `run.json`.
-- `os/verification/BENCHMARK_HISTORY.md`: curated Core history for public-safe playbook activation outcomes. Keep only summarized results there; raw transcripts and saved runs stay in the Personal Overlay.
+- `os/verification/BENCHMARK_STATUS.md`: current public-safe Core benchmark snapshot. Keep raw transcripts and saved runs outside Core.
 
 ## Commands
 

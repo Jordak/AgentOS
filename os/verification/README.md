@@ -18,23 +18,17 @@ The default validator reads local files only and runs structural checks plus det
 
 AgentOS uses a hybrid benchmark-evidence model:
 
-- Private raw reports stay in the Personal Overlay, usually under `personal/os/verification/<suite>/reports/`. Saved runs may include `report.md`, `run.json`, harness diagnostics, local paths, and other private run evidence.
-- Core benchmark history lives in `os/verification/BENCHMARK_HISTORY.md`. It contains only curated public-safe fields: date, commit/PR reference, suite, pass/total, fail/total, or hit-rate ratio summary, interpretation, and caveats such as `dry-run only` or `no real harness run`.
+- Core benchmark status lives in `os/verification/BENCHMARK_STATUS.md`. It is a current public-safe snapshot, not a run history or source of raw evidence.
+- Private raw reports may stay in the Personal Overlay, usually under `personal/os/verification/<suite>/reports/`, when a workflow benefits from saved evidence. Saved runs may include `report.md`, `run.json`, harness diagnostics, local paths, and other private run evidence.
 
-Do not paste raw report dumps, transcripts, local machine paths, account/session details, private prompts, or generated report payloads into Core history. If a private run produces an insight worth preserving publicly, summarize the result by hand and keep the raw evidence in the Personal Overlay.
+Do not paste raw report dumps, transcripts, local machine paths, account/session details, private prompts, or generated report payloads into Core benchmark status. If a private run produces an insight worth preserving publicly, summarize only the current public-safe posture by hand.
 
-The default validator lints Core benchmark history for public-safe shape and raw-report leakage.
+The default validator lints Core benchmark status for raw-report leakage.
 
-Check saved raw harness report freshness during Weekly Review:
+Check saved raw harness report freshness during Weekly Review when local raw reports exist:
 
 ```bash
 python3 os/verification/scripts/check_benchmark_harness_freshness.py
-```
-
-When reviewing whether the curated Core history has caught up with private raw runs, include the history check:
-
-```bash
-python3 os/verification/scripts/check_benchmark_harness_freshness.py --check-history
 ```
 
 ## Commit And Tree Scans
