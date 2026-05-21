@@ -87,6 +87,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print exact private-path diagnostics and subprocess output. Never prints file contents.",
     )
     parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Exit nonzero for WARN results as well as FAIL results.",
+    )
+    parser.add_argument(
         "--self-test",
         action="store_true",
         help="Run temporary-directory self-tests and exit.",
@@ -103,6 +108,7 @@ def main(argv: list[str] | None = None) -> int:
             or args.all_default_adapters
             or args.adapter
             or args.verbose
+            or args.strict
         ):
             print("error: --self-test cannot be combined with other options", file=sys.stderr)
             return 2
@@ -118,7 +124,7 @@ def main(argv: list[str] | None = None) -> int:
         adapter_args=adapter_args(args),
     )
     print_report(report, verbose=args.verbose)
-    return exit_code_for(report.results)
+    return exit_code_for(report.results, strict=args.strict)
 
 
 def adapter_args(args: argparse.Namespace) -> list[str]:
@@ -912,11 +918,11 @@ def print_report(report: DoctorReport, verbose: bool) -> None:
         print("Tip: pass --verbose to include exact private-path diagnostics without file contents.")
 
 
-def exit_code_for(results: Iterable[CheckResult]) -> int:
+def exit_code_for(results: Iterable[CheckResult], strict: bool = False) -> int:
     statuses = {result.status for result in results}
     if "FAIL" in statuses:
         return 2
-    if "WARN" in statuses:
+    if strict and "WARN" in statuses:
         return 1
     return 0
 
@@ -940,6 +946,8 @@ def run_self_tests() -> int:
         test_unrelated_codex_automation_does_not_pass,
         test_codex_agentos_automation_evidence_passes,
         test_automation_files_without_registry_warns,
+        test_warn_exit_code_is_zero_by_default,
+        test_strict_warn_exit_code_is_nonzero,
     ]
     for test in tests:
         try:
@@ -1244,6 +1252,16 @@ def test_automation_files_without_registry_warns() -> None:
         result = check_automations(root, Path(tmp) / "home", verbose=False)
         assert_true(result.status == "WARN", "automation files without registry should warn")
         assert_true("registry" in result.summary, "warning should mention missing registry")
+
+
+def test_warn_exit_code_is_zero_by_default() -> None:
+    results = [CheckResult("example", "WARN", "advisory gap")]
+    assert_true(exit_code_for(results) == 0, "WARN should be advisory by default")
+
+
+def test_strict_warn_exit_code_is_nonzero() -> None:
+    results = [CheckResult("example", "WARN", "advisory gap")]
+    assert_true(exit_code_for(results, strict=True) == 1, "strict WARN should be nonzero")
 
 
 def render_report_for_test(report: DoctorReport, verbose: bool) -> str:
