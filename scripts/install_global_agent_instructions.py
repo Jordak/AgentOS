@@ -40,30 +40,47 @@ class AdapterSpec:
     import_style: str = "pointer"
     override_parts: tuple[str, ...] | None = None
 
-    def path_for(self, home: Path, codex_home: Path | None = None) -> Path:
-        root = self.root_for(home, codex_home)
+    def path_for(
+        self,
+        home: Path,
+        codex_home: Path | None = None,
+        gemini_cli_home: Path | None = None,
+    ) -> Path:
+        root = self.root_for(home, codex_home, gemini_cli_home)
         if self.override_parts:
-            override = root.joinpath(*self.parts_for_root(self.override_parts, codex_home))
+            override = root.joinpath(*self.parts_for_root(self.override_parts, codex_home, gemini_cli_home))
             override_error = validate_target_path(override, allow_missing=True)
             if override_error:
                 return override
             if override.exists() and override.stat().st_size > 0:
                 return override
-        return root.joinpath(*self.parts_for_root(self.parts, codex_home))
+        return root.joinpath(*self.parts_for_root(self.parts, codex_home, gemini_cli_home))
 
-    def all_paths_for(self, home: Path, codex_home: Path | None = None) -> tuple[Path, ...]:
-        root = self.root_for(home, codex_home)
-        paths = [root.joinpath(*self.parts_for_root(self.parts, codex_home))]
+    def all_paths_for(
+        self,
+        home: Path,
+        codex_home: Path | None = None,
+        gemini_cli_home: Path | None = None,
+    ) -> tuple[Path, ...]:
+        root = self.root_for(home, codex_home, gemini_cli_home)
+        paths = [root.joinpath(*self.parts_for_root(self.parts, codex_home, gemini_cli_home))]
         if self.override_parts:
-            paths.append(root.joinpath(*self.parts_for_root(self.override_parts, codex_home)))
+            paths.append(root.joinpath(*self.parts_for_root(self.override_parts, codex_home, gemini_cli_home)))
         return tuple(paths)
 
-    def root_for(self, home: Path, codex_home: Path | None) -> Path:
+    def root_for(self, home: Path, codex_home: Path | None, gemini_cli_home: Path | None) -> Path:
         if self.name == "codex" and codex_home is not None:
             return codex_home
+        if self.name == "gemini" and gemini_cli_home is not None:
+            return gemini_cli_home
         return home
 
-    def parts_for_root(self, parts: tuple[str, ...], codex_home: Path | None) -> tuple[str, ...]:
+    def parts_for_root(
+        self,
+        parts: tuple[str, ...],
+        codex_home: Path | None,
+        gemini_cli_home: Path | None,
+    ) -> tuple[str, ...]:
         if self.name == "codex" and codex_home is not None and parts[:1] == (".codex",):
             return parts[1:]
         return parts
@@ -95,6 +112,12 @@ class FileSnapshot:
     data: bytes | None
     mode: int | None
     missing_parents: tuple[Path, ...]
+
+
+@dataclass
+class RollbackError:
+    path: Path
+    message: str
 
 
 DEFAULT_ADAPTERS = (
@@ -165,10 +188,22 @@ def main(argv: list[str] | None = None) -> int:
             print("error: --self-test cannot be combined with other options", file=sys.stderr)
             return 2
         return run_self_tests()
-    return run(args, home=Path.home(), out=sys.stdout, codex_home=codex_home_from_env())
+    return run(
+        args,
+        home=Path.home(),
+        out=sys.stdout,
+        codex_home=codex_home_from_env(),
+        gemini_cli_home=gemini_cli_home_from_env(),
+    )
 
 
-def run(args: argparse.Namespace, home: Path, out: TextIO, codex_home: Path | None = None) -> int:
+def run(
+    args: argparse.Namespace,
+    home: Path,
+    out: TextIO,
+    codex_home: Path | None = None,
+    gemini_cli_home: Path | None = None,
+) -> int:
     mode = "check" if args.check else "remove" if args.remove else "install"
     if args.check and args.remove:
         print("error: --check and --remove cannot be combined", file=out)
@@ -197,6 +232,7 @@ def run(args: argparse.Namespace, home: Path, out: TextIO, codex_home: Path | No
     targets = collect_targets(
         home=home,
         codex_home=codex_home,
+        gemini_cli_home=gemini_cli_home,
         mode=mode,
         include_all_default_adapters=args.all_default_adapters,
         extra_adapters=args.adapter,
@@ -217,6 +253,8 @@ def run(args: argparse.Namespace, home: Path, out: TextIO, codex_home: Path | No
     print(f"Canonical global file: {global_instructions_path(home)}", file=out)
     if codex_home is not None:
         print(f"Codex home: {codex_home}", file=out)
+    if gemini_cli_home is not None:
+        print(f"Gemini CLI home: {gemini_cli_home}", file=out)
     print("", file=out)
 
     results: list[Result] = []
@@ -316,8 +354,9 @@ def run(args: argparse.Namespace, home: Path, out: TextIO, codex_home: Path | No
             return 1
 
     rolled_back = False
+    rollback_errors: list[RollbackError] = []
     if mode != "check" and not dry_run:
-        results, rolled_back = apply_targets_transactionally(
+        results, rolled_back, rollback_errors = apply_targets_transactionally(
             targets,
             mode,
             home,
@@ -345,7 +384,13 @@ def run(args: argparse.Namespace, home: Path, out: TextIO, codex_home: Path | No
             print("Drift detected. Remediation:", file=out)
             print(remediation_command(args, agentos_home), file=out)
         elif rolled_back:
-            print("Some targets failed. Earlier changes were rolled back.", file=out)
+            if rollback_errors:
+                print(
+                    "Some targets failed. Rollback was attempted but did not complete; inspect rollback-error entries above.",
+                    file=out,
+                )
+            else:
+                print("Some targets failed. Earlier changes were rolled back.", file=out)
         else:
             print("Some targets failed. Files reporting failure were not modified.", file=out)
         return 1
@@ -384,7 +429,7 @@ def apply_targets_transactionally(
     agentos_home: Path | None,
     preflight_results: list[Result],
     timestamp: str,
-) -> tuple[list[Result], bool]:
+) -> tuple[list[Result], bool, list[RollbackError]]:
     results: list[Result] = []
     snapshots: list[FileSnapshot] = []
 
@@ -407,9 +452,10 @@ def apply_targets_transactionally(
                 snapshots.append(capture_snapshot(preflight.backup))
         except OSError as exc:
             results.append(Result(False, "error", target.path, f"filesystem error before write: {exc}"))
-            rollback_snapshots(snapshots)
+            rollback_errors = rollback_snapshots(snapshots)
+            append_rollback_error_results(results, rollback_errors)
             append_not_run_results(results, targets[index + 1 :])
-            return results, True
+            return results, True, rollback_errors
 
         result = evaluate_target(
             target,
@@ -421,11 +467,12 @@ def apply_targets_transactionally(
         )
         results.append(result)
         if not result.ok:
-            rollback_snapshots(snapshots)
+            rollback_errors = rollback_snapshots(snapshots)
+            append_rollback_error_results(results, rollback_errors)
             append_not_run_results(results, targets[index + 1 :])
-            return results, True
+            return results, True, rollback_errors
 
-    return results, False
+    return results, False, []
 
 
 def append_not_run_results(results: list[Result], remaining_targets: list[Target]) -> None:
@@ -434,6 +481,11 @@ def append_not_run_results(results: list[Result], remaining_targets: list[Target
             results.append(Result(True, "skip", target.path, target.skipped_reason))
         else:
             results.append(Result(True, "not run", target.path, "not evaluated because an earlier write failed"))
+
+
+def append_rollback_error_results(results: list[Result], rollback_errors: list[RollbackError]) -> None:
+    for error in rollback_errors:
+        results.append(Result(False, "rollback-error", error.path, f"rollback did not restore this path: {error.message}"))
 
 
 def capture_snapshot(path: Path) -> FileSnapshot:
@@ -460,12 +512,26 @@ def missing_parent_dirs(path: Path) -> list[Path]:
     return missing
 
 
-def rollback_snapshots(snapshots: list[FileSnapshot]) -> None:
-    for snapshot in reversed(snapshots):
+def rollback_snapshots(snapshots: list[FileSnapshot]) -> list[RollbackError]:
+    errors: list[RollbackError] = []
+    existing_snapshots = [snapshot for snapshot in snapshots if snapshot.existed]
+    missing_snapshots = [snapshot for snapshot in snapshots if not snapshot.existed]
+
+    for snapshot in reversed(existing_snapshots):
         try:
             restore_snapshot(snapshot)
-        except OSError:
-            pass
+        except OSError as exc:
+            errors.append(RollbackError(snapshot.path, str(exc)))
+
+    if errors:
+        return errors
+
+    for snapshot in reversed(missing_snapshots):
+        try:
+            restore_snapshot(snapshot)
+        except OSError as exc:
+            errors.append(RollbackError(snapshot.path, str(exc)))
+    return errors
 
 
 def restore_snapshot(snapshot: FileSnapshot) -> None:
@@ -488,6 +554,13 @@ def restore_snapshot(snapshot: FileSnapshot) -> None:
 
 def codex_home_from_env() -> Path | None:
     raw = os.environ.get("CODEX_HOME")
+    if not raw:
+        return None
+    return absolute_lexical_path(Path(os.path.expanduser(raw)))
+
+
+def gemini_cli_home_from_env() -> Path | None:
+    raw = os.environ.get("GEMINI_CLI_HOME")
     if not raw:
         return None
     return absolute_lexical_path(Path(os.path.expanduser(raw)))
@@ -548,6 +621,7 @@ def global_instructions_path(home: Path) -> Path:
 def collect_targets(
     home: Path,
     codex_home: Path | None,
+    gemini_cli_home: Path | None,
     mode: str,
     include_all_default_adapters: bool,
     extra_adapters: Iterable[str],
@@ -584,23 +658,24 @@ def collect_targets(
 
     add_target(Target("global", global_instructions_path(home), "global"))
     for spec in DEFAULT_ADAPTERS:
-        path = spec.path_for(home, codex_home)
-        parent_exists = path.parent.exists()
-        if include_all_default_adapters or parent_exists:
-            add_target(Target(spec.name, path, "adapter", spec.import_style))
-        else:
-            add_target(
-                Target(
-                    spec.name,
-                    path,
-                    "adapter",
-                    spec.import_style,
-                    skipped_reason=f"default {spec.name} adapter skipped because {path.parent} does not exist",
+        managed_paths = managed_paths_for_spec(spec, home, codex_home, gemini_cli_home)
+        for path in managed_paths:
+            parent_exists = path.parent.exists()
+            if include_all_default_adapters or parent_exists:
+                add_target(Target(spec.name, path, "adapter", spec.import_style))
+            else:
+                add_target(
+                    Target(
+                        spec.name,
+                        path,
+                        "adapter",
+                        spec.import_style,
+                        skipped_reason=f"default {spec.name} adapter skipped because {path.parent} does not exist",
+                    )
                 )
-            )
         if mode in {"check", "remove"} and spec.override_parts:
-            for sibling in spec.all_paths_for(home, codex_home):
-                if sibling == path:
+            for sibling in spec.all_paths_for(home, codex_home, gemini_cli_home):
+                if sibling in managed_paths:
                     continue
                 sibling_error = validate_target_path(sibling, allow_missing=True)
                 if sibling_error:
@@ -631,6 +706,22 @@ def collect_targets(
         path = resolve_user_path(raw, home)
         add_target(Target(f"adapter:{raw}", path, "adapter"))
     return targets
+
+
+def managed_paths_for_spec(
+    spec: AdapterSpec,
+    home: Path,
+    codex_home: Path | None,
+    gemini_cli_home: Path | None,
+) -> tuple[Path, ...]:
+    active_path = spec.path_for(home, codex_home, gemini_cli_home)
+    paths: list[Path] = [active_path]
+    if spec.name == "codex" and spec.override_parts:
+        all_paths = spec.all_paths_for(home, codex_home, gemini_cli_home)
+        base_path = all_paths[0]
+        if active_path != base_path:
+            paths.insert(0, base_path)
+    return tuple(dict.fromkeys(paths))
 
 
 def should_check_sibling_target(path: Path, mode: str) -> bool:
@@ -890,7 +981,7 @@ def upsert_block(text: str, block: str, start_marker: str, end_marker: str) -> s
     block = convert_newlines(ensure_trailing_newline(block), newline)
     found = find_block(text, start_marker, end_marker)
     if found is None:
-        separator = newline if not text else newline + newline
+        separator = "" if not text else newline
         return block + separator + text
     return text[: found[0]] + block.rstrip("\r\n") + text[found[1] :]
 
@@ -988,6 +1079,18 @@ def run_args_with_codex_home(args: list[str], home: Path, codex_home: Path | Non
     return code, output.getvalue()
 
 
+def run_args_with_adapter_homes(
+    args: list[str],
+    home: Path,
+    codex_home: Path | None = None,
+    gemini_cli_home: Path | None = None,
+) -> tuple[int, str]:
+    parsed = parser().parse_args(args)
+    output = io.StringIO()
+    code = run(parsed, home=home, out=output, codex_home=codex_home, gemini_cli_home=gemini_cli_home)
+    return code, output.getvalue()
+
+
 def make_fake_agentos(root: Path, name: str = "AgentOS") -> Path:
     agentos = root / name
     (agentos / "os" / "playbook").mkdir(parents=True)
@@ -1014,6 +1117,7 @@ def run_self_tests() -> int:
         test_remove_preserves_unmanaged_content,
         test_remove_does_not_require_live_agentos_home,
         test_codex_override_file_is_effective_adapter_target,
+        test_gemini_cli_home_targets_profile_root,
         test_all_default_adapters_and_explicit_adapter,
         test_explicit_default_adapter_overrides_skipped_default,
         test_crlf_paths_with_spaces_and_duplicate_blocks,
@@ -1122,7 +1226,11 @@ def test_remove_preserves_unmanaged_content() -> None:
         home.mkdir()
         (home / ".codex").mkdir()
         codex = home / ".codex" / "AGENTS.md"
-        codex.write_text("Keep me.\n", encoding="utf-8")
+        codex_original = "Keep me.\n"
+        codex.write_text(codex_original, encoding="utf-8")
+        global_original = "Global keep.\n"
+        global_instructions_path(home).parent.mkdir()
+        global_instructions_path(home).write_text(global_original, encoding="utf-8")
         agentos = make_fake_agentos(root)
         code, output = run_args(["--agentos-home", str(agentos), "--no-dry-run"], home)
         assert_true(code == 0, output)
@@ -1131,9 +1239,10 @@ def test_remove_preserves_unmanaged_content() -> None:
         assert_true(codex.exists(), "remove deleted adapter file")
         text = read_text_preserve_newlines(codex)
         assert_true(ADAPTER_START not in text, "remove left adapter block")
-        assert_true("Keep me." in text, "remove lost unmanaged content")
+        assert_true(text == codex_original, "remove did not restore unmanaged adapter content exactly")
         global_text = read_text_preserve_newlines(global_instructions_path(home))
         assert_true(GLOBAL_START not in global_text, "remove left global block")
+        assert_true(global_text == global_original, "remove did not restore unmanaged global content exactly")
         assert_true(global_instructions_path(home).exists(), "remove deleted global file")
 
 
@@ -1162,10 +1271,12 @@ def test_codex_override_file_is_effective_adapter_target() -> None:
         agentos = make_fake_agentos(root)
         code, output = run_args(["--agentos-home", str(agentos), "--no-dry-run"], home)
         assert_true(code == 0, output)
+        base = home / ".codex" / "AGENTS.md"
         override_text = read_text_preserve_newlines(override)
+        base_text = read_text_preserve_newlines(base)
         assert_true(override_text.startswith(ADAPTER_START), "Codex override adapter block was not prepended")
+        assert_true(base_text.startswith(ADAPTER_START), "durable Codex base adapter block was not created")
         assert_true("Existing override guidance." in override_text, "Codex override content was lost")
-        assert_true(not (home / ".codex" / "AGENTS.md").exists(), "Codex AGENTS.md should not be created when override is effective")
         code, output = run_args(["--agentos-home", str(agentos), "--check"], home)
         assert_true(code == 0, output)
 
@@ -1182,8 +1293,10 @@ def test_codex_override_file_is_effective_adapter_target() -> None:
         code, output = run_args(["--agentos-home", str(agentos_two), "--no-dry-run"], fallback_home)
         assert_true(code == 0, output)
         code, output = run_args(["--agentos-home", str(agentos_two), "--check"], fallback_home)
-        assert_true(code == 1, "inactive Codex sibling should fail check")
-        assert_true("inactive adapter sibling" in output, "inactive sibling check should be explicit")
+        assert_true(code == 0, "Codex override and durable base should both check clean")
+        assert_true(ADAPTER_START in read_text_preserve_newlines(fallback_codex), "durable Codex base was not managed")
+        assert_true(ADAPTER_START in read_text_preserve_newlines(fallback_override), "Codex override was not managed")
+        assert_true(str(agentos_two) in read_text_preserve_newlines(global_instructions_path(fallback_home)), "global path was not updated")
         code, output = run_args(["--agentos-home", str(agentos_one), "--remove", "--no-dry-run"], fallback_home)
         assert_true(code == 0, output)
         assert_true(ADAPTER_START not in read_text_preserve_newlines(fallback_codex), "remove left managed block in Codex fallback")
@@ -1226,6 +1339,30 @@ def test_codex_override_file_is_effective_adapter_target() -> None:
             ["--agentos-home", str(agentos_profile), "--check"],
             profile_home,
             codex_profile.resolve(),
+        )
+        assert_true(code == 0, output)
+
+
+def test_gemini_cli_home_targets_profile_root() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-global-installer-") as tmp:
+        root = Path(tmp)
+        home = root / "home"
+        home.mkdir()
+        gemini_cli_home = root / "gemini-cli-home"
+        (gemini_cli_home / ".gemini").mkdir(parents=True)
+        agentos = make_fake_agentos(root)
+        code, output = run_args_with_adapter_homes(
+            ["--agentos-home", str(agentos), "--no-dry-run"],
+            home,
+            gemini_cli_home=gemini_cli_home.resolve(),
+        )
+        assert_true(code == 0, output)
+        assert_true((gemini_cli_home / ".gemini" / "GEMINI.md").exists(), "GEMINI_CLI_HOME adapter was not created")
+        assert_true(not (home / ".gemini").exists(), "default Gemini home was used despite GEMINI_CLI_HOME")
+        code, output = run_args_with_adapter_homes(
+            ["--agentos-home", str(agentos), "--check"],
+            home,
+            gemini_cli_home=gemini_cli_home.resolve(),
         )
         assert_true(code == 0, output)
 
@@ -1360,6 +1497,43 @@ def test_preflight_prevents_partial_writes() -> None:
             assert_true(code == 1, "later write failure should fail")
             assert_true("rolled back" in output, "write failure should report rollback")
             assert_true(not global_instructions_path(write_fail_home).exists(), "global file remained after rollback")
+
+            incomplete_home = root / "incomplete-rollback-home"
+            incomplete_home.mkdir()
+            (incomplete_home / ".codex").mkdir()
+            incomplete_codex = (incomplete_home / ".codex" / "AGENTS.md").resolve()
+            incomplete_original = b"Existing Codex guidance.\n"
+            incomplete_codex.write_bytes(incomplete_original)
+            blocked_incomplete_dir = incomplete_home / "blocked-adapter"
+            blocked_incomplete_dir.mkdir()
+            os.chmod(blocked_incomplete_dir, 0o500)
+            original_write_bytes_atomic = globals()["write_bytes_atomic"]
+
+            def fail_codex_restore(path: Path, data: bytes, mode: int | None = None) -> None:
+                if path == incomplete_codex and data == incomplete_original:
+                    raise OSError("restore blocked")
+                original_write_bytes_atomic(path, data, mode=mode)
+
+            globals()["write_bytes_atomic"] = fail_codex_restore
+            try:
+                code, output = run_args(
+                    [
+                        "--agentos-home",
+                        str(agentos),
+                        "--adapter",
+                        str((blocked_incomplete_dir / "AGENTS.md").resolve()),
+                        "--no-dry-run",
+                    ],
+                    incomplete_home,
+                )
+            finally:
+                globals()["write_bytes_atomic"] = original_write_bytes_atomic
+                os.chmod(blocked_incomplete_dir, 0o700)
+            assert_true(code == 1, "incomplete rollback should fail")
+            assert_true("rollback-error" in output, "incomplete rollback should report rollback-error entries")
+            assert_true("did not complete" in output, "incomplete rollback summary should not claim success")
+            backups = list((incomplete_home / ".codex").glob("AGENTS.md.agentos-backup-*"))
+            assert_true(backups, "failed rollback should preserve backup artifact")
 
 
 def test_symlink_targets_fail_closed_and_modes_are_preserved() -> None:
