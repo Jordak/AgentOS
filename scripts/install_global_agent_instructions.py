@@ -813,10 +813,28 @@ def explicit_adapter_import_style(
 ) -> str:
     path_abs = absolute_lexical_path(path)
     for spec in DEFAULT_ADAPTERS:
-        for known_path in spec.all_paths_for(home, codex_home, claude_config_dir, gemini_cli_home):
-            if absolute_lexical_path(known_path) == path_abs:
+        for known_path in explicit_adapter_style_paths(
+            spec,
+            home,
+            codex_home,
+            claude_config_dir,
+            gemini_cli_home,
+        ):
+            if target_paths_conflict(known_path, path_abs):
                 return spec.import_style
     return "pointer"
+
+
+def explicit_adapter_style_paths(
+    spec: AdapterSpec,
+    home: Path,
+    codex_home: Path | None,
+    claude_config_dir: Path | None,
+    gemini_cli_home: Path | None,
+) -> tuple[Path, ...]:
+    paths = list(spec.all_paths_for(home, codex_home, claude_config_dir, gemini_cli_home))
+    paths.extend(spec.all_paths_for(home, None, None, None))
+    return tuple(dict.fromkeys(absolute_lexical_path(path) for path in paths))
 
 
 def managed_paths_for_spec(
@@ -1342,6 +1360,7 @@ def run_self_tests() -> int:
         test_remove_does_not_require_live_agentos_home,
         test_inline_adapters_mirror_effective_global_file,
         test_codex_override_file_is_effective_adapter_target,
+        test_explicit_default_profile_adapters_keep_style_with_env_profiles,
         test_claude_config_dir_targets_profile_root,
         test_gemini_cli_home_targets_profile_root,
         test_all_default_adapters_and_explicit_adapter,
@@ -1638,6 +1657,56 @@ def test_codex_override_file_is_effective_adapter_target() -> None:
         assert_true("# Global Agent Instructions" in explicit_base_text, "explicit Codex base did not inline global instructions")
         assert_true(explicit_global_path not in explicit_override_text, "explicit Codex override used pointer adapter text")
         code, output = run_args(["--agentos-home", str(agentos), "--check"], explicit_override_home)
+        assert_true(code == 0, output)
+
+
+def test_explicit_default_profile_adapters_keep_style_with_env_profiles() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-global-installer-") as tmp:
+        root = Path(tmp)
+        home = root / "home"
+        home.mkdir()
+        (home / ".codex").mkdir()
+        (home / ".claude").mkdir()
+        (home / ".gemini").mkdir()
+        agentos = make_fake_agentos(root)
+        default_adapters = [
+            "--adapter",
+            "<home>/.codex/AGENTS.md",
+            "--adapter",
+            "<home>/.codex/AGENTS.override.md",
+            "--adapter",
+            "<home>/.claude/CLAUDE.md",
+            "--adapter",
+            "<home>/.gemini/GEMINI.md",
+        ]
+        code, output = run_args_with_adapter_homes(
+            ["--agentos-home", str(agentos), *default_adapters, "--no-dry-run"],
+            home,
+            codex_home=(root / "inactive-codex-profile").resolve(),
+            claude_config_dir=(root / "inactive-claude-profile").resolve(),
+            gemini_cli_home=(root / "inactive-gemini-profile").resolve(),
+        )
+        assert_true(code == 0, output)
+        codex_base_text = read_text_preserve_newlines(home / ".codex" / "AGENTS.md")
+        codex_override_text = read_text_preserve_newlines(home / ".codex" / "AGENTS.override.md")
+        claude_text = read_text_preserve_newlines(home / ".claude" / "CLAUDE.md")
+        gemini_text = read_text_preserve_newlines(home / ".gemini" / "GEMINI.md")
+        default_global_path = str(global_instructions_path(home.resolve()))
+        assert_true("# Global Agent Instructions" in codex_base_text, "inactive default Codex base did not inline global instructions")
+        assert_true("# Global Agent Instructions" in codex_override_text, "inactive default Codex override did not inline global instructions")
+        assert_true(default_global_path not in codex_base_text, "inactive default Codex base used pointer text")
+        assert_true(default_global_path not in codex_override_text, "inactive default Codex override used pointer text")
+        assert_true(f"@{global_instructions_path(home.resolve())}" in claude_text, "inactive default Claude adapter import style was lost")
+        assert_true("# Global Agent Instructions" in gemini_text, "inactive default Gemini adapter did not inline global instructions")
+        assert_true(default_global_path not in gemini_text, "inactive default Gemini adapter used pointer text")
+
+        code, output = run_args_with_adapter_homes(
+            ["--agentos-home", str(agentos), "--check", *default_adapters],
+            home,
+            codex_home=(root / "inactive-codex-profile").resolve(),
+            claude_config_dir=(root / "inactive-claude-profile").resolve(),
+            gemini_cli_home=(root / "inactive-gemini-profile").resolve(),
+        )
         assert_true(code == 0, output)
 
 
