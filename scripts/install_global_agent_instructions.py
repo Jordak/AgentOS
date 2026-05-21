@@ -861,6 +861,8 @@ def target_paths_conflict(existing: Path, candidate: Path) -> bool:
     candidate_abs = absolute_lexical_path(candidate)
     if existing_abs == candidate_abs:
         return True
+    if casefolded_path_parts(existing_abs) == casefolded_path_parts(candidate_abs):
+        return True
     try:
         if existing_abs.exists() and candidate_abs.exists() and existing_abs.samefile(candidate_abs):
             return True
@@ -876,6 +878,10 @@ def target_paths_conflict(existing: Path, candidate: Path) -> bool:
         return existing_parent.exists() and candidate_parent.exists() and existing_parent.samefile(candidate_parent)
     except OSError:
         return False
+
+
+def casefolded_path_parts(path: Path) -> tuple[str, ...]:
+    return tuple(part.casefold() for part in path.parts)
 
 
 def path_exists_for_planning(path: Path) -> tuple[bool, str | None]:
@@ -2084,6 +2090,18 @@ def test_duplicate_adapter_dedupes_and_conflicting_adapter_fails() -> None:
             [
                 "--agentos-home",
                 str(agentos),
+                "--adapter",
+                "<home>/.Agents/AGENTS.md",
+            ],
+            home,
+        )
+        assert_true(code == 1, "case-only adapter parent conflict with global target should fail")
+        assert_true("conflicts" in output, "case-only parent conflict failure should be explicit")
+
+        code, output = run_args(
+            [
+                "--agentos-home",
+                str(agentos),
                 "--all-default-adapters",
                 "--adapter",
                 "<home>/.codex/agents.md",
@@ -2092,6 +2110,19 @@ def test_duplicate_adapter_dedupes_and_conflicting_adapter_fails() -> None:
         )
         assert_true(code == 1, "case-only adapter conflict with default Codex target should fail")
         assert_true("conflicts" in output, "default adapter case conflict failure should be explicit")
+
+        code, output = run_args(
+            [
+                "--agentos-home",
+                str(agentos),
+                "--all-default-adapters",
+                "--adapter",
+                "<home>/.Codex/AGENTS.md",
+            ],
+            home,
+        )
+        assert_true(code == 1, "case-only adapter parent conflict with default Codex target should fail")
+        assert_true("conflicts" in output, "default adapter parent case conflict failure should be explicit")
 
         if hasattr(os, "link"):
             hardlink_home = root / "hardlink-home"
