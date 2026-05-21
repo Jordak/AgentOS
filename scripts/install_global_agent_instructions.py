@@ -793,8 +793,30 @@ def collect_targets(
                         add_target(Target(f"{spec.name}:sibling", sibling, "adapter", spec.import_style))
     for raw in extra_adapters:
         path = resolve_user_path(raw, home)
-        add_target(Target(f"adapter:{raw}", path, "adapter"))
+        add_target(
+            Target(
+                f"adapter:{raw}",
+                path,
+                "adapter",
+                explicit_adapter_import_style(path, home, codex_home, claude_config_dir, gemini_cli_home),
+            )
+        )
     return targets
+
+
+def explicit_adapter_import_style(
+    path: Path,
+    home: Path,
+    codex_home: Path | None,
+    claude_config_dir: Path | None,
+    gemini_cli_home: Path | None,
+) -> str:
+    path_abs = absolute_lexical_path(path)
+    for spec in DEFAULT_ADAPTERS:
+        for known_path in spec.all_paths_for(home, codex_home, claude_config_dir, gemini_cli_home):
+            if absolute_lexical_path(known_path) == path_abs:
+                return spec.import_style
+    return "pointer"
 
 
 def managed_paths_for_spec(
@@ -1590,6 +1612,32 @@ def test_codex_override_file_is_effective_adapter_target() -> None:
             profile_home,
             codex_profile.resolve(),
         )
+        assert_true(code == 0, output)
+
+        explicit_override_home = root / "explicit-override-home"
+        explicit_override_home.mkdir()
+        (explicit_override_home / ".codex").mkdir()
+        explicit_override = explicit_override_home / ".codex" / "AGENTS.override.md"
+        explicit_override.write_text("", encoding="utf-8")
+        code, output = run_args(
+            [
+                "--agentos-home",
+                str(agentos),
+                "--adapter",
+                "<home>/.codex/AGENTS.override.md",
+                "--no-dry-run",
+            ],
+            explicit_override_home,
+        )
+        assert_true(code == 0, output)
+        explicit_base = explicit_override_home / ".codex" / "AGENTS.md"
+        explicit_override_text = read_text_preserve_newlines(explicit_override)
+        explicit_base_text = read_text_preserve_newlines(explicit_base)
+        explicit_global_path = str(global_instructions_path(explicit_override_home.resolve()))
+        assert_true("# Global Agent Instructions" in explicit_override_text, "explicit Codex override did not inline global instructions")
+        assert_true("# Global Agent Instructions" in explicit_base_text, "explicit Codex base did not inline global instructions")
+        assert_true(explicit_global_path not in explicit_override_text, "explicit Codex override used pointer adapter text")
+        code, output = run_args(["--agentos-home", str(agentos), "--check"], explicit_override_home)
         assert_true(code == 0, output)
 
 
