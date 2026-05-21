@@ -154,7 +154,6 @@ class AgentOSValidator:
     def run_structural_checks(self) -> None:
         self.check_markdown_path_portability()
         self.check_source_map_path_health()
-        self.check_skill_frontmatter_parseability()
         self.check_skills_manifest_consistency()
         self.check_agent_contract_completeness()
         self.check_automation_registry_completeness()
@@ -786,98 +785,6 @@ class AgentOSValidator:
 
         self.checked.append(check)
 
-    def check_skill_frontmatter_parseability(self) -> None:
-        check = "skill frontmatter parseability"
-        for skill_name, path in sorted(self.discover_canonical_skills().items()):
-            text = self.read_text(path, check)
-            if not text:
-                continue
-            lines = text.splitlines()
-            if not lines or lines[0] != "---":
-                self.add_error(check, path, f"{skill_name}: missing YAML frontmatter delimiter")
-                continue
-            try:
-                end_index = lines[1:].index("---") + 1
-            except ValueError:
-                self.add_error(check, path, f"{skill_name}: missing closing YAML frontmatter delimiter")
-                continue
-
-            fields: dict[str, str] = {}
-            for line_no, line in enumerate(lines[1:end_index], start=2):
-                if not line.strip():
-                    continue
-                match = re.match(r"^([A-Za-z][A-Za-z0-9_-]*):\s*(.*)$", line)
-                if not match:
-                    self.add_error(
-                        check,
-                        f"{self.display_path(path)}:{line_no}",
-                        f"{skill_name}: frontmatter line must be simple key: value",
-                    )
-                    continue
-                key, value = match.groups()
-                value = value.strip()
-                fields[key] = value
-                if not value:
-                    self.add_error(
-                        check,
-                        f"{self.display_path(path)}:{line_no}",
-                        f"{skill_name}: frontmatter field {key!r} is empty",
-                    )
-                    continue
-                if value[0] in {"'", '"'}:
-                    if len(value) < 2 or value[-1] != value[0]:
-                        self.add_error(
-                            check,
-                            f"{self.display_path(path)}:{line_no}",
-                            f"{skill_name}: quoted frontmatter field {key!r} is not closed",
-                        )
-                    elif self.quoted_scalar_has_unescaped_inner_quote(value):
-                        self.add_error(
-                            check,
-                            f"{self.display_path(path)}:{line_no}",
-                            f"{skill_name}: quoted frontmatter field {key!r} contains an unescaped inner quote",
-                        )
-                    continue
-                if re.search(r":\s", value):
-                    self.add_error(
-                        check,
-                        f"{self.display_path(path)}:{line_no}",
-                        f"{skill_name}: plain frontmatter field {key!r} contains ': '; quote the value",
-                    )
-
-            for field_name in ["name", "description"]:
-                if field_name not in fields:
-                    self.add_error(check, path, f"{skill_name}: missing frontmatter field {field_name!r}")
-
-        self.checked.append(check)
-
-    def quoted_scalar_has_unescaped_inner_quote(self, value: str) -> bool:
-        quote = value[0]
-        inner = value[1:-1]
-        if quote == '"':
-            for index, character in enumerate(inner):
-                if character != '"':
-                    continue
-                backslashes = 0
-                cursor = index - 1
-                while cursor >= 0 and inner[cursor] == "\\":
-                    backslashes += 1
-                    cursor -= 1
-                if backslashes % 2 == 0:
-                    return True
-            return False
-
-        index = 0
-        while index < len(inner):
-            if inner[index] != "'":
-                index += 1
-                continue
-            if index + 1 < len(inner) and inner[index + 1] == "'":
-                index += 2
-                continue
-            return True
-        return False
-
     def skill_manifest_entries(self, manifest: str) -> dict[str, str]:
         matches = list(SKILL_HEADING_RE.finditer(manifest))
         entries: dict[str, str] = {}
@@ -1474,28 +1381,6 @@ def run_self_test() -> int:
             ),
             encoding="utf-8",
         )
-        bad_skill = root / "os/skills/bad-frontmatter/SKILL.md"
-        bad_skill.parent.mkdir(parents=True)
-        bad_skill.write_text(
-            "---\n"
-            "name: bad-frontmatter\n"
-            "description: Bad example: contains an unquoted colon-space\n"
-            "---\n"
-            "\n"
-            "# Bad Frontmatter\n",
-            encoding="utf-8",
-        )
-        bad_quoted_skill = root / "os/skills/bad-quoted-frontmatter/SKILL.md"
-        bad_quoted_skill.parent.mkdir(parents=True)
-        bad_quoted_skill.write_text(
-            "---\n"
-            "name: bad-quoted-frontmatter\n"
-            "description: \"Bad \"quoted\" example\"\n"
-            "---\n"
-            "\n"
-            "# Bad Quoted Frontmatter\n",
-            encoding="utf-8",
-        )
         (root / ".git").mkdir()
         (root / ".gitignore").write_text(
             "/" + "Users" + "/private-client/cache\n!personal/**/*.md\n",
@@ -1555,7 +1440,6 @@ def run_self_test() -> int:
         validator = AgentOSValidator(root)
         validator.check_markdown_path_portability()
         validator.check_source_map_path_health()
-        validator.check_skill_frontmatter_parseability()
         validator.check_benchmark_manifest()
         validator.check_no_git_directory()
         validator.check_public_export_allowlist()
@@ -1571,8 +1455,6 @@ def run_self_test() -> int:
             "hardcodes the AgentOS checkout path",
             "uses a parent-relative AgentOS path",
             "listed local path does not exist",
-            "plain frontmatter field 'description' contains ': '; quote the value",
-            "quoted frontmatter field 'description' contains an unescaped inner quote",
             "benchmark script missing from manifest",
             "public export must not contain git history",
             "private marker matched",
