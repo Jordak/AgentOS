@@ -34,6 +34,7 @@ Use this verification when:
 - `scripts/benchmark_retrieval.py`: single public CLI for local and harness retrieval benchmark suites.
 - `scripts/harness_eval.py`: implementation module for Codex/Claude-style harness answers and local evidence grading.
 - `personal/os/verification/retrieval/reports/`: optional saved report directories. Each saved run contains `report.md` for human review and `run.json` for diagnosis or downstream tooling.
+- `os/verification/BENCHMARK_HISTORY.md`: curated Core history for public-safe retrieval benchmark outcomes. The local index and harness grader exclude this file so previous summaries cannot contaminate answer-key discovery.
 
 ## Eval Layers
 
