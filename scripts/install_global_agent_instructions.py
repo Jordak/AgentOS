@@ -137,7 +137,7 @@ class RollbackError:
 DEFAULT_ADAPTERS = (
     AdapterSpec("codex", (".codex", "AGENTS.md"), "inline_global", (".codex", "AGENTS.override.md")),
     AdapterSpec("claude", (".claude", "CLAUDE.md"), "markdown_import"),
-    AdapterSpec("gemini", (".gemini", "GEMINI.md"), "inline_global"),
+    AdapterSpec("gemini", (".gemini", "GEMINI.md"), "inline_global_gemini"),
 )
 
 
@@ -1024,6 +1024,8 @@ def expected_block(target: Target, home: Path, agentos_home: Path) -> str:
         return global_block(agentos_home)
     if target.import_style == "inline_global":
         return inline_global_adapter_block(home, agentos_home)
+    if target.import_style == "inline_global_gemini":
+        return inline_global_adapter_block(home, agentos_home, reject_gemini_imports=True)
     return adapter_block(global_instructions_path(home), target.import_style)
 
 
@@ -1069,7 +1071,7 @@ def effective_global_instructions(home: Path, agentos_home: Path) -> str:
     return upsert_block(existing, block, GLOBAL_START, GLOBAL_END)
 
 
-def inline_global_adapter_block(home: Path, agentos_home: Path) -> str:
+def inline_global_adapter_block(home: Path, agentos_home: Path, reject_gemini_imports: bool = False) -> str:
     canonical = effective_global_instructions(home, agentos_home).rstrip()
     for marker in (ADAPTER_START, ADAPTER_END):
         if marker in canonical:
@@ -1077,10 +1079,85 @@ def inline_global_adapter_block(home: Path, agentos_home: Path) -> str:
                 "canonical global instructions contain an adapter managed block marker; "
                 "remove or rephrase that marker before mirroring into inline adapters"
             )
+    if reject_gemini_imports:
+        gemini_import = find_gemini_import_like_reference(canonical)
+        if gemini_import is not None:
+            line_number, reference = gemini_import
+            raise ManagedBlockError(
+                "canonical global instructions contain Gemini-style import syntax outside code "
+                f"at line {line_number}: {reference}; Gemini would resolve mirrored imports from "
+                "the adapter file location, so remove or inline that import before managing the Gemini adapter"
+            )
     return f"""{ADAPTER_START}
 {canonical}
 {ADAPTER_END}
 """
+
+
+GEMINI_IMPORT_LIKE_RE = re.compile(
+    r"(?<![\w.-])@(?P<path>(?:\.{1,2}[\\/]|[\\/]|\x7e[\\/]|[A-Za-z0-9_.-]+[\\/]|[A-Za-z0-9_.-]+\.md(?:[^\s`]*)?)[^\s`]*)"
+)
+
+
+def find_gemini_import_like_reference(text: str) -> tuple[int, str] | None:
+    in_fence = False
+    fence_char = ""
+    fence_length = 0
+    for line_number, line in enumerate(text.splitlines(), start=1):
+        fence = markdown_fence_marker(line)
+        if fence is not None:
+            char, length = fence
+            if not in_fence:
+                in_fence = True
+                fence_char = char
+                fence_length = length
+            elif char == fence_char and length >= fence_length:
+                in_fence = False
+            continue
+        if in_fence or line.startswith("    ") or line.startswith("\t"):
+            continue
+        active_text = strip_inline_code_spans(line)
+        match = GEMINI_IMPORT_LIKE_RE.search(active_text)
+        if match:
+            return line_number, "@" + match.group("path")
+    return None
+
+
+def markdown_fence_marker(line: str) -> tuple[str, int] | None:
+    stripped = line.lstrip()
+    if not stripped:
+        return None
+    char = stripped[0]
+    if char not in {"`", "~"}:
+        return None
+    length = 0
+    for current in stripped:
+        if current != char:
+            break
+        length += 1
+    if length < 3:
+        return None
+    return char, length
+
+
+def strip_inline_code_spans(line: str) -> str:
+    result: list[str] = []
+    index = 0
+    while index < len(line):
+        if line[index] != "`":
+            result.append(line[index])
+            index += 1
+            continue
+        tick_count = 1
+        while index + tick_count < len(line) and line[index + tick_count] == "`":
+            tick_count += 1
+        closing = line.find("`" * tick_count, index + tick_count)
+        if closing == -1:
+            result.append(line[index])
+            index += 1
+            continue
+        index = closing + tick_count
+    return "".join(result)
 
 
 def adapter_block(global_path: Path, import_style: str = "pointer") -> str:
@@ -1444,6 +1521,7 @@ def run_self_tests() -> int:
         test_remove_preserves_unmanaged_content,
         test_remove_does_not_require_live_agentos_home,
         test_inline_adapters_mirror_effective_global_file,
+        test_gemini_inline_adapter_rejects_active_canonical_imports,
         test_codex_override_file_is_effective_adapter_target,
         test_explicit_default_profile_adapters_keep_style_with_env_profiles,
         test_explicit_default_codex_siblings_follow_inactive_profile_targets,
@@ -1633,6 +1711,51 @@ def test_inline_adapters_mirror_effective_global_file() -> None:
             "marker failure modified the canonical global file",
         )
         assert_true(not (marker_home / ".codex" / "AGENTS.md").exists(), "marker failure created a Codex adapter")
+
+
+def test_gemini_inline_adapter_rejects_active_canonical_imports() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-global-installer-") as tmp:
+        root = Path(tmp)
+        home = root / "home"
+        home.mkdir()
+        (home / ".gemini").mkdir()
+        global_file = global_instructions_path(home)
+        global_file.parent.mkdir()
+        global_original = "Existing global guidance.\n@./shared.md\n"
+        global_file.write_text(global_original, encoding="utf-8")
+        agentos = make_fake_agentos(root)
+        code, output = run_args(["--agentos-home", str(agentos), "--no-dry-run"], home)
+        assert_true(code == 1, "Gemini adapter should reject canonical imports that would be re-rooted")
+        assert_true("Gemini-style import syntax" in output, "Gemini import failure should explain the blocked syntax")
+        assert_true(read_text_preserve_newlines(global_file) == global_original, "Gemini import failure modified canonical global file")
+        assert_true(not (home / ".gemini" / "GEMINI.md").exists(), "Gemini import failure created adapter")
+
+        code_safe_home = root / "code-safe-home"
+        code_safe_home.mkdir()
+        (code_safe_home / ".gemini").mkdir()
+        code_safe_global = global_instructions_path(code_safe_home)
+        code_safe_global.parent.mkdir()
+        code_safe_global.write_text(
+            "Inline code `@./shared.md` is only documentation.\n"
+            "```\n"
+            "@../fenced.md\n"
+            "```\n"
+            "    @./indented.md\n",
+            encoding="utf-8",
+        )
+        code, output = run_args(["--agentos-home", str(agentos), "--no-dry-run"], code_safe_home)
+        assert_true(code == 0, output)
+        assert_true((code_safe_home / ".gemini" / "GEMINI.md").exists(), "Gemini adapter rejected code-only import examples")
+
+        codex_home = root / "codex-home"
+        codex_home.mkdir()
+        (codex_home / ".codex").mkdir()
+        codex_global = global_instructions_path(codex_home)
+        codex_global.parent.mkdir()
+        codex_global.write_text("Existing global guidance.\n@./shared.md\n", encoding="utf-8")
+        code, output = run_args(["--agentos-home", str(agentos), "--no-dry-run"], codex_home)
+        assert_true(code == 0, output)
+        assert_true("@./shared.md" in read_text_preserve_newlines(codex_home / ".codex" / "AGENTS.md"), "Codex mirror should not use Gemini import guard")
 
 
 def test_codex_override_file_is_effective_adapter_target() -> None:
