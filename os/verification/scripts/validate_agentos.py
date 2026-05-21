@@ -186,6 +186,7 @@ class AgentOSValidator:
         self.check_private_overlay_files_are_ignored()
         self.check_personal_overlay_ignore_rules()
         self.check_personal_overlay_tracking(allow_private_files=True)
+        self.check_benchmark_history()
         self.check_core_private_markers()
         self.check_secret_like_tokens()
         self.checked.append("publication precheck")
@@ -196,6 +197,7 @@ class AgentOSValidator:
         self.check_public_export_allowlist()
         self.check_personal_overlay_ignore_file_rules()
         self.check_personal_overlay_tracking(allow_private_files=False)
+        self.check_benchmark_history()
         self.check_core_private_markers()
         self.check_secret_like_tokens()
         self.check_no_private_generated_outputs()
@@ -1191,13 +1193,16 @@ class AgentOSValidator:
 
     def check_benchmark_history(self) -> None:
         check = "benchmark history hygiene"
+        if check in self.checked:
+            return
         history_path = self.root / BENCHMARK_HISTORY_PATH
         text = self.read_text(history_path, check)
         if not text:
             return
 
         for line_no, line in enumerate(text.splitlines(), start=1):
-            if "personal/" in line:
+            normalized_line = line.lower().replace("\\", "/")
+            if "personal/" in normalized_line:
                 self.add_error(
                     check,
                     f"{self.display_path(history_path)}:{line_no}",
@@ -1496,6 +1501,7 @@ def run_self_test() -> int:
         private_linux_home_path = "/" + "home" + "/example-user/PrivateProject/file.md"
         private_tmp_path = "/" + "tmp" + "/agentos-private/run.json"
         private_macos_tmp_path = "/" + "private" + "/" + "var" + "/folders/aa/private-cache/run.json"
+        backslash = chr(92)
         drive_link = "https://drive.google.com/" + "file/d/private-id/view"
         calendar_id = "othercalendar" + "@group.calendar.google.com"
         source_map.write_text(
@@ -1549,6 +1555,17 @@ def run_self_test() -> int:
             "\n"
             "`raw_response`: fixture payload copied from a saved report.\n"
             "Stored under personal/os/verification/retrieval/reports/example.\n"
+            "Stored under Personal"
+            + backslash
+            + "os"
+            + backslash
+            + "verification"
+            + backslash
+            + "retrieval"
+            + backslash
+            + "reports"
+            + backslash
+            + "example.\n"
             "User: copied transcript line\n"
             "\n"
             "```json\n"
@@ -1565,7 +1582,6 @@ def run_self_test() -> int:
         private_csv.parent.mkdir()
         private_csv.write_text("/" + "Users" + "/private-csv/cache\n", encoding="utf-8")
         local_path_variants = root / "docs/local-path-variants.md"
-        backslash = chr(92)
         local_path_variants.write_text(
             "\n".join(
                 [
@@ -1775,14 +1791,28 @@ def run_self_test() -> int:
             and "required Personal Overlay skeleton .gitkeep is missing" in error.message
             for error in validator.errors
         )
+        benchmark_history_case_separator_rejected = any(
+            error.path == "os/verification/BENCHMARK_HISTORY.md:11"
+            and "benchmark history must not include Personal Overlay paths" in error.message
+            for error in validator.errors
+        )
 
         symlink_root = root / "_publication_symlink_fixture"
         (symlink_root / "os/context").mkdir(parents=True)
         (symlink_root / "os/agents/current-awareness-agent").mkdir(parents=True)
+        (symlink_root / BENCHMARK_HISTORY_PATH.parent).mkdir(parents=True, exist_ok=True)
         (symlink_root / "os/reports").mkdir()
         (symlink_root / "personal").mkdir()
         (symlink_root / ".gitignore").write_text("personal/**\n", encoding="utf-8")
         (symlink_root / "os/INDEX.md").write_text("safe\n", encoding="utf-8")
+        (symlink_root / BENCHMARK_HISTORY_PATH).write_text(
+            "# AgentOS Benchmark History\n\n"
+            "## Entries\n\n"
+            "| Date | Commit/PR | Suite | Result Summary | Interpretation | Caveats |\n"
+            "| --- | --- | --- | --- | --- | --- |\n"
+            "| 2026-05-17 | PR #1 | retrieval | Passed 8/8 | Looks stable. | dry-run only |\n",
+            encoding="utf-8",
+        )
         (symlink_root / "os/context/CAREER.md").write_text("private-looking filename with sanitized content\n", encoding="utf-8")
         (symlink_root / "os/agents/current-awareness-agent/JOB.md").write_text(
             "live agent fixture with sanitized content\n",
@@ -1862,6 +1892,28 @@ def run_self_test() -> int:
             error.path == "os/reports/private.md" and "generated output" in error.message
             for error in default_validator.errors
         )
+        publication_precheck_validator = AgentOSValidator(root)
+        publication_precheck_validator.run_publication_precheck_checks()
+        publication_precheck_catches_benchmark_history = any(
+            error.path.startswith("os/verification/BENCHMARK_HISTORY.md:")
+            and "benchmark history" in error.message
+            for error in publication_precheck_validator.errors
+        )
+        public_export_validator = AgentOSValidator(root)
+        public_export_validator.root = root
+        public_export_validator.check_no_git_directory()
+        public_export_validator.check_public_export_allowlist()
+        public_export_validator.check_personal_overlay_ignore_file_rules()
+        public_export_validator.check_personal_overlay_tracking(allow_private_files=False)
+        public_export_validator.check_benchmark_history()
+        public_export_validator.check_core_private_markers()
+        public_export_validator.check_secret_like_tokens()
+        public_export_validator.check_no_private_generated_outputs()
+        public_export_catches_benchmark_history = any(
+            error.path.startswith("os/verification/BENCHMARK_HISTORY.md:")
+            and "benchmark history" in error.message
+            for error in public_export_validator.errors
+        )
 
         matched = (
             all(
@@ -1880,6 +1932,7 @@ def run_self_test() -> int:
             and configured_marker_redacted
             and built_in_marker_redacted
             and missing_skeleton_rejected
+            and benchmark_history_case_separator_rejected
             and symlink_rejected_cleanly
             and live_core_file_rejected
             and live_agent_path_rejected
@@ -1888,6 +1941,8 @@ def run_self_test() -> int:
             and core_gitkeep_rejected
             and core_report_gitkeep_rejected
             and default_catches_publication_precheck
+            and publication_precheck_catches_benchmark_history
+            and public_export_catches_benchmark_history
         )
         if matched:
             print("SELF-TEST PASS: structural and publication/privacy fixtures were caught.")
