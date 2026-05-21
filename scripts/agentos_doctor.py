@@ -491,11 +491,11 @@ def check_skill_mirrors(
         )
 
     hard_statuses = {"source-missing", "source-unreadable", "mirror-unreadable", "unknown"}
+    audit_command = mirror_command(agentos_home, mirror_root)
     if any(status in hard_statuses for status in statuses):
         recommendations = [
             "Fix the reported source, readability, or audit-shape errors before syncing mirrors.",
-            "Inspect the audit: python3 os/skills/mirror-skills/scripts/mirror_skills.py "
-            f"--agentos-root {agentos_home} --mirror-root {mirror_root}",
+            "Inspect the audit: " + shell_command(audit_command, agentos_home),
         ]
         return CheckResult(
             "skill mirrors",
@@ -506,14 +506,13 @@ def check_skill_mirrors(
         )
 
     recommendations = [
-        "Inspect the audit: python3 os/skills/mirror-skills/scripts/mirror_skills.py "
-        f"--agentos-root {agentos_home} --mirror-root {mirror_root}",
+        "Inspect the audit: " + shell_command(audit_command, agentos_home),
     ]
     if statuses.get("missing") or statuses.get("stale"):
+        sync_command = [*audit_command, "--sync"]
         recommendations.append(
-            "After approving current-machine mirror writes: python3 "
-            "os/skills/mirror-skills/scripts/mirror_skills.py "
-            f"--agentos-root {agentos_home} --mirror-root {mirror_root} --sync"
+            "After approving current-machine mirror writes: "
+            + shell_command(sync_command, agentos_home)
         )
     if statuses.get("extra-files"):
         recommendations.append(
@@ -625,17 +624,33 @@ def starter_personal_paths(getting_started: Path) -> tuple[list[str], str | None
     return paths, None
 
 
+def mirror_command(agentos_home: Path, mirror_root: Path) -> list[str]:
+    return [
+        sys.executable,
+        str(agentos_home / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py"),
+        "--agentos-root",
+        str(agentos_home),
+        "--mirror-root",
+        str(mirror_root),
+    ]
+
+
 def check_automations(agentos_home: Path, process_home: Path, verbose: bool) -> CheckResult:
     core_registry = agentos_home / "os" / "automations" / "AUTOMATIONS.md"
     personal_automations = agentos_home / "personal" / "os" / "automations"
     personal_registry = personal_automations / "AUTOMATIONS.md"
     codex_automations = process_home / ".codex" / "automations"
+    personal_file_count = count_non_gitkeep_files(personal_automations)
+    codex_file_count = count_non_gitkeep_files(codex_automations)
+    registry_mentions_checks = personal_registry_mentions_agentos_checks(personal_registry)
+    recurring_check_evidence = registry_mentions_checks or codex_file_count > 0
 
     details = [
         "Core automation registry: " + ("present" if core_registry.is_file() else "missing"),
         "Personal automation registry: " + ("present" if personal_registry.is_file() else "missing"),
-        f"Personal automation files: {count_non_gitkeep_files(personal_automations)}",
+        f"Personal automation files: {personal_file_count}",
         "Codex automation mirror dir: " + presence_with_count(codex_automations),
+        "Recurring AgentOS check evidence: " + ("found" if recurring_check_evidence else "not found"),
     ]
     if verbose:
         details.extend(
@@ -653,7 +668,7 @@ def check_automations(agentos_home: Path, process_home: Path, verbose: bool) -> 
             "Core automation registry is missing.",
             details=details,
         )
-    if personal_automations.exists() and count_non_gitkeep_files(personal_automations) and not personal_registry.is_file():
+    if personal_automations.exists() and personal_file_count and not personal_registry.is_file():
         return CheckResult(
             "automations",
             "WARN",
@@ -663,13 +678,34 @@ def check_automations(agentos_home: Path, process_home: Path, verbose: bool) -> 
                 "If those files are live automations, record the registry in personal/os/automations/AUTOMATIONS.md."
             ],
         )
+    if not recurring_check_evidence:
+        return CheckResult(
+            "automations",
+            "WARN",
+            "No recurring AgentOS update or drift-check automation evidence was found.",
+            details=details,
+            recommendations=[
+                "Live automations are optional; if desired, use os/playbook/GETTING_STARTED.md to choose a cadence before creating one."
+            ],
+        )
 
     return CheckResult(
         "automations",
         "PASS",
-        "Automation policy is present; live automation setup is optional.",
+        "Automation policy is present and recurring check evidence was found.",
         details=details,
     )
+
+
+def personal_registry_mentions_agentos_checks(path: Path) -> bool:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return False
+    except OSError:
+        return False
+    lowered = text.lower()
+    return "agentos" in lowered and any(term in lowered for term in ("drift", "update", "repository"))
 
 
 def count_non_gitkeep_files(root: Path) -> int:
@@ -877,6 +913,10 @@ def run_self_tests() -> int:
         test_mirror_smoke_uses_temp_dirs,
         test_mirror_command_failure_is_not_sync_advice,
         test_mirror_source_failure_is_not_sync_advice,
+        test_mirror_recommendations_quote_paths,
+        test_automation_no_evidence_warns,
+        test_automation_registry_evidence_passes,
+        test_automation_files_without_registry_warns,
     ]
     for test in tests:
         try:
@@ -1105,6 +1145,53 @@ def test_mirror_source_failure_is_not_sync_advice() -> None:
         assert_true(result.status == "FAIL", "missing canonical source should fail")
         assert_true("source-missing=1" in joined, "source-missing status should be reported")
         assert_true("--sync" not in joined, "source failure should not recommend mirror sync")
+
+
+def test_mirror_recommendations_quote_paths() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS With Spaces"
+        mirror_root = Path(tmp) / "mirrors with spaces"
+        make_fake_agentos(root)
+        result = check_skill_mirrors(root, mirror_root, minimal_env(Path(tmp) / "home"), verbose=False)
+        joined = "\n".join(result.recommendations)
+        assert_true(result.status == "WARN", "missing mirrors should warn")
+        assert_true("mirrors with spaces'" in joined, "mirror path should be shell quoted")
+        assert_true("AgentOS With Spaces'" in joined, "AgentOS path should be shell quoted")
+
+
+def test_automation_no_evidence_warns() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        make_fake_agentos(root)
+        result = check_automations(root, Path(tmp) / "home", verbose=False)
+        joined = "\n".join(result.details)
+        assert_true(result.status == "WARN", "missing recurring check evidence should warn")
+        assert_true("Recurring AgentOS check evidence: not found" in joined, "missing evidence should be explicit")
+
+
+def test_automation_registry_evidence_passes() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        make_fake_agentos(root)
+        registry = root / "personal" / "os" / "automations" / "AUTOMATIONS.md"
+        registry.write_text("AgentOS repository update and adapter drift check automation.\n", encoding="utf-8")
+        result = check_automations(root, Path(tmp) / "home", verbose=False)
+        joined = "\n".join(result.details)
+        assert_true(result.status == "PASS", "registry evidence should pass")
+        assert_true("Recurring AgentOS check evidence: found" in joined, "found evidence should be explicit")
+
+
+def test_automation_files_without_registry_warns() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        make_fake_agentos(root)
+        (root / "personal" / "os" / "automations" / "drift-check.md").write_text(
+            "AgentOS drift check draft.\n",
+            encoding="utf-8",
+        )
+        result = check_automations(root, Path(tmp) / "home", verbose=False)
+        assert_true(result.status == "WARN", "automation files without registry should warn")
+        assert_true("registry" in result.summary, "warning should mention missing registry")
 
 
 def render_report_for_test(report: DoctorReport, verbose: bool) -> str:
