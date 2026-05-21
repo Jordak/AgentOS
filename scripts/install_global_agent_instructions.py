@@ -135,7 +135,7 @@ class RollbackError:
 
 
 DEFAULT_ADAPTERS = (
-    AdapterSpec("codex", (".codex", "AGENTS.md"), "pointer", (".codex", "AGENTS.override.md")),
+    AdapterSpec("codex", (".codex", "AGENTS.md"), "inline_global", (".codex", "AGENTS.override.md")),
     AdapterSpec("claude", (".claude", "CLAUDE.md"), "markdown_import"),
     AdapterSpec("gemini", (".gemini", "GEMINI.md"), "inline_global"),
 )
@@ -699,6 +699,18 @@ def collect_targets(
         key = absolute_lexical_path(target.path)
         existing_index = seen.get(key)
         if existing_index is None:
+            for existing in targets:
+                if target_paths_conflict(existing.path, target.path):
+                    targets.append(
+                        Target(
+                            target.name,
+                            target.path,
+                            target.kind,
+                            target.import_style,
+                            error_reason=f"target conflicts with {existing.kind} target {existing.path}",
+                        )
+                    )
+                    return
             seen[key] = len(targets)
             targets.append(target)
             return
@@ -844,6 +856,28 @@ def absolute_lexical_path(path: Path) -> Path:
     return Path(os.path.abspath(os.fspath(path)))
 
 
+def target_paths_conflict(existing: Path, candidate: Path) -> bool:
+    existing_abs = absolute_lexical_path(existing)
+    candidate_abs = absolute_lexical_path(candidate)
+    if existing_abs == candidate_abs:
+        return True
+    try:
+        if existing_abs.exists() and candidate_abs.exists() and existing_abs.samefile(candidate_abs):
+            return True
+    except OSError:
+        pass
+    if existing_abs.name.casefold() != candidate_abs.name.casefold():
+        return False
+    existing_parent = absolute_lexical_path(existing_abs.parent)
+    candidate_parent = absolute_lexical_path(candidate_abs.parent)
+    if existing_parent == candidate_parent:
+        return True
+    try:
+        return existing_parent.exists() and candidate_parent.exists() and existing_parent.samefile(candidate_parent)
+    except OSError:
+        return False
+
+
 def path_exists_for_planning(path: Path) -> tuple[bool, str | None]:
     try:
         path.lstat()
@@ -858,7 +892,7 @@ def expected_block(target: Target, home: Path, agentos_home: Path) -> str:
     if target.kind == "global":
         return global_block(agentos_home)
     if target.import_style == "inline_global":
-        return inline_global_adapter_block(agentos_home)
+        return inline_global_adapter_block(home, agentos_home)
     return adapter_block(global_instructions_path(home), target.import_style)
 
 
@@ -896,9 +930,18 @@ def global_block(agentos_home: Path) -> str:
 """
 
 
-def inline_global_adapter_block(agentos_home: Path) -> str:
+def effective_global_instructions(home: Path, agentos_home: Path) -> str:
+    block = global_block(agentos_home)
+    existing = read_optional(global_instructions_path(home))
+    if existing is None:
+        return ensure_trailing_newline(block)
+    return upsert_block(existing, block, GLOBAL_START, GLOBAL_END)
+
+
+def inline_global_adapter_block(home: Path, agentos_home: Path) -> str:
+    canonical = effective_global_instructions(home, agentos_home).rstrip()
     return f"""{ADAPTER_START}
-{global_instructions_body(agentos_home).rstrip()}
+{canonical}
 {ADAPTER_END}
 """
 
@@ -1263,6 +1306,7 @@ def run_self_tests() -> int:
         test_check_pass_and_fail,
         test_remove_preserves_unmanaged_content,
         test_remove_does_not_require_live_agentos_home,
+        test_inline_adapters_mirror_effective_global_file,
         test_codex_override_file_is_effective_adapter_target,
         test_claude_config_dir_targets_profile_root,
         test_gemini_cli_home_targets_profile_root,
@@ -1317,6 +1361,7 @@ def test_install_preserves_content_and_targets_existing_default_adapters() -> No
         assert_true(GLOBAL_START in read_text_preserve_newlines(global_file), "global block missing")
         codex_text = read_text_preserve_newlines(codex)
         assert_true(codex_text.startswith(ADAPTER_START), "adapter block was not prepended")
+        assert_true("# Global Agent Instructions" in codex_text, "Codex adapter did not inline global instructions")
         assert_true("Existing Codex guidance." in codex_text, "existing adapter content lost")
         assert_true(not (home / ".claude").exists(), "missing default harness dir was created")
         backups = list((home / ".codex").glob("AGENTS.md.agentos-backup-*"))
@@ -1411,6 +1456,31 @@ def test_remove_does_not_require_live_agentos_home() -> None:
         assert_true(GLOBAL_START not in read_text_preserve_newlines(global_instructions_path(home)), "remove needed live AgentOS home")
 
 
+def test_inline_adapters_mirror_effective_global_file() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-global-installer-") as tmp:
+        root = Path(tmp)
+        home = root / "home"
+        home.mkdir()
+        (home / ".codex").mkdir()
+        (home / ".gemini").mkdir()
+        global_file = global_instructions_path(home)
+        global_file.parent.mkdir()
+        global_file.write_text("Existing global guidance.\n", encoding="utf-8")
+        agentos = make_fake_agentos(root)
+        code, output = run_args(["--agentos-home", str(agentos), "--no-dry-run"], home)
+        assert_true(code == 0, output)
+        global_text = read_text_preserve_newlines(global_file)
+        codex_text = read_text_preserve_newlines(home / ".codex" / "AGENTS.md")
+        gemini_text = read_text_preserve_newlines(home / ".gemini" / "GEMINI.md")
+        assert_true("Existing global guidance." in global_text, "global file lost unmanaged content")
+        assert_true("Existing global guidance." in codex_text, "inline Codex adapter did not mirror unmanaged global content")
+        assert_true("Existing global guidance." in gemini_text, "inline Gemini adapter did not mirror unmanaged global content")
+        assert_true(GLOBAL_START in codex_text, "inline Codex adapter did not mirror managed global block")
+        assert_true(GLOBAL_START in gemini_text, "inline Gemini adapter did not mirror managed global block")
+        code, output = run_args(["--agentos-home", str(agentos), "--check"], home)
+        assert_true(code == 0, output)
+
+
 def test_codex_override_file_is_effective_adapter_target() -> None:
     with tempfile.TemporaryDirectory(prefix="agentos-global-installer-") as tmp:
         root = Path(tmp)
@@ -1427,6 +1497,8 @@ def test_codex_override_file_is_effective_adapter_target() -> None:
         base_text = read_text_preserve_newlines(base)
         assert_true(override_text.startswith(ADAPTER_START), "Codex override adapter block was not prepended")
         assert_true(base_text.startswith(ADAPTER_START), "durable Codex base adapter block was not created")
+        assert_true("# Global Agent Instructions" in override_text, "Codex override adapter did not inline global instructions")
+        assert_true("# Global Agent Instructions" in base_text, "Codex base adapter did not inline global instructions")
         assert_true("Existing override guidance." in override_text, "Codex override content was lost")
         code, output = run_args(["--agentos-home", str(agentos), "--check"], home)
         assert_true(code == 0, output)
@@ -1571,8 +1643,11 @@ def test_all_default_adapters_and_explicit_adapter() -> None:
             assert_true(ADAPTER_START in read_text_preserve_newlines(path), f"adapter block missing: {path}")
         resolved_global = global_instructions_path(home.resolve())
         claude_text = read_text_preserve_newlines(home / ".claude" / "CLAUDE.md")
+        codex_text = read_text_preserve_newlines(home / ".codex" / "AGENTS.md")
         gemini_text = read_text_preserve_newlines(home / ".gemini" / "GEMINI.md")
         openclaw_text = read_text_preserve_newlines(home / ".openclaw" / "AGENTS.md")
+        assert_true("# Global Agent Instructions" in codex_text, "Codex adapter did not inline global instructions")
+        assert_true(f"@{resolved_global}" not in codex_text, "Codex adapter should not rely on transitive pointer/import behavior")
         assert_true(f"@{resolved_global}" in claude_text, "Claude adapter import missing")
         assert_true("# Global Agent Instructions" in gemini_text, "Gemini adapter did not inline global instructions")
         assert_true(str(agentos.resolve()) in gemini_text, "Gemini inline adapter missing AgentOS path")
@@ -1992,6 +2067,56 @@ def test_duplicate_adapter_dedupes_and_conflicting_adapter_fails() -> None:
         )
         assert_true(code == 1, "adapter conflicting with global target should fail")
         assert_true("conflicts" in output, "conflict failure should be explicit")
+
+        code, output = run_args(
+            [
+                "--agentos-home",
+                str(agentos),
+                "--adapter",
+                "<home>/.agents/agents.md",
+            ],
+            home,
+        )
+        assert_true(code == 1, "case-only adapter conflict with global target should fail")
+        assert_true("conflicts" in output, "case-only conflict failure should be explicit")
+
+        code, output = run_args(
+            [
+                "--agentos-home",
+                str(agentos),
+                "--all-default-adapters",
+                "--adapter",
+                "<home>/.codex/agents.md",
+            ],
+            home,
+        )
+        assert_true(code == 1, "case-only adapter conflict with default Codex target should fail")
+        assert_true("conflicts" in output, "default adapter case conflict failure should be explicit")
+
+        if hasattr(os, "link"):
+            hardlink_home = root / "hardlink-home"
+            hardlink_home.mkdir()
+            hardlink_global = global_instructions_path(hardlink_home)
+            hardlink_global.parent.mkdir()
+            hardlink_global.write_text("Existing global guidance.\n", encoding="utf-8")
+            hardlink_adapter = hardlink_home / ".hardlink" / "AGENTS.md"
+            hardlink_adapter.parent.mkdir()
+            try:
+                os.link(hardlink_global, hardlink_adapter)
+            except OSError:
+                pass
+            else:
+                code, output = run_args(
+                    [
+                        "--agentos-home",
+                        str(agentos),
+                        "--adapter",
+                        str(hardlink_adapter),
+                    ],
+                    hardlink_home,
+                )
+                assert_true(code == 1, "hardlinked adapter conflict with global target should fail")
+                assert_true("conflicts" in output, "hardlink conflict failure should be explicit")
 
 
 def test_tilde_windows_and_relative_adapter_paths() -> None:
