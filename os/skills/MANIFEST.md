@@ -10,7 +10,7 @@ Contract reference: `os/skills/SKILL_CONTRACT.md`.
 
 ## Summary
 
-- Canonical Core skills: 10.
+- Canonical Core skills: 12.
 
 ## Maintenance Fields
 
@@ -75,6 +75,18 @@ Each skill entry records:
 - Safety posture: treat local skills as potentially private or externally owned until reviewed; require approval before import, overwrite, archive, delete, permanent delete, mirror sync, or issue creation; default local deletion to archive/move; do not overwrite canonical skills automatically; do not record machine-local mirror state in the manifest; do not import externally sourced skills without explicit vendor/fork approval.
 - Verification coverage: validate the skill with `quick_validate.py` when available; run `python3 os/verification/scripts/validate_agentos.py`; run scoped `mirror-skills` audit/sync smoke checks; manually confirm no bundled reverse mirror script, no future Personal Overlay governance dependency, no specific-person reference, backup behavior, bulk approval behavior, external-origin exclusion behavior, and protected-main behavior.
 - Upgrade notes: complements `mirror-skills` by reviewing local harness skills before promoting approved ones into AgentOS; revisit after the deferred Personal Overlay skills governance design lands.
+
+### `review-loop`
+
+- Canonical source: `os/skills/review-loop/SKILL.md`
+- Contract status: full.
+- Mutability: mixed: reads local code, GitHub PR metadata, and review context; may edit project files, create fix commits, push to a target PR branch, post consolidated Agent Review PR comments, apply the repository's established ready-for-human marker, and write a temporary HTML report when explicitly authorized for a review loop.
+- Tools and connectors: local `git`, project validation commands, GitHub connector or `gh`, review subagents when available, `make-temp-file`, `os/playbook/ARTIFACTS.md`, and `os/playbook/GITHUB_WORKFLOW.md`.
+- Output artifact: temporary static HTML review-loop report, optional project fix commits, optional consolidated PR comments, and optional ready-for-human PR marker.
+- Filing rule: no durable AgentOS state by default; temporary reports live under the system temporary directory; project fixes, commits, branches, and reports live in the target project; PR comments and ready markers stay in GitHub.
+- Safety posture: use only after explicit review-loop authorization; keep reviewer subagents read-only; do not merge, close issues, create labels, delete branches, change permissions, push outside the target PR branch, or publish outside the PR review surface without separate approval.
+- Verification coverage: confirm target/base/head and panel sizing, baseline intent, reviewer prompt templates, accepted/declined findings, sibling sweeps, validation commands, clean final reviewer panel, temporary HTML report, and absence of unapproved external writes.
+- Upgrade notes: Core reusable orchestration workflow for fresh-context PR review/fix loops.
 
 ### `double-steelman`
 
