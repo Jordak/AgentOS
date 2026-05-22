@@ -52,6 +52,7 @@ class CheckResult:
 class DoctorReport:
     agentos_home: Path
     primary_agentos_home: Path
+    setup_agentos_home: Path
     mirror_root: Path
     results: list[CheckResult]
 
@@ -166,8 +167,11 @@ def run_doctor(
 ) -> DoctorReport:
     agentos_home, discovery_result = resolve_agentos_home(requested_agentos_home, cwd)
     primary_agentos_home = expand_path(requested_primary_agentos_home, cwd) if requested_primary_agentos_home else agentos_home
+    setup_agentos_home = primary_agentos_home if requested_primary_agentos_home else agentos_home
     mirror_root = expand_path(mirror_root, cwd)
     adapter_args = adapter_args or []
+    linked_worktree_without_primary = requested_primary_agentos_home is None and is_linked_git_worktree(agentos_home)
+    current_machine_recommendations_allowed = not linked_worktree_without_primary
 
     results = [discovery_result, check_agentos_home(agentos_home)]
     home_is_usable = results[-1].status != "FAIL"
@@ -177,18 +181,47 @@ def run_doctor(
         home_is_usable = primary_result.status != "FAIL"
 
     if home_is_usable:
+        if linked_worktree_without_primary:
+            results.append(linked_worktree_without_primary_result(agentos_home))
         results.append(
             check_adapters(
-                agentos_home=agentos_home,
+                agentos_home=setup_agentos_home,
                 process_home=process_home,
                 env=env,
                 extra_args=adapter_args,
                 verbose=verbose,
+                allow_remediation=current_machine_recommendations_allowed,
             )
         )
-        results.append(check_skill_mirrors(agentos_home, primary_agentos_home, mirror_root, env, verbose))
-        results.append(check_personal_overlay(agentos_home, primary_agentos_home, verbose))
-        results.append(check_automations(agentos_home, primary_agentos_home, process_home, verbose))
+        results.append(
+            check_skill_mirrors(
+                agentos_home,
+                primary_agentos_home,
+                mirror_root,
+                env,
+                verbose,
+                allow_sync_recommendation=current_machine_recommendations_allowed,
+                mirror_agentos_home=setup_agentos_home,
+                script_agentos_home=agentos_home,
+            )
+        )
+        results.append(
+            check_personal_overlay(
+                agentos_home,
+                primary_agentos_home,
+                verbose,
+                private_root_is_canonical=not linked_worktree_without_primary,
+            )
+        )
+        results.append(
+            check_automations(
+                agentos_home,
+                primary_agentos_home,
+                process_home,
+                verbose,
+                private_root_is_canonical=not linked_worktree_without_primary,
+            )
+        )
     else:
         results.append(
             CheckResult(
@@ -225,6 +258,7 @@ def run_doctor(
     return DoctorReport(
         agentos_home=agentos_home,
         primary_agentos_home=primary_agentos_home,
+        setup_agentos_home=setup_agentos_home,
         mirror_root=mirror_root,
         results=results,
     )
@@ -276,6 +310,30 @@ def expand_path(path: Path, cwd: Path) -> Path:
     if not expanded.is_absolute():
         expanded = cwd / expanded
     return expanded.resolve()
+
+
+def is_linked_git_worktree(path: Path) -> bool:
+    git_entry = path / ".git"
+    try:
+        if not git_entry.is_file():
+            return False
+        text = git_entry.read_text(encoding="utf-8", errors="replace").strip()
+    except OSError:
+        return False
+    return text.lower().startswith("gitdir:") and "/worktrees/" in text.replace("\\", "/")
+
+
+def linked_worktree_without_primary_result(agentos_home: Path) -> CheckResult:
+    return CheckResult(
+        "worktree mode",
+        "WARN",
+        "Linked Git worktree detected without --primary-agentos-home.",
+        details=[f"Linked worktree: {agentos_home}"],
+        recommendations=[
+            "Re-run with --primary-agentos-home <primary-agentos-home> before applying current-machine setup recommendations.",
+            "Adapter write and skill mirror sync recommendations are suppressed for this run.",
+        ],
+    )
 
 
 def is_agentos_home(path: Path) -> bool:
@@ -346,6 +404,7 @@ def check_adapters(
     env: Mapping[str, str],
     extra_args: list[str],
     verbose: bool,
+    allow_remediation: bool = True,
 ) -> CheckResult:
     script = agentos_home / "scripts" / "install_global_agent_instructions.py"
     if not script.is_file():
@@ -417,20 +476,26 @@ def check_adapters(
             ],
         )
 
-    dry_run_command = [
-        sys.executable,
-        str(script),
-        "--agentos-home",
-        str(agentos_home),
-        *extra_args,
-    ]
-    write_command = [*dry_run_command, "--no-dry-run"]
-    recommendations = [
-        "Review the dry-run/write flow before applying any remediation.",
-        f"Dry-run: {shell_command(dry_run_command, agentos_home)}",
-        f"After approving writes: {shell_command(write_command, agentos_home)}",
-        "Then re-run this doctor command.",
-    ]
+    if allow_remediation:
+        dry_run_command = [
+            sys.executable,
+            str(script),
+            "--agentos-home",
+            str(agentos_home),
+            *extra_args,
+        ]
+        write_command = [*dry_run_command, "--no-dry-run"]
+        recommendations = [
+            "Review the dry-run/write flow before applying any remediation.",
+            f"Dry-run: {shell_command(dry_run_command, agentos_home)}",
+            f"After approving writes: {shell_command(write_command, agentos_home)}",
+            "Then re-run this doctor command.",
+        ]
+    else:
+        recommendations = [
+            "Adapter write recommendations are suppressed because this run is using a linked worktree without --primary-agentos-home.",
+            "Re-run from the canonical checkout or pass --primary-agentos-home <primary-agentos-home> before applying adapter remediation.",
+        ]
     return CheckResult(
         "adapter drift",
         "WARN",
@@ -446,34 +511,44 @@ def check_skill_mirrors(
     mirror_root: Path,
     env: Mapping[str, str],
     verbose: bool,
+    allow_sync_recommendation: bool = True,
+    mirror_agentos_home: Path | None = None,
+    script_agentos_home: Path | None = None,
 ) -> CheckResult:
-    script = agentos_home / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py"
+    mirror_agentos_home = mirror_agentos_home or agentos_home
+    script_agentos_home = script_agentos_home or agentos_home
+    script = script_agentos_home / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py"
     if not script.is_file():
         return CheckResult(
             "skill mirrors",
             "FAIL",
             "Mirror-skills audit script is missing.",
-            details=[root_relative(agentos_home, script)],
+            details=[root_relative(script_agentos_home, script)],
         )
 
     command = [
         sys.executable,
         str(script),
         "--agentos-root",
-        str(agentos_home),
+        str(mirror_agentos_home),
         "--mirror-root",
         str(mirror_root),
         "--personal-overlay-root",
         str(primary_agentos_home / "personal" / "os"),
         "--json",
     ]
-    completed = run_subprocess(command, cwd=agentos_home, env=env)
+    completed = run_subprocess(command, cwd=script_agentos_home, env=env)
     base_details = [
-        f"Command: {shell_command(command, agentos_home)}",
+        f"Command: {shell_command(command, script_agentos_home)}",
         f"Exit code: {completed.returncode}",
     ]
     if not completed.stdout.strip():
-        base_details.extend(subprocess_failure_details(completed, verbose))
+        if verbose:
+            base_details.extend(subprocess_failure_details(completed, verbose))
+        else:
+            base_details.append(
+                "Mirror-skills diagnostics suppressed; re-run with --verbose or the lower-level mirror audit for exact names."
+            )
         return CheckResult(
             "skill mirrors",
             "FAIL",
@@ -514,8 +589,9 @@ def check_skill_mirrors(
     statuses = Counter(str(result.get("status", "unknown")) for result in results)
     source_kinds = Counter(str(result.get("source_kind", "unknown")) for result in results)
     details = [
-        f"Command: {shell_command(command, agentos_home)}",
+        f"Command: {shell_command(command, script_agentos_home)}",
         f"Exit code: {completed.returncode}",
+        f"AgentOS root audited: {mirror_agentos_home}",
         f"Mirror root: {mirror_root}",
         f"Skills audited: {len(results)}",
         "Source kinds: " + format_counts(source_kinds),
@@ -543,11 +619,11 @@ def check_skill_mirrors(
         )
 
     hard_statuses = {"source-missing", "source-unreadable", "mirror-unreadable", "unknown"}
-    audit_command = mirror_command(agentos_home, primary_agentos_home, mirror_root)
+    audit_command = mirror_command(script_agentos_home, mirror_agentos_home, primary_agentos_home, mirror_root)
     if any(status in hard_statuses for status in statuses):
         recommendations = [
             "Fix the reported source, readability, or audit-shape errors before syncing mirrors.",
-            "Inspect the audit: " + shell_command(audit_command, agentos_home),
+            "Inspect the audit: " + shell_command(audit_command, script_agentos_home),
         ]
         return CheckResult(
             "skill mirrors",
@@ -558,14 +634,22 @@ def check_skill_mirrors(
         )
 
     recommendations = [
-        "Inspect the audit: " + shell_command(audit_command, agentos_home),
+        "Inspect the audit: " + shell_command(audit_command, script_agentos_home),
     ]
     if statuses.get("missing") or statuses.get("stale"):
-        sync_command = [*audit_command, "--sync"]
-        recommendations.append(
-            "After approving current-machine mirror writes: "
-            + shell_command(sync_command, agentos_home)
-        )
+        if allow_sync_recommendation:
+            sync_command = [*audit_command, "--sync"]
+            recommendations.append(
+                "After approving current-machine mirror writes: "
+                + shell_command(sync_command, script_agentos_home)
+            )
+        else:
+            recommendations.append(
+                "Mirror sync recommendation suppressed because this run is using a linked worktree without --primary-agentos-home."
+            )
+            recommendations.append(
+                "Re-run from the canonical checkout or pass --primary-agentos-home <primary-agentos-home> before syncing mirrors."
+            )
     if statuses.get("extra-files"):
         recommendations.append(
             "Extra mirror files are not deleted by default; inspect them before considering --prune-extra."
@@ -580,7 +664,12 @@ def check_skill_mirrors(
     )
 
 
-def check_personal_overlay(agentos_home: Path, primary_agentos_home: Path, verbose: bool) -> CheckResult:
+def check_personal_overlay(
+    agentos_home: Path,
+    primary_agentos_home: Path,
+    verbose: bool,
+    private_root_is_canonical: bool = True,
+) -> CheckResult:
     personal_root = primary_agentos_home / "personal" / "os"
     getting_started = agentos_home / "os" / "playbook" / "GETTING_STARTED.md"
     starter_paths, starter_error = starter_personal_paths(getting_started)
@@ -593,9 +682,10 @@ def check_personal_overlay(agentos_home: Path, primary_agentos_home: Path, verbo
                 "Starter paths documented: " + str(len(starter_paths)),
                 f"Expected root: {root_relative(agentos_home, personal_root)}",
             ],
-            recommendations=[
-                "Create approved private starter files under personal/os/ using os/playbook/GETTING_STARTED.md."
-            ],
+            recommendations=private_state_recommendations(
+                private_root_is_canonical,
+                "Create approved private starter files under personal/os/ using os/playbook/GETTING_STARTED.md.",
+            ),
         )
 
     if not personal_root.is_dir():
@@ -637,10 +727,11 @@ def check_personal_overlay(agentos_home: Path, primary_agentos_home: Path, verbo
             "WARN",
             "Some documented starter Personal Overlay files are absent.",
             details=details,
-            recommendations=[
+            recommendations=private_state_recommendations(
+                private_root_is_canonical,
                 "Run a guided first-pass setup using os/playbook/GETTING_STARTED.md.",
                 "Ask before writing private state; create only approved files under personal/os/.",
-            ],
+            ),
         )
 
     return CheckResult(
@@ -649,6 +740,15 @@ def check_personal_overlay(agentos_home: Path, primary_agentos_home: Path, verbo
         "Documented starter Personal Overlay files are present.",
         details=details,
     )
+
+
+def private_state_recommendations(private_root_is_canonical: bool, *canonical_recommendations: str) -> list[str]:
+    if private_root_is_canonical:
+        return list(canonical_recommendations)
+    return [
+        "Re-run with --primary-agentos-home <primary-agentos-home> before creating or updating private AgentOS state from a linked worktree.",
+        "Do not write private state into this feature worktree unless it is the canonical AgentOS home.",
+    ]
 
 
 def starter_personal_paths(getting_started: Path) -> tuple[list[str], str | None]:
@@ -676,12 +776,17 @@ def starter_personal_paths(getting_started: Path) -> tuple[list[str], str | None
     return paths, None
 
 
-def mirror_command(agentos_home: Path, primary_agentos_home: Path, mirror_root: Path) -> list[str]:
+def mirror_command(
+    script_agentos_home: Path,
+    mirror_agentos_home: Path,
+    primary_agentos_home: Path,
+    mirror_root: Path,
+) -> list[str]:
     return [
         sys.executable,
-        str(agentos_home / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py"),
+        str(script_agentos_home / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py"),
         "--agentos-root",
-        str(agentos_home),
+        str(mirror_agentos_home),
         "--mirror-root",
         str(mirror_root),
         "--personal-overlay-root",
@@ -689,7 +794,13 @@ def mirror_command(agentos_home: Path, primary_agentos_home: Path, mirror_root: 
     ]
 
 
-def check_automations(agentos_home: Path, primary_agentos_home: Path, process_home: Path, verbose: bool) -> CheckResult:
+def check_automations(
+    agentos_home: Path,
+    primary_agentos_home: Path,
+    process_home: Path,
+    verbose: bool,
+    private_root_is_canonical: bool = True,
+) -> CheckResult:
     core_registry = agentos_home / "os" / "automations" / "AUTOMATIONS.md"
     personal_automations = primary_agentos_home / "personal" / "os" / "automations"
     personal_registry = personal_automations / "AUTOMATIONS.md"
@@ -730,9 +841,10 @@ def check_automations(agentos_home: Path, primary_agentos_home: Path, process_ho
             "WARN",
             "Personal automation files exist but no personal automation registry was found.",
             details=details,
-            recommendations=[
-                "If those files are live automations, record the registry in personal/os/automations/AUTOMATIONS.md."
-            ],
+            recommendations=private_state_recommendations(
+                private_root_is_canonical,
+                "If those files are live automations, record the registry in personal/os/automations/AUTOMATIONS.md.",
+            ),
         )
     if not recurring_check_evidence:
         return CheckResult(
@@ -740,9 +852,10 @@ def check_automations(agentos_home: Path, primary_agentos_home: Path, process_ho
             "WARN",
             "No recurring AgentOS update or drift-check automation evidence was found.",
             details=details,
-            recommendations=[
-                "Live automations are optional; if desired, use os/playbook/GETTING_STARTED.md to choose a cadence before creating one."
-            ],
+            recommendations=private_state_recommendations(
+                private_root_is_canonical,
+                "Live automations are optional; if desired, use os/playbook/GETTING_STARTED.md to choose a cadence before creating one.",
+            ),
         )
 
     return CheckResult(
@@ -924,12 +1037,6 @@ def shell_command(command: list[str], agentos_home: Path) -> str:
         if path == agentos_home:
             rendered.append(str(path))
             continue
-        try:
-            if path.is_absolute() and path.is_relative_to(agentos_home):
-                rendered.append(path.relative_to(agentos_home).as_posix())
-                continue
-        except ValueError:
-            pass
         rendered.append(part)
     return " ".join(sh_quote(part) for part in rendered)
 
@@ -952,6 +1059,8 @@ def print_report(report: DoctorReport, verbose: bool) -> None:
     print(f"AgentOS home: {report.agentos_home}")
     if report.primary_agentos_home != report.agentos_home:
         print(f"Primary AgentOS home: {report.primary_agentos_home}")
+    if report.setup_agentos_home != report.agentos_home:
+        print(f"Current-machine setup home: {report.setup_agentos_home}")
     print(f"Skill mirror root: {report.mirror_root}")
     print("No files were modified.")
     print("")
@@ -993,8 +1102,12 @@ def run_self_tests() -> int:
         test_mirror_smoke_uses_temp_dirs,
         test_mirror_command_failure_is_not_sync_advice,
         test_mirror_source_failure_is_not_sync_advice,
+        test_mirror_failure_suppresses_private_names_without_verbose,
         test_mirror_recommendations_quote_paths,
+        test_recommendations_are_cwd_stable,
         test_primary_agentos_home_supplies_private_skill_mirrors,
+        test_primary_agentos_home_drives_current_machine_recommendations,
+        test_linked_worktree_without_primary_suppresses_writes,
         test_automation_no_evidence_warns,
         test_automation_registry_evidence_passes,
         test_unrelated_codex_automation_does_not_pass,
@@ -1298,6 +1411,21 @@ def test_mirror_source_failure_is_not_sync_advice() -> None:
         assert_true("--sync" not in joined, "source failure should not recommend mirror sync")
 
 
+def test_mirror_failure_suppresses_private_names_without_verbose() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        mirror_root = Path(tmp) / "mirrors"
+        make_fake_agentos(root)
+        duplicate = root / "personal" / "os" / "skills" / "example-skill" / "SKILL.md"
+        duplicate.parent.mkdir(parents=True)
+        duplicate.write_text("# Duplicate Private Skill\n", encoding="utf-8")
+        result = check_skill_mirrors(root, root, mirror_root, minimal_env(Path(tmp) / "home"), verbose=False)
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "FAIL", "mirror command failure should fail")
+        assert_true("example-skill" not in joined, "non-verbose mirror diagnostics should not print skill names")
+        assert_true("diagnostics suppressed" in joined, "suppression hint should be explicit")
+
+
 def test_mirror_recommendations_quote_paths() -> None:
     with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
         root = Path(tmp) / "AgentOS With Spaces"
@@ -1310,6 +1438,27 @@ def test_mirror_recommendations_quote_paths() -> None:
         assert_true("AgentOS With Spaces'" in joined, "AgentOS path should be shell quoted")
 
 
+def test_recommendations_are_cwd_stable() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS With Spaces"
+        mirror_root = Path(tmp) / "mirrors"
+        make_fake_agentos(root)
+        write_drift_installer(root)
+        adapter_result = check_adapters(
+            agentos_home=root,
+            process_home=Path(tmp) / "home",
+            env=minimal_env(Path(tmp) / "home"),
+            extra_args=[],
+            verbose=False,
+        )
+        mirror_result = check_skill_mirrors(root, root, mirror_root, minimal_env(Path(tmp) / "home"), verbose=False)
+        joined = "\n".join(adapter_result.recommendations + mirror_result.recommendations)
+        assert_true(str(root / "scripts" / "install_global_agent_instructions.py") in joined, "adapter recommendation should use an absolute script path")
+        assert_true(str(root / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py") in joined, "mirror recommendation should use an absolute script path")
+        assert_true("python3 scripts/install_global_agent_instructions.py" not in joined, "adapter recommendation should not depend on caller cwd")
+        assert_true("python3 os/skills/mirror-skills/scripts/mirror_skills.py" not in joined, "mirror recommendation should not depend on caller cwd")
+
+
 def test_primary_agentos_home_supplies_private_skill_mirrors() -> None:
     with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
         worktree = Path(tmp) / "worktree"
@@ -1320,6 +1469,69 @@ def test_primary_agentos_home_supplies_private_skill_mirrors() -> None:
         result = check_skill_mirrors(worktree, primary, mirror_root, minimal_env(Path(tmp) / "home"), verbose=False)
         joined = "\n".join(result.details)
         assert_true("personal-overlay=1" in joined, "primary Personal Overlay skill was not audited")
+
+
+def test_primary_agentos_home_drives_current_machine_recommendations() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        worktree = Path(tmp) / "worktree"
+        primary = Path(tmp) / "primary"
+        mirror_root = Path(tmp) / "mirrors"
+        make_fake_agentos(worktree)
+        make_fake_agentos(primary)
+        write_drift_installer(primary)
+        report = run_doctor(
+            requested_agentos_home=worktree,
+            requested_primary_agentos_home=primary,
+            cwd=worktree,
+            mirror_root=mirror_root,
+            verbose=False,
+            process_home=Path(tmp) / "home",
+            env=minimal_env(Path(tmp) / "home"),
+        )
+        adapter_result = result_named(report, "adapter drift")
+        mirror_result = result_named(report, "skill mirrors")
+        adapter_text = "\n".join(adapter_result.details + adapter_result.recommendations)
+        mirror_text = "\n".join(mirror_result.details + mirror_result.recommendations)
+        assert_true(report.setup_agentos_home == primary.resolve(), "primary home should drive current-machine setup checks")
+        assert_true(str(primary.resolve()) in adapter_text, "adapter recommendations should target primary home")
+        assert_true(str(worktree.resolve()) not in adapter_text, "adapter recommendations should not target feature worktree")
+        assert_true(f"--agentos-root {primary.resolve()}" in mirror_text, "mirror recommendations should audit primary home")
+        assert_true(f"--agentos-root {worktree.resolve()}" not in mirror_text, "mirror recommendations should not sync from feature worktree")
+
+
+def test_linked_worktree_without_primary_suppresses_writes() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        worktree = Path(tmp) / "worktree"
+        mirror_root = Path(tmp) / "mirrors"
+        make_fake_agentos(worktree)
+        make_linked_worktree_marker(worktree)
+        write_drift_installer(worktree)
+        report = run_doctor(
+            requested_agentos_home=worktree,
+            requested_primary_agentos_home=None,
+            cwd=worktree,
+            mirror_root=mirror_root,
+            verbose=False,
+            process_home=Path(tmp) / "home",
+            env=minimal_env(Path(tmp) / "home"),
+        )
+        worktree_result = result_named(report, "worktree mode")
+        adapter_result = result_named(report, "adapter drift")
+        mirror_result = result_named(report, "skill mirrors")
+        overlay_result = result_named(report, "Personal Overlay")
+        automation_result = result_named(report, "automations")
+        joined = "\n".join(
+            worktree_result.recommendations
+            + adapter_result.recommendations
+            + mirror_result.recommendations
+            + overlay_result.recommendations
+            + automation_result.recommendations
+        )
+        assert_true(worktree_result.status == "WARN", "linked worktree without primary should be explicit")
+        assert_true("--no-dry-run" not in joined, "adapter write command should be suppressed")
+        assert_true("--sync" not in joined, "mirror sync command should be suppressed")
+        assert_true("--primary-agentos-home" in joined, "recommendations should ask for primary home")
+        assert_true("Do not write private state into this feature worktree" in joined, "private writes should be discouraged")
 
 
 def test_automation_no_evidence_warns() -> None:
@@ -1453,6 +1665,7 @@ def render_report_for_test(report: DoctorReport, verbose: bool) -> str:
         "AgentOS doctor (read-only)",
         f"AgentOS home: {report.agentos_home}",
         f"Primary AgentOS home: {report.primary_agentos_home}",
+        f"Current-machine setup home: {report.setup_agentos_home}",
         f"Skill mirror root: {report.mirror_root}",
     ]
     for result in report.results:
@@ -1522,6 +1735,28 @@ def make_fake_agentos(root: Path) -> None:
 def copy_script(source: Path, destination: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+
+
+def write_drift_installer(root: Path) -> None:
+    installer = root / "scripts" / "install_global_agent_instructions.py"
+    installer.write_text(
+        "import sys\nprint('[FAIL] drift codex - stale managed block')\nsys.exit(1)\n",
+        encoding="utf-8",
+    )
+
+
+def make_linked_worktree_marker(root: Path) -> None:
+    (root / ".git").write_text(
+        f"gitdir: {root.parent / '.git' / 'worktrees' / root.name}\n",
+        encoding="utf-8",
+    )
+
+
+def result_named(report: DoctorReport, name: str) -> CheckResult:
+    for result in report.results:
+        if result.name == name:
+            return result
+    raise AssertionError(f"missing result named {name}")
 
 
 def minimal_env(home: Path) -> dict[str, str]:
