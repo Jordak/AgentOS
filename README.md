@@ -41,10 +41,10 @@ Install AgentOS for me.
 7. Run the drift check:
    python3 scripts/install_global_agent_instructions.py --agentos-home <resolved-agentos-home> --check
    If extra --adapter <path> flags were used above, repeat those exact flags here.
-8. Run the read-only setup health check:
+8. Run the Run AgentOS Doctor skill, using its deterministic helper script for setup facts:
    python3 scripts/agentos_doctor.py --agentos-home <resolved-agentos-home>
-   If extra --all-default-adapters or --adapter <path> flags were used above, repeat those exact flags here. Treat warnings as next-step recommendations, not permission to change files.
-9. Summarize what changed, where backups were written, whether the adapter check passed, and what the doctor recommends.
+   If extra --all-default-adapters or --adapter <path> flags were used above, repeat those exact flags here. Treat script warnings as facts or next-step recommendations, then use agent judgment for ambiguous setup notes such as automation drafts or disabled notes. Do not make changes without approval.
+9. Summarize what changed, where backups were written, whether the adapter check passed, and what Run AgentOS Doctor recommends.
 10. Ask me whether I want AgentOS skills to be discoverable from my harnesses. If I do, use the mirror-skills workflow to check Core skills and Personal Overlay skills, show me the audit result, and ask before syncing any files outside this checkout.
 11. Ask me if I want to hear how to get the most out of AgentOS.
 ```
@@ -70,29 +70,30 @@ python3 scripts/agentos_doctor.py --agentos-home <agentos-home>
 ```
 
 If you use `--all-default-adapters` or any custom `--adapter <path>` flags, repeat those same flags on the dry-run, write, check, and remove commands.
-Repeat those same flags on `scripts/agentos_doctor.py` runs too, because the doctor passes them through to its read-only adapter drift check.
+Repeat those same flags when using Run AgentOS Doctor or `scripts/agentos_doctor.py`, because the helper script passes them through to its read-only adapter drift check.
 
 </details>
 
 For installer adapter details, see the [portability playbook](os/playbook/PORTABILITY.md). The [glossary](os/context/GLOSSARY.md) defines AgentOS terms such as harness, adapter, Core, Personal Overlay, and drift.
 
-## Setup Health Check
+## Run AgentOS Doctor
 
-Run the AgentOS doctor when you want a read-only report on local setup health:
+Use the [Run AgentOS Doctor skill](os/skills/run-agentos-doctor/SKILL.md) when you want a read-only setup-health audit with agent judgment for ambiguous local state. The skill uses this deterministic helper script for facts:
 
 ```bash
 python3 scripts/agentos_doctor.py
 ```
 
-The doctor discovers the AgentOS checkout from the current directory, or you can pass `--agentos-home <agentos-home>`. It always prints the resolved home, runs the installer drift check in read-only `--check` mode, audits skill mirrors through mirror-skills without syncing them, checks documented starter Personal Overlay paths from [os/playbook/GETTING_STARTED.md](os/playbook/GETTING_STARTED.md), and reports best-effort automation presence. It does not remediate, install, sync, delete, or print private file contents.
+The helper script discovers the AgentOS checkout from the current directory, or you can pass `--agentos-home <agentos-home>`. It always prints the resolved home, runs the installer drift check in read-only `--check` mode, audits skill mirrors through mirror-skills without syncing them, checks documented starter Personal Overlay paths from [os/playbook/GETTING_STARTED.md](os/playbook/GETTING_STARTED.md), and reports deterministic automation evidence conservatively. It does not remediate, install, sync, delete, or print private file contents.
 
-When your setup uses `--all-default-adapters` or custom `--adapter <path>` targets, pass those same flags to the doctor so the adapter drift result covers the same harness instruction files as your installer check.
+When your setup uses `--all-default-adapters` or custom `--adapter <path>` targets, pass those same flags to Run AgentOS Doctor or the helper script so the adapter drift result covers the same harness instruction files as your installer check.
 
 When running the doctor from an isolated feature worktree, pass `--primary-agentos-home <primary-agentos-home>` so current-machine adapter and mirror checks target the canonical checkout, while Personal Overlay starter files, private skills, and live automation registry checks read from the checkout that owns ignored private state. Without that flag, linked-worktree runs suppress adapter write and mirror sync recommendations.
 
 Use the tools this way:
 
-- `scripts/agentos_doctor.py`: read-only health report and exact next-step recommendations.
+- `os/skills/run-agentos-doctor/SKILL.md`: read-only setup-health workflow with agent judgment for ambiguous local state.
+- `scripts/agentos_doctor.py`: deterministic setup facts and exact command recommendations.
 - `scripts/install_global_agent_instructions.py`: dry-run, install, check, or remove global instruction adapters after review.
 - `os/skills/mirror-skills/scripts/mirror_skills.py`: audit skill mirrors by default; sync only after approving current-machine writes.
 

@@ -807,17 +807,20 @@ def check_automations(
     codex_automations = process_home / ".codex" / "automations"
     personal_file_count = count_non_gitkeep_files(personal_automations)
     codex_file_count = count_non_gitkeep_files(codex_automations)
-    registry_mentions_checks = personal_registry_mentions_agentos_checks(personal_registry)
-    codex_mentions_checks = codex_automations_mention_agentos_checks(codex_automations)
-    recurring_check_evidence = registry_mentions_checks or codex_mentions_checks
+    registry_mentions_checks = text_mentions_agentos_checks(read_text_or_empty(personal_registry))
+    codex_active_checks, codex_possible_checks = codex_automation_evidence(codex_automations)
+    possible_check_evidence = registry_mentions_checks or codex_possible_checks
+    recurring_check_evidence = codex_active_checks
 
     details = [
         "Core automation registry: " + ("present" if core_registry.is_file() else "missing"),
         "Personal automation registry: " + ("present" if personal_registry.is_file() else "missing"),
         f"Personal automation files: {personal_file_count}",
         "Codex automation mirror dir: " + presence_with_count(codex_automations),
-        "Codex AgentOS check evidence: " + ("found" if codex_mentions_checks else "not found"),
-        "Recurring AgentOS check evidence: " + ("found" if recurring_check_evidence else "not found"),
+        "Personal automation mention: " + ("found" if registry_mentions_checks else "not found"),
+        "Codex active AgentOS check evidence: " + ("found" if codex_active_checks else "not found"),
+        "Possible AgentOS check mention: " + ("found" if possible_check_evidence else "not found"),
+        "Recurring AgentOS check evidence: " + ("active" if recurring_check_evidence else "not found"),
     ]
     if verbose:
         details.extend(
@@ -847,6 +850,17 @@ def check_automations(
             ),
         )
     if not recurring_check_evidence:
+        if possible_check_evidence:
+            return CheckResult(
+                "automations",
+                "WARN",
+                "Possible AgentOS automation mention found, but no active scheduled evidence was detected.",
+                details=details,
+                recommendations=private_state_recommendations(
+                    private_root_is_canonical,
+                    "Use the Run AgentOS Doctor skill to inspect automation notes and confirm whether a recurring check is active.",
+                ),
+            )
         return CheckResult(
             "automations",
             "WARN",
@@ -866,34 +880,45 @@ def check_automations(
     )
 
 
-def personal_registry_mentions_agentos_checks(path: Path) -> bool:
+def read_text_or_empty(path: Path) -> str:
     try:
-        text = path.read_text(encoding="utf-8")
+        return path.read_text(encoding="utf-8")
     except FileNotFoundError:
-        return False
+        return ""
     except OSError:
-        return False
+        return ""
+    except UnicodeDecodeError:
+        return ""
+
+
+def text_mentions_agentos_checks(text: str) -> bool:
     lowered = text.lower()
     return "agentos" in lowered and any(term in lowered for term in ("drift", "update", "repository"))
 
 
-def codex_automations_mention_agentos_checks(root: Path) -> bool:
+def codex_automation_evidence(root: Path) -> tuple[bool, bool]:
+    active = False
+    possible = False
     if not root.exists() or not root.is_dir():
-        return False
+        return active, possible
     for path in root.rglob("*"):
         if not path.is_file() or path.name == ".gitkeep":
             continue
-        candidate = path.name.lower()
-        try:
-            candidate += "\n" + path.read_text(encoding="utf-8")
-        except OSError:
+        text = path.name + "\n" + read_text_or_empty(path)
+        if not text_mentions_agentos_checks(text):
             continue
-        except UnicodeDecodeError:
-            continue
-        lowered = candidate.lower()
-        if "agentos" in lowered and any(term in lowered for term in ("drift", "update", "repository")):
-            return True
-    return False
+        if path.name == "automation.toml" and codex_automation_toml_is_active_scheduled(text):
+            active = True
+        else:
+            possible = True
+    return active, possible
+
+
+def codex_automation_toml_is_active_scheduled(text: str) -> bool:
+    return bool(
+        re.search(r"(?im)^\s*status\s*=\s*[\"']ACTIVE[\"']\s*$", text)
+        and re.search(r"(?im)^\s*(rrule|schedule)\s*=", text)
+    )
 
 
 def count_non_gitkeep_files(root: Path) -> int:
@@ -1109,8 +1134,9 @@ def run_self_tests() -> int:
         test_primary_agentos_home_drives_current_machine_recommendations,
         test_linked_worktree_without_primary_suppresses_writes,
         test_automation_no_evidence_warns,
-        test_automation_registry_evidence_passes,
+        test_automation_registry_mention_warns,
         test_unrelated_codex_automation_does_not_pass,
+        test_disabled_codex_agentos_automation_does_not_pass,
         test_codex_agentos_automation_evidence_passes,
         test_automation_files_without_registry_warns,
         test_primary_agentos_home_supplies_personal_overlay,
@@ -1544,7 +1570,7 @@ def test_automation_no_evidence_warns() -> None:
         assert_true("Recurring AgentOS check evidence: not found" in joined, "missing evidence should be explicit")
 
 
-def test_automation_registry_evidence_passes() -> None:
+def test_automation_registry_mention_warns() -> None:
     with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
         root = Path(tmp) / "AgentOS"
         make_fake_agentos(root)
@@ -1552,8 +1578,9 @@ def test_automation_registry_evidence_passes() -> None:
         registry.write_text("AgentOS repository update and adapter drift check automation.\n", encoding="utf-8")
         result = check_automations(root, root, Path(tmp) / "home", verbose=False)
         joined = "\n".join(result.details)
-        assert_true(result.status == "PASS", "registry evidence should pass")
-        assert_true("Recurring AgentOS check evidence: found" in joined, "found evidence should be explicit")
+        assert_true(result.status == "WARN", "registry prose should not be treated as deterministic active evidence")
+        assert_true("Personal automation mention: found" in joined, "registry mention should remain visible")
+        assert_true("Recurring AgentOS check evidence: not found" in joined, "ambiguous registry prose should not pass")
 
 
 def test_unrelated_codex_automation_does_not_pass() -> None:
@@ -1568,7 +1595,22 @@ def test_unrelated_codex_automation_does_not_pass() -> None:
         joined = "\n".join(result.details)
         assert_true(result.status == "WARN", "unrelated Codex automation should not pass")
         assert_true("Codex automation mirror dir: present (1 files)" in joined, "Codex presence should remain visible")
-        assert_true("Codex AgentOS check evidence: not found" in joined, "unrelated Codex file should not be evidence")
+        assert_true("Codex active AgentOS check evidence: not found" in joined, "unrelated Codex file should not be evidence")
+
+
+def test_disabled_codex_agentos_automation_does_not_pass() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        home = Path(tmp) / "home"
+        make_fake_agentos(root)
+        codex_automation = home / ".codex" / "automations" / "disabled-note.md"
+        codex_automation.parent.mkdir(parents=True)
+        codex_automation.write_text("Do not run AgentOS repository update automation.\n", encoding="utf-8")
+        result = check_automations(root, root, home, verbose=False)
+        joined = "\n".join(result.details)
+        assert_true(result.status == "WARN", "disabled prose note should not pass")
+        assert_true("Possible AgentOS check mention: found" in joined, "possible mention should remain visible")
+        assert_true("Recurring AgentOS check evidence: not found" in joined, "disabled prose should not be active evidence")
 
 
 def test_codex_agentos_automation_evidence_passes() -> None:
@@ -1576,13 +1618,19 @@ def test_codex_agentos_automation_evidence_passes() -> None:
         root = Path(tmp) / "AgentOS"
         home = Path(tmp) / "home"
         make_fake_agentos(root)
-        codex_automation = home / ".codex" / "automations" / "agentos-drift-check.txt"
+        codex_automation = home / ".codex" / "automations" / "agentos-drift-check" / "automation.toml"
         codex_automation.parent.mkdir(parents=True)
-        codex_automation.write_text("AgentOS adapter drift check.\n", encoding="utf-8")
+        codex_automation.write_text(
+            'name = "AgentOS drift check"\n'
+            'prompt = "Check AgentOS repository updates and adapter drift."\n'
+            'status = "ACTIVE"\n'
+            'rrule = "RRULE:FREQ=WEEKLY"\n',
+            encoding="utf-8",
+        )
         result = check_automations(root, root, home, verbose=False)
         joined = "\n".join(result.details)
-        assert_true(result.status == "PASS", "AgentOS Codex automation evidence should pass")
-        assert_true("Codex AgentOS check evidence: found" in joined, "Codex evidence should be explicit")
+        assert_true(result.status == "PASS", "active scheduled Codex automation evidence should pass")
+        assert_true("Codex active AgentOS check evidence: found" in joined, "Codex evidence should be explicit")
 
 
 def test_automation_files_without_registry_warns() -> None:

@@ -71,23 +71,24 @@ Useful first Personal Overlay files include:
 
 Use the matching Core templates under `os/` when the user wants structure but has not supplied private facts yet.
 
-## Setup Doctor
+## Run AgentOS Doctor
 
-Use the AgentOS doctor when the user wants a read-only setup health check:
+Use the Run AgentOS Doctor skill when the user wants a read-only setup health check with agent judgment for ambiguous local state. The skill uses this deterministic helper script for setup facts:
 
 ```bash
 python3 scripts/agentos_doctor.py
 ```
 
-The doctor discovers `$root` from the current directory, or accepts `--agentos-home <root>`. It reports the resolved AgentOS home, checks adapter drift through `scripts/install_global_agent_instructions.py --check`, audits skill mirrors through mirror-skills without syncing, checks the starter Personal Overlay paths listed above, and reports best-effort automation presence. It prints presence, absence, counts, and paths only; it must not print Personal Overlay file contents.
+The helper script discovers `$root` from the current directory, or accepts `--agentos-home <root>`. It reports the resolved AgentOS home, checks adapter drift through `scripts/install_global_agent_instructions.py --check`, audits skill mirrors through mirror-skills without syncing, checks the starter Personal Overlay paths listed above, and reports deterministic automation evidence conservatively. It prints presence, absence, counts, and paths only; it must not print Personal Overlay file contents.
 
-If the installer or adapter check used `--all-default-adapters` or any custom `--adapter <path>` flags, repeat those exact flags on the doctor command so the read-only adapter drift result covers the same harness files.
+If the installer or adapter check used `--all-default-adapters` or any custom `--adapter <path>` flags, repeat those exact flags when using Run AgentOS Doctor or the helper script so the read-only adapter drift result covers the same harness files.
 
 If the command is running from an isolated feature worktree, pass `--primary-agentos-home <primary-agentos-home>` so current-machine adapter and mirror checks target the canonical checkout, while Personal Overlay starter files, private skills, and automation registry checks use the checkout that owns ignored private state. Without that flag, linked-worktree runs suppress adapter write and mirror sync recommendations.
 
-Doctor is not the installer and not mirror sync:
+Run AgentOS Doctor is not the installer and not mirror sync:
 
-- Use `scripts/agentos_doctor.py` for read-only setup health and exact next steps.
+- Use `os/skills/run-agentos-doctor/SKILL.md` for setup-health workflow and judgment over ambiguous notes.
+- Use `scripts/agentos_doctor.py` for deterministic setup facts and exact command recommendations.
 - Use `scripts/install_global_agent_instructions.py` when the user has approved creating, updating, checking, or removing global instruction adapters.
 - Use `os/skills/mirror-skills/scripts/mirror_skills.py` when the user wants to audit or, after approval, sync harness-discoverable skill mirrors.
 
@@ -134,5 +135,5 @@ Or:
 ```text
 Audit my AgentOS setup.
 
-Run `python3 scripts/agentos_doctor.py` from my AgentOS checkout. Check whether the global instruction adapters point at this AgentOS checkout, whether AgentOS skills are discoverable from my harness, whether my Personal Overlay has starter identity, context, memory, tool, and boundary files, and whether automation state appears configured. Report gaps and ask before making changes.
+Use the Run AgentOS Doctor skill from my AgentOS checkout. Run `python3 scripts/agentos_doctor.py` for deterministic setup facts, then check whether the global instruction adapters point at this AgentOS checkout, whether AgentOS skills are discoverable from my harness, whether my Personal Overlay has starter identity, context, memory, tool, and boundary files, and whether automation state appears actively configured or only ambiguously mentioned. Report gaps and ask before making changes.
 ```
