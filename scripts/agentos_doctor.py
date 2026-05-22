@@ -66,6 +66,13 @@ AUTOMATION_NEGATIVE_PROSE_MARKERS = (
     "inactive",
     "paused",
     "not active",
+    "draft candidate",
+    "draft-only candidate",
+    "draft only candidate",
+    "candidate draft",
+    "candidate automation",
+    "candidate agentos",
+    "deprecated",
 )
 AUTOMATION_ACTIVE_STATUS_MARKERS = ("active", "enabled", "scheduled", "running")
 AUTOMATION_EMPTY_SCHEDULE_MARKERS = (
@@ -75,6 +82,10 @@ AUTOMATION_EMPTY_SCHEDULE_MARKERS = (
     "na",
     "manual",
     "manual only",
+    "manual-only",
+    "once",
+    "one time",
+    "one-time",
     "tbd",
     "todo",
     "unscheduled",
@@ -1041,7 +1052,10 @@ def codex_automation_evidence(root: Path) -> tuple[bool, bool]:
 def codex_automation_toml_is_active_scheduled(text: str) -> bool:
     return bool(
         re.search(r"(?im)^\s*status\s*=\s*[\"']ACTIVE[\"']\s*$", text)
-        and re.search(r"(?im)^\s*(rrule|schedule)\s*=", text)
+        and any(
+            automation_schedule_is_set(value)
+            for value in simple_config_field_values(text, ("rrule", "schedule"))
+        )
     )
 
 
@@ -1285,9 +1299,12 @@ def run_self_tests() -> int:
         test_automation_registry_mention_warns,
         test_personal_active_automation_registry_passes,
         test_personal_disabled_automation_registry_warns,
+        test_personal_draft_candidate_automation_registry_warns,
         test_unrelated_codex_automation_does_not_pass,
         test_disabled_codex_agentos_automation_does_not_pass,
         test_negative_codex_agentos_automation_toml_warns,
+        test_codex_manual_schedule_does_not_pass,
+        test_codex_draft_candidate_automation_toml_warns,
         test_codex_agentos_automation_evidence_passes,
         test_automation_files_without_registry_warns,
         test_primary_agentos_home_supplies_personal_overlay,
@@ -1807,6 +1824,39 @@ Do not run AgentOS repository update automation.
         assert_true("Recurring AgentOS check evidence: not found" in joined, "disabled personal evidence should not be recurring")
 
 
+def test_personal_draft_candidate_automation_registry_warns() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        make_fake_agentos(root)
+        registry = root / "personal" / "os" / "automations" / "AUTOMATIONS.md"
+        registry.write_text(
+            """# Automations
+
+## Active Automations
+
+### Weekly AgentOS Doctor
+
+Automation id: weekly-agentos-doctor
+
+Status: Active
+
+Schedule rule: RRULE:FREQ=WEEKLY
+
+Invocation prompt:
+
+```text
+Draft-only candidate AgentOS doctor rollout.
+```
+""",
+            encoding="utf-8",
+        )
+        result = check_automations(root, root, Path(tmp) / "home", verbose=False)
+        joined = "\n".join(result.details)
+        assert_true(result.status == "WARN", "draft candidate Personal Overlay automation should not pass")
+        assert_true("Personal automation mention: found" in joined, "draft candidate mention should remain visible")
+        assert_true("Personal active AgentOS check evidence: not found" in joined, "draft candidate personal evidence should not be active")
+
+
 def test_unrelated_codex_automation_does_not_pass() -> None:
     with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
         root = Path(tmp) / "AgentOS"
@@ -1857,6 +1907,48 @@ def test_negative_codex_agentos_automation_toml_warns() -> None:
         assert_true("Possible AgentOS check mention: found" in joined, "negative TOML should remain possible evidence")
         assert_true("Codex active AgentOS check evidence: not found" in joined, "negative TOML should not be active evidence")
         assert_true("Recurring AgentOS check evidence: not found" in joined, "negative TOML should not be recurring")
+
+
+def test_codex_manual_schedule_does_not_pass() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        home = Path(tmp) / "home"
+        make_fake_agentos(root)
+        codex_automation = home / ".codex" / "automations" / "manual-agentos-doctor" / "automation.toml"
+        codex_automation.parent.mkdir(parents=True)
+        codex_automation.write_text(
+            'name = "AgentOS doctor health check"\n'
+            'prompt = "Run AgentOS Doctor."\n'
+            'status = "ACTIVE"\n'
+            'schedule = "manual"\n',
+            encoding="utf-8",
+        )
+        result = check_automations(root, root, home, verbose=False)
+        joined = "\n".join(result.details)
+        assert_true(result.status == "WARN", "manual Codex schedule should not pass as recurring")
+        assert_true("Possible AgentOS check mention: found" in joined, "manual schedule should remain possible evidence")
+        assert_true("Codex active AgentOS check evidence: not found" in joined, "manual schedule should not be active evidence")
+
+
+def test_codex_draft_candidate_automation_toml_warns() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        home = Path(tmp) / "home"
+        make_fake_agentos(root)
+        codex_automation = home / ".codex" / "automations" / "draft-agentos-doctor" / "automation.toml"
+        codex_automation.parent.mkdir(parents=True)
+        codex_automation.write_text(
+            'name = "AgentOS doctor health check"\n'
+            'prompt = "Draft candidate AgentOS doctor rollout."\n'
+            'status = "ACTIVE"\n'
+            'rrule = "RRULE:FREQ=WEEKLY"\n',
+            encoding="utf-8",
+        )
+        result = check_automations(root, root, home, verbose=False)
+        joined = "\n".join(result.details)
+        assert_true(result.status == "WARN", "draft candidate Codex TOML should not pass")
+        assert_true("Possible AgentOS check mention: found" in joined, "draft candidate TOML should remain possible evidence")
+        assert_true("Codex active AgentOS check evidence: not found" in joined, "draft candidate TOML should not be active evidence")
 
 
 def test_codex_agentos_automation_evidence_passes() -> None:
