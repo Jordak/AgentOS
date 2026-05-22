@@ -121,4 +121,5 @@ Before closing an implementation issue:
 Respect workflow labels as authority:
 
 - `ready-for-agent` means an agent may implement the issue when the instructions are clear.
+- For feature-sized implementation work, `ready-for-agent` is not a substitute for implementation readiness; the work must also pass or intentionally skip `os/playbook/IMPLEMENT_FEATURES.md`.
 - `ready-for-human`, `needs-human`, `needs-a-human`, or equivalent labels mean a human must do the work or make the closure decision. Do not close these issues as an agent, even if local work appears complete. Instead, leave an evidence comment and ask the user or the human owner to review and close.

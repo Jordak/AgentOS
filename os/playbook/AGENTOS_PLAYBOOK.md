@@ -30,6 +30,7 @@ Use small files with clear jobs:
 - Agents define durable jobs.
 - Verification describes quality checks.
 - Artifact policy explains output formats.
+- Implementation readiness explains when feature-sized work is ready for an agent to build.
 - Programming playbooks route durable coding, CLI, interface-design, and Markdown authoring preferences.
 - Automations describe scheduled or trigger-based work.
 - The source map tells agents where to inspect real project state.
@@ -82,6 +83,7 @@ Use the narrowest path that can answer the request.
 - Guided first-pass setup: `os/playbook/GETTING_STARTED.md`
 - Personal overlay load and migration rule: `os/playbook/PERSONAL_OVERLAY.md`
 - Public repository publication workflow: `os/playbook/PUBLICATION.md`
+- Feature implementation readiness: `os/playbook/IMPLEMENT_FEATURES.md`
 - Output artifact policy: `os/playbook/ARTIFACTS.md`
 - GitHub issue, PR, branch, and closure workflow: `os/playbook/GITHUB_WORKFLOW.md`
 - Programming preferences: `os/playbook/programming/README.md`

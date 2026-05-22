@@ -36,6 +36,15 @@
     "rationale": "Sandboxed GitHub CLI auth failures should activate the GitHub workflow policy so the agent retries with keyring access before blaming the user's credential."
   },
   {
+    "id": "feature-implementation-readiness",
+    "category": "implementation",
+    "task": "Implement a new AgentOS feature from an issue, starting from the feature request and deciding whether the agent may begin coding or needs more design consensus first.",
+    "must_access": [
+      "os/playbook/IMPLEMENT_FEATURES.md"
+    ],
+    "rationale": "Feature-sized implementation work should activate the implementation readiness gate before the agent begins coding or relies on tracker labels alone."
+  },
+  {
     "id": "generated-findings-propagation",
     "category": "memory",
     "task": "A generated review found durable AgentOS updates for context, skills, verification, and automations. Turn those findings into the proper reviewable proposals without applying the canonical edits yet.",
