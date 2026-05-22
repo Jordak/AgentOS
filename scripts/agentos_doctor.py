@@ -37,6 +37,48 @@ INSTALLER_RESULT_STATUSES = (
     "skip",
     "ok",
 )
+AUTOMATION_CHECK_TERMS = (
+    "drift",
+    "update",
+    "repository",
+    "review",
+    "doctor",
+    "health",
+    "setup",
+)
+AUTOMATION_NEGATIVE_MARKERS = (
+    "do not run",
+    "do not use",
+    "disabled",
+    "retired",
+    "inactive",
+    "paused",
+    "draft",
+    "candidate",
+    "deprecated",
+    "not active",
+)
+AUTOMATION_NEGATIVE_PROSE_MARKERS = (
+    "do not run",
+    "do not use",
+    "disabled",
+    "retired",
+    "inactive",
+    "paused",
+    "not active",
+)
+AUTOMATION_ACTIVE_STATUS_MARKERS = ("active", "enabled", "scheduled", "running")
+AUTOMATION_EMPTY_SCHEDULE_MARKERS = (
+    "",
+    "none",
+    "n/a",
+    "na",
+    "manual",
+    "manual only",
+    "tbd",
+    "todo",
+    "unscheduled",
+)
 
 
 @dataclass
@@ -200,8 +242,9 @@ def run_doctor(
                 mirror_root,
                 env,
                 verbose,
-                allow_sync_recommendation=current_machine_recommendations_allowed,
-                mirror_agentos_home=setup_agentos_home,
+                allow_sync_recommendation=current_machine_recommendations_allowed
+                and setup_agentos_home == agentos_home,
+                mirror_agentos_home=agentos_home,
                 script_agentos_home=agentos_home,
             )
         )
@@ -645,10 +688,10 @@ def check_skill_mirrors(
             )
         else:
             recommendations.append(
-                "Mirror sync recommendation suppressed because this run is using a linked worktree without --primary-agentos-home."
+                "Mirror sync recommendation suppressed because this run is auditing a checkout that should not be used for current-machine mirror writes."
             )
             recommendations.append(
-                "Re-run from the canonical checkout or pass --primary-agentos-home <primary-agentos-home> before syncing mirrors."
+                "Re-run from the canonical checkout after merging or pulling this Core change before syncing mirrors."
             )
     if statuses.get("extra-files"):
         recommendations.append(
@@ -807,10 +850,12 @@ def check_automations(
     codex_automations = process_home / ".codex" / "automations"
     personal_file_count = count_non_gitkeep_files(personal_automations)
     codex_file_count = count_non_gitkeep_files(codex_automations)
-    registry_mentions_checks = text_mentions_agentos_checks(read_text_or_empty(personal_registry))
+    personal_registry_text = read_text_or_empty(personal_registry)
+    registry_mentions_checks = text_mentions_agentos_checks(personal_registry_text)
+    registry_active_checks = personal_registry_active_agentos_check_evidence(personal_registry_text)
     codex_active_checks, codex_possible_checks = codex_automation_evidence(codex_automations)
     possible_check_evidence = registry_mentions_checks or codex_possible_checks
-    recurring_check_evidence = codex_active_checks
+    recurring_check_evidence = registry_active_checks or codex_active_checks
 
     details = [
         "Core automation registry: " + ("present" if core_registry.is_file() else "missing"),
@@ -818,6 +863,7 @@ def check_automations(
         f"Personal automation files: {personal_file_count}",
         "Codex automation mirror dir: " + presence_with_count(codex_automations),
         "Personal automation mention: " + ("found" if registry_mentions_checks else "not found"),
+        "Personal active AgentOS check evidence: " + ("found" if registry_active_checks else "not found"),
         "Codex active AgentOS check evidence: " + ("found" if codex_active_checks else "not found"),
         "Possible AgentOS check mention: " + ("found" if possible_check_evidence else "not found"),
         "Recurring AgentOS check evidence: " + ("active" if recurring_check_evidence else "not found"),
@@ -893,7 +939,81 @@ def read_text_or_empty(path: Path) -> str:
 
 def text_mentions_agentos_checks(text: str) -> bool:
     lowered = text.lower()
-    return "agentos" in lowered and any(term in lowered for term in ("drift", "update", "repository"))
+    return "agentos" in lowered and any(term in lowered for term in AUTOMATION_CHECK_TERMS)
+
+
+def text_has_negative_automation_marker(text: str) -> bool:
+    lowered = text.lower()
+    return any(marker in lowered for marker in AUTOMATION_NEGATIVE_MARKERS)
+
+
+def text_has_negative_automation_prose(text: str) -> bool:
+    lowered = text.lower()
+    return any(marker in lowered for marker in AUTOMATION_NEGATIVE_PROSE_MARKERS)
+
+
+def personal_registry_active_agentos_check_evidence(text: str) -> bool:
+    active_section = markdown_section(text, "Active Automations")
+    if not active_section:
+        return False
+    for heading, body in markdown_subsections(active_section):
+        entry_marker = heading.strip()
+        entry_text = heading + "\n" + body
+        if not text_mentions_agentos_checks(entry_text):
+            continue
+        if text_has_negative_automation_marker(entry_marker):
+            continue
+        if text_has_negative_automation_prose(entry_text):
+            continue
+        status = markdown_field_value(body, "Status")
+        schedule = markdown_field_value(body, "Schedule rule")
+        if automation_status_is_active(status) and automation_schedule_is_set(schedule):
+            return True
+    return False
+
+
+def markdown_section(text: str, heading: str) -> str:
+    match = re.search(rf"(?im)^##\s+{re.escape(heading)}\s*$", text)
+    if not match:
+        return ""
+    next_match = re.search(r"(?m)^##\s+", text[match.end() :])
+    if not next_match:
+        return text[match.end() :]
+    return text[match.end() : match.end() + next_match.start()]
+
+
+def markdown_subsections(section: str) -> list[tuple[str, str]]:
+    matches = list(re.finditer(r"(?m)^###\s+(.+?)\s*$", section))
+    if not matches:
+        return [("", section)]
+    entries: list[tuple[str, str]] = []
+    for index, match in enumerate(matches):
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(section)
+        entries.append((match.group(1), section[match.end() : end]))
+    return entries
+
+
+def markdown_field_value(text: str, field: str) -> str:
+    match = re.search(rf"(?im)^\s*{re.escape(field)}\s*:\s*(.*?)\s*$", text)
+    if not match:
+        return ""
+    return match.group(1).strip()
+
+
+def automation_status_is_active(status: str) -> bool:
+    lowered = status.lower()
+    if text_has_negative_automation_marker(lowered):
+        return False
+    return any(re.search(rf"\b{re.escape(marker)}\b", lowered) for marker in AUTOMATION_ACTIVE_STATUS_MARKERS)
+
+
+def automation_schedule_is_set(schedule: str) -> bool:
+    lowered = schedule.strip().lower()
+    if lowered in AUTOMATION_EMPTY_SCHEDULE_MARKERS:
+        return False
+    if text_has_negative_automation_marker(lowered):
+        return False
+    return True
 
 
 def codex_automation_evidence(root: Path) -> tuple[bool, bool]:
@@ -907,7 +1027,11 @@ def codex_automation_evidence(root: Path) -> tuple[bool, bool]:
         text = path.name + "\n" + read_text_or_empty(path)
         if not text_mentions_agentos_checks(text):
             continue
-        if path.name == "automation.toml" and codex_automation_toml_is_active_scheduled(text):
+        if (
+            path.name == "automation.toml"
+            and codex_automation_toml_is_active_scheduled(text)
+            and codex_automation_toml_has_active_agentos_marker(text)
+        ):
             active = True
         else:
             possible = True
@@ -919,6 +1043,30 @@ def codex_automation_toml_is_active_scheduled(text: str) -> bool:
         re.search(r"(?im)^\s*status\s*=\s*[\"']ACTIVE[\"']\s*$", text)
         and re.search(r"(?im)^\s*(rrule|schedule)\s*=", text)
     )
+
+
+def codex_automation_toml_has_active_agentos_marker(text: str) -> bool:
+    marker = "\n".join(simple_config_field_values(text, ("id", "name", "title")))
+    return bool(
+        marker
+        and text_mentions_agentos_checks(marker)
+        and not text_has_negative_automation_marker(marker)
+        and not text_has_negative_automation_prose(text)
+    )
+
+
+def simple_config_field_values(text: str, fields: Iterable[str]) -> list[str]:
+    values: list[str] = []
+    for field in fields:
+        quoted = re.compile(rf"(?im)^\s*{re.escape(field)}\s*=\s*([\"'])(.*?)\1\s*$")
+        for match in quoted.finditer(text):
+            values.append(match.group(2))
+        unquoted = re.compile(rf"(?im)^\s*{re.escape(field)}\s*=\s*([^#\n]+?)\s*$")
+        for match in unquoted.finditer(text):
+            raw = match.group(1).strip()
+            if raw and not (raw.startswith('"') or raw.startswith("'")):
+                values.append(raw)
+    return values
 
 
 def count_non_gitkeep_files(root: Path) -> int:
@@ -1135,8 +1283,11 @@ def run_self_tests() -> int:
         test_linked_worktree_without_primary_suppresses_writes,
         test_automation_no_evidence_warns,
         test_automation_registry_mention_warns,
+        test_personal_active_automation_registry_passes,
+        test_personal_disabled_automation_registry_warns,
         test_unrelated_codex_automation_does_not_pass,
         test_disabled_codex_agentos_automation_does_not_pass,
+        test_negative_codex_agentos_automation_toml_warns,
         test_codex_agentos_automation_evidence_passes,
         test_automation_files_without_registry_warns,
         test_primary_agentos_home_supplies_personal_overlay,
@@ -1521,8 +1672,9 @@ def test_primary_agentos_home_drives_current_machine_recommendations() -> None:
         assert_true(report.setup_agentos_home == primary.resolve(), "primary home should drive current-machine setup checks")
         assert_true(str(primary.resolve()) in adapter_text, "adapter recommendations should target primary home")
         assert_true(str(worktree.resolve()) not in adapter_text, "adapter recommendations should not target feature worktree")
-        assert_true(f"--agentos-root {primary.resolve()}" in mirror_text, "mirror recommendations should audit primary home")
-        assert_true(f"--agentos-root {worktree.resolve()}" not in mirror_text, "mirror recommendations should not sync from feature worktree")
+        assert_true(f"--agentos-root {worktree.resolve()}" in mirror_text, "mirror audit should use the current Core checkout")
+        assert_true(f"--personal-overlay-root {primary.resolve() / 'personal' / 'os'}" in mirror_text, "mirror audit should use the primary Personal Overlay")
+        assert_true("--sync" not in mirror_text, "mirror recommendations should not sync from feature worktree")
 
 
 def test_linked_worktree_without_primary_suppresses_writes() -> None:
@@ -1583,6 +1735,78 @@ def test_automation_registry_mention_warns() -> None:
         assert_true("Recurring AgentOS check evidence: not found" in joined, "ambiguous registry prose should not pass")
 
 
+def test_personal_active_automation_registry_passes() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        make_fake_agentos(root)
+        registry = root / "personal" / "os" / "automations" / "AUTOMATIONS.md"
+        registry.write_text(
+            """# Automations
+
+## Active Automations
+
+### Weekly AgentOS Review
+
+Automation id: weekly-agentos-review
+
+Status: Active
+
+Schedule rule: RRULE:FREQ=WEEKLY
+
+Invocation prompt:
+
+```text
+Run the AgentOS weekly review workflow.
+```
+
+## Candidate Automations
+
+### Candidate AgentOS Doctor
+
+Status: Candidate
+""",
+            encoding="utf-8",
+        )
+        result = check_automations(root, root, Path(tmp) / "home", verbose=False)
+        joined = "\n".join(result.details)
+        assert_true(result.status == "PASS", "documented active Personal Overlay automation should pass")
+        assert_true("Personal active AgentOS check evidence: found" in joined, "active personal evidence should be explicit")
+
+
+def test_personal_disabled_automation_registry_warns() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        make_fake_agentos(root)
+        registry = root / "personal" / "os" / "automations" / "AUTOMATIONS.md"
+        registry.write_text(
+            """# Automations
+
+## Active Automations
+
+### Retired AgentOS Repository Update
+
+Automation id: retired-agentos-update
+
+Status: Disabled
+
+Schedule rule: RRULE:FREQ=WEEKLY
+
+Invocation prompt:
+
+```text
+Do not run AgentOS repository update automation.
+```
+""",
+            encoding="utf-8",
+        )
+        result = check_automations(root, root, Path(tmp) / "home", verbose=False)
+        joined = "\n".join(result.details)
+        assert_true(result.status == "WARN", "disabled Personal Overlay automation should not pass")
+        assert_true("Personal automation mention: found" in joined, "disabled registry mention should remain visible")
+        assert_true("Personal active AgentOS check evidence: not found" in joined, "disabled personal evidence should not be active")
+        assert_true("Recurring AgentOS check evidence: not found" in joined, "disabled personal evidence should not be recurring")
+
+
 def test_unrelated_codex_automation_does_not_pass() -> None:
     with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
         root = Path(tmp) / "AgentOS"
@@ -1611,6 +1835,28 @@ def test_disabled_codex_agentos_automation_does_not_pass() -> None:
         assert_true(result.status == "WARN", "disabled prose note should not pass")
         assert_true("Possible AgentOS check mention: found" in joined, "possible mention should remain visible")
         assert_true("Recurring AgentOS check evidence: not found" in joined, "disabled prose should not be active evidence")
+
+
+def test_negative_codex_agentos_automation_toml_warns() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        home = Path(tmp) / "home"
+        make_fake_agentos(root)
+        codex_automation = home / ".codex" / "automations" / "disabled-agentos-note" / "automation.toml"
+        codex_automation.parent.mkdir(parents=True)
+        codex_automation.write_text(
+            'name = "AgentOS repository update automation"\n'
+            'prompt = "Do not run this AgentOS repository update automation."\n'
+            'status = "ACTIVE"\n'
+            'rrule = "RRULE:FREQ=WEEKLY"\n',
+            encoding="utf-8",
+        )
+        result = check_automations(root, root, home, verbose=False)
+        joined = "\n".join(result.details)
+        assert_true(result.status == "WARN", "negative active Codex TOML should not pass")
+        assert_true("Possible AgentOS check mention: found" in joined, "negative TOML should remain possible evidence")
+        assert_true("Codex active AgentOS check evidence: not found" in joined, "negative TOML should not be active evidence")
+        assert_true("Recurring AgentOS check evidence: not found" in joined, "negative TOML should not be recurring")
 
 
 def test_codex_agentos_automation_evidence_passes() -> None:
