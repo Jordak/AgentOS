@@ -12,3 +12,6 @@ Use this file for durable tool preferences, installed surfaces, and known constr
 - Access surface:
 - Safety notes:
 - Current status:
+- Last reviewed:
+- Refresh trigger:
+- Staleness risk:

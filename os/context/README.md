@@ -34,6 +34,32 @@ Use `os/context/` for public-safe, relatively stable context templates and Core 
 - Inspect mapped project sources before changing project-specific context.
 - Keep stale context honest with dates, status markers, or TODOs instead of silently rewriting history.
 - User corrections outrank older context. Preserve the correction in the narrowest relevant file.
+- Treat repeated re-explanation as a context smell. When the user has to explain the same project, stakeholder, tool, boundary, or preference again, propose adding the stable part to the narrowest context file.
+- Prefer small, focused context files over a single large document. A one-page current file is usually better than a stale comprehensive one.
+- Add freshness fields where staleness would mislead future agents: last reviewed, refresh trigger, and staleness risk.
+
+## Context Curation
+
+Context is a maintained library, not a one-time project. Agents should update or propose updates when they discover missing stable facts, stale project summaries, broken source routes, or repeated explanations from the user.
+
+Good context files answer one question well, such as:
+
+- what project or source should be inspected;
+- what priorities matter this quarter;
+- which tools and connectors exist;
+- which boundaries constrain a sensitive area;
+- which stakeholders or audiences matter.
+
+If a fact belongs to a mapped project, keep the source of truth in that project and store only routing or summary context here.
+
+## Freshness Fields
+
+Use these fields in Personal Overlay context files when useful:
+
+- Last reviewed:
+- Refresh trigger:
+- Staleness risk:
+- Source of truth:
 
 ## Provenance
 
