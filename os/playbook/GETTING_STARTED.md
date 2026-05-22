@@ -27,6 +27,34 @@ Ask enough to make the next agent session better:
 
 After the interview, summarize proposed writes before making them. Include the target path, why it belongs there, and whether the content is private.
 
+## Bootstrap Loop
+
+Prefer a useful 70% first version over a perfect private profile. The fastest path is:
+
+1. Ask the user for a rough brain dump about identity, projects, tools, workflows, and boundaries.
+2. Interview them with focused follow-up questions.
+3. Draft the smallest starter files that will improve the next session.
+4. Ask for approval before writing private state.
+5. Patch the files over the next few weeks whenever the user has to re-explain something important.
+
+Concrete starter prompt:
+
+```text
+I'm building my AgentOS Personal Overlay. Interview me before writing anything.
+
+Ask me about:
+- who I am and how I want agents to work with me;
+- how direct, detailed, skeptical, or action-oriented I want responses to be;
+- what I value when making decisions;
+- what frustrates me about AI assistance today;
+- what agents should never do without approval;
+- which projects, tools, accounts, and source systems matter now;
+- which workflows I repeat often enough to deserve a skill or agent;
+- what future agents should remember between sessions.
+
+After the interview, propose a 70% first version of the starter files. Include the target path, whether the content is private, and any unanswered questions. Do not write files until I approve the paths and contents.
+```
+
 ## Starter Files
 
 Useful first Personal Overlay files include:

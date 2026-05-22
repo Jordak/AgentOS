@@ -13,3 +13,6 @@ Use this file for stable project summaries that should shape future recommendati
 - Canonical source:
 - Public/private posture:
 - Next useful action:
+- Last reviewed:
+- Refresh trigger:
+- Staleness risk:

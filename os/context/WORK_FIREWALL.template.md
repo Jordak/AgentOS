@@ -15,3 +15,6 @@ Agents must not ask for, store, infer, summarize, or expose restricted informati
 - Disallowed information:
 - Approval requirements:
 - Relevant files or connectors:
+- Last reviewed:
+- Refresh trigger:
+- Staleness risk:

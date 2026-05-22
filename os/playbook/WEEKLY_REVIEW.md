@@ -31,6 +31,19 @@ Review whether AgentOS state is current, useful, and safely filed.
 5. Draft a report as a private generated output under `personal/os/memory/weekly-review/`.
 6. Ask the user to approve any durable state changes or external actions.
 
+## Retrospective Checklist
+
+Check whether the OS is still serving the user:
+
+- Stale context: source maps, project summaries, tool notes, work boundaries, and dated context files.
+- Repeated explanations: facts the user had to restate that should become context, memory, a source-map entry, or a skill.
+- Unused or weak skills: skills that are never invoked, produce poor outputs, lack verification, or duplicate another workflow.
+- Agent instructions: live agent roles, inputs, outputs, boundaries, and verification checklists that no longer match actual use.
+- Automations: live registry entries, manual-run evidence, last verification dates, logs, run histories, review modes, and disable notes.
+- Memory: decisions or lessons that should be promoted, stale working memory that should be removed, and generated reports that remain only evidence.
+- Source-map drift: moved repositories, stale document links, missing canonical sources, or project work that belongs outside AgentOS.
+- Propagation review: proposed durable updates that are still waiting, applied entries that need decision records, and rejected entries that should be closed.
+
 ## Safety
 
 - Do not inspect external accounts unless the user explicitly asks.

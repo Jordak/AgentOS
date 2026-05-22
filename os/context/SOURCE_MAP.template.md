@@ -10,12 +10,16 @@ Use this file to list canonical sources for a personal AgentOS overlay.
 - Prefer cloud documents only when they are the canonical source.
 - Record whether each source is public, private, or account-bound.
 - Do not copy private project implementation context into AgentOS when a mapped project already owns it.
+- Keep source routes fresh. If an agent finds a missing, moved, or stale source, it should say so and propose an update.
 
 ## Projects
 
 ### Project Name
 
 Purpose:
+Last reviewed:
+Refresh trigger:
+Staleness risk:
 
 Primary source:
 

@@ -40,6 +40,18 @@ Output:
 
 - Output artifacts or destinations. Prefer `personal/os/...` for local generated artifacts.
 
+Manual-run evidence:
+
+- Summarize the manual runs that proved this workflow is reliable enough to automate.
+
+Last verified:
+
+Logs or run history:
+
+Review mode:
+
+- Draft-only, local artifact, self-delivery, or external delivery.
+
 Verification:
 
 - Required checks.
@@ -47,6 +59,10 @@ Verification:
 Safety:
 
 - Approval gates and external-effect boundaries.
+
+Disable or rollback:
+
+- How to pause, disable, or recover if the automation behaves incorrectly.
 
 ## Candidate Automations
 
@@ -59,3 +75,9 @@ Suggested trigger:
 Suggested output:
 
 Activation standard:
+
+Manual-run evidence needed:
+
+Review mode:
+
+Safety gates:
