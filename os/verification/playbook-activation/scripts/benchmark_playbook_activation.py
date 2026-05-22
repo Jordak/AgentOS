@@ -10,6 +10,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -56,8 +57,7 @@ def git_value(root: Path, *args: str) -> str | None:
         return None
     if completed.returncode != 0:
         return None
-    value = completed.stdout.strip()
-    return value or None
+    return completed.stdout.strip()
 
 
 def collect_git_state(root: Path) -> dict[str, Any]:
@@ -782,8 +782,28 @@ def run_self_test(root: Path) -> int:
     if reason is None:
         print("SELF-TEST FAIL: harness startup failure was not detected.")
         return 1
+    if not run_git_state_self_test():
+        return 1
     print("SELF-TEST PASS: playbook activation grader accepted observed tool access.")
     return 0
+
+
+def run_git_state_self_test() -> bool:
+    with tempfile.TemporaryDirectory(prefix="agentos-playbook-git-self-test-") as tmp:
+        repo = Path(tmp)
+        subprocess.run(["git", "init", "-q", str(repo)], check=True)
+        clean_state = collect_git_state(repo)
+        if clean_state["worktree_clean"] is not True:
+            print("SELF-TEST FAIL: clean git worktree was not detected.")
+            print(json.dumps(clean_state, indent=2))
+            return False
+        (repo / "dirty.txt").write_text("dirty\n", encoding="utf-8")
+        dirty_state = collect_git_state(repo)
+        if dirty_state["worktree_clean"] is not False:
+            print("SELF-TEST FAIL: dirty git worktree was not detected.")
+            print(json.dumps(dirty_state, indent=2))
+            return False
+    return True
 
 
 def report_exit_code(report: dict[str, Any]) -> int:

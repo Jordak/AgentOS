@@ -15,6 +15,7 @@ import re
 import shlex
 import subprocess
 import sys
+import tempfile
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -112,8 +113,7 @@ def git_value(root: Path, *args: str) -> str | None:
         return None
     if completed.returncode != 0:
         return None
-    value = completed.stdout.strip()
-    return value or None
+    return completed.stdout.strip()
 
 
 def collect_git_state(root: Path) -> dict[str, Any]:
@@ -653,6 +653,24 @@ def report_exit_code(report: dict[str, Any]) -> int:
     return 0
 
 
+def run_git_state_self_test() -> bool:
+    with tempfile.TemporaryDirectory(prefix="agentos-retrieval-git-self-test-") as tmp:
+        repo = Path(tmp)
+        subprocess.run(["git", "init", "-q", str(repo)], check=True)
+        clean_state = collect_git_state(repo)
+        if clean_state["worktree_clean"] is not True:
+            print("SELF-TEST FAIL: clean git worktree was not detected.")
+            print(json.dumps(clean_state, indent=2))
+            return False
+        (repo / "dirty.txt").write_text("dirty\n", encoding="utf-8")
+        dirty_state = collect_git_state(repo)
+        if dirty_state["worktree_clean"] is not False:
+            print("SELF-TEST FAIL: dirty git worktree was not detected.")
+            print(json.dumps(dirty_state, indent=2))
+            return False
+    return True
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run AgentOS retrieval benchmark suites.")
     parser.add_argument("--root", type=Path, default=default_root())
@@ -704,6 +722,8 @@ def main(argv: list[str] | None = None) -> int:
     dry_run = args.dry_run if args.dry_run is not None else True
 
     if args.self_test:
+        if not run_git_state_self_test():
+            return 1
         return harness_eval.run_self_test(root, questions_path)
 
     if args.output and args.save_report:
