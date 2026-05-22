@@ -83,7 +83,7 @@ The helper script discovers `$root` from the current directory, or accepts `--ag
 
 If the installer or adapter check used `--all-default-adapters` or any custom `--adapter <path>` flags, repeat those exact flags when using Run AgentOS Doctor or the helper script so the read-only adapter drift result covers the same harness files.
 
-If the command is running from an isolated feature worktree, pass `--primary-agentos-home <primary-agentos-home>` so current-machine adapter and mirror checks target the canonical checkout, while Personal Overlay starter files, private skills, and automation registry checks use the checkout that owns ignored private state. Without that flag, linked-worktree runs suppress adapter write and mirror sync recommendations.
+If the command is running from an isolated feature worktree, pass `--primary-agentos-home <primary-agentos-home>` so adapter drift checks and adapter remediation recommendations target the canonical checkout. Skill mirror audits still use `--agentos-home` as the Core audit root and use `<primary-agentos-home>/personal/os` for private skill sources; mirror sync recommendations are suppressed while those roots differ. Personal Overlay starter files and automation registry checks also use the checkout that owns ignored private state. Without that flag, linked-worktree runs suppress adapter write and mirror sync recommendations.
 
 Run AgentOS Doctor is not the installer and not mirror sync:
 

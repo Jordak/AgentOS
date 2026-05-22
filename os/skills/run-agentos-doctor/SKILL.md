@@ -49,7 +49,7 @@ Safety:
    Read `AGENTS.md`, `os/INDEX.md`, `os/playbook/PERSONAL_OVERLAY.md`, and `os/playbook/GETTING_STARTED.md`. If you need current-machine setup boundaries, also read `os/RESOLVER.md`.
 
 2. Choose roots.
-   Use the current checkout as `--agentos-home`. If running from an isolated Git worktree, find or ask for the primary checkout and pass `--primary-agentos-home <primary-agentos-home>` so current-machine setup checks target the canonical installation.
+   Use the current checkout as the Core audit root via `--agentos-home`. If running from an isolated Git worktree, find or ask for the primary checkout and pass `--primary-agentos-home <primary-agentos-home>` so adapter setup checks and remediation recommendations target the canonical installation, while Personal Overlay reads come from `<primary-agentos-home>/personal/os`. Skill mirror audits compare Core skills from `--agentos-home` plus private skills from the primary overlay; mirror sync recommendations are suppressed while those roots differ.
 
 3. Run the deterministic helper.
    Use:
@@ -99,6 +99,6 @@ Safety:
 Before finishing, confirm:
 
 1. The doctor script ran, or explain why it could not.
-2. Any feature-worktree run used `--primary-agentos-home` or clearly warned that current-machine recommendations are limited.
+2. Any feature-worktree run used `--primary-agentos-home` or clearly warned that adapter write and mirror sync recommendations are limited.
 3. Automation evidence was classified conservatively.
 4. Recommended writes were framed as requests for approval, not actions already authorized.
