@@ -18,6 +18,7 @@ Inputs:
 - Personal Overlay skill directories under `personal/os/skills/<skill-name>/SKILL.md`, when present.
 - A current-machine mirror root, defaulting to the user's `.agents/skills` directory.
 - Optional private config at `personal/os/skills/mirror-skills/CONFIG.md` for current-machine mirror roots or validator paths.
+- Optional skill filter: one or more canonical skill names to audit or sync.
 - Optional mode: audit-only by default, or sync when the user asks to create/update mirrors.
 
 Output artifact:
@@ -52,10 +53,12 @@ Safety:
 2. Run an audit:
    - Use `python3 os/skills/mirror-skills/scripts/mirror_skills.py`.
    - Pass `--mirror-root <path>` if checking somewhere other than the default current-machine mirror root.
+   - Pass repeated `--skill <name>` arguments to check only a named subset of canonical skills.
    - Report missing, stale, and extra-file mirrors before syncing.
 
 3. Sync when requested:
    - Use the same script with `--sync` to create missing mirrors and copy changed canonical files.
+   - Use `--skill <name>` with `--sync` when the user only approved syncing specific canonical skills.
    - Ask for confirmation before syncing unless the user has already explicitly approved the exact mirror root and write scope in the current thread.
    - Use `--prune-extra` only after explicit approval, because it deletes mirror files that are not present in the canonical skill source.
    - Re-run audit after sync.
@@ -79,6 +82,13 @@ Create or update mirrors under the default current-machine mirror root:
 python3 os/skills/mirror-skills/scripts/mirror_skills.py --sync
 ```
 
+Audit or sync only a named canonical skill:
+
+```bash
+python3 os/skills/mirror-skills/scripts/mirror_skills.py --skill mirror-skills
+python3 os/skills/mirror-skills/scripts/mirror_skills.py --skill mirror-skills --sync
+```
+
 Test against a temporary mirror root:
 
 ```bash
@@ -89,6 +99,8 @@ python3 os/skills/mirror-skills/scripts/mirror_skills.py --mirror-root <mirror-r
 
 - The audit derives canonical skills from the manifest, Personal Overlay skill paths, and canonical source paths, not from machine-local mirror records.
 - The audit includes both Core manifest skills and Personal Overlay skills, unless `--core-only` is used.
+- Skill filters only select from canonical skills discovered in the selected scope and fail clearly when a requested skill is unknown or directly collides between Core and the Personal Overlay.
+- Scoped skill filters should not fail because of unrelated Personal Overlay collisions outside the requested skill names.
 - Personal Overlay skill names must not collide with Core skill names; use `personal/os/skills/<core-skill>/CONFIG.md` for private inputs to a Core skill.
 - Sync mode copies all required canonical skill files for directory-backed skills, including `os/agents/`, `scripts/`, `assets/`, and `references/` when present.
 - The report clearly separates missing/stale mirrors from extra mirror files.
@@ -106,6 +118,8 @@ Before finishing:
 
 1. Run the script in audit mode.
 2. Run a sync smoke test against a temporary mirror root.
-3. Run any private validator path named in `personal/os/skills/mirror-skills/CONFIG.md` when available.
-4. Run `python3 os/verification/scripts/validate_agentos.py`.
-5. Confirm no machine-local mirror state was added to the manifest.
+3. Run scoped audit and sync smoke tests with `--skill <name>`, including repeated `--skill` arguments when more than one canonical skill is available.
+4. Run an unknown-skill failure check and confirm it fails clearly.
+5. Run any private validator path named in `personal/os/skills/mirror-skills/CONFIG.md` when available.
+6. Run `python3 os/verification/scripts/validate_agentos.py`.
+7. Confirm no machine-local mirror state was added to the manifest.

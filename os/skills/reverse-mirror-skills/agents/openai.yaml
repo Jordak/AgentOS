@@ -1,0 +1,4 @@
+interface:
+  display_name: "Reverse Mirror Skills"
+  short_description: "Review local skills for AgentOS import."
+  default_prompt: "Use $reverse-mirror-skills to review local skills and recommend which ones should become canonical in AgentOS."
