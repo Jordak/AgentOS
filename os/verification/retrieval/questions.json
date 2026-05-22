@@ -73,5 +73,13 @@
     "expected_paths": [
       "os/context/SOURCE_MAP.md"
     ]
+  },
+  {
+    "id": "benchmark-status",
+    "category": "benchmark-status",
+    "question": "Where should an agent find the current public-safe AgentOS benchmark status snapshot?",
+    "expected_paths": [
+      "os/verification/BENCHMARK_STATUS.md"
+    ]
   }
 ]

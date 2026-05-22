@@ -22,6 +22,7 @@ from typing import Any
 CONFIDENCE_VALUES = {"low", "medium", "high"}
 KNOWN_HARNESSES = ("codex", "claude")
 DEFAULT_DISALLOWED_EXACT_PATHS = (
+    "os/verification/BENCHMARK_STATUS.md",
     "os/verification/retrieval/questions.json",
 )
 DEFAULT_DISALLOWED_PATH_PREFIXES = (
@@ -73,6 +74,12 @@ def load_questions(path: Path, selected_ids: set[str] | None = None) -> list[dic
     return [question for question in questions if question.get("id") in selected_ids]
 
 
+def disallowed_paths_for_question(question: dict[str, Any]) -> tuple[str, ...]:
+    expected_paths = set(question.get("expected_paths", []))
+    allowed_exact_paths = expected_paths & set(DEFAULT_DISALLOWED_EXACT_PATHS)
+    return tuple(path for path in DEFAULT_DISALLOWED_PATHS if path not in allowed_exact_paths)
+
+
 def disallowed_path_prompt_rules(disallowed_paths: tuple[str, ...] = DEFAULT_DISALLOWED_PATHS) -> str:
     lines = []
     for path in disallowed_paths:
@@ -92,7 +99,7 @@ Markdown fences and do not include commentary outside the JSON object.
 
 Rules:
 - Cite canonical AgentOS Markdown files, not eval fixtures or previous result reports.
-{disallowed_path_prompt_rules()}
+{disallowed_path_prompt_rules(disallowed_paths_for_question(question))}
 - Include at least one short quote from each file you rely on.
 - Evidence quotes must copy the file's words exactly, except whitespace may
   differ. Do not quote inferred section labels, summaries, or path
@@ -474,8 +481,10 @@ def grade_response(
     root: Path,
     question: dict[str, Any],
     response: dict[str, Any] | None,
-    disallowed_paths: tuple[str, ...] = DEFAULT_DISALLOWED_PATHS,
+    disallowed_paths: tuple[str, ...] | None = None,
 ) -> dict[str, Any]:
+    if disallowed_paths is None:
+        disallowed_paths = disallowed_paths_for_question(question)
     shape_errors = validate_response_shape(response)
     cited_paths: list[str] = []
     evidence_paths: list[str] = []

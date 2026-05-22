@@ -13,6 +13,7 @@ import json
 import math
 import re
 import shlex
+import subprocess
 import sys
 from collections import Counter, defaultdict
 from dataclasses import dataclass
@@ -98,7 +99,64 @@ def tokenize(text: str) -> list[str]:
     return tokens
 
 
-def markdown_files(root: Path) -> list[Path]:
+def git_value(root: Path, *args: str) -> str | None:
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(root), *args],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if completed.returncode != 0:
+        return None
+    value = completed.stdout.strip()
+    return value or None
+
+
+def collect_git_state(root: Path) -> dict[str, Any]:
+    status = git_value(root, "status", "--porcelain=v1")
+    branch = git_value(root, "branch", "--show-current")
+    commit = git_value(root, "rev-parse", "HEAD")
+    commit_time = git_value(root, "show", "-s", "--format=%cI", "HEAD")
+    upstream = git_value(root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
+    upstream_commit = git_value(root, "rev-parse", "@{u}") if upstream else None
+    ahead = behind = None
+    if upstream:
+        counts = git_value(root, "rev-list", "--left-right", "--count", "HEAD...@{u}")
+        if counts:
+            parts = counts.split()
+            if len(parts) == 2 and all(part.isdigit() for part in parts):
+                ahead = int(parts[0])
+                behind = int(parts[1])
+
+    worktree_clean = status == "" if status is not None else None
+    upstream_fresh = ahead == 0 and behind == 0 if ahead is not None and behind is not None else None
+    eligible_fresh_main = (
+        branch == "main"
+        and upstream == "origin/main"
+        and worktree_clean is True
+        and upstream_fresh is True
+        and bool(commit)
+    )
+    return {
+        "branch": branch or "unknown",
+        "commit": commit or "unknown",
+        "commit_time": commit_time or "unknown",
+        "upstream": upstream or "none",
+        "upstream_commit": upstream_commit or "unknown",
+        "ahead": ahead,
+        "behind": behind,
+        "upstream_fresh": upstream_fresh,
+        "worktree_clean": worktree_clean,
+        "eligible_fresh_main": bool(eligible_fresh_main),
+    }
+
+
+def markdown_files(root: Path, allowed_exact_paths: set[str] | None = None) -> list[Path]:
+    allowed_exact_paths = allowed_exact_paths or set()
     root_markdown_files = ("AGENTS.md", "README.md", "DOMAIN.md")
     files = [root / name for name in root_markdown_files if (root / name).exists()]
     for source_dir in ("docs", "os"):
@@ -108,24 +166,29 @@ def markdown_files(root: Path) -> list[Path]:
     return sorted(
         path
         for path in files
-        if path.is_file() and should_index_markdown(root, path)
+        if path.is_file() and should_index_markdown(root, path, allowed_exact_paths)
     )
 
 
-def should_index_markdown(root: Path, path: Path) -> bool:
+def should_index_markdown(root: Path, path: Path, allowed_exact_paths: set[str] | None = None) -> bool:
+    allowed_exact_paths = allowed_exact_paths or set()
     rel_path = path.relative_to(root).as_posix()
-    if rel_path in EXCLUDED_MARKDOWN_PATHS:
+    if rel_path in EXCLUDED_MARKDOWN_PATHS and rel_path not in allowed_exact_paths:
         return False
     return not any(rel_path.startswith(prefix) for prefix in EXCLUDED_MARKDOWN_PREFIXES)
 
 
-def load_files(root: Path) -> list[MarkdownFile]:
+def load_files(root: Path, allowed_exact_paths: set[str] | None = None) -> list[MarkdownFile]:
     docs: list[MarkdownFile] = []
-    for path in markdown_files(root):
+    for path in markdown_files(root, allowed_exact_paths):
         rel_path = path.relative_to(root).as_posix()
         text = path.read_text(encoding="utf-8")
         docs.append(MarkdownFile(rel_path, text, Counter(tokenize(f"{rel_path}\n{text}"))))
     return docs
+
+
+def allowed_exact_paths_for_question(question: dict[str, Any]) -> set[str]:
+    return set(question.get("expected_paths", [])) & EXCLUDED_MARKDOWN_PATHS
 
 
 def split_sections(doc: MarkdownFile) -> list[Section]:
@@ -250,12 +313,17 @@ def render_result_paths(results: list[dict[str, Any]]) -> str:
 
 
 def build_local_report(root: Path, questions: list[dict[str, Any]], limit: int) -> dict[str, Any]:
-    docs = load_files(root)
+    default_docs = load_files(root)
+    docs_by_allowed_paths: dict[tuple[str, ...], list[MarkdownFile]] = {(): default_docs}
     rows: list[dict[str, Any]] = []
     keyword_hits = 0
     section_hits = 0
 
     for item in questions:
+        allowed_key = tuple(sorted(allowed_exact_paths_for_question(item)))
+        if allowed_key not in docs_by_allowed_paths:
+            docs_by_allowed_paths[allowed_key] = load_files(root, set(allowed_key))
+        docs = docs_by_allowed_paths[allowed_key]
         expected = set(item["expected_paths"])
         keyword = keyword_file_search(docs, item["question"], limit)
         section = section_index_search(docs, item["question"], limit)
@@ -275,7 +343,7 @@ def build_local_report(root: Path, questions: list[dict[str, Any]], limit: int) 
         )
 
     return {
-        "docs_indexed": len(docs),
+        "docs_indexed": max(len(docs) for docs in docs_by_allowed_paths.values()),
         "questions": len(questions),
         "limit": limit,
         "keyword_hit": keyword_hits,
@@ -371,6 +439,7 @@ def build_report(
     report: dict[str, Any] = {
         "version": 1,
         "generated_at": datetime.now(timezone.utc).isoformat(),
+        "agentos_git": collect_git_state(root),
         "root": str(root),
         "suite": suite,
         "dry_run": dry_run,
@@ -399,10 +468,15 @@ def build_report(
 
 def render_markdown(report: dict[str, Any]) -> str:
     harness_dry_run = str(report["dry_run"]).lower() if "harness" in report else "n/a"
+    git_state = report.get("agentos_git", {})
     lines = [
         "# AgentOS Retrieval Benchmark",
         "",
         f"- Generated: `{report['generated_at']}`",
+        f"- AgentOS commit: `{git_state.get('commit', 'unknown')}`",
+        f"- AgentOS branch: `{git_state.get('branch', 'unknown')}`",
+        f"- Worktree clean: `{str(git_state.get('worktree_clean', 'unknown')).lower()}`",
+        f"- Fresh main eligible: `{str(git_state.get('eligible_fresh_main', False)).lower()}`",
         f"- Suite: `{report['suite']}`",
         f"- Harness dry run: `{harness_dry_run}`",
         f"- Harness model: `{report['model']}`",

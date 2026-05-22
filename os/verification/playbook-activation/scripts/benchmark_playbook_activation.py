@@ -43,6 +43,62 @@ def default_root() -> Path:
     return Path(__file__).resolve().parents[4]
 
 
+def git_value(root: Path, *args: str) -> str | None:
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(root), *args],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if completed.returncode != 0:
+        return None
+    value = completed.stdout.strip()
+    return value or None
+
+
+def collect_git_state(root: Path) -> dict[str, Any]:
+    status = git_value(root, "status", "--porcelain=v1")
+    branch = git_value(root, "branch", "--show-current")
+    commit = git_value(root, "rev-parse", "HEAD")
+    commit_time = git_value(root, "show", "-s", "--format=%cI", "HEAD")
+    upstream = git_value(root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
+    upstream_commit = git_value(root, "rev-parse", "@{u}") if upstream else None
+    ahead = behind = None
+    if upstream:
+        counts = git_value(root, "rev-list", "--left-right", "--count", "HEAD...@{u}")
+        if counts:
+            parts = counts.split()
+            if len(parts) == 2 and all(part.isdigit() for part in parts):
+                ahead = int(parts[0])
+                behind = int(parts[1])
+
+    worktree_clean = status == "" if status is not None else None
+    upstream_fresh = ahead == 0 and behind == 0 if ahead is not None and behind is not None else None
+    eligible_fresh_main = (
+        branch == "main"
+        and upstream == "origin/main"
+        and worktree_clean is True
+        and upstream_fresh is True
+        and bool(commit)
+    )
+    return {
+        "branch": branch or "unknown",
+        "commit": commit or "unknown",
+        "commit_time": commit_time or "unknown",
+        "upstream": upstream or "none",
+        "upstream_commit": upstream_commit or "unknown",
+        "ahead": ahead,
+        "behind": behind,
+        "upstream_fresh": upstream_fresh,
+        "worktree_clean": worktree_clean,
+        "eligible_fresh_main": bool(eligible_fresh_main),
+    }
+
+
 def resolve_under_root(root: Path, path: Path) -> Path:
     return path if path.is_absolute() else root / path
 
@@ -374,6 +430,7 @@ def build_dry_run_report(
     return {
         "version": 1,
         "generated_at": datetime.now(timezone.utc).isoformat(),
+        "agentos_git": collect_git_state(root),
         "root": str(root),
         "mode": "dry-run",
         "summary": {
@@ -401,6 +458,7 @@ def build_transcript_report(
     return {
         "version": 1,
         "generated_at": datetime.now(timezone.utc).isoformat(),
+        "agentos_git": collect_git_state(root),
         "root": str(root),
         "mode": "transcript",
         "transcripts": [str(path) for path in transcript_paths],
@@ -448,6 +506,7 @@ def build_harness_report(
     return {
         "version": 1,
         "generated_at": datetime.now(timezone.utc).isoformat(),
+        "agentos_git": collect_git_state(root),
         "root": str(root),
         "mode": "run",
         "summary": {
@@ -504,10 +563,15 @@ def coverage_report(coverage: list[dict[str, Any]], fixtures: list[dict[str, Any
 
 
 def render_markdown(report: dict[str, Any]) -> str:
+    git_state = report.get("agentos_git", {})
     lines = [
         "# AgentOS Playbook Activation Verification",
         "",
         f"- Generated: `{report['generated_at']}`",
+        f"- AgentOS commit: `{git_state.get('commit', 'unknown')}`",
+        f"- AgentOS branch: `{git_state.get('branch', 'unknown')}`",
+        f"- Worktree clean: `{str(git_state.get('worktree_clean', 'unknown')).lower()}`",
+        f"- Fresh main eligible: `{str(git_state.get('eligible_fresh_main', False)).lower()}`",
         f"- Mode: `{report['mode']}`",
         "",
         "> Scope: this benchmark grades only observed access to required guidance files. Task completion, write success, read-only sandbox failures, and final-answer quality are diagnostic context, not scoring inputs.",

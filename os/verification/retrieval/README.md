@@ -14,6 +14,8 @@ The benchmark asks representative AgentOS lookup questions and checks whether th
 - support the answer with evidence from local files;
 - avoid eval fixtures, previous reports, and other answer-key files.
 
+`os/verification/BENCHMARK_STATUS.md` is excluded from ordinary retrieval evidence because it summarizes benchmark outcomes. A dedicated benchmark-status lookup question may target that file directly, but unrelated retrieval questions should not use it as answer evidence.
+
 This gives AgentOS one score to watch during maintenance: can the current harness find and support the right answer from the control plane?
 
 The goal is not to replace Codex, Claude Code, or any other harness with a homegrown retriever. The goal is to make AgentOS discoverability observable, so changes to file layout, routing language, skills, memory, and agent definitions can be checked before they silently make future agents worse.

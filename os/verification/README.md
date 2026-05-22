@@ -14,6 +14,12 @@ python3 os/verification/scripts/validate_agentos.py
 
 The default validator reads local files only and runs structural checks plus deterministic publication/privacy checks.
 
+## Benchmark Status
+
+Core benchmark posture lives in `os/verification/BENCHMARK_STATUS.md`. That file is a current public-safe snapshot for humans and agents, not raw evidence, a run log, or append-only history.
+
+Raw benchmark reports and run histories belong outside Core, usually under the Personal Overlay report directories configured in `os/verification/BENCHMARKS.json`. Use `os/skills/refresh-benchmark-status/SKILL.md` to refresh the Core snapshot from eligible local evidence without copying private or raw run details into Core.
+
 ## Commit And Tree Scans
 
 For shell-backed publication safety scans, run:
