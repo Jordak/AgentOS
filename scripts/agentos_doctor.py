@@ -88,6 +88,10 @@ AUTOMATION_NONRECURRING_SCHEDULE_MARKERS = (
     "todo",
     "unscheduled",
 )
+AUTOMATION_BOUNDED_SCHEDULE_MARKERS = (
+    "count=",
+    "until=",
+)
 AUTOMATION_RECURRING_SCHEDULE_MARKERS = (
     "rrule:freq=",
     "freq=daily",
@@ -1054,6 +1058,8 @@ def automation_schedule_is_recurring(schedule: str) -> bool:
         return False
     if text_has_marker(lowered, AUTOMATION_NONRECURRING_SCHEDULE_MARKERS):
         return False
+    if any(marker in lowered for marker in AUTOMATION_BOUNDED_SCHEDULE_MARKERS):
+        return False
     return text_has_marker(lowered, AUTOMATION_RECURRING_SCHEDULE_MARKERS)
 
 
@@ -1331,12 +1337,14 @@ def run_self_tests() -> int:
         test_personal_disabled_automation_registry_warns,
         test_personal_draft_candidate_automation_registry_warns,
         test_personal_one_off_schedule_warns,
+        test_personal_bounded_rrule_warns,
         test_personal_prompt_only_agentos_mention_warns,
         test_unrelated_codex_automation_does_not_pass,
         test_disabled_codex_agentos_automation_does_not_pass,
         test_negative_codex_agentos_automation_toml_warns,
         test_codex_manual_schedule_does_not_pass,
         test_codex_one_off_schedule_warns,
+        test_codex_bounded_rrule_warns,
         test_codex_draft_candidate_automation_toml_warns,
         test_codex_agentos_automation_evidence_passes,
         test_automation_files_without_registry_warns,
@@ -1923,6 +1931,39 @@ Run AgentOS Doctor.
         assert_true("Personal active AgentOS check evidence: not found" in joined, "one-off personal schedule should not be active")
 
 
+def test_personal_bounded_rrule_warns() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        make_fake_agentos(root)
+        registry = root / "personal" / "os" / "automations" / "AUTOMATIONS.md"
+        registry.write_text(
+            """# Automations
+
+## Active Automations
+
+### Weekly AgentOS Doctor
+
+Automation id: weekly-agentos-doctor
+
+Status: Active
+
+Schedule rule: RRULE:FREQ=WEEKLY;COUNT=1
+
+Invocation prompt:
+
+```text
+Run AgentOS Doctor.
+```
+""",
+            encoding="utf-8",
+        )
+        result = check_automations(root, root, Path(tmp) / "home", verbose=False)
+        joined = "\n".join(result.details)
+        assert_true(result.status == "WARN", "bounded Personal Overlay RRULE should not pass")
+        assert_true("Personal automation mention: found" in joined, "bounded RRULE mention should remain visible")
+        assert_true("Personal active AgentOS check evidence: not found" in joined, "bounded personal RRULE should not be active")
+
+
 def test_personal_prompt_only_agentos_mention_warns() -> None:
     with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
         root = Path(tmp) / "AgentOS"
@@ -2048,6 +2089,27 @@ def test_codex_one_off_schedule_warns() -> None:
         assert_true(result.status == "WARN", "one-off Codex schedule should not pass as recurring")
         assert_true("Possible AgentOS check mention: found" in joined, "one-off schedule should remain possible evidence")
         assert_true("Codex active AgentOS check evidence: not found" in joined, "one-off schedule should not be active evidence")
+
+
+def test_codex_bounded_rrule_warns() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        home = Path(tmp) / "home"
+        make_fake_agentos(root)
+        codex_automation = home / ".codex" / "automations" / "bounded-agentos-doctor" / "automation.toml"
+        codex_automation.parent.mkdir(parents=True)
+        codex_automation.write_text(
+            'name = "AgentOS doctor health check"\n'
+            'prompt = "Run AgentOS Doctor."\n'
+            'status = "ACTIVE"\n'
+            'rrule = "RRULE:FREQ=WEEKLY;COUNT=1"\n',
+            encoding="utf-8",
+        )
+        result = check_automations(root, root, home, verbose=False)
+        joined = "\n".join(result.details)
+        assert_true(result.status == "WARN", "bounded Codex RRULE should not pass as recurring")
+        assert_true("Possible AgentOS check mention: found" in joined, "bounded RRULE should remain possible evidence")
+        assert_true("Codex active AgentOS check evidence: not found" in joined, "bounded RRULE should not be active evidence")
 
 
 def test_codex_draft_candidate_automation_toml_warns() -> None:
