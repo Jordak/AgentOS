@@ -109,6 +109,17 @@ def extract_field(section: str, field_name: str) -> str | None:
     return code_span.group(1) if code_span else value
 
 
+def managed_relative_path_problem(raw_path: str) -> str | None:
+    path = Path(raw_path)
+    if path.is_absolute():
+        return "must be root-relative, not absolute"
+    if raw_path.startswith("~"):
+        return "must be root-relative, not home-relative"
+    if ".." in path.parts:
+        return "must not contain parent-directory segments"
+    return None
+
+
 def parse_manifest(agentos_root: Path) -> list[SkillEntry]:
     manifest_path = agentos_root / "os/skills/MANIFEST.md"
     manifest_problems = path_component_problems(manifest_path, expected_kind="file", allow_missing=False)
@@ -126,6 +137,9 @@ def parse_manifest(agentos_root: Path) -> list[SkillEntry]:
         canonical_source = extract_field(section, "Canonical source")
         if not canonical_source:
             continue
+        canonical_problem = managed_relative_path_problem(canonical_source)
+        if canonical_problem:
+            raise SystemExit(f"{name}: unsafe Canonical source {canonical_source!r}: {canonical_problem}")
 
         source_path = agentos_root / canonical_source
         source_root = source_path.parent if source_path.name == "SKILL.md" else source_path
@@ -707,7 +721,11 @@ def main() -> int:
         )
         preflight_results.extend(personal_preflight_results(personal_problems, mirror_root))
     blocked_names = {result.name for result in preflight_results}
-    entries = select_entries(core_entries, personal_entries, args.skill, blocked_names=blocked_names)
+    if "personal-overlay" in blocked_names and args.skill:
+        requested_set = set(args.skill)
+        entries = [entry for entry in core_entries if entry.name in requested_set]
+    else:
+        entries = select_entries(core_entries, personal_entries, args.skill, blocked_names=blocked_names)
     if not entries and not preflight_results:
         raise SystemExit("No mirrorable Core or Personal Overlay skills found.")
 

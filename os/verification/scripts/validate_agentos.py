@@ -898,7 +898,14 @@ class AgentOSValidator:
                     self.add_error(check, manifest_path, f"{skill_name}: missing {field_name}")
 
             if canonical:
-                canonical_path = self.resolve_path(canonical)
+                canonical_path = self.managed_relative_path(
+                    canonical,
+                    check,
+                    manifest_path,
+                    f"{skill_name}: Canonical source",
+                )
+                if not canonical_path:
+                    continue
                 if not canonical_path.exists():
                     self.add_error(
                         check,
@@ -940,6 +947,19 @@ class AgentOSValidator:
         if code_span:
             return code_span.group(1)
         return value.rstrip(".").strip()
+
+    def managed_relative_path(self, raw_path: str, check: str, source: Path, label: str) -> Path | None:
+        path = Path(raw_path)
+        if path.is_absolute():
+            self.add_error(check, source, f"{label} must be root-relative, not absolute: {raw_path}")
+            return None
+        if raw_path.startswith("~"):
+            self.add_error(check, source, f"{label} must be root-relative, not home-relative: {raw_path}")
+            return None
+        if ".." in path.parts:
+            self.add_error(check, source, f"{label} must not contain parent-directory segments: {raw_path}")
+            return None
+        return self.root / path
 
     def resolve_path(self, raw_path: str) -> Path:
         path = Path(raw_path).expanduser()
@@ -1723,6 +1743,31 @@ def run_self_test() -> int:
             and "required Personal Overlay skeleton .gitkeep is missing" in error.message
             for error in validator.errors
         )
+        canonical_escape_root = root / "_canonical_escape_fixture"
+        (canonical_escape_root / "os/skills").mkdir(parents=True)
+        (canonical_escape_root / "personal").mkdir()
+        (canonical_escape_root / "os/skills/MANIFEST.md").write_text(
+            "# Skills\n\n"
+            "### `escape`\n\n"
+            "- Canonical source: `/agentos-fixture-outside/SKILL.md`\n"
+            "- Contract status: `partial`\n"
+            "- Mutability: read-only\n"
+            "- Tools and connectors: none\n"
+            "- Output artifact: none\n"
+            "- Filing rule: none\n"
+            "- Safety posture: safe\n"
+            "- Verification coverage: none\n"
+            "- Upgrade notes: none\n",
+            encoding="utf-8",
+        )
+        canonical_escape_validator = AgentOSValidator(canonical_escape_root)
+        canonical_escape_validator.check_skills_manifest_consistency()
+        canonical_escape_rejected = any(
+            error.check == "skills manifest consistency"
+            and error.path == "os/skills/MANIFEST.md"
+            and "Canonical source must be root-relative" in error.message
+            for error in canonical_escape_validator.errors
+        )
         marker_symlink_root = root / "_marker_symlink_fixture"
         marker_symlink_file = marker_symlink_root / "personal/os/verification/privacy-markers.txt"
         marker_symlink_file.parent.mkdir(parents=True)
@@ -1903,6 +1948,7 @@ def run_self_test() -> int:
             and configured_marker_redacted
             and built_in_marker_redacted
             and missing_skeleton_rejected
+            and canonical_escape_rejected
             and marker_symlink_rejected
             and marker_symlink_not_loaded
             and personal_symlink_rejected
@@ -1928,6 +1974,8 @@ def run_self_test() -> int:
             for error in publication_validator.errors:
                 print(f"EXPECTED {error.format()}")
             for error in broad_gitkeep_validator.errors:
+                print(f"EXPECTED {error.format()}")
+            for error in canonical_escape_validator.errors:
                 print(f"EXPECTED {error.format()}")
             for error in marker_config_validator.errors:
                 print(f"EXPECTED {error.format()}")
