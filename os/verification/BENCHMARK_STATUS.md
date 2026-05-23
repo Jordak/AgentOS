@@ -21,38 +21,38 @@ Do not use `stale` as a Core status. Staleness is relative to the current checko
 
 ### Local Lexical
 
-- Status: `not run`
-- Reviewed Core revision: `not reviewed`
-- Last reviewed evidence: No eligible evidence reviewed as of `2026-05-22 17:07 PDT`
-- Evidence scope: `none`
-- Summary: No current-schema clean, remote-fresh main local lexical retrieval evidence has been reviewed for this snapshot.
-- Caveats: Run the current retrieval benchmark on clean, remote-fresh `main` before marking this entry as `passing` or `attention needed`.
+- Status: `attention needed`
+- Reviewed Core revision: `36c707b40428033510432c921feeec5e4c9827df`
+- Last reviewed evidence: `2026-05-22 19:33 PDT`
+- Evidence scope: `retrieval local lexical suite; 10 lookup questions; section-index and keyword hit@5`
+- Summary: Section-index retrieval found an expected canonical path within the top 5 for all 10 lookup tasks. The simpler keyword baseline found expected paths for 8 of 10 tasks.
+- Caveats: Keyword search missed two lookup categories even though section-index retrieval succeeded for both. No model-call harness evidence is included in this local lexical entry.
 
 ### Codex
 
-- Status: `not run`
-- Reviewed Core revision: `not reviewed`
-- Last reviewed evidence: No eligible evidence reviewed as of `2026-05-22 17:07 PDT`
-- Evidence scope: `none`
-- Summary: No current-schema clean, remote-fresh main Codex retrieval harness evidence has been reviewed for this snapshot.
-- Caveats: Run the current retrieval harness benchmark on clean, remote-fresh `main` before marking this entry as `passing` or `attention needed`.
+- Status: `attention needed`
+- Reviewed Core revision: `36c707b40428033510432c921feeec5e4c9827df`
+- Last reviewed evidence: `2026-05-22 19:45 PDT`
+- Evidence scope: `retrieval Codex harness; 10 lookup questions; gpt-5.5 xhigh`
+- Summary: Codex produced graded responses for all 10 retrieval tasks and passed 5. It succeeded on context projects, skills contract, agent templates, Personal Overlay routing, and benchmark status lookup.
+- Caveats: Five tasks failed, mostly because evidence quotes did not support the cited source strongly enough or the expected source path was missed. The failing categories included identity defaults, memory/current state, publication safety, mapped projects, and run-benchmarks routing.
 
 ### Claude
 
-- Status: `not run`
-- Reviewed Core revision: `not reviewed`
-- Last reviewed evidence: No eligible evidence reviewed as of `2026-05-22 17:07 PDT`
-- Evidence scope: `none`
-- Summary: No current-schema clean, remote-fresh main Claude retrieval harness evidence has been reviewed for this snapshot.
-- Caveats: Run the current retrieval harness benchmark on clean, remote-fresh `main` before marking this entry as `passing` or `attention needed`.
+- Status: `attention needed`
+- Reviewed Core revision: `36c707b40428033510432c921feeec5e4c9827df`
+- Last reviewed evidence: `2026-05-22 19:45 PDT`
+- Evidence scope: `retrieval Claude harness; 10 lookup questions; gpt-5.5 xhigh`
+- Summary: Claude produced graded responses for all 10 retrieval tasks but passed only the context-projects lookup.
+- Caveats: Nine tasks failed primarily on schema-shape, source-path, and evidence-support requirements. This indicates a harness/response-format alignment problem as much as a retrieval problem.
 
 ## Playbook Activation
 
 ### Codex
 
-- Status: `not run`
-- Reviewed Core revision: `not reviewed`
-- Last reviewed evidence: No eligible evidence reviewed as of `2026-05-22 17:07 PDT`
-- Evidence scope: `none`
-- Summary: No current-schema clean, remote-fresh main Codex playbook-activation evidence has been reviewed for this snapshot.
-- Caveats: Run the current playbook-activation benchmark on clean, remote-fresh `main` before marking this entry as `passing` or `attention needed`.
+- Status: `passing`
+- Reviewed Core revision: `36c707b40428033510432c921feeec5e4c9827df`
+- Last reviewed evidence: `2026-05-22 20:35 PDT`
+- Evidence scope: `playbook-activation Codex harness; 10 fixtures; gpt-5.5 xhigh`
+- Summary: Codex accessed the required guidance for all 10 playbook-activation fixtures, covering programming CLI, artifact format selection, GitHub workflow, implementation readiness, propagation review, weekly review, portability, Markdown style, and skill contract upgrade routing.
+- Caveats: Claude is not currently a configured playbook-activation harness, so there is no Claude playbook-activation entry in this snapshot.
