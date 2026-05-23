@@ -236,8 +236,9 @@ def run_doctor(
     setup_agentos_home = primary_agentos_home if requested_primary_agentos_home else agentos_home
     mirror_root = expand_path(mirror_root, cwd)
     adapter_args = adapter_args or []
-    linked_worktree_without_primary = requested_primary_agentos_home is None and is_linked_git_worktree(agentos_home)
-    current_machine_recommendations_allowed = not linked_worktree_without_primary
+    setup_home_is_linked_worktree = is_linked_git_worktree(setup_agentos_home)
+    private_root_is_canonical = not is_linked_git_worktree(primary_agentos_home)
+    current_machine_recommendations_allowed = not setup_home_is_linked_worktree
 
     results = [discovery_result, check_agentos_home(agentos_home)]
     home_is_usable = results[-1].status != "FAIL"
@@ -247,8 +248,8 @@ def run_doctor(
         home_is_usable = primary_result.status != "FAIL"
 
     if home_is_usable:
-        if linked_worktree_without_primary:
-            results.append(linked_worktree_without_primary_result(agentos_home))
+        if setup_home_is_linked_worktree:
+            results.append(linked_worktree_setup_suppressed_result(agentos_home, setup_agentos_home, requested_primary_agentos_home))
         results.append(
             check_adapters(
                 agentos_home=setup_agentos_home,
@@ -277,7 +278,7 @@ def run_doctor(
                 agentos_home,
                 primary_agentos_home,
                 verbose,
-                private_root_is_canonical=not linked_worktree_without_primary,
+                private_root_is_canonical=private_root_is_canonical,
             )
         )
         results.append(
@@ -286,7 +287,9 @@ def run_doctor(
                 primary_agentos_home,
                 process_home,
                 verbose,
-                private_root_is_canonical=not linked_worktree_without_primary,
+                private_root_is_canonical=private_root_is_canonical,
+                env=env,
+                cwd=cwd,
             )
         )
     else:
@@ -379,6 +382,26 @@ def expand_path(path: Path, cwd: Path) -> Path:
     return expanded.resolve()
 
 
+def absolute_lexical_path(path: Path, cwd: Path) -> Path:
+    if not path.is_absolute():
+        path = cwd / path
+    return Path(os.path.abspath(os.fspath(path)))
+
+
+def codex_home_from_env(env: Mapping[str, str], cwd: Path) -> Path | None:
+    raw = env.get("CODEX_HOME")
+    if not raw:
+        return None
+    return absolute_lexical_path(Path(os.path.expanduser(raw)), cwd)
+
+
+def codex_automations_root(process_home: Path, env: Mapping[str, str], cwd: Path) -> Path:
+    codex_home = codex_home_from_env(env, cwd)
+    if codex_home:
+        return codex_home / "automations"
+    return process_home / ".codex" / "automations"
+
+
 def is_linked_git_worktree(path: Path) -> bool:
     git_entry = path / ".git"
     try:
@@ -390,16 +413,29 @@ def is_linked_git_worktree(path: Path) -> bool:
     return text.lower().startswith("gitdir:") and "/worktrees/" in text.replace("\\", "/")
 
 
-def linked_worktree_without_primary_result(agentos_home: Path) -> CheckResult:
+def linked_worktree_setup_suppressed_result(
+    agentos_home: Path,
+    setup_agentos_home: Path,
+    requested_primary_agentos_home: Path | None,
+) -> CheckResult:
+    if requested_primary_agentos_home is None:
+        summary = "Linked Git worktree detected without --primary-agentos-home."
+        recommendations = [
+            "Re-run with --primary-agentos-home <primary-agentos-home> before applying current-machine setup recommendations.",
+            "Adapter write and skill mirror sync recommendations are suppressed for this run.",
+        ]
+    else:
+        summary = "Linked Git worktree selected for current-machine setup."
+        recommendations = [
+            "Pass a primary AgentOS checkout that is not a linked feature worktree before applying current-machine setup recommendations.",
+            "Adapter write and skill mirror sync recommendations are suppressed for this run.",
+        ]
     return CheckResult(
         "worktree mode",
         "WARN",
-        "Linked Git worktree detected without --primary-agentos-home.",
-        details=[f"Linked worktree: {agentos_home}"],
-        recommendations=[
-            "Re-run with --primary-agentos-home <primary-agentos-home> before applying current-machine setup recommendations.",
-            "Adapter write and skill mirror sync recommendations are suppressed for this run.",
-        ],
+        summary,
+        details=[f"AgentOS home: {agentos_home}", f"Current-machine setup home: {setup_agentos_home}"],
+        recommendations=recommendations,
     )
 
 
@@ -1040,11 +1076,15 @@ def check_automations(
     process_home: Path,
     verbose: bool,
     private_root_is_canonical: bool = True,
+    env: Mapping[str, str] | None = None,
+    cwd: Path | None = None,
 ) -> CheckResult:
     core_registry = agentos_home / "os" / "automations" / "AUTOMATIONS.md"
     personal_automations = primary_agentos_home / "personal" / "os" / "automations"
     personal_registry = personal_automations / "AUTOMATIONS.md"
-    codex_automations = process_home / ".codex" / "automations"
+    env = env or {}
+    cwd = cwd or Path.cwd()
+    codex_automations = codex_automations_root(process_home, env, cwd)
     core_registry_is_file, core_registry_error = safe_path_is_file(core_registry)
     personal_automations_exists, personal_automations_exists_error = safe_path_exists(personal_automations)
     personal_registry_is_file, personal_registry_file_error = safe_path_is_file(personal_registry)
@@ -1429,7 +1469,7 @@ def codex_automation_evidence(root: Path) -> tuple[bool, bool, bool, OSError | U
     if root_dir_error:
         return active, negative, possible, root_dir_error
     if not root_is_dir:
-        return active, negative, possible, None
+        return active, negative, possible, NotADirectoryError(os.fspath(root))
     read_error: OSError | UnicodeDecodeError | None = None
     paths, walk_error = safe_tree_files(root)
     if walk_error:
@@ -1571,7 +1611,7 @@ def count_non_gitkeep_files_with_error(root: Path) -> tuple[int, OSError | None]
     if dir_error:
         return 0, dir_error
     if not root_is_dir:
-        return 0, None
+        return 0, NotADirectoryError(os.fspath(root))
     count = 0
     paths, walk_error = safe_tree_files(root)
     if walk_error:
@@ -1817,11 +1857,15 @@ def run_self_tests() -> int:
         test_primary_agentos_home_supplies_private_skill_mirrors,
         test_primary_agentos_home_drives_current_machine_recommendations,
         test_linked_worktree_without_primary_suppresses_writes,
+        test_linked_worktree_primary_self_suppresses_writes,
         test_personal_overlay_unreadable_starter_warns,
         test_automation_no_evidence_warns,
+        test_automation_respects_codex_home,
         test_automation_unreadable_registry_warns,
         test_automation_unreadable_codex_file_warns,
         test_automation_unreadable_codex_directory_warns,
+        test_automation_codex_root_file_blocks_pass,
+        test_automation_personal_root_file_blocks_pass,
         test_automation_registry_mention_warns,
         test_personal_active_automation_registry_passes,
         test_personal_disabled_automation_registry_warns,
@@ -2461,6 +2505,41 @@ def test_linked_worktree_without_primary_suppresses_writes() -> None:
         assert_true("Do not write private state into this feature worktree" in joined, "private writes should be discouraged")
 
 
+def test_linked_worktree_primary_self_suppresses_writes() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        worktree = Path(tmp) / "worktree"
+        mirror_root = Path(tmp) / "mirrors"
+        make_fake_agentos(worktree)
+        make_linked_worktree_marker(worktree)
+        write_drift_installer(worktree)
+        report = run_doctor(
+            requested_agentos_home=worktree,
+            requested_primary_agentos_home=worktree,
+            cwd=worktree,
+            mirror_root=mirror_root,
+            verbose=False,
+            process_home=Path(tmp) / "home",
+            env=minimal_env(Path(tmp) / "home"),
+        )
+        worktree_result = result_named(report, "worktree mode")
+        adapter_result = result_named(report, "adapter drift")
+        mirror_result = result_named(report, "skill mirrors")
+        overlay_result = result_named(report, "Personal Overlay")
+        automation_result = result_named(report, "automations")
+        joined = "\n".join(
+            worktree_result.recommendations
+            + adapter_result.recommendations
+            + mirror_result.recommendations
+            + overlay_result.recommendations
+            + automation_result.recommendations
+        )
+        assert_true(worktree_result.status == "WARN", "linked setup home should be explicit")
+        assert_true("--no-dry-run" not in joined, "adapter write command should be suppressed for linked setup home")
+        assert_true("--sync" not in joined, "mirror sync command should be suppressed for linked setup home")
+        assert_true("not a linked feature worktree" in joined, "recommendations should ask for a non-worktree primary")
+        assert_true("Do not write private state into this feature worktree" in joined, "private writes should be discouraged")
+
+
 def test_personal_overlay_unreadable_starter_warns() -> None:
     global safe_path_is_file
 
@@ -2495,6 +2574,30 @@ def test_automation_no_evidence_warns() -> None:
         joined = "\n".join(result.details)
         assert_true(result.status == "WARN", "missing recurring check evidence should warn")
         assert_true("Recurring AgentOS check evidence: not found" in joined, "missing evidence should be explicit")
+
+
+def test_automation_respects_codex_home() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        home = Path(tmp) / "home"
+        codex_home = Path(tmp) / "custom-codex"
+        make_fake_agentos(root)
+        codex_automation = codex_home / "automations" / "agentos-doctor" / "automation.toml"
+        codex_automation.parent.mkdir(parents=True)
+        codex_automation.write_text(
+            'name = "AgentOS doctor health check"\n'
+            'prompt = "Run AgentOS Doctor for repository drift."\n'
+            'status = "ACTIVE"\n'
+            'rrule = "RRULE:FREQ=WEEKLY"\n',
+            encoding="utf-8",
+        )
+        env = minimal_env(home)
+        env["CODEX_HOME"] = str(codex_home)
+        result = check_automations(root, root, home, verbose=False, env=env, cwd=root)
+        joined = "\n".join(result.details)
+        assert_true(result.status == "PASS", "CODEX_HOME automation evidence should pass")
+        assert_true(f"Codex automation mirror path: {codex_home / 'automations'}" not in joined, "non-verbose paths should stay hidden")
+        assert_true("Codex active AgentOS check evidence: found" in joined, "CODEX_HOME evidence should be audited")
 
 
 def test_automation_unreadable_registry_warns() -> None:
@@ -2617,6 +2720,63 @@ Schedule rule: RRULE:FREQ=WEEKLY
         assert_true("could not be fully inspected" in result.summary, "unreadable Codex directory summary should be explicit")
         assert_true("Codex automation scan" in joined, "unreadable Codex directory detail should name source")
         assert_true("Recurring AgentOS check evidence: not found" in joined, "unreadable Codex directory should block PASS")
+
+
+def test_automation_codex_root_file_blocks_pass() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        home = Path(tmp) / "home"
+        make_fake_agentos(root)
+        registry = root / "personal" / "os" / "automations" / "AUTOMATIONS.md"
+        registry.write_text(
+            """# Automations
+
+## Active Automations
+
+### Weekly AgentOS Doctor
+
+Automation id: weekly-agentos-doctor
+
+Status: Active
+
+Schedule rule: RRULE:FREQ=WEEKLY
+""",
+            encoding="utf-8",
+        )
+        codex_root = home / ".codex" / "automations"
+        codex_root.parent.mkdir(parents=True)
+        codex_root.write_text("not a directory\n", encoding="utf-8")
+        result = check_automations(root, root, home, verbose=False)
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "WARN", "non-directory Codex automation root should block PASS")
+        assert_true("could not be fully inspected" in result.summary, "non-directory Codex root summary should be explicit")
+        assert_true("Codex automation scan" in joined, "non-directory Codex root should name source")
+        assert_true("Recurring AgentOS check evidence: not found" in joined, "non-directory Codex root should suppress recurring PASS")
+
+
+def test_automation_personal_root_file_blocks_pass() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        home = Path(tmp) / "home"
+        make_fake_agentos(root)
+        personal_root = root / "personal" / "os" / "automations"
+        personal_root.rmdir()
+        personal_root.write_text("not a directory\n", encoding="utf-8")
+        codex_automation = home / ".codex" / "automations" / "agentos-doctor" / "automation.toml"
+        codex_automation.parent.mkdir(parents=True)
+        codex_automation.write_text(
+            'name = "AgentOS doctor health check"\n'
+            'prompt = "Run AgentOS Doctor for repository drift."\n'
+            'status = "ACTIVE"\n'
+            'rrule = "RRULE:FREQ=WEEKLY"\n',
+            encoding="utf-8",
+        )
+        result = check_automations(root, root, home, verbose=False)
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "WARN", "non-directory Personal automation root should block PASS")
+        assert_true("could not be fully inspected" in result.summary, "non-directory Personal root summary should be explicit")
+        assert_true("Personal automation file count" in joined, "non-directory Personal root should name source")
+        assert_true("Recurring AgentOS check evidence: not found" in joined, "non-directory Personal root should suppress recurring PASS")
 
 
 def test_automation_registry_mention_warns() -> None:
