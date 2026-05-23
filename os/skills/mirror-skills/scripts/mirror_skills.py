@@ -64,6 +64,38 @@ def lexical_path(path: Path, cwd: Path) -> Path:
     return Path(os.path.abspath(os.fspath(expanded)))
 
 
+def destination_root_problem(path: Path) -> str | None:
+    absolute = lexical_path(path, Path.cwd())
+    current = Path(absolute.anchor)
+    for part in absolute.parts[1:]:
+        current = current / part
+        try:
+            current_stat = current.lstat()
+        except FileNotFoundError:
+            return None
+        except OSError as error:
+            return f"{current}: {error.__class__.__name__}: {error}"
+        if stat.S_ISLNK(current_stat.st_mode):
+            if allowed_destination_alias(current):
+                continue
+            return f"{current}: symbolic link is not allowed"
+        if not stat.S_ISDIR(current_stat.st_mode):
+            return f"{current}: not a directory"
+    return None
+
+
+def allowed_destination_alias(path: Path) -> bool:
+    # macOS exposes these root-owned aliases under /private; deeper symlinks still fail.
+    allowed = {
+        "/tmp": Path("/private/tmp"),
+        "/var": Path("/private/var"),
+    }
+    expected = allowed.get(path.as_posix())
+    if expected is None:
+        return False
+    return Path(os.path.realpath(os.fspath(path))) == expected
+
+
 def extract_field(section: str, field_name: str) -> str | None:
     pattern = re.compile(FIELD_RE_TEMPLATE.format(field=re.escape(field_name)), re.MULTILINE)
     match = pattern.search(section)
@@ -278,7 +310,7 @@ def personal_overlay_discovery_error_result(
 
 
 def mirror_root_problem(mirror_root: Path) -> str | None:
-    return source_path_problem(mirror_root.parent, mirror_root, "directory")
+    return destination_root_problem(mirror_root)
 
 
 def mirror_root_error_result(mirror_root: Path, problem: str) -> MirrorResult:

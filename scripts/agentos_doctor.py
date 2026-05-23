@@ -736,6 +736,17 @@ def check_skill_mirrors(
             "Mirror-skills audit script is missing.",
             details=[root_relative(script_agentos_home, script)],
         )
+    mirror_root_error = destination_root_problem(mirror_root)
+    if mirror_root_error:
+        return CheckResult(
+            "skill mirrors",
+            "FAIL",
+            "Skill mirror root could not be inspected.",
+            details=[path_error_detail("mirror root", agentos_home, mirror_root, mirror_root_error, verbose)],
+            recommendations=[
+                "Fix the mirror root path before trusting mirror status or syncing mirrors."
+            ],
+        )
     mirror_root_exists, mirror_root_exists_error = safe_path_exists(mirror_root)
     if mirror_root_exists_error:
         return CheckResult(
@@ -1748,6 +1759,38 @@ def safe_path_is_dir(path: Path) -> tuple[bool, OSError | None]:
 
 def safe_path_is_file(path: Path) -> tuple[bool, OSError | None]:
     return safe_path_kind(path, "file")
+
+
+def destination_root_problem(path: Path) -> OSError | None:
+    absolute = absolute_lexical_path(path, Path.cwd())
+    current = Path(absolute.anchor)
+    for part in absolute.parts[1:]:
+        current = current / part
+        try:
+            current_stat = current.lstat()
+        except FileNotFoundError:
+            return None
+        except OSError as exc:
+            return exc
+        if stat.S_ISLNK(current_stat.st_mode):
+            if allowed_destination_alias(current):
+                continue
+            return UnsafePathError(f"symbolic link is not allowed: {current}")
+        if not stat.S_ISDIR(current_stat.st_mode):
+            return NotADirectoryError(os.fspath(current))
+    return None
+
+
+def allowed_destination_alias(path: Path) -> bool:
+    # macOS exposes these root-owned aliases under /private; deeper symlinks still fail.
+    allowed = {
+        "/tmp": Path("/private/tmp"),
+        "/var": Path("/private/var"),
+    }
+    expected = allowed.get(path.as_posix())
+    if expected is None:
+        return False
+    return Path(os.path.realpath(os.fspath(path))) == expected
 
 
 def trusted_path_kind(boundary_root: Path, path: Path, expected_kind: str) -> tuple[bool, OSError | None]:
@@ -2793,6 +2836,40 @@ def test_mirror_root_symlink_fails_closed() -> None:
         )
         assert_true(completed.returncode == 1, "mirror sync should fail closed for symlinked mirror root")
         assert_true("mirror-unreadable" in completed.stdout, "symlinked mirror root should be reported")
+
+        real_parent = Path(tmp) / "real-parent"
+        linked_parent = Path(tmp) / "linked-parent"
+        real_parent.mkdir()
+        linked_parent.symlink_to(real_parent, target_is_directory=True)
+        missing_below_link = linked_parent / "missing-child" / "mirrors"
+        result = check_skill_mirrors(
+            root,
+            root,
+            missing_below_link,
+            minimal_env(Path(tmp) / "home"),
+            verbose=False,
+        )
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "FAIL", "mirror root below symlinked ancestor should fail closed in doctor")
+        assert_true("--sync" not in joined, "mirror root below symlinked ancestor should not recommend sync")
+
+        completed = run_subprocess(
+            [
+                sys.executable,
+                str(script),
+                "--agentos-root",
+                str(root),
+                "--mirror-root",
+                str(missing_below_link),
+                "--sync",
+                "--json",
+            ],
+            cwd=root,
+            env=minimal_env(Path(tmp) / "home"),
+        )
+        assert_true(completed.returncode == 1, "mirror sync should fail closed below symlinked ancestor")
+        assert_true("mirror-unreadable" in completed.stdout, "symlinked mirror ancestor should be reported")
+        assert_true(not (real_parent / "missing-child").exists(), "mirror sync should not write through symlinked ancestor")
 
 
 def test_mirror_sync_blocks_writes_after_discovery_error() -> None:
