@@ -176,11 +176,13 @@ def file_map(root: Path) -> tuple[dict[str, Path], list[str]]:
     files: dict[str, Path] = {}
     problems: list[str] = []
     try:
-        root_stat = root.stat()
+        root_stat = root.lstat()
     except FileNotFoundError:
         return files, problems
     except OSError as error:
         return files, [f". ({error.__class__.__name__}: {error})"]
+    if stat.S_ISLNK(root_stat.st_mode):
+        return files, [f". (symbolic link is not allowed: {root})"]
     if not stat.S_ISDIR(root_stat.st_mode):
         return files, [f". (not a directory: {root})"]
 
@@ -199,11 +201,13 @@ def file_map(root: Path) -> tuple[dict[str, Path], list[str]]:
                 continue
             rel = rel_path.as_posix()
             try:
-                path_stat = path.stat()
+                path_stat = path.lstat()
             except OSError as error:
                 problems.append(f"{rel} ({error.__class__.__name__}: {error})")
                 continue
-            if stat.S_ISDIR(path_stat.st_mode):
+            if stat.S_ISLNK(path_stat.st_mode):
+                problems.append(f"{rel} (symbolic link is not allowed)")
+            elif stat.S_ISDIR(path_stat.st_mode):
                 pending.append(path)
             elif stat.S_ISREG(path_stat.st_mode):
                 files[rel] = path
@@ -229,6 +233,52 @@ def unreadable_files(files: dict[str, Path]) -> list[str]:
         problem = file_read_problem(path)
         if problem:
             problems.append(f"{rel} ({problem})")
+    return problems
+
+
+def existing_path_kind_problem(path: Path, expected_kind: str) -> str | None:
+    try:
+        path_stat = path.lstat()
+    except FileNotFoundError:
+        return None
+    except OSError as error:
+        return f"{error.__class__.__name__}: {error}"
+    if stat.S_ISLNK(path_stat.st_mode):
+        return "symbolic link is not allowed"
+    if expected_kind == "directory" and not stat.S_ISDIR(path_stat.st_mode):
+        return "not a directory"
+    if expected_kind == "file" and not stat.S_ISREG(path_stat.st_mode):
+        return "not a regular file"
+    return None
+
+
+def mirror_path_kind_problems(mirror_dir: Path, canonical_files: dict[str, Path]) -> list[str]:
+    try:
+        mirror_root_stat = mirror_dir.lstat()
+    except FileNotFoundError:
+        return []
+    except OSError as error:
+        return [f". ({error.__class__.__name__}: {error})"]
+    if not stat.S_ISDIR(mirror_root_stat.st_mode):
+        return []
+
+    problems: list[str] = []
+    for rel in sorted(canonical_files):
+        current = mirror_dir
+        parts = Path(rel).parts
+        for part in parts[:-1]:
+            current = current / part
+            problem = existing_path_kind_problem(current, "directory")
+            if problem:
+                problems.append(f"{rel} ({current.relative_to(mirror_dir).as_posix()}: {problem})")
+                break
+            if not current.exists():
+                break
+        else:
+            destination = mirror_dir / rel
+            problem = existing_path_kind_problem(destination, "file")
+            if problem:
+                problems.append(f"{rel} ({rel}: {problem})")
     return problems
 
 
@@ -262,7 +312,11 @@ def compare_entry(entry: SkillEntry) -> MirrorResult:
             extra_files=sorted(set(mirror_files) - set(canonical_files)),
             notes=source_unreadable,
         )
-    mirror_unreadable = [*mirror_problems, *unreadable_files(mirror_files)]
+    mirror_unreadable = [
+        *mirror_problems,
+        *mirror_path_kind_problems(entry.mirror_dir, canonical_files),
+        *unreadable_files(mirror_files),
+    ]
     if mirror_unreadable:
         return MirrorResult(
             name=entry.name,
@@ -313,6 +367,8 @@ def sync_entry(entry: SkillEntry, prune_extra: bool) -> None:
 
     canonical_files, source_problems = file_map(entry.source_root)
     if source_problems:
+        return
+    if mirror_path_kind_problems(entry.mirror_dir, canonical_files):
         return
     entry.mirror_dir.mkdir(parents=True, exist_ok=True)
 

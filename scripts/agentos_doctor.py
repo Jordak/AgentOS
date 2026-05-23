@@ -1681,6 +1681,7 @@ def run_subprocess(
             cwd=cwd,
             env=dict(env),
             text=True,
+            errors="replace",
             capture_output=True,
             timeout=DEFAULT_TIMEOUT_SECONDS,
             check=False,
@@ -1860,6 +1861,7 @@ def run_self_tests() -> int:
         test_adapter_check_skip_downgrades_pass,
         test_adapter_check_nonzero_without_actionable_drift_fails,
         test_subprocess_timeout_output_is_text,
+        test_subprocess_invalid_utf8_output_is_text,
         test_mirror_smoke_uses_temp_dirs,
         test_mirror_command_failure_is_not_sync_advice,
         test_mirror_source_failure_is_not_sync_advice,
@@ -1872,6 +1874,8 @@ def run_self_tests() -> int:
         test_mirror_file_path_fails_closed,
         test_mirror_nested_source_directory_error_fails,
         test_mirror_nested_mirror_directory_error_fails,
+        test_mirror_source_symlinks_fail_closed,
+        test_mirror_nested_path_kind_conflicts_fail_closed,
         test_mirror_unreadable_personal_skills_root_fails,
         test_mirror_failure_suppresses_private_names_without_verbose,
         test_mirror_recommendations_quote_paths,
@@ -2262,6 +2266,31 @@ def test_subprocess_timeout_output_is_text() -> None:
         assert_true("Timed out after 1 seconds." in joined, "timeout stderr should be preserved as text")
 
 
+def test_subprocess_invalid_utf8_output_is_text() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        home = Path(tmp) / "home"
+        make_fake_agentos(root)
+        home.mkdir()
+        installer = root / "scripts" / "install_global_agent_instructions.py"
+        installer.write_text(
+            "import sys\n"
+            "sys.stdout.buffer.write(bytes([255, 10]))\n"
+            "sys.exit(1)\n",
+            encoding="utf-8",
+        )
+        result = check_adapters(
+            agentos_home=root,
+            process_home=home,
+            env=minimal_env(home),
+            extra_args=[],
+            verbose=True,
+        )
+        joined = "\n".join(result.details)
+        assert_true(result.status == "FAIL", "invalid subprocess bytes should return a failure result")
+        assert_true("installer stdout:" in joined, "invalid subprocess output should be preserved as text")
+
+
 def test_mirror_smoke_uses_temp_dirs() -> None:
     with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
         root = Path(tmp) / "AgentOS"
@@ -2503,6 +2532,45 @@ def test_mirror_nested_mirror_directory_error_fails() -> None:
         assert_true(result.status == "FAIL", "unreadable nested mirror directories should fail closed")
         assert_true("mirror-unreadable=1" in joined, "nested mirror traversal failure should be reported")
         assert_true("--sync" not in joined, "unreadable mirror evidence should not recommend sync")
+
+
+def test_mirror_source_symlinks_fail_closed() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        mirror_root = Path(tmp) / "mirrors"
+        external = Path(tmp) / "external"
+        make_fake_agentos(root)
+        external.mkdir()
+        (external / "private.md").write_text("private\n", encoding="utf-8")
+        (external / "private-dir").mkdir()
+        (root / "os" / "skills" / "example-skill" / "linked.md").symlink_to(external / "private.md")
+        (root / "os" / "skills" / "example-skill" / "linked-dir").symlink_to(
+            external / "private-dir",
+            target_is_directory=True,
+        )
+        result = check_skill_mirrors(root, root, mirror_root, minimal_env(Path(tmp) / "home"), verbose=False)
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "FAIL", "source symlinks should fail closed")
+        assert_true("source-unreadable=1" in joined, "source symlink evidence should be reported")
+        assert_true("--sync" not in joined, "source symlinks should not recommend sync")
+
+
+def test_mirror_nested_path_kind_conflicts_fail_closed() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        mirror_root = Path(tmp) / "mirrors"
+        make_fake_agentos(root)
+        nested_source = root / "os" / "skills" / "example-skill" / "scripts" / "tool.py"
+        nested_source.parent.mkdir()
+        nested_source.write_text("print('ok')\n", encoding="utf-8")
+        (mirror_root / "example-skill").mkdir(parents=True)
+        (mirror_root / "example-skill" / "scripts").write_text("not a directory\n", encoding="utf-8")
+        (mirror_root / "example-skill" / "SKILL.md").mkdir()
+        result = check_skill_mirrors(root, root, mirror_root, minimal_env(Path(tmp) / "home"), verbose=False)
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "FAIL", "nested mirror path-kind conflicts should fail closed")
+        assert_true("mirror-unreadable=1" in joined, "nested path-kind conflict should be reported")
+        assert_true("--sync" not in joined, "path-kind conflicts should not recommend sync")
 
 
 def test_mirror_unreadable_personal_skills_root_fails() -> None:
