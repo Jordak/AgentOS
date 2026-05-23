@@ -44,7 +44,14 @@ class MirrorResult:
 
 def find_agentos_root(start: Path) -> Path:
     for path in [start, *start.parents]:
-        if (path / "os/skills/MANIFEST.md").exists():
+        manifest_path = path / "os/skills/MANIFEST.md"
+        try:
+            manifest_path.lstat()
+        except FileNotFoundError:
+            continue
+        except OSError:
+            continue
+        if source_path_problem(path, manifest_path, "file") is None:
             return path
     raise SystemExit("Could not find AgentOS root containing os/skills/MANIFEST.md")
 
@@ -64,6 +71,17 @@ def source_path_problem(boundary_root: Path, source_path: Path, expected_kind: s
         rel = source_path.relative_to(boundary_root)
     except ValueError:
         return f"source path is outside boundary root: {source_path}"
+
+    try:
+        root_stat = boundary_root.lstat()
+    except FileNotFoundError:
+        return None
+    except OSError as error:
+        return f".: {error.__class__.__name__}: {error}"
+    if stat.S_ISLNK(root_stat.st_mode):
+        return f".: symbolic link is not allowed: {boundary_root}"
+    if not stat.S_ISDIR(root_stat.st_mode):
+        return f".: not a directory: {boundary_root}"
 
     current = boundary_root
     parts = rel.parts
@@ -88,6 +106,12 @@ def source_path_problem(boundary_root: Path, source_path: Path, expected_kind: s
     return None
 
 
+def personal_overlay_boundary_root(personal_overlay_root: Path) -> Path:
+    if personal_overlay_root.name == "os" and personal_overlay_root.parent.name == "personal":
+        return personal_overlay_root.parent.parent
+    return personal_overlay_root.parent
+
+
 def core_source_problem(agentos_root: Path, skill_name: str, canonical_source: str, source_path: Path) -> str | None:
     source = Path(canonical_source)
     if source.is_absolute():
@@ -103,6 +127,9 @@ def core_source_problem(agentos_root: Path, skill_name: str, canonical_source: s
 
 def parse_manifest(agentos_root: Path) -> list[SkillEntry]:
     manifest_path = agentos_root / "os/skills/MANIFEST.md"
+    manifest_problem = source_path_problem(agentos_root, manifest_path, "file")
+    if manifest_problem:
+        raise SystemExit(f"Skills manifest could not be inspected: {manifest_problem}")
     manifest = manifest_path.read_text(encoding="utf-8")
     matches = list(SKILL_HEADING_RE.finditer(manifest))
     entries: list[SkillEntry] = []
@@ -136,12 +163,33 @@ def parse_manifest(agentos_root: Path) -> list[SkillEntry]:
 
 def discover_personal_overlay_entries(agentos_root: Path, personal_overlay_root: Path | None = None) -> list[SkillEntry]:
     personal_skills_root = (personal_overlay_root or (agentos_root / "personal/os")) / "skills"
-    if not personal_skills_root.exists():
+    boundary_root = personal_overlay_boundary_root(personal_skills_root.parent)
+    try:
+        personal_skills_root.lstat()
+    except FileNotFoundError:
+        return []
+    except OSError:
+        return []
+    if source_path_problem(boundary_root, personal_skills_root, "directory"):
         return []
 
     entries: list[SkillEntry] = []
-    for skill_file in sorted(personal_skills_root.glob("*/SKILL.md")):
-        skill_dir = skill_file.parent
+    for skill_dir in sorted(personal_skills_root.iterdir()):
+        try:
+            skill_dir_stat = skill_dir.lstat()
+        except OSError:
+            continue
+        if stat.S_ISLNK(skill_dir_stat.st_mode) or not stat.S_ISDIR(skill_dir_stat.st_mode):
+            continue
+        skill_file = skill_dir / "SKILL.md"
+        try:
+            skill_file.lstat()
+        except FileNotFoundError:
+            continue
+        except OSError as error:
+            source_error = f"{skill_file.relative_to(boundary_root).as_posix()}: {error.__class__.__name__}: {error}"
+        else:
+            source_error = source_path_problem(boundary_root, skill_file, "file")
         name = skill_dir.name
         try:
             canonical_source = skill_file.relative_to(agentos_root).as_posix()
@@ -155,6 +203,7 @@ def discover_personal_overlay_entries(agentos_root: Path, personal_overlay_root:
                 source_path=skill_file,
                 source_root=skill_dir,
                 mirror_dir=Path(),
+                source_error=source_error,
             )
         )
 
@@ -162,32 +211,22 @@ def discover_personal_overlay_entries(agentos_root: Path, personal_overlay_root:
 
 
 def personal_overlay_root_problem(personal_overlay_root: Path) -> str | None:
-    try:
-        stat_result = personal_overlay_root.lstat()
-    except FileNotFoundError:
-        return None
-    except OSError as error:
-        return f"{error.__class__.__name__}: {error}"
-    if stat.S_ISLNK(stat_result.st_mode):
-        return "symbolic link is not allowed"
-    if not stat.S_ISDIR(stat_result.st_mode):
-        return "not a directory"
-    return None
+    return source_path_problem(
+        personal_overlay_boundary_root(personal_overlay_root),
+        personal_overlay_root,
+        "directory",
+    )
 
 
 def personal_overlay_skills_root_problem(personal_skills_root: Path) -> str | None:
-    try:
-        stat_result = personal_skills_root.lstat()
-    except FileNotFoundError:
-        return None
-    except OSError as error:
-        return f"{error.__class__.__name__}: {error}"
-    if stat.S_ISLNK(stat_result.st_mode):
-        return "symbolic link is not allowed"
-    if not stat.S_ISDIR(stat_result.st_mode):
-        return "not a directory"
+    boundary_root = personal_overlay_boundary_root(personal_skills_root.parent)
+    root_problem = source_path_problem(boundary_root, personal_skills_root, "directory")
+    if root_problem:
+        return root_problem
     try:
         children = list(personal_skills_root.iterdir())
+    except FileNotFoundError:
+        return None
     except OSError as error:
         return f"{error.__class__.__name__}: {error}"
     for child in children:
@@ -196,19 +235,12 @@ def personal_overlay_skills_root_problem(personal_skills_root: Path) -> str | No
         except OSError as error:
             return f"{error.__class__.__name__}: {error}"
         if stat.S_ISLNK(child_stat.st_mode):
-            return f"{child.name}: symbolic link is not allowed"
+            return f"{child.relative_to(boundary_root).as_posix()}: symbolic link is not allowed"
         if not stat.S_ISDIR(child_stat.st_mode):
             continue
-        try:
-            skill_stat = (child / "SKILL.md").lstat()
-        except FileNotFoundError:
-            continue
-        except OSError as error:
-            return f"{error.__class__.__name__}: {error}"
-        if stat.S_ISLNK(skill_stat.st_mode):
-            return f"{child.name}/SKILL.md: symbolic link is not allowed"
-        if not stat.S_ISREG(skill_stat.st_mode):
-            return f"{child.name}/SKILL.md: not a regular file"
+        skill_problem = source_path_problem(boundary_root, child / "SKILL.md", "file")
+        if skill_problem:
+            return skill_problem
     return None
 
 
@@ -363,7 +395,9 @@ def compare_entry(entry: SkillEntry) -> MirrorResult:
             extra_files=[],
             notes=[entry.source_error],
         )
-    if not entry.source_path.exists():
+    try:
+        entry.source_path.lstat()
+    except FileNotFoundError:
         return MirrorResult(
             name=entry.name,
             source_kind=entry.source_kind,
@@ -374,6 +408,18 @@ def compare_entry(entry: SkillEntry) -> MirrorResult:
             changed_files=[],
             extra_files=[],
             notes=[f"canonical source does not exist: {entry.source_path}"],
+        )
+    except OSError as error:
+        return MirrorResult(
+            name=entry.name,
+            source_kind=entry.source_kind,
+            status="source-unreadable",
+            canonical_source=entry.canonical_source,
+            mirror_path=str(entry.mirror_dir),
+            missing_files=[],
+            changed_files=[],
+            extra_files=[],
+            notes=[f"{error.__class__.__name__}: {error}"],
         )
 
     canonical_files, source_problems = file_map(entry.source_root)
@@ -441,7 +487,11 @@ def compare_entry(entry: SkillEntry) -> MirrorResult:
 
 
 def sync_entry(entry: SkillEntry, prune_extra: bool) -> None:
-    if not entry.source_path.exists():
+    if entry.source_error:
+        return
+    try:
+        entry.source_path.lstat()
+    except OSError:
         return
 
     canonical_files, source_problems = file_map(entry.source_root)

@@ -7,7 +7,9 @@ import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
+import stat
 import sys
 import tempfile
 from collections import Counter
@@ -104,6 +106,11 @@ AUTOMATION_REGISTRY_SECTIONS = (
     "Disabled Automations",
     "Retired Automations",
 )
+
+
+class UnsafePathError(OSError):
+    """Raised when filesystem evidence would require following an unsafe path."""
+
 
 @dataclass
 class CheckResult:
@@ -440,7 +447,11 @@ def linked_worktree_setup_suppressed_result(
 
 
 def is_agentos_home(path: Path) -> bool:
-    return all((path / rel).is_file() for rel in REQUIRED_AGENTOS_FILES)
+    for rel in REQUIRED_AGENTOS_FILES:
+        is_file, error = trusted_path_is_file(path, path / rel)
+        if error or not is_file:
+            return False
+    return True
 
 
 def check_agentos_home(agentos_home: Path) -> CheckResult:
@@ -448,19 +459,26 @@ def check_agentos_home(agentos_home: Path) -> CheckResult:
     wrong_kind = []
     for rel in REQUIRED_AGENTOS_FILES:
         path = agentos_home / rel
-        try:
-            path.lstat()
-        except FileNotFoundError:
-            missing.append(rel)
-            continue
-        except OSError as exc:
+        exists, exists_error = trusted_path_exists(agentos_home, path)
+        if exists_error:
             return CheckResult(
                 "home structure",
                 "FAIL",
                 "Could not inspect required AgentOS files.",
-                details=[f"{rel}: {exc}"],
+                details=[path_error_detail(rel, agentos_home, path, exists_error, verbose=True)],
             )
-        if not path.is_file():
+        if not exists:
+            missing.append(rel)
+            continue
+        is_file, file_error = trusted_path_is_file(agentos_home, path)
+        if file_error:
+            return CheckResult(
+                "home structure",
+                "FAIL",
+                "Could not inspect required AgentOS files.",
+                details=[path_error_detail(rel, agentos_home, path, file_error, verbose=True)],
+            )
+        if not is_file:
             wrong_kind.append(rel)
 
     if missing or wrong_kind:
@@ -510,7 +528,15 @@ def check_adapters(
     allow_remediation: bool = True,
 ) -> CheckResult:
     script = agentos_home / "scripts" / "install_global_agent_instructions.py"
-    if not script.is_file():
+    script_is_file, script_error = trusted_path_is_file(agentos_home, script)
+    if script_error:
+        return CheckResult(
+            "adapter drift",
+            "FAIL",
+            "Adapter drift check script could not be inspected.",
+            details=[path_error_detail("adapter script", agentos_home, script, script_error, verbose)],
+        )
+    if not script_is_file:
         return CheckResult(
             "adapter drift",
             "FAIL",
@@ -687,7 +713,15 @@ def check_skill_mirrors(
     mirror_agentos_home = mirror_agentos_home or agentos_home
     script_agentos_home = script_agentos_home or agentos_home
     script = script_agentos_home / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py"
-    if not script.is_file():
+    script_is_file, script_error = trusted_path_is_file(script_agentos_home, script)
+    if script_error:
+        return CheckResult(
+            "skill mirrors",
+            "FAIL",
+            "Mirror-skills audit script could not be inspected.",
+            details=[path_error_detail("mirror-skills script", script_agentos_home, script, script_error, verbose)],
+        )
+    if not script_is_file:
         return CheckResult(
             "skill mirrors",
             "FAIL",
@@ -898,8 +932,8 @@ def check_personal_overlay(
 ) -> CheckResult:
     personal_root = primary_agentos_home / "personal" / "os"
     getting_started = agentos_home / "os" / "playbook" / "GETTING_STARTED.md"
-    starter_paths, starter_error = starter_personal_paths(getting_started)
-    personal_root_exists, personal_root_exists_error = safe_path_exists(personal_root)
+    starter_paths, starter_error = starter_personal_paths(agentos_home, getting_started)
+    personal_root_exists, personal_root_exists_error = trusted_path_exists(primary_agentos_home, personal_root)
     if personal_root_exists_error:
         return CheckResult(
             "Personal Overlay",
@@ -930,7 +964,7 @@ def check_personal_overlay(
             ),
         )
 
-    personal_root_is_dir, personal_root_dir_error = safe_path_is_dir(personal_root)
+    personal_root_is_dir, personal_root_dir_error = trusted_path_is_dir(primary_agentos_home, personal_root)
     if personal_root_dir_error:
         return CheckResult(
             "Personal Overlay",
@@ -959,6 +993,13 @@ def check_personal_overlay(
     unreadable_starter_details: list[str] = []
     for rel in starter_paths:
         path = primary_agentos_home / rel
+        exists, exists_error = trusted_path_exists(primary_agentos_home, path)
+        if exists_error:
+            unreadable_starters.append(rel)
+            unreadable_starter_details.append(path_error_detail(rel, agentos_home, path, exists_error, verbose))
+            continue
+        if not exists:
+            continue
         is_file, error = safe_path_is_file(path)
         if error:
             unreadable_starters.append(rel)
@@ -968,7 +1009,10 @@ def check_personal_overlay(
     missing_starters = [
         rel for rel in starter_paths if rel not in existing_starters and rel not in unreadable_starters
     ]
-    private_file_count, private_file_count_error = count_non_gitkeep_files_with_error(personal_root)
+    private_file_count, private_file_count_error = count_non_gitkeep_files_with_error(
+        personal_root,
+        boundary_root=primary_agentos_home,
+    )
     details = [
         "Private files under personal/os/: "
         + ("unreadable" if private_file_count_error else str(private_file_count)),
@@ -1041,7 +1085,12 @@ def private_state_recommendations(private_root_is_canonical: bool, *canonical_re
     ]
 
 
-def starter_personal_paths(getting_started: Path) -> tuple[list[str], str | None]:
+def starter_personal_paths(agentos_home: Path, getting_started: Path) -> tuple[list[str], str | None]:
+    getting_started_is_file, getting_started_error = trusted_path_is_file(agentos_home, getting_started)
+    if getting_started_error:
+        return [], f"Could not inspect GETTING_STARTED.md: {getting_started_error}"
+    if not getting_started_is_file:
+        return [], "GETTING_STARTED.md is missing; starter path audit skipped."
     try:
         text = getting_started.read_text(encoding="utf-8")
     except FileNotFoundError:
@@ -1101,11 +1150,23 @@ def check_automations(
     env = env or {}
     cwd = cwd or Path.cwd()
     codex_automations = codex_automations_root(process_home, env, cwd)
-    core_registry_is_file, core_registry_error = safe_path_is_file(core_registry)
-    personal_automations_exists, personal_automations_exists_error = safe_path_exists(personal_automations)
-    personal_registry_is_file, personal_registry_file_error = safe_path_is_file(personal_registry)
-    personal_file_count, personal_file_count_error = count_non_gitkeep_files_with_error(personal_automations)
-    personal_registry_text, personal_registry_read_error = read_text_with_error(personal_registry)
+    core_registry_is_file, core_registry_error = trusted_path_is_file(agentos_home, core_registry)
+    personal_automations_exists, personal_automations_exists_error = trusted_path_exists(
+        primary_agentos_home,
+        personal_automations,
+    )
+    personal_registry_is_file, personal_registry_file_error = trusted_path_is_file(
+        primary_agentos_home,
+        personal_registry,
+    )
+    personal_file_count, personal_file_count_error = count_non_gitkeep_files_with_error(
+        personal_automations,
+        boundary_root=primary_agentos_home,
+    )
+    if personal_registry_file_error or not personal_registry_is_file:
+        personal_registry_text, personal_registry_read_error = "", None
+    else:
+        personal_registry_text, personal_registry_read_error = read_text_with_error(personal_registry)
     registry_mentions_checks = text_mentions_agentos_checks(personal_registry_text)
     registry_active_checks = personal_registry_active_agentos_check_evidence(personal_registry_text)
     registry_negative_checks = personal_registry_negative_agentos_check_evidence(personal_registry_text)
@@ -1242,6 +1303,11 @@ def check_automations(
 
 
 def read_text_with_error(path: Path) -> tuple[str, OSError | UnicodeDecodeError | None]:
+    is_file, file_error = safe_path_is_file(path)
+    if file_error:
+        return "", file_error
+    if not is_file:
+        return "", None
     try:
         return path.read_text(encoding="utf-8"), None
     except FileNotFoundError:
@@ -1574,29 +1640,101 @@ def simple_config_field_values(text: str, fields: Iterable[str]) -> list[str]:
     return values
 
 
-def safe_path_exists(path: Path) -> tuple[bool, OSError | None]:
+def path_kind_matches(mode: int, expected_kind: str) -> bool:
+    if expected_kind == "exists":
+        return True
+    if expected_kind == "file":
+        return stat.S_ISREG(mode)
+    if expected_kind == "directory":
+        return stat.S_ISDIR(mode)
+    raise ValueError(f"unknown path kind: {expected_kind}")
+
+
+def safe_path_kind(path: Path, expected_kind: str) -> tuple[bool, OSError | None]:
     try:
-        return path.exists(), None
+        path_stat = path.lstat()
+    except FileNotFoundError:
+        return False, None
     except OSError as exc:
         return False, exc
+    if stat.S_ISLNK(path_stat.st_mode):
+        return False, UnsafePathError(f"symbolic link is not allowed: {path}")
+    return path_kind_matches(path_stat.st_mode, expected_kind), None
+
+
+def safe_path_exists(path: Path) -> tuple[bool, OSError | None]:
+    return safe_path_kind(path, "exists")
 
 
 def safe_path_is_dir(path: Path) -> tuple[bool, OSError | None]:
-    try:
-        return path.is_dir(), None
-    except OSError as exc:
-        return False, exc
+    return safe_path_kind(path, "directory")
 
 
 def safe_path_is_file(path: Path) -> tuple[bool, OSError | None]:
+    return safe_path_kind(path, "file")
+
+
+def trusted_path_kind(boundary_root: Path, path: Path, expected_kind: str) -> tuple[bool, OSError | None]:
     try:
-        return path.is_file(), None
+        rel = path.relative_to(boundary_root)
+    except ValueError:
+        return False, UnsafePathError(f"path is outside trusted root: {path}")
+
+    current = boundary_root
+    try:
+        root_stat = current.lstat()
     except OSError as exc:
         return False, exc
+    if stat.S_ISLNK(root_stat.st_mode):
+        return False, UnsafePathError(f"symbolic link is not allowed: {current}")
+    if not stat.S_ISDIR(root_stat.st_mode):
+        return False, NotADirectoryError(os.fspath(current))
+
+    parts = rel.parts
+    if not parts:
+        return path_kind_matches(root_stat.st_mode, expected_kind), None
+
+    for index, part in enumerate(parts):
+        current = current / part
+        is_final = index == len(parts) - 1
+        try:
+            current_stat = current.lstat()
+        except FileNotFoundError:
+            return False, None
+        except OSError as exc:
+            return False, exc
+        if stat.S_ISLNK(current_stat.st_mode):
+            return False, UnsafePathError(f"symbolic link is not allowed: {current}")
+        if is_final:
+            return path_kind_matches(current_stat.st_mode, expected_kind), None
+        if not stat.S_ISDIR(current_stat.st_mode):
+            return False, NotADirectoryError(os.fspath(current))
+
+    return False, None
 
 
-def safe_tree_files(root: Path) -> tuple[list[Path], OSError | None]:
+def trusted_path_exists(boundary_root: Path, path: Path) -> tuple[bool, OSError | None]:
+    return trusted_path_kind(boundary_root, path, "exists")
+
+
+def trusted_path_is_dir(boundary_root: Path, path: Path) -> tuple[bool, OSError | None]:
+    return trusted_path_kind(boundary_root, path, "directory")
+
+
+def trusted_path_is_file(boundary_root: Path, path: Path) -> tuple[bool, OSError | None]:
+    return trusted_path_kind(boundary_root, path, "file")
+
+
+def safe_tree_files(root: Path, boundary_root: Path | None = None) -> tuple[list[Path], OSError | None]:
     files: list[Path] = []
+    if boundary_root is not None:
+        root_is_dir, root_error = trusted_path_is_dir(boundary_root, root)
+    else:
+        root_is_dir, root_error = safe_path_is_dir(root)
+    if root_error:
+        return files, root_error
+    if not root_is_dir:
+        return files, NotADirectoryError(os.fspath(root))
     stack = [root]
     while stack:
         directory = stack.pop()
@@ -1617,19 +1755,25 @@ def safe_tree_files(root: Path) -> tuple[list[Path], OSError | None]:
     return files, None
 
 
-def count_non_gitkeep_files_with_error(root: Path) -> tuple[int, OSError | None]:
-    root_exists, exists_error = safe_path_exists(root)
+def count_non_gitkeep_files_with_error(root: Path, boundary_root: Path | None = None) -> tuple[int, OSError | None]:
+    if boundary_root is not None:
+        root_exists, exists_error = trusted_path_exists(boundary_root, root)
+    else:
+        root_exists, exists_error = safe_path_exists(root)
     if exists_error:
         return 0, exists_error
     if not root_exists:
         return 0, None
-    root_is_dir, dir_error = safe_path_is_dir(root)
+    if boundary_root is not None:
+        root_is_dir, dir_error = trusted_path_is_dir(boundary_root, root)
+    else:
+        root_is_dir, dir_error = safe_path_is_dir(root)
     if dir_error:
         return 0, dir_error
     if not root_is_dir:
         return 0, NotADirectoryError(os.fspath(root))
     count = 0
-    paths, walk_error = safe_tree_files(root)
+    paths, walk_error = safe_tree_files(root, boundary_root=boundary_root)
     if walk_error:
         return count, walk_error
     for path in paths:
@@ -1850,6 +1994,7 @@ def run_self_tests() -> int:
         test_personal_overlay_empty_starter_list_warns,
         test_personal_overlay_malformed_getting_started_warns,
         test_invalid_home_is_graceful,
+        test_home_required_symlink_fails_closed,
         test_adapter_check_uses_temp_home,
         test_relative_adapter_args_resolve_from_invocation_cwd,
         test_relative_adapter_args_preserve_symlink_ancestors,
@@ -1888,6 +2033,7 @@ def run_self_tests() -> int:
         test_linked_worktree_without_primary_suppresses_writes,
         test_linked_worktree_primary_self_suppresses_writes,
         test_personal_overlay_unreadable_starter_warns,
+        test_personal_overlay_ancestor_symlink_warns,
         test_automation_no_evidence_warns,
         test_automation_respects_codex_home,
         test_automation_unreadable_registry_warns,
@@ -1895,6 +2041,7 @@ def run_self_tests() -> int:
         test_automation_unreadable_codex_directory_warns,
         test_automation_codex_root_file_blocks_pass,
         test_automation_personal_root_file_blocks_pass,
+        test_automation_symlink_evidence_blocks_pass,
         test_automation_registry_mention_warns,
         test_personal_active_automation_registry_passes,
         test_personal_disabled_automation_registry_warns,
@@ -2015,6 +2162,20 @@ def test_invalid_home_is_graceful() -> None:
         statuses = [result.status for result in report.results]
         assert_true("FAIL" in statuses, "invalid home should fail gracefully")
         assert_true(report.agentos_home == root.resolve(), "explicit home was not printed/resolved")
+
+
+def test_home_required_symlink_fails_closed() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        external = Path(tmp) / "external-index.md"
+        make_fake_agentos(root)
+        external.write_text("# External Index\n", encoding="utf-8")
+        (root / "os" / "INDEX.md").unlink()
+        (root / "os" / "INDEX.md").symlink_to(external)
+        result = check_agentos_home(root)
+        joined = "\n".join(result.details)
+        assert_true(result.status == "FAIL", "symlinked required Core file should fail closed")
+        assert_true("UnsafePathError" in joined, "symlinked required Core file should be reported as unsafe")
 
 
 def test_adapter_check_uses_temp_home() -> None:
@@ -2683,6 +2844,31 @@ def test_mirror_personal_overlay_ancestor_symlinks_fail_closed() -> None:
         assert_true("source-unreadable=1" in joined, "symlinked Personal Overlay skills root should be reported")
         assert_true("--sync" not in joined, "symlinked Personal Overlay skills root should not recommend sync")
 
+        external_personal = Path(tmp) / "external-personal"
+        (external_personal / "os" / "skills" / "external-private").mkdir(parents=True)
+        (external_personal / "os" / "skills" / "external-private" / "SKILL.md").write_text(
+            "# External Private\n",
+            encoding="utf-8",
+        )
+        (external_personal / "os" / "skills" / "external-private" / "private.txt").write_text(
+            "private\n",
+            encoding="utf-8",
+        )
+        primary_personal_symlink = Path(tmp) / "primary-personal-symlink"
+        primary_personal_symlink.mkdir()
+        (primary_personal_symlink / "personal").symlink_to(external_personal, target_is_directory=True)
+        result = check_skill_mirrors(
+            root,
+            primary_personal_symlink,
+            Path(tmp) / "mirrors-personal-symlink",
+            minimal_env(Path(tmp) / "home"),
+            verbose=False,
+        )
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "FAIL", "symlinked Personal Overlay ancestor should fail closed")
+        assert_true("source-unreadable=1" in joined, "symlinked Personal Overlay ancestor should be reported")
+        assert_true("--sync" not in joined, "symlinked Personal Overlay ancestor should not recommend sync")
+
 
 def test_mirror_nested_path_kind_conflicts_fail_closed() -> None:
     with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
@@ -2897,6 +3083,7 @@ def test_personal_overlay_unreadable_starter_warns() -> None:
         root = Path(tmp) / "AgentOS"
         make_fake_agentos(root)
         unreadable = root / "personal" / "os" / "identity" / "USER.md"
+        unreadable.write_text("# private starter\n", encoding="utf-8")
         original_safe_path_is_file = safe_path_is_file
 
         def fake_safe_path_is_file(path: Path) -> tuple[bool, OSError | None]:
@@ -2914,6 +3101,23 @@ def test_personal_overlay_unreadable_starter_warns() -> None:
         assert_true(result.status == "WARN", "unreadable starter path should warn")
         assert_true("could not be inspected" in result.summary, "unreadable starter summary should be explicit")
         assert_true("PermissionError" in joined, "unreadable starter should preserve error class")
+
+
+def test_personal_overlay_ancestor_symlink_warns() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        external_personal = Path(tmp) / "external-personal"
+        make_fake_agentos(root)
+        shutil.rmtree(root / "personal")
+        (external_personal / "os" / "identity").mkdir(parents=True)
+        for rel in ("USER.md", "COMMUNICATION.md"):
+            (external_personal / "os" / "identity" / rel).write_text("# external private\n", encoding="utf-8")
+        (root / "personal").symlink_to(external_personal, target_is_directory=True)
+        result = check_personal_overlay(root, root, verbose=False)
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "WARN", "symlinked Personal Overlay ancestor should warn")
+        assert_true("could not be inspected" in result.summary, "symlinked Personal Overlay should not pass")
+        assert_true("UnsafePathError" in joined, "symlinked Personal Overlay should be reported as unsafe")
 
 
 def test_automation_no_evidence_warns() -> None:
@@ -3054,10 +3258,13 @@ Schedule rule: RRULE:FREQ=WEEKLY
         blocked.mkdir()
         original_safe_tree_files = safe_tree_files
 
-        def fake_safe_tree_files(root_path: Path) -> tuple[list[Path], OSError | None]:
+        def fake_safe_tree_files(
+            root_path: Path,
+            boundary_root: Path | None = None,
+        ) -> tuple[list[Path], OSError | None]:
             if root_path == codex_root:
                 return [], PermissionError("blocked directory for test")
-            return original_safe_tree_files(root_path)
+            return original_safe_tree_files(root_path, boundary_root=boundary_root)
 
         safe_tree_files = fake_safe_tree_files
         try:
@@ -3127,6 +3334,37 @@ def test_automation_personal_root_file_blocks_pass() -> None:
         assert_true("could not be fully inspected" in result.summary, "non-directory Personal root summary should be explicit")
         assert_true("Personal automation file count" in joined, "non-directory Personal root should name source")
         assert_true("Recurring AgentOS check evidence: not found" in joined, "non-directory Personal root should suppress recurring PASS")
+
+
+def test_automation_symlink_evidence_blocks_pass() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        external_personal = Path(tmp) / "external-personal"
+        make_fake_agentos(root)
+        shutil.rmtree(root / "personal")
+        (external_personal / "os" / "automations").mkdir(parents=True)
+        (external_personal / "os" / "automations" / "AUTOMATIONS.md").write_text(
+            """# Automations
+
+## Active Automations
+
+### Weekly AgentOS Doctor
+
+Automation id: weekly-agentos-doctor
+
+Status: Active
+
+Schedule rule: RRULE:FREQ=WEEKLY
+""",
+            encoding="utf-8",
+        )
+        (root / "personal").symlink_to(external_personal, target_is_directory=True)
+        result = check_automations(root, root, Path(tmp) / "home", verbose=False)
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "WARN", "symlinked Personal automation evidence should block PASS")
+        assert_true("could not be fully inspected" in result.summary, "symlinked automation evidence should warn")
+        assert_true("UnsafePathError" in joined, "symlinked automation evidence should be reported as unsafe")
+        assert_true("Recurring AgentOS check evidence: not found" in joined, "unsafe evidence should suppress PASS")
 
 
 def test_automation_registry_mention_warns() -> None:
