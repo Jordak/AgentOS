@@ -519,6 +519,30 @@ def check_adapters(
             ],
         )
 
+    if result_statuses.get("unknown"):
+        details.extend(subprocess_failure_details(completed, verbose))
+        return CheckResult(
+            "adapter drift",
+            "FAIL",
+            "Adapter drift check returned unrecognized structured target results.",
+            details=details,
+            recommendations=[
+                "Fix the adapter check output format before trusting adapter drift status."
+            ],
+        )
+
+    if completed.returncode == 0 and counts.get("FAIL"):
+        details.extend(subprocess_failure_details(completed, verbose))
+        return CheckResult(
+            "adapter drift",
+            "FAIL",
+            "Adapter drift check returned contradictory success and failure evidence.",
+            details=details,
+            recommendations=[
+                "Fix the adapter check command or output format before applying adapter remediation."
+            ],
+        )
+
     if completed.returncode == 0:
         return CheckResult(
             "adapter drift",
@@ -1339,10 +1363,9 @@ def codex_automation_evidence(root: Path) -> tuple[bool, bool, bool, OSError | U
     if not root_is_dir:
         return active, negative, possible, None
     read_error: OSError | UnicodeDecodeError | None = None
-    try:
-        paths = list(root.rglob("*"))
-    except OSError as exc:
-        return active, negative, possible, exc
+    paths, walk_error = safe_tree_files(root)
+    if walk_error:
+        read_error = walk_error
     for path in paths:
         is_file, file_error = safe_path_is_file(path)
         if file_error:
@@ -1448,6 +1471,28 @@ def safe_path_is_file(path: Path) -> tuple[bool, OSError | None]:
         return False, exc
 
 
+def safe_tree_files(root: Path) -> tuple[list[Path], OSError | None]:
+    files: list[Path] = []
+    stack = [root]
+    while stack:
+        directory = stack.pop()
+        try:
+            with os.scandir(directory) as entries:
+                entry_list = list(entries)
+        except OSError as exc:
+            return files, exc
+        for entry in entry_list:
+            path = Path(entry.path)
+            try:
+                if entry.is_dir(follow_symlinks=False):
+                    stack.append(path)
+                elif entry.is_file(follow_symlinks=False):
+                    files.append(path)
+            except OSError as exc:
+                return files, exc
+    return files, None
+
+
 def count_non_gitkeep_files_with_error(root: Path) -> tuple[int, OSError | None]:
     root_exists, exists_error = safe_path_exists(root)
     if exists_error:
@@ -1460,10 +1505,9 @@ def count_non_gitkeep_files_with_error(root: Path) -> tuple[int, OSError | None]
     if not root_is_dir:
         return 0, None
     count = 0
-    try:
-        paths = list(root.rglob("*"))
-    except OSError as exc:
-        return count, exc
+    paths, walk_error = safe_tree_files(root)
+    if walk_error:
+        return count, walk_error
     for path in paths:
         is_file, file_error = safe_path_is_file(path)
         if file_error:
@@ -1687,6 +1731,7 @@ def run_self_tests() -> int:
         test_adapter_check_command_failure_is_not_drift,
         test_adapter_check_preflight_error_is_not_drift,
         test_adapter_check_empty_success_output_fails,
+        test_adapter_check_success_with_fail_line_fails,
         test_subprocess_timeout_output_is_text,
         test_mirror_smoke_uses_temp_dirs,
         test_mirror_command_failure_is_not_sync_advice,
@@ -1702,6 +1747,7 @@ def run_self_tests() -> int:
         test_automation_no_evidence_warns,
         test_automation_unreadable_registry_warns,
         test_automation_unreadable_codex_file_warns,
+        test_automation_unreadable_codex_directory_warns,
         test_automation_registry_mention_warns,
         test_personal_active_automation_registry_passes,
         test_personal_disabled_automation_registry_warns,
@@ -1953,6 +1999,30 @@ def test_adapter_check_empty_success_output_fails() -> None:
         assert_true(result.status == "FAIL", "empty successful adapter output should fail")
         assert_true("Managed targets checked: 0" in joined, "empty adapter output should report zero parsed targets")
         assert_true("structured target results" in result.summary, "empty adapter output should name missing structured evidence")
+
+
+def test_adapter_check_success_with_fail_line_fails() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        home = Path(tmp) / "home"
+        make_fake_agentos(root)
+        home.mkdir()
+        installer = root / "scripts" / "install_global_agent_instructions.py"
+        installer.write_text(
+            "import sys\nprint('[FAIL] drift codex - stale managed block')\nsys.exit(0)\n",
+            encoding="utf-8",
+        )
+        result = check_adapters(
+            agentos_home=root,
+            process_home=home,
+            env=minimal_env(home),
+            extra_args=[],
+            verbose=False,
+        )
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "FAIL", "adapter FAIL lines should block PASS even with exit 0")
+        assert_true("Statuses: FAIL=1" in joined, "contradictory adapter evidence should preserve parsed failure")
+        assert_true("contradictory" in result.summary, "contradictory adapter evidence should be explicit")
 
 
 def test_subprocess_timeout_output_is_text() -> None:
@@ -2297,6 +2367,53 @@ def test_automation_unreadable_codex_file_warns() -> None:
         assert_true(result.status == "WARN", "unreadable Codex automation file should warn")
         assert_true("could not be fully inspected" in result.summary, "unreadable Codex automation summary should be explicit")
         assert_true("Codex automation scan" in joined, "unreadable Codex detail should name source")
+
+
+def test_automation_unreadable_codex_directory_warns() -> None:
+    global safe_tree_files
+
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        home = Path(tmp) / "home"
+        make_fake_agentos(root)
+        registry = root / "personal" / "os" / "automations" / "AUTOMATIONS.md"
+        registry.write_text(
+            """# Automations
+
+## Active Automations
+
+### Weekly AgentOS Doctor
+
+Automation id: weekly-agentos-doctor
+
+Status: Active
+
+Schedule rule: RRULE:FREQ=WEEKLY
+""",
+            encoding="utf-8",
+        )
+        codex_root = home / ".codex" / "automations"
+        codex_root.mkdir(parents=True)
+        blocked = codex_root / "blocked"
+        blocked.mkdir()
+        original_safe_tree_files = safe_tree_files
+
+        def fake_safe_tree_files(root_path: Path) -> tuple[list[Path], OSError | None]:
+            if root_path == codex_root:
+                return [], PermissionError("blocked directory for test")
+            return original_safe_tree_files(root_path)
+
+        safe_tree_files = fake_safe_tree_files
+        try:
+            result = check_automations(root, root, home, verbose=False)
+        finally:
+            safe_tree_files = original_safe_tree_files
+
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "WARN", "unreadable Codex automation directory should warn")
+        assert_true("could not be fully inspected" in result.summary, "unreadable Codex directory summary should be explicit")
+        assert_true("Codex automation scan" in joined, "unreadable Codex directory detail should name source")
+        assert_true("Recurring AgentOS check evidence: not found" in joined, "unreadable Codex directory should block PASS")
 
 
 def test_automation_registry_mention_warns() -> None:
