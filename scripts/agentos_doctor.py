@@ -1595,10 +1595,28 @@ def markdown_field_value(text: str, field: str) -> str:
 
 
 def markdown_field_values(text: str, field: str) -> list[str]:
+    text = markdown_without_fenced_blocks(text)
     return [
         match.group(1).strip()
         for match in re.finditer(rf"(?im)^\s*{re.escape(field)}\s*:\s*(.*?)\s*$", text)
     ]
+
+
+def markdown_without_fenced_blocks(text: str) -> str:
+    lines: list[str] = []
+    fence: str | None = None
+    for line in text.splitlines():
+        stripped = line.lstrip()
+        marker = stripped[:3]
+        if marker in ("```", "~~~"):
+            if fence is None:
+                fence = marker
+            elif marker == fence:
+                fence = None
+            continue
+        if fence is None:
+            lines.append(line)
+    return "\n".join(lines)
 
 
 def automation_status_is_active(status: str) -> bool:
@@ -1679,17 +1697,20 @@ def codex_automation_evidence(root: Path) -> tuple[bool, bool, bool, OSError | U
         if not text_mentions_agentos_checks(text):
             continue
         if path.name == "automation.toml":
-            if (
-                codex_automation_toml_is_active_scheduled(text)
-                and codex_automation_toml_has_active_agentos_marker(text)
+            _config_fields, config_ok = simple_config_field_map(file_text)
+            if not config_ok:
+                possible = True
+            elif (
+                codex_automation_toml_is_active_scheduled(file_text)
+                and codex_automation_toml_has_active_agentos_marker(file_text)
             ):
                 active = True
             elif (
-                text_has_negative_automation_prose(text)
-                or codex_automation_toml_has_negative_status(text)
+                text_has_negative_automation_prose(file_text)
+                or codex_automation_toml_has_negative_status(file_text)
             ) or (
-                codex_automation_toml_has_agentos_marker(text)
-                and codex_automation_toml_has_active_status(text)
+                codex_automation_toml_has_agentos_marker(file_text)
+                and codex_automation_toml_has_active_status(file_text)
             ):
                 negative = True
             else:
@@ -1736,17 +1757,36 @@ def codex_automation_toml_has_active_agentos_marker(text: str) -> bool:
 
 
 def simple_config_field_values(text: str, fields: Iterable[str]) -> list[str]:
+    parsed, ok = simple_config_field_map(text)
+    if not ok:
+        return []
     values: list[str] = []
     for field in fields:
-        quoted = re.compile(rf"(?im)^\s*{re.escape(field)}\s*=\s*([\"'])(.*?)\1\s*$")
-        for match in quoted.finditer(text):
-            values.append(match.group(2))
-        unquoted = re.compile(rf"(?im)^\s*{re.escape(field)}\s*=\s*([^#\n]+?)\s*$")
-        for match in unquoted.finditer(text):
-            raw = match.group(1).strip()
-            if raw and not (raw.startswith('"') or raw.startswith("'")):
-                values.append(raw)
+        value = parsed.get(field.lower())
+        if value is not None:
+            values.append(value)
     return values
+
+
+def simple_config_field_map(text: str) -> tuple[dict[str, str], bool]:
+    values: dict[str, str] = {}
+    key_re = r"([A-Za-z_][A-Za-z0-9_-]*)"
+    quoted = re.compile(rf"^{key_re}\s*=\s*([\"'])(.*?)\2\s*(?:#.*)?$")
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("[") or '"""' in line or "'''" in line:
+            return {}, False
+        match = quoted.match(line)
+        if not match:
+            return {}, False
+        key = match.group(1).lower()
+        value = match.group(3)
+        if key in values:
+            return {}, False
+        values[key] = value
+    return values, True
 
 
 def path_kind_matches(mode: int, expected_kind: str) -> bool:
@@ -2209,6 +2249,7 @@ def run_self_tests() -> int:
         test_personal_negative_status_warns,
         test_personal_negative_schedule_warns,
         test_personal_conflicting_registry_fields_warn,
+        test_personal_fenced_registry_fields_warn,
         test_personal_draft_candidate_automation_registry_warns,
         test_personal_one_off_schedule_warns,
         test_personal_bounded_rrule_warns,
@@ -2232,6 +2273,7 @@ def run_self_tests() -> int:
         test_codex_bounded_rrule_warns,
         test_codex_draft_candidate_automation_toml_warns,
         test_codex_conflicting_toml_fields_warn,
+        test_codex_malformed_toml_warns,
         test_codex_agentos_automation_status_is_normalized,
         test_codex_agentos_automation_evidence_passes,
         test_automation_files_without_registry_warns,
@@ -4004,6 +4046,36 @@ Automation id: weekly-agentos-doctor
             assert_true("Recurring AgentOS check evidence: not found" in joined, f"{label} should suppress recurring PASS")
 
 
+def test_personal_fenced_registry_fields_warn() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        make_fake_agentos(root)
+        registry = root / "personal" / "os" / "automations" / "AUTOMATIONS.md"
+        registry.write_text(
+            """# Automations
+
+## Active Automations
+
+### Weekly AgentOS Doctor
+
+Automation id: weekly-agentos-doctor
+
+Example metadata:
+
+```text
+Status: Active
+Schedule rule: RRULE:FREQ=WEEKLY
+```
+""",
+            encoding="utf-8",
+        )
+        result = check_automations(root, root, Path(tmp) / "home", verbose=False)
+        joined = "\n".join(result.details)
+        assert_true(result.status == "WARN", "fenced registry example fields should not pass as active recurring evidence")
+        assert_true("Personal active AgentOS check evidence: not found" in joined, "fenced registry fields should not be active evidence")
+        assert_true("Recurring AgentOS check evidence: not found" in joined, "fenced registry fields should suppress recurring PASS")
+
+
 def test_personal_draft_candidate_automation_registry_warns() -> None:
     with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
         root = Path(tmp) / "AgentOS"
@@ -4707,6 +4779,45 @@ def test_codex_conflicting_toml_fields_warn() -> None:
             'rrule = "RRULE:FREQ=WEEKLY"\n'
             'rrule = "RRULE:FREQ=WEEKLY;COUNT=1"\n',
             "conflicting schedule",
+        ),
+    )
+    for toml_text, label in cases:
+        with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+            root = Path(tmp) / "AgentOS"
+            home = Path(tmp) / "home"
+            make_fake_agentos(root)
+            codex_automation = home / ".codex" / "automations" / f"{label.replace(' ', '-')}" / "automation.toml"
+            codex_automation.parent.mkdir(parents=True)
+            codex_automation.write_text(toml_text, encoding="utf-8")
+            result = check_automations(root, root, home, verbose=False)
+            joined = "\n".join(result.details)
+            assert_true(result.status == "WARN", f"{label} should not pass as active recurring evidence")
+            assert_true("Codex active AgentOS check evidence: not found" in joined, f"{label} should not be active evidence")
+            assert_true("Recurring AgentOS check evidence: not found" in joined, f"{label} should suppress recurring PASS")
+
+
+def test_codex_malformed_toml_warns() -> None:
+    cases = (
+        (
+            'This is prose, not TOML.\n'
+            'name = "AgentOS doctor health check"\n'
+            'status = "ACTIVE"\n'
+            'rrule = "RRULE:FREQ=WEEKLY"\n',
+            "prose with field-shaped lines",
+        ),
+        (
+            'name = "AgentOS doctor health check"\n'
+            'prompt = """\n'
+            'status = "ACTIVE"\n'
+            'rrule = "RRULE:FREQ=WEEKLY"\n'
+            '"""\n',
+            "multiline string with field-shaped lines",
+        ),
+        (
+            'name = "AgentOS doctor health check"\n'
+            'status = ACTIVE\n'
+            'rrule = "RRULE:FREQ=WEEKLY"\n',
+            "unquoted status",
         ),
     )
     for toml_text, label in cases:
