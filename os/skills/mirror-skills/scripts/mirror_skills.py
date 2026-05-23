@@ -599,7 +599,17 @@ def main() -> int:
                     notes=personal_problems,
                 )
             )
-    entries = select_entries(core_entries, personal_entries, args.skill)
+    try:
+        entries = select_entries(core_entries, personal_entries, args.skill)
+    except SystemExit:
+        if not preflight_results:
+            raise
+        requested_set = set(args.skill)
+        entries = [
+            entry
+            for entry in [*core_entries, *personal_entries]
+            if not requested_set or entry.name in requested_set
+        ]
     if not entries and not preflight_results:
         raise SystemExit("No mirrorable Core or Personal Overlay skills found.")
 
