@@ -755,6 +755,9 @@ def main() -> int:
     root_problem = final_path_kind_problem(agentos_root, expected_kind="directory", allow_missing=False)
     if root_problem:
         raise SystemExit(f"Unsafe AgentOS root: {agentos_root} ({root_problem})")
+    mirror_root_problem = final_path_kind_problem(mirror_root, expected_kind="directory", allow_missing=True)
+    if mirror_root_problem:
+        raise SystemExit(f"Unsafe mirror root: {mirror_root} ({mirror_root_problem})")
 
     core_entries = parse_manifest(agentos_root)
     personal_entries: list[SkillEntry] = []
