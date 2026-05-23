@@ -590,6 +590,20 @@ def check_adapters(
         )
 
     if completed.returncode == 0:
+        non_current_statuses = Counter(
+            {status: count for status, count in result_statuses.items() if status != "ok"}
+        )
+        if non_current_statuses:
+            return CheckResult(
+                "adapter drift",
+                "WARN",
+                "Some adapter targets did not produce active current evidence.",
+                details=details,
+                recommendations=[
+                    "Review skipped or not-run adapter targets if you expected "
+                    "those harness adapters to be managed."
+                ],
+            )
         return CheckResult(
             "adapter drift",
             "PASS",
@@ -1032,6 +1046,8 @@ def starter_personal_paths(getting_started: Path) -> tuple[list[str], str | None
         text = getting_started.read_text(encoding="utf-8")
     except FileNotFoundError:
         return [], "GETTING_STARTED.md is missing; starter path audit skipped."
+    except UnicodeDecodeError as exc:
+        return [], f"Could not decode GETTING_STARTED.md: {exc}"
     except OSError as exc:
         return [], f"Could not read GETTING_STARTED.md: {exc}"
 
@@ -1831,6 +1847,7 @@ def run_self_tests() -> int:
         test_home_discovery_and_personal_overlay_privacy,
         test_personal_overlay_source_error_warns,
         test_personal_overlay_empty_starter_list_warns,
+        test_personal_overlay_malformed_getting_started_warns,
         test_invalid_home_is_graceful,
         test_adapter_check_uses_temp_home,
         test_relative_adapter_args_resolve_from_invocation_cwd,
@@ -1840,6 +1857,7 @@ def run_self_tests() -> int:
         test_adapter_check_preflight_error_is_not_drift,
         test_adapter_check_empty_success_output_fails,
         test_adapter_check_success_with_fail_line_fails,
+        test_adapter_check_skip_downgrades_pass,
         test_adapter_check_nonzero_without_actionable_drift_fails,
         test_subprocess_timeout_output_is_text,
         test_mirror_smoke_uses_temp_dirs,
@@ -1851,6 +1869,9 @@ def run_self_tests() -> int:
         test_mirror_unknown_status_fails,
         test_mirror_unknown_source_kind_fails,
         test_mirror_sync_blocks_writes_after_discovery_error,
+        test_mirror_file_path_fails_closed,
+        test_mirror_nested_source_directory_error_fails,
+        test_mirror_nested_mirror_directory_error_fails,
         test_mirror_unreadable_personal_skills_root_fails,
         test_mirror_failure_suppresses_private_names_without_verbose,
         test_mirror_recommendations_quote_paths,
@@ -1958,6 +1979,17 @@ def test_personal_overlay_empty_starter_list_warns() -> None:
         result = check_personal_overlay(root, root, verbose=False)
         assert_true(result.status == "WARN", "empty starter checklist should warn")
         assert_true("Could not determine" in result.summary, "empty starter warning summary missing")
+
+
+def test_personal_overlay_malformed_getting_started_warns() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        make_fake_agentos(root)
+        (root / "os" / "playbook" / "GETTING_STARTED.md").write_bytes(b"\xff")
+        result = check_personal_overlay(root, root, verbose=False)
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "WARN", "malformed GETTING_STARTED.md should warn")
+        assert_true("Could not decode GETTING_STARTED.md" in joined, "decode failure should be reported")
 
 
 def test_invalid_home_is_graceful() -> None:
@@ -2143,6 +2175,33 @@ def test_adapter_check_success_with_fail_line_fails() -> None:
         assert_true(result.status == "FAIL", "adapter FAIL lines should block PASS even with exit 0")
         assert_true("Statuses: FAIL=1" in joined, "contradictory adapter evidence should preserve parsed failure")
         assert_true("contradictory" in result.summary, "contradictory adapter evidence should be explicit")
+
+
+def test_adapter_check_skip_downgrades_pass() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        home = Path(tmp) / "home"
+        make_fake_agentos(root)
+        home.mkdir()
+        installer = root / "scripts" / "install_global_agent_instructions.py"
+        installer.write_text(
+            "import sys\n"
+            "print('[OK] ok global - managed block current')\n"
+            "print('[OK] skip codex - parent harness directory is absent')\n"
+            "sys.exit(0)\n",
+            encoding="utf-8",
+        )
+        result = check_adapters(
+            agentos_home=root,
+            process_home=home,
+            env=minimal_env(home),
+            extra_args=[],
+            verbose=False,
+        )
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "WARN", "skipped adapter targets should not produce PASS")
+        assert_true("skip=1" in joined, "skip evidence should be reported")
+        assert_true("--no-dry-run" not in joined, "skipped adapter evidence should not recommend writes")
 
 
 def test_adapter_check_nonzero_without_actionable_drift_fails() -> None:
@@ -2381,6 +2440,69 @@ def test_mirror_sync_blocks_writes_after_discovery_error() -> None:
             not (mirror_root / "example-skill").exists(),
             "sync should not write mirrors after discovery failure",
         )
+
+
+def test_mirror_file_path_fails_closed() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        mirror_root = Path(tmp) / "mirrors"
+        make_fake_agentos(root)
+        mirror_root.mkdir()
+        (mirror_root / "example-skill").write_text("# Example Skill\n", encoding="utf-8")
+        (mirror_root / "private-skill").write_text("# Private Skill\n", encoding="utf-8")
+        result = check_skill_mirrors(root, root, mirror_root, minimal_env(Path(tmp) / "home"), verbose=False)
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "FAIL", "file-backed mirror paths should fail closed")
+        assert_true("mirror-unreadable=2" in joined, "file-backed mirror paths should be reported")
+        assert_true("--sync" not in joined, "malformed mirror paths should not recommend sync")
+
+
+def test_mirror_nested_source_directory_error_fails() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        mirror_root = Path(tmp) / "mirrors"
+        make_fake_agentos(root)
+        blocked = root / "os" / "skills" / "example-skill" / "blocked"
+        blocked.mkdir()
+        blocked.chmod(0)
+        try:
+            result = check_skill_mirrors(root, root, mirror_root, minimal_env(Path(tmp) / "home"), verbose=False)
+        finally:
+            blocked.chmod(0o755)
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "FAIL", "unreadable nested source directories should fail closed")
+        assert_true("source-unreadable=1" in joined, "nested source traversal failure should be reported")
+        assert_true("--sync" not in joined, "unreadable source evidence should not recommend sync")
+
+
+def test_mirror_nested_mirror_directory_error_fails() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        mirror_root = Path(tmp) / "mirrors"
+        make_fake_agentos(root)
+        script = root / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py"
+        sync_command = [
+            sys.executable,
+            str(script),
+            "--agentos-root",
+            str(root),
+            "--mirror-root",
+            str(mirror_root),
+            "--sync",
+        ]
+        completed = run_subprocess(sync_command, cwd=root, env=minimal_env(Path(tmp) / "home"))
+        assert_true(completed.returncode == 0, completed.stderr or completed.stdout)
+        blocked = mirror_root / "example-skill" / "blocked"
+        blocked.mkdir()
+        blocked.chmod(0)
+        try:
+            result = check_skill_mirrors(root, root, mirror_root, minimal_env(Path(tmp) / "home"), verbose=False)
+        finally:
+            blocked.chmod(0o755)
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "FAIL", "unreadable nested mirror directories should fail closed")
+        assert_true("mirror-unreadable=1" in joined, "nested mirror traversal failure should be reported")
+        assert_true("--sync" not in joined, "unreadable mirror evidence should not recommend sync")
 
 
 def test_mirror_unreadable_personal_skills_root_fails() -> None:

@@ -172,19 +172,44 @@ def should_ignore(path: Path) -> bool:
     return any(part in IGNORED_NAMES or part.endswith(".pyc") for part in path.parts)
 
 
-def file_map(root: Path) -> dict[str, Path]:
-    if not root.exists():
-        return {}
-    if root.is_file():
-        return {"SKILL.md": root}
-
+def file_map(root: Path) -> tuple[dict[str, Path], list[str]]:
     files: dict[str, Path] = {}
-    for path in root.rglob("*"):
-        if path.is_file():
-            rel = path.relative_to(root)
-            if not should_ignore(rel):
-                files[rel.as_posix()] = path
-    return files
+    problems: list[str] = []
+    try:
+        root_stat = root.stat()
+    except FileNotFoundError:
+        return files, problems
+    except OSError as error:
+        return files, [f". ({error.__class__.__name__}: {error})"]
+    if not stat.S_ISDIR(root_stat.st_mode):
+        return files, [f". (not a directory: {root})"]
+
+    pending = [root]
+    while pending:
+        directory = pending.pop()
+        try:
+            children = sorted(directory.iterdir())
+        except OSError as error:
+            rel = directory.relative_to(root).as_posix() if directory != root else "."
+            problems.append(f"{rel} ({error.__class__.__name__}: {error})")
+            continue
+        for path in children:
+            rel_path = path.relative_to(root)
+            if should_ignore(rel_path):
+                continue
+            rel = rel_path.as_posix()
+            try:
+                path_stat = path.stat()
+            except OSError as error:
+                problems.append(f"{rel} ({error.__class__.__name__}: {error})")
+                continue
+            if stat.S_ISDIR(path_stat.st_mode):
+                pending.append(path)
+            elif stat.S_ISREG(path_stat.st_mode):
+                files[rel] = path
+            else:
+                problems.append(f"{rel} (not a regular file or directory)")
+    return files, problems
 
 
 def file_read_problem(path: Path) -> str | None:
@@ -222,9 +247,9 @@ def compare_entry(entry: SkillEntry) -> MirrorResult:
             notes=[f"canonical source does not exist: {entry.source_path}"],
         )
 
-    canonical_files = file_map(entry.source_root)
-    mirror_files = file_map(entry.mirror_dir)
-    source_unreadable = unreadable_files(canonical_files)
+    canonical_files, source_problems = file_map(entry.source_root)
+    mirror_files, mirror_problems = file_map(entry.mirror_dir)
+    source_unreadable = [*source_problems, *unreadable_files(canonical_files)]
     if source_unreadable:
         return MirrorResult(
             name=entry.name,
@@ -237,7 +262,7 @@ def compare_entry(entry: SkillEntry) -> MirrorResult:
             extra_files=sorted(set(mirror_files) - set(canonical_files)),
             notes=source_unreadable,
         )
-    mirror_unreadable = unreadable_files(mirror_files)
+    mirror_unreadable = [*mirror_problems, *unreadable_files(mirror_files)]
     if mirror_unreadable:
         return MirrorResult(
             name=entry.name,
@@ -286,7 +311,9 @@ def sync_entry(entry: SkillEntry, prune_extra: bool) -> None:
     if not entry.source_path.exists():
         return
 
-    canonical_files = file_map(entry.source_root)
+    canonical_files, source_problems = file_map(entry.source_root)
+    if source_problems:
+        return
     entry.mirror_dir.mkdir(parents=True, exist_ok=True)
 
     for rel, source in canonical_files.items():
@@ -298,7 +325,9 @@ def sync_entry(entry: SkillEntry, prune_extra: bool) -> None:
             shutil.copy2(source, destination)
 
     if prune_extra:
-        mirror_files = file_map(entry.mirror_dir)
+        mirror_files, mirror_problems = file_map(entry.mirror_dir)
+        if mirror_problems:
+            return
         for rel in sorted(set(mirror_files) - set(canonical_files), reverse=True):
             mirror_files[rel].unlink()
         remove_empty_dirs(entry.mirror_dir)
