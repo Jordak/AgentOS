@@ -49,6 +49,17 @@ MIRROR_RESULT_STATUSES = (
     "in-sync",
 )
 MIRROR_SOURCE_KINDS = ("core", "personal-overlay")
+MIRROR_RESULT_REQUIRED_FIELDS = {
+    "name": str,
+    "source_kind": str,
+    "status": str,
+    "canonical_source": str,
+    "mirror_path": str,
+    "missing_files": list,
+    "changed_files": list,
+    "extra_files": list,
+    "notes": list,
+}
 AUTOMATION_CHECK_TERMS = (
     "drift",
     "update",
@@ -383,10 +394,7 @@ def resolve_agentos_home(requested: Path | None, cwd: Path) -> tuple[Path, Check
 
 
 def expand_path(path: Path, cwd: Path) -> Path:
-    expanded = Path(os.path.expanduser(str(path)))
-    if not expanded.is_absolute():
-        expanded = cwd / expanded
-    return expanded.resolve()
+    return absolute_lexical_path(Path(os.path.expanduser(str(path))), cwd)
 
 
 def absolute_lexical_path(path: Path, cwd: Path) -> Path:
@@ -728,6 +736,39 @@ def check_skill_mirrors(
             "Mirror-skills audit script is missing.",
             details=[root_relative(script_agentos_home, script)],
         )
+    mirror_root_exists, mirror_root_exists_error = safe_path_exists(mirror_root)
+    if mirror_root_exists_error:
+        return CheckResult(
+            "skill mirrors",
+            "FAIL",
+            "Skill mirror root could not be inspected.",
+            details=[path_error_detail("mirror root", agentos_home, mirror_root, mirror_root_exists_error, verbose)],
+            recommendations=[
+                "Fix the mirror root path before trusting mirror status or syncing mirrors."
+            ],
+        )
+    if mirror_root_exists:
+        mirror_root_is_dir, mirror_root_dir_error = safe_path_is_dir(mirror_root)
+        if mirror_root_dir_error:
+            return CheckResult(
+                "skill mirrors",
+                "FAIL",
+                "Skill mirror root could not be inspected.",
+                details=[path_error_detail("mirror root", agentos_home, mirror_root, mirror_root_dir_error, verbose)],
+                recommendations=[
+                    "Fix the mirror root path before trusting mirror status or syncing mirrors."
+                ],
+            )
+        if not mirror_root_is_dir:
+            return CheckResult(
+                "skill mirrors",
+                "FAIL",
+                "Skill mirror root exists but is not a directory.",
+                details=[root_relative(agentos_home, mirror_root)],
+                recommendations=[
+                    "Fix the mirror root path before trusting mirror status or syncing mirrors."
+                ],
+            )
 
     command = [
         sys.executable,
@@ -801,6 +842,24 @@ def check_skill_mirrors(
             details=details,
             recommendations=[
                 "Fix the mirror-skills command, manifest, or audit output format before syncing mirrors."
+            ],
+        )
+
+    shape_errors = mirror_result_shape_errors(results)
+    if shape_errors:
+        details = list(base_details)
+        details.extend(shape_errors[:5])
+        if len(shape_errors) > 5:
+            details.append(f"Additional malformed mirror results: {len(shape_errors) - 5}")
+        if verbose:
+            details.extend(prefix_lines("mirror-skills", completed.stdout, completed.stderr))
+        return CheckResult(
+            "skill mirrors",
+            "FAIL",
+            "Mirror-skills audit returned malformed structured evidence.",
+            details=details,
+            recommendations=[
+                "Fix the mirror-skills output schema before trusting mirror status or syncing mirrors."
             ],
         )
 
@@ -922,6 +981,23 @@ def check_skill_mirrors(
         details=details,
         recommendations=recommendations,
     )
+
+
+def mirror_result_shape_errors(results: list[dict[str, object]]) -> list[str]:
+    errors: list[str] = []
+    list_fields = {"missing_files", "changed_files", "extra_files", "notes"}
+    for index, result in enumerate(results):
+        for field, expected_type in MIRROR_RESULT_REQUIRED_FIELDS.items():
+            if field not in result:
+                errors.append(f"Mirror result {index}: missing required field {field}.")
+                continue
+            value = result[field]
+            if not isinstance(value, expected_type):
+                errors.append(f"Mirror result {index}: field {field} has wrong type.")
+                continue
+            if field in list_fields and not all(isinstance(item, str) for item in value):
+                errors.append(f"Mirror result {index}: field {field} must contain only strings.")
+    return errors
 
 
 def check_personal_overlay(
@@ -1679,6 +1755,8 @@ def trusted_path_kind(boundary_root: Path, path: Path, expected_kind: str) -> tu
         rel = path.relative_to(boundary_root)
     except ValueError:
         return False, UnsafePathError(f"path is outside trusted root: {path}")
+    if any(part == ".." for part in rel.parts):
+        return False, UnsafePathError(f"parent-directory traversal is not allowed: {path}")
 
     current = boundary_root
     try:
@@ -1746,10 +1824,15 @@ def safe_tree_files(root: Path, boundary_root: Path | None = None) -> tuple[list
         for entry in entry_list:
             path = Path(entry.path)
             try:
-                if entry.is_dir(follow_symlinks=False):
+                entry_stat = entry.stat(follow_symlinks=False)
+                if stat.S_ISLNK(entry_stat.st_mode):
+                    return files, UnsafePathError(f"symbolic link is not allowed: {path}")
+                if stat.S_ISDIR(entry_stat.st_mode):
                     stack.append(path)
-                elif entry.is_file(follow_symlinks=False):
+                elif stat.S_ISREG(entry_stat.st_mode):
                     files.append(path)
+                else:
+                    return files, UnsafePathError(f"unsupported filesystem entry kind: {path}")
             except OSError as exc:
                 return files, exc
     return files, None
@@ -1995,6 +2078,7 @@ def run_self_tests() -> int:
         test_personal_overlay_malformed_getting_started_warns,
         test_invalid_home_is_graceful,
         test_home_required_symlink_fails_closed,
+        test_requested_root_symlinks_fail_closed,
         test_adapter_check_uses_temp_home,
         test_relative_adapter_args_resolve_from_invocation_cwd,
         test_relative_adapter_args_preserve_symlink_ancestors,
@@ -2015,6 +2099,8 @@ def run_self_tests() -> int:
         test_mirror_zero_exit_with_drift_status_fails,
         test_mirror_unknown_status_fails,
         test_mirror_unknown_source_kind_fails,
+        test_mirror_malformed_actionable_result_fails,
+        test_mirror_root_symlink_fails_closed,
         test_mirror_sync_blocks_writes_after_discovery_error,
         test_mirror_file_path_fails_closed,
         test_mirror_nested_source_directory_error_fails,
@@ -2034,6 +2120,7 @@ def run_self_tests() -> int:
         test_linked_worktree_primary_self_suppresses_writes,
         test_personal_overlay_unreadable_starter_warns,
         test_personal_overlay_ancestor_symlink_warns,
+        test_personal_overlay_traversal_starter_warns,
         test_automation_no_evidence_warns,
         test_automation_respects_codex_home,
         test_automation_unreadable_registry_warns,
@@ -2042,6 +2129,7 @@ def run_self_tests() -> int:
         test_automation_codex_root_file_blocks_pass,
         test_automation_personal_root_file_blocks_pass,
         test_automation_symlink_evidence_blocks_pass,
+        test_automation_nested_symlink_blocks_pass,
         test_automation_registry_mention_warns,
         test_personal_active_automation_registry_passes,
         test_personal_disabled_automation_registry_warns,
@@ -2161,7 +2249,7 @@ def test_invalid_home_is_graceful() -> None:
         )
         statuses = [result.status for result in report.results]
         assert_true("FAIL" in statuses, "invalid home should fail gracefully")
-        assert_true(report.agentos_home == root.resolve(), "explicit home was not printed/resolved")
+        assert_true(report.agentos_home == absolute_lexical_path(root, root.parent), "explicit home was not printed lexically")
 
 
 def test_home_required_symlink_fails_closed() -> None:
@@ -2176,6 +2264,43 @@ def test_home_required_symlink_fails_closed() -> None:
         joined = "\n".join(result.details)
         assert_true(result.status == "FAIL", "symlinked required Core file should fail closed")
         assert_true("UnsafePathError" in joined, "symlinked required Core file should be reported as unsafe")
+
+
+def test_requested_root_symlinks_fail_closed() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        real_root = Path(tmp) / "real-AgentOS"
+        linked_root = Path(tmp) / "linked-AgentOS"
+        make_fake_agentos(real_root)
+        linked_root.symlink_to(real_root, target_is_directory=True)
+        report = run_doctor(
+            requested_agentos_home=linked_root,
+            requested_primary_agentos_home=None,
+            cwd=Path(tmp),
+            mirror_root=Path(tmp) / "mirrors",
+            verbose=False,
+            process_home=Path(tmp) / "home",
+            env=minimal_env(Path(tmp) / "home"),
+        )
+        home_result = result_named(report, "home structure")
+        assert_true(home_result.status == "FAIL", "symlinked --agentos-home should fail closed")
+
+        worktree = Path(tmp) / "worktree"
+        primary = Path(tmp) / "primary"
+        linked_primary = Path(tmp) / "linked-primary"
+        make_fake_agentos(worktree)
+        make_fake_agentos(primary)
+        linked_primary.symlink_to(primary, target_is_directory=True)
+        report = run_doctor(
+            requested_agentos_home=worktree,
+            requested_primary_agentos_home=linked_primary,
+            cwd=Path(tmp),
+            mirror_root=Path(tmp) / "mirrors",
+            verbose=False,
+            process_home=Path(tmp) / "home",
+            env=minimal_env(Path(tmp) / "home"),
+        )
+        primary_result = result_named(report, "primary home structure")
+        assert_true(primary_result.status == "FAIL", "symlinked --primary-agentos-home should fail closed")
 
 
 def test_adapter_check_uses_temp_home() -> None:
@@ -2538,7 +2663,9 @@ def test_mirror_nonzero_without_actionable_status_fails() -> None:
         script = root / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py"
         script.write_text(
             "import json, sys\n"
-            "print(json.dumps([{'skill': 'example-skill', 'source_kind': 'core', 'status': 'in-sync'}]))\n"
+            "print(json.dumps([{'name': 'example-skill', 'source_kind': 'core', 'status': 'in-sync', "
+            "'canonical_source': 'os/skills/example-skill/SKILL.md', 'mirror_path': 'mirror', "
+            "'missing_files': [], 'changed_files': [], 'extra_files': [], 'notes': []}]))\n"
             "sys.exit(1)\n",
             encoding="utf-8",
         )
@@ -2557,7 +2684,9 @@ def test_mirror_zero_exit_with_drift_status_fails() -> None:
         script = root / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py"
         script.write_text(
             "import json\n"
-            "print(json.dumps([{'name': 'example-skill', 'source_kind': 'core', 'status': 'missing'}]))\n",
+            "print(json.dumps([{'name': 'example-skill', 'source_kind': 'core', 'status': 'missing', "
+            "'canonical_source': 'os/skills/example-skill/SKILL.md', 'mirror_path': 'mirror', "
+            "'missing_files': ['SKILL.md'], 'changed_files': [], 'extra_files': [], 'notes': []}]))\n",
             encoding="utf-8",
         )
         result = check_skill_mirrors(root, root, mirror_root, minimal_env(Path(tmp) / "home"), verbose=False)
@@ -2575,7 +2704,9 @@ def test_mirror_unknown_status_fails() -> None:
         script = root / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py"
         script.write_text(
             "import json\n"
-            "print(json.dumps([{'name': 'example-skill', 'source_kind': 'core', 'status': 'skipped'}]))\n",
+            "print(json.dumps([{'name': 'example-skill', 'source_kind': 'core', 'status': 'skipped', "
+            "'canonical_source': 'os/skills/example-skill/SKILL.md', 'mirror_path': 'mirror', "
+            "'missing_files': [], 'changed_files': [], 'extra_files': [], 'notes': []}]))\n",
             encoding="utf-8",
         )
         result = check_skill_mirrors(root, root, mirror_root, minimal_env(Path(tmp) / "home"), verbose=False)
@@ -2594,7 +2725,9 @@ def test_mirror_unknown_source_kind_fails() -> None:
         script = root / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py"
         script.write_text(
             "import json\n"
-            "print(json.dumps([{'name': 'example-skill', 'source_kind': 'plugin', 'status': 'in-sync'}]))\n",
+            "print(json.dumps([{'name': 'example-skill', 'source_kind': 'plugin', 'status': 'in-sync', "
+            "'canonical_source': 'os/skills/example-skill/SKILL.md', 'mirror_path': 'mirror', "
+            "'missing_files': [], 'changed_files': [], 'extra_files': [], 'notes': []}]))\n",
             encoding="utf-8",
         )
         result = check_skill_mirrors(root, root, mirror_root, minimal_env(Path(tmp) / "home"), verbose=False)
@@ -2603,6 +2736,63 @@ def test_mirror_unknown_source_kind_fails() -> None:
         assert_true("unknown structured evidence" in result.summary, "unknown source kind summary should be explicit")
         assert_true("plugin" in joined, "unknown mirror source kind should be reported")
         assert_true("--sync" not in joined, "unknown mirror source kind should not recommend sync")
+
+
+def test_mirror_malformed_actionable_result_fails() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        mirror_root = Path(tmp) / "mirrors"
+        make_fake_agentos(root)
+        script = root / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py"
+        script.write_text(
+            "import json, sys\n"
+            "print(json.dumps([{'status': 'missing', 'source_kind': 'core'}]))\n"
+            "sys.exit(1)\n",
+            encoding="utf-8",
+        )
+        result = check_skill_mirrors(root, root, mirror_root, minimal_env(Path(tmp) / "home"), verbose=False)
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "FAIL", "malformed actionable mirror result should fail closed")
+        assert_true("malformed structured evidence" in result.summary, "malformed mirror schema should be explicit")
+        assert_true("--sync" not in joined, "malformed actionable mirror result should not recommend sync")
+
+
+def test_mirror_root_symlink_fails_closed() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        real_mirror_root = Path(tmp) / "real-mirrors"
+        linked_mirror_root = Path(tmp) / "linked-mirrors"
+        make_fake_agentos(root)
+        real_mirror_root.mkdir()
+        linked_mirror_root.symlink_to(real_mirror_root, target_is_directory=True)
+        result = check_skill_mirrors(
+            root,
+            root,
+            linked_mirror_root,
+            minimal_env(Path(tmp) / "home"),
+            verbose=False,
+        )
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "FAIL", "symlinked mirror root should fail closed in doctor")
+        assert_true("--sync" not in joined, "symlinked mirror root should not recommend sync")
+
+        script = root / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py"
+        completed = run_subprocess(
+            [
+                sys.executable,
+                str(script),
+                "--agentos-root",
+                str(root),
+                "--mirror-root",
+                str(linked_mirror_root),
+                "--sync",
+                "--json",
+            ],
+            cwd=root,
+            env=minimal_env(Path(tmp) / "home"),
+        )
+        assert_true(completed.returncode == 1, "mirror sync should fail closed for symlinked mirror root")
+        assert_true("mirror-unreadable" in completed.stdout, "symlinked mirror root should be reported")
 
 
 def test_mirror_sync_blocks_writes_after_discovery_error() -> None:
@@ -2998,11 +3188,13 @@ def test_primary_agentos_home_drives_current_machine_recommendations() -> None:
         mirror_result = result_named(report, "skill mirrors")
         adapter_text = "\n".join(adapter_result.details + adapter_result.recommendations)
         mirror_text = "\n".join(mirror_result.details + mirror_result.recommendations)
-        assert_true(report.setup_agentos_home == primary.resolve(), "primary home should drive current-machine setup checks")
-        assert_true(str(primary.resolve()) in adapter_text, "adapter recommendations should target primary home")
-        assert_true(str(worktree.resolve()) not in adapter_text, "adapter recommendations should not target feature worktree")
-        assert_true(f"--agentos-root {worktree.resolve()}" in mirror_text, "mirror audit should use the current Core checkout")
-        assert_true(f"--personal-overlay-root {primary.resolve() / 'personal' / 'os'}" in mirror_text, "mirror audit should use the primary Personal Overlay")
+        lexical_primary = absolute_lexical_path(primary, worktree)
+        lexical_worktree = absolute_lexical_path(worktree, worktree)
+        assert_true(report.setup_agentos_home == lexical_primary, "primary home should drive current-machine setup checks")
+        assert_true(str(lexical_primary) in adapter_text, "adapter recommendations should target primary home")
+        assert_true(str(lexical_worktree) not in adapter_text, "adapter recommendations should not target feature worktree")
+        assert_true(f"--agentos-root {lexical_worktree}" in mirror_text, "mirror audit should use the current Core checkout")
+        assert_true(f"--personal-overlay-root {lexical_primary / 'personal' / 'os'}" in mirror_text, "mirror audit should use the primary Personal Overlay")
         assert_true("--sync" not in mirror_text, "mirror recommendations should not sync from feature worktree")
 
 
@@ -3118,6 +3310,21 @@ def test_personal_overlay_ancestor_symlink_warns() -> None:
         assert_true(result.status == "WARN", "symlinked Personal Overlay ancestor should warn")
         assert_true("could not be inspected" in result.summary, "symlinked Personal Overlay should not pass")
         assert_true("UnsafePathError" in joined, "symlinked Personal Overlay should be reported as unsafe")
+
+
+def test_personal_overlay_traversal_starter_warns() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        make_fake_agentos(root)
+        (root / "os" / "playbook" / "GETTING_STARTED.md").write_text(
+            "# Getting Started\n\n## Starter Files\n\n- `personal/os/../../AGENTS.md`: invalid traversal.\n",
+            encoding="utf-8",
+        )
+        result = check_personal_overlay(root, root, verbose=False)
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "WARN", "traversing starter path should warn")
+        assert_true("could not be inspected" in result.summary, "traversing starter path should not pass")
+        assert_true("UnsafePathError" in joined, "traversing starter path should be reported as unsafe")
 
 
 def test_automation_no_evidence_warns() -> None:
@@ -3365,6 +3572,30 @@ Schedule rule: RRULE:FREQ=WEEKLY
         assert_true("could not be fully inspected" in result.summary, "symlinked automation evidence should warn")
         assert_true("UnsafePathError" in joined, "symlinked automation evidence should be reported as unsafe")
         assert_true("Recurring AgentOS check evidence: not found" in joined, "unsafe evidence should suppress PASS")
+
+
+def test_automation_nested_symlink_blocks_pass() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        home = Path(tmp) / "home"
+        external_note = Path(tmp) / "external-disabled.md"
+        make_fake_agentos(root)
+        codex_automation = home / ".codex" / "automations" / "agentos-doctor" / "automation.toml"
+        codex_automation.parent.mkdir(parents=True)
+        codex_automation.write_text(
+            'name = "AgentOS doctor health check"\n'
+            'status = "ACTIVE"\n'
+            'rrule = "RRULE:FREQ=WEEKLY"\n',
+            encoding="utf-8",
+        )
+        external_note.write_text("disabled AgentOS doctor automation\n", encoding="utf-8")
+        (home / ".codex" / "automations" / "linked-disabled.md").symlink_to(external_note)
+        result = check_automations(root, root, home, verbose=False)
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "WARN", "nested symlink automation evidence should block PASS")
+        assert_true("could not be fully inspected" in result.summary, "nested symlink should warn")
+        assert_true("UnsafePathError" in joined, "nested symlink should be reported as unsafe")
+        assert_true("Recurring AgentOS check evidence: not found" in joined, "unsafe nested evidence should suppress PASS")
 
 
 def test_automation_registry_mention_warns() -> None:
@@ -4269,8 +4500,8 @@ def test_primary_agentos_home_supplies_personal_overlay() -> None:
             process_home=Path(tmp) / "home",
             env=minimal_env(Path(tmp) / "home"),
         )
-        assert_true(report.agentos_home == worktree.resolve(), "worktree should remain Core home")
-        assert_true(report.primary_agentos_home == primary.resolve(), "primary home should be recorded")
+        assert_true(report.agentos_home == absolute_lexical_path(worktree, worktree), "worktree should remain Core home")
+        assert_true(report.primary_agentos_home == absolute_lexical_path(primary, worktree), "primary home should be recorded")
 
 
 def test_primary_overlay_uses_worktree_starter_checklist() -> None:

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shutil
 import stat
@@ -56,6 +57,13 @@ def find_agentos_root(start: Path) -> Path:
     raise SystemExit("Could not find AgentOS root containing os/skills/MANIFEST.md")
 
 
+def lexical_path(path: Path, cwd: Path) -> Path:
+    expanded = Path(os.path.expanduser(str(path)))
+    if not expanded.is_absolute():
+        expanded = cwd / expanded
+    return Path(os.path.abspath(os.fspath(expanded)))
+
+
 def extract_field(section: str, field_name: str) -> str | None:
     pattern = re.compile(FIELD_RE_TEMPLATE.format(field=re.escape(field_name)), re.MULTILINE)
     match = pattern.search(section)
@@ -71,6 +79,8 @@ def source_path_problem(boundary_root: Path, source_path: Path, expected_kind: s
         rel = source_path.relative_to(boundary_root)
     except ValueError:
         return f"source path is outside boundary root: {source_path}"
+    if any(part == ".." for part in rel.parts):
+        return f"{rel.as_posix()}: parent-directory traversal is not allowed"
 
     try:
         root_stat = boundary_root.lstat()
@@ -264,6 +274,24 @@ def personal_overlay_discovery_error_result(
         changed_files=[],
         extra_files=[],
         notes=[f"Personal Overlay skills root could not be inspected: {problem}"],
+    )
+
+
+def mirror_root_problem(mirror_root: Path) -> str | None:
+    return source_path_problem(mirror_root.parent, mirror_root, "directory")
+
+
+def mirror_root_error_result(mirror_root: Path, problem: str) -> MirrorResult:
+    return MirrorResult(
+        name="mirror-root",
+        source_kind="core",
+        status="mirror-unreadable",
+        canonical_source=".",
+        mirror_path=str(mirror_root),
+        missing_files=[],
+        changed_files=[],
+        extra_files=[],
+        notes=[f"Mirror root could not be inspected: {problem}"],
     )
 
 
@@ -643,15 +671,19 @@ def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
 
-    agentos_root = args.agentos_root.resolve() if args.agentos_root else find_agentos_root(Path.cwd().resolve())
-    mirror_root = args.mirror_root.expanduser().resolve()
+    cwd = lexical_path(Path.cwd(), Path.cwd())
+    agentos_root = lexical_path(args.agentos_root, cwd) if args.agentos_root else find_agentos_root(cwd)
+    mirror_root = lexical_path(args.mirror_root, cwd)
 
     core_entries = parse_manifest(agentos_root)
     personal_entries: list[SkillEntry] = []
     discovery_results: list[MirrorResult] = []
+    mirror_problem = mirror_root_problem(mirror_root)
+    if mirror_problem:
+        discovery_results.append(mirror_root_error_result(mirror_root, mirror_problem))
     if not args.core_only:
         personal_overlay_root = (
-            args.personal_overlay_root.expanduser()
+            lexical_path(args.personal_overlay_root, cwd)
             if args.personal_overlay_root
             else agentos_root / "personal/os"
         )
