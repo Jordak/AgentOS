@@ -69,11 +69,9 @@
   {
     "id": "personal-overlay-false-empty",
     "category": "personal-overlay",
-    "question": "Which AgentOS files define the rule for handling ignore-aware personal/os/ discovery that returns only .gitkeep skeleton files?",
+    "question": "Which AgentOS playbook file defines the operational rule for handling ignore-aware personal/os/ discovery that returns only .gitkeep skeleton files?",
     "expected_paths": [
-      "os/playbook/PERSONAL_OVERLAY.md",
-      "os/RESOLVER.md",
-      "docs/adr/0003-personal-overlay-discovery.md"
+      "os/playbook/PERSONAL_OVERLAY.md"
     ]
   },
   {
