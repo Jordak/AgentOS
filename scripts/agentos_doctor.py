@@ -495,15 +495,7 @@ def check_adapters(
     if verbose:
         details.extend(prefix_lines("installer", completed.stdout, completed.stderr))
 
-    if completed.returncode == 0:
-        return CheckResult(
-            "adapter drift",
-            "PASS",
-            "Global instruction adapters are current for the checked targets.",
-            details=details,
-        )
-
-    if completed.returncode in {124, 127} or not check_lines:
+    if completed.returncode in {124, 127}:
         details.extend(subprocess_failure_details(completed, verbose))
         return CheckResult(
             "adapter drift",
@@ -513,6 +505,26 @@ def check_adapters(
             recommendations=[
                 "Fix the adapter check command or environment, then re-run this doctor command."
             ],
+        )
+
+    if not check_lines:
+        details.extend(subprocess_failure_details(completed, verbose))
+        return CheckResult(
+            "adapter drift",
+            "FAIL",
+            "Adapter drift check did not return structured target results.",
+            details=details,
+            recommendations=[
+                "Fix the adapter check command or output format, then re-run this doctor command."
+            ],
+        )
+
+    if completed.returncode == 0:
+        return CheckResult(
+            "adapter drift",
+            "PASS",
+            "Global instruction adapters are current for the checked targets.",
+            details=details,
         )
 
     hard_failure_statuses = {
@@ -643,6 +655,21 @@ def check_skill_mirrors(
             details=details,
         )
 
+    if not results:
+        details = list(base_details)
+        details.append("JSON output contained no mirror result objects.")
+        if verbose:
+            details.extend(prefix_lines("mirror-skills", completed.stdout, completed.stderr))
+        return CheckResult(
+            "skill mirrors",
+            "FAIL",
+            "Mirror-skills audit returned no mirror results.",
+            details=details,
+            recommendations=[
+                "Fix the mirror-skills command, manifest, or audit output format before syncing mirrors."
+            ],
+        )
+
     statuses = Counter(str(result.get("status", "unknown")) for result in results)
     source_kinds = Counter(str(result.get("source_kind", "unknown")) for result in results)
     details = [
@@ -730,7 +757,23 @@ def check_personal_overlay(
     personal_root = primary_agentos_home / "personal" / "os"
     getting_started = agentos_home / "os" / "playbook" / "GETTING_STARTED.md"
     starter_paths, starter_error = starter_personal_paths(getting_started)
-    if not personal_root.exists():
+    personal_root_exists, personal_root_exists_error = safe_path_exists(personal_root)
+    if personal_root_exists_error:
+        return CheckResult(
+            "Personal Overlay",
+            "WARN",
+            "Personal Overlay root could not be inspected.",
+            details=[
+                "Starter paths documented: " + str(len(starter_paths)),
+                path_error_detail("Personal Overlay root", agentos_home, personal_root, personal_root_exists_error, verbose),
+            ],
+            recommendations=private_state_recommendations(
+                private_root_is_canonical,
+                "Check local filesystem permissions, then re-run this doctor command.",
+            ),
+        )
+
+    if not personal_root_exists:
         return CheckResult(
             "Personal Overlay",
             "WARN",
@@ -745,7 +788,23 @@ def check_personal_overlay(
             ),
         )
 
-    if not personal_root.is_dir():
+    personal_root_is_dir, personal_root_dir_error = safe_path_is_dir(personal_root)
+    if personal_root_dir_error:
+        return CheckResult(
+            "Personal Overlay",
+            "WARN",
+            "Personal Overlay root could not be inspected.",
+            details=[
+                "Starter paths documented: " + str(len(starter_paths)),
+                path_error_detail("Personal Overlay root", agentos_home, personal_root, personal_root_dir_error, verbose),
+            ],
+            recommendations=private_state_recommendations(
+                private_root_is_canonical,
+                "Check local filesystem permissions, then re-run this doctor command.",
+            ),
+        )
+
+    if not personal_root_is_dir:
         return CheckResult(
             "Personal Overlay",
             "FAIL",
@@ -753,15 +812,35 @@ def check_personal_overlay(
             details=[root_relative(agentos_home, personal_root)],
         )
 
-    existing_starters = [rel for rel in starter_paths if (primary_agentos_home / rel).is_file()]
-    missing_starters = [rel for rel in starter_paths if rel not in existing_starters]
-    private_file_count = count_non_gitkeep_files(personal_root)
+    existing_starters: list[str] = []
+    unreadable_starters: list[str] = []
+    unreadable_starter_details: list[str] = []
+    for rel in starter_paths:
+        path = primary_agentos_home / rel
+        is_file, error = safe_path_is_file(path)
+        if error:
+            unreadable_starters.append(rel)
+            unreadable_starter_details.append(path_error_detail(rel, agentos_home, path, error, verbose))
+        elif is_file:
+            existing_starters.append(rel)
+    missing_starters = [
+        rel for rel in starter_paths if rel not in existing_starters and rel not in unreadable_starters
+    ]
+    private_file_count, private_file_count_error = count_non_gitkeep_files_with_error(personal_root)
     details = [
-        f"Private files under personal/os/: {private_file_count}",
+        "Private files under personal/os/: "
+        + ("unreadable" if private_file_count_error else str(private_file_count)),
         f"Starter files present: {len(existing_starters)}/{len(starter_paths)}",
     ]
+    if private_file_count_error:
+        details.append(
+            path_error_detail("Personal Overlay file count", agentos_home, personal_root, private_file_count_error, verbose)
+        )
     if starter_error:
         details.append(starter_error)
+    if unreadable_starters:
+        details.append("Unreadable starter paths: " + ", ".join(unreadable_starters))
+        details.extend(unreadable_starter_details)
     if missing_starters:
         details.append("Missing starter paths: " + ", ".join(missing_starters))
     if verbose and existing_starters:
@@ -776,6 +855,18 @@ def check_personal_overlay(
             recommendations=[
                 "Restore or repair os/playbook/GETTING_STARTED.md so the Starter Files section can be audited."
             ],
+        )
+
+    if private_file_count_error or unreadable_starters:
+        return CheckResult(
+            "Personal Overlay",
+            "WARN",
+            "Some documented Personal Overlay paths could not be inspected.",
+            details=details,
+            recommendations=private_state_recommendations(
+                private_root_is_canonical,
+                "Check local filesystem permissions, then re-run this doctor command.",
+            ),
         )
 
     if missing_starters:
@@ -862,27 +953,39 @@ def check_automations(
     personal_automations = primary_agentos_home / "personal" / "os" / "automations"
     personal_registry = personal_automations / "AUTOMATIONS.md"
     codex_automations = process_home / ".codex" / "automations"
-    personal_file_count = count_non_gitkeep_files(personal_automations)
-    codex_file_count = count_non_gitkeep_files(codex_automations)
-    personal_registry_text = read_text_or_empty(personal_registry)
+    core_registry_is_file, core_registry_error = safe_path_is_file(core_registry)
+    personal_automations_exists, personal_automations_exists_error = safe_path_exists(personal_automations)
+    personal_registry_is_file, personal_registry_file_error = safe_path_is_file(personal_registry)
+    personal_file_count, personal_file_count_error = count_non_gitkeep_files_with_error(personal_automations)
+    personal_registry_text, personal_registry_read_error = read_text_with_error(personal_registry)
     registry_mentions_checks = text_mentions_agentos_checks(personal_registry_text)
     registry_active_checks = personal_registry_active_agentos_check_evidence(personal_registry_text)
     registry_negative_checks = personal_registry_negative_agentos_check_evidence(personal_registry_text)
     registry_possible_checks = personal_registry_possible_agentos_check_evidence(personal_registry_text)
-    codex_active_checks, codex_negative_checks, codex_possible_checks = codex_automation_evidence(codex_automations)
+    codex_active_checks, codex_negative_checks, codex_possible_checks, codex_read_error = codex_automation_evidence(codex_automations)
     negative_check_evidence = registry_negative_checks or codex_negative_checks
     ambiguous_check_evidence = registry_possible_checks or codex_possible_checks
     possible_check_evidence = registry_mentions_checks or negative_check_evidence or codex_possible_checks
+    read_error_evidence = bool(
+        core_registry_error
+        or personal_automations_exists_error
+        or personal_registry_file_error
+        or personal_file_count_error
+        or personal_registry_read_error
+        or codex_read_error
+    )
     recurring_check_evidence = (
         (registry_active_checks or codex_active_checks)
         and not negative_check_evidence
         and not ambiguous_check_evidence
+        and not read_error_evidence
     )
 
     details = [
-        "Core automation registry: " + ("present" if core_registry.is_file() else "missing"),
-        "Personal automation registry: " + ("present" if personal_registry.is_file() else "missing"),
-        f"Personal automation files: {personal_file_count}",
+        "Core automation registry: " + ("present" if core_registry_is_file else "missing"),
+        "Personal automation registry: " + ("present" if personal_registry_is_file else "missing"),
+        "Personal automation files: "
+        + ("unreadable" if personal_file_count_error else str(personal_file_count)),
         "Codex automation mirror dir: " + presence_with_count(codex_automations),
         "Personal automation mention: " + ("found" if registry_mentions_checks else "not found"),
         "Personal active AgentOS check evidence: " + ("found" if registry_active_checks else "not found"),
@@ -893,6 +996,16 @@ def check_automations(
         "Possible AgentOS check mention: " + ("found" if possible_check_evidence else "not found"),
         "Recurring AgentOS check evidence: " + ("active" if recurring_check_evidence else "not found"),
     ]
+    for label, path, error in (
+        ("Core automation registry", core_registry, core_registry_error),
+        ("Personal automation root", personal_automations, personal_automations_exists_error),
+        ("Personal automation registry", personal_registry, personal_registry_file_error),
+        ("Personal automation file count", personal_automations, personal_file_count_error),
+        ("Personal automation registry read", personal_registry, personal_registry_read_error),
+        ("Codex automation scan", codex_automations, codex_read_error),
+    ):
+        if error:
+            details.append(path_error_detail(label, agentos_home, path, error, verbose))
     if verbose:
         details.extend(
             [
@@ -902,14 +1015,32 @@ def check_automations(
             ]
         )
 
-    if not core_registry.is_file():
+    if core_registry_error:
+        return CheckResult(
+            "automations",
+            "FAIL",
+            "Core automation registry could not be inspected.",
+            details=details,
+        )
+    if not core_registry_is_file:
         return CheckResult(
             "automations",
             "FAIL",
             "Core automation registry is missing.",
             details=details,
         )
-    if personal_automations.exists() and personal_file_count and not personal_registry.is_file():
+    if read_error_evidence:
+        return CheckResult(
+            "automations",
+            "WARN",
+            "Automation evidence could not be fully inspected.",
+            details=details,
+            recommendations=private_state_recommendations(
+                private_root_is_canonical,
+                "Check local filesystem permissions, then re-run this doctor command.",
+            ),
+        )
+    if personal_automations_exists and personal_file_count and not personal_registry_is_file:
         return CheckResult(
             "automations",
             "WARN",
@@ -962,15 +1093,20 @@ def check_automations(
     )
 
 
-def read_text_or_empty(path: Path) -> str:
+def read_text_with_error(path: Path) -> tuple[str, OSError | UnicodeDecodeError | None]:
     try:
-        return path.read_text(encoding="utf-8")
+        return path.read_text(encoding="utf-8"), None
     except FileNotFoundError:
-        return ""
-    except OSError:
-        return ""
-    except UnicodeDecodeError:
-        return ""
+        return "", None
+    except OSError as exc:
+        return "", exc
+    except UnicodeDecodeError as exc:
+        return "", exc
+
+
+def read_text_or_empty(path: Path) -> str:
+    text, _error = read_text_with_error(path)
+    return text
 
 
 def text_mentions_agentos_checks(text: str) -> bool:
@@ -1188,16 +1324,37 @@ def normalized_marker_text(text: str) -> str:
     return re.sub(r"\s+", " ", text.strip().lower().strip(".:;"))
 
 
-def codex_automation_evidence(root: Path) -> tuple[bool, bool, bool]:
+def codex_automation_evidence(root: Path) -> tuple[bool, bool, bool, OSError | UnicodeDecodeError | None]:
     active = False
     negative = False
     possible = False
-    if not root.exists() or not root.is_dir():
-        return active, negative, possible
-    for path in root.rglob("*"):
-        if not path.is_file() or path.name == ".gitkeep":
+    root_exists, root_exists_error = safe_path_exists(root)
+    if root_exists_error:
+        return active, negative, possible, root_exists_error
+    if not root_exists:
+        return active, negative, possible, None
+    root_is_dir, root_dir_error = safe_path_is_dir(root)
+    if root_dir_error:
+        return active, negative, possible, root_dir_error
+    if not root_is_dir:
+        return active, negative, possible, None
+    read_error: OSError | UnicodeDecodeError | None = None
+    try:
+        paths = list(root.rglob("*"))
+    except OSError as exc:
+        return active, negative, possible, exc
+    for path in paths:
+        is_file, file_error = safe_path_is_file(path)
+        if file_error:
+            read_error = read_error or file_error
             continue
-        text = path.name + "\n" + read_text_or_empty(path)
+        if not is_file or path.name == ".gitkeep":
+            continue
+        file_text, file_read_error = read_text_with_error(path)
+        if file_read_error:
+            read_error = read_error or file_read_error
+            continue
+        text = path.name + "\n" + file_text
         if not text_mentions_agentos_checks(text):
             continue
         if path.name == "automation.toml":
@@ -1220,7 +1377,7 @@ def codex_automation_evidence(root: Path) -> tuple[bool, bool, bool]:
             negative = True
         else:
             possible = True
-    return active, negative, possible
+    return active, negative, possible, read_error
 
 
 def codex_automation_toml_is_active_scheduled(text: str) -> bool:
@@ -1270,22 +1427,79 @@ def simple_config_field_values(text: str, fields: Iterable[str]) -> list[str]:
     return values
 
 
-def count_non_gitkeep_files(root: Path) -> int:
-    if not root.exists() or not root.is_dir():
-        return 0
+def safe_path_exists(path: Path) -> tuple[bool, OSError | None]:
+    try:
+        return path.exists(), None
+    except OSError as exc:
+        return False, exc
+
+
+def safe_path_is_dir(path: Path) -> tuple[bool, OSError | None]:
+    try:
+        return path.is_dir(), None
+    except OSError as exc:
+        return False, exc
+
+
+def safe_path_is_file(path: Path) -> tuple[bool, OSError | None]:
+    try:
+        return path.is_file(), None
+    except OSError as exc:
+        return False, exc
+
+
+def count_non_gitkeep_files_with_error(root: Path) -> tuple[int, OSError | None]:
+    root_exists, exists_error = safe_path_exists(root)
+    if exists_error:
+        return 0, exists_error
+    if not root_exists:
+        return 0, None
+    root_is_dir, dir_error = safe_path_is_dir(root)
+    if dir_error:
+        return 0, dir_error
+    if not root_is_dir:
+        return 0, None
     count = 0
-    for path in root.rglob("*"):
-        if path.is_file() and path.name != ".gitkeep":
+    try:
+        paths = list(root.rglob("*"))
+    except OSError as exc:
+        return count, exc
+    for path in paths:
+        is_file, file_error = safe_path_is_file(path)
+        if file_error:
+            return count, file_error
+        if is_file and path.name != ".gitkeep":
             count += 1
+    return count, None
+
+
+def count_non_gitkeep_files(root: Path) -> int:
+    count, _error = count_non_gitkeep_files_with_error(root)
     return count
 
 
 def presence_with_count(path: Path) -> str:
-    if not path.exists():
+    exists, exists_error = safe_path_exists(path)
+    if exists_error:
+        return "unreadable"
+    if not exists:
         return "missing"
-    if not path.is_dir():
+    is_dir, dir_error = safe_path_is_dir(path)
+    if dir_error:
+        return "unreadable"
+    if not is_dir:
         return "present but not a directory"
-    return f"present ({count_non_gitkeep_files(path)} files)"
+    count, count_error = count_non_gitkeep_files_with_error(path)
+    if count_error:
+        return "present but unreadable"
+    return f"present ({count} files)"
+
+
+def path_error_detail(label: str, root: Path, path: Path, error: OSError | UnicodeDecodeError, verbose: bool) -> str:
+    error_name = error.__class__.__name__
+    if verbose:
+        return f"{label}: {root_relative(root, path)} ({error_name}: {error})"
+    return f"{label}: unreadable ({error_name}); re-run with --verbose for exact path diagnostics."
 
 
 def run_subprocess(
@@ -1472,17 +1686,22 @@ def run_self_tests() -> int:
         test_home_adapter_args_are_preserved,
         test_adapter_check_command_failure_is_not_drift,
         test_adapter_check_preflight_error_is_not_drift,
+        test_adapter_check_empty_success_output_fails,
         test_subprocess_timeout_output_is_text,
         test_mirror_smoke_uses_temp_dirs,
         test_mirror_command_failure_is_not_sync_advice,
         test_mirror_source_failure_is_not_sync_advice,
+        test_mirror_empty_success_output_fails,
         test_mirror_failure_suppresses_private_names_without_verbose,
         test_mirror_recommendations_quote_paths,
         test_recommendations_are_cwd_stable,
         test_primary_agentos_home_supplies_private_skill_mirrors,
         test_primary_agentos_home_drives_current_machine_recommendations,
         test_linked_worktree_without_primary_suppresses_writes,
+        test_personal_overlay_unreadable_starter_warns,
         test_automation_no_evidence_warns,
+        test_automation_unreadable_registry_warns,
+        test_automation_unreadable_codex_file_warns,
         test_automation_registry_mention_warns,
         test_personal_active_automation_registry_passes,
         test_personal_disabled_automation_registry_warns,
@@ -1715,6 +1934,27 @@ def test_adapter_check_preflight_error_is_not_drift() -> None:
         assert_true("error=1" in joined, "preflight result status should be reported")
 
 
+def test_adapter_check_empty_success_output_fails() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        home = Path(tmp) / "home"
+        make_fake_agentos(root)
+        home.mkdir()
+        installer = root / "scripts" / "install_global_agent_instructions.py"
+        installer.write_text("import sys\nsys.exit(0)\n", encoding="utf-8")
+        result = check_adapters(
+            agentos_home=root,
+            process_home=home,
+            env=minimal_env(home),
+            extra_args=[],
+            verbose=False,
+        )
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "FAIL", "empty successful adapter output should fail")
+        assert_true("Managed targets checked: 0" in joined, "empty adapter output should report zero parsed targets")
+        assert_true("structured target results" in result.summary, "empty adapter output should name missing structured evidence")
+
+
 def test_subprocess_timeout_output_is_text() -> None:
     global DEFAULT_TIMEOUT_SECONDS
     with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
@@ -1808,6 +2048,20 @@ def test_mirror_source_failure_is_not_sync_advice() -> None:
         assert_true(result.status == "FAIL", "missing canonical source should fail")
         assert_true("source-missing=1" in joined, "source-missing status should be reported")
         assert_true("--sync" not in joined, "source failure should not recommend mirror sync")
+
+
+def test_mirror_empty_success_output_fails() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        mirror_root = Path(tmp) / "mirrors"
+        make_fake_agentos(root)
+        script = root / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py"
+        script.write_text("print('[]')\n", encoding="utf-8")
+        result = check_skill_mirrors(root, root, mirror_root, minimal_env(Path(tmp) / "home"), verbose=False)
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "FAIL", "empty successful mirror output should fail")
+        assert_true("no mirror results" in result.summary, "empty mirror output should name missing evidence")
+        assert_true("--sync" not in joined, "empty mirror output should not recommend mirror sync")
 
 
 def test_mirror_failure_suppresses_private_names_without_verbose() -> None:
@@ -1934,6 +2188,32 @@ def test_linked_worktree_without_primary_suppresses_writes() -> None:
         assert_true("Do not write private state into this feature worktree" in joined, "private writes should be discouraged")
 
 
+def test_personal_overlay_unreadable_starter_warns() -> None:
+    global safe_path_is_file
+
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        make_fake_agentos(root)
+        unreadable = root / "personal" / "os" / "identity" / "USER.md"
+        original_safe_path_is_file = safe_path_is_file
+
+        def fake_safe_path_is_file(path: Path) -> tuple[bool, OSError | None]:
+            if path == unreadable:
+                return False, PermissionError("blocked for test")
+            return original_safe_path_is_file(path)
+
+        safe_path_is_file = fake_safe_path_is_file
+        try:
+            result = check_personal_overlay(root, root, verbose=False)
+        finally:
+            safe_path_is_file = original_safe_path_is_file
+
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "WARN", "unreadable starter path should warn")
+        assert_true("could not be inspected" in result.summary, "unreadable starter summary should be explicit")
+        assert_true("PermissionError" in joined, "unreadable starter should preserve error class")
+
+
 def test_automation_no_evidence_warns() -> None:
     with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
         root = Path(tmp) / "AgentOS"
@@ -1942,6 +2222,81 @@ def test_automation_no_evidence_warns() -> None:
         joined = "\n".join(result.details)
         assert_true(result.status == "WARN", "missing recurring check evidence should warn")
         assert_true("Recurring AgentOS check evidence: not found" in joined, "missing evidence should be explicit")
+
+
+def test_automation_unreadable_registry_warns() -> None:
+    global read_text_with_error
+
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        make_fake_agentos(root)
+        registry = root / "personal" / "os" / "automations" / "AUTOMATIONS.md"
+        registry.write_text(
+            """# Automations
+
+## Active Automations
+
+### Weekly AgentOS Doctor
+
+Automation id: weekly-agentos-doctor
+
+Status: Active
+
+Schedule rule: RRULE:FREQ=WEEKLY
+""",
+            encoding="utf-8",
+        )
+        original_read_text_with_error = read_text_with_error
+
+        def fake_read_text_with_error(path: Path) -> tuple[str, OSError | UnicodeDecodeError | None]:
+            if path == registry:
+                return "", PermissionError("blocked for test")
+            return original_read_text_with_error(path)
+
+        read_text_with_error = fake_read_text_with_error
+        try:
+            result = check_automations(root, root, Path(tmp) / "home", verbose=False)
+        finally:
+            read_text_with_error = original_read_text_with_error
+
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "WARN", "unreadable automation registry should warn")
+        assert_true("could not be fully inspected" in result.summary, "unreadable automation summary should be explicit")
+        assert_true("Personal automation registry read" in joined, "unreadable registry detail should name source")
+
+
+def test_automation_unreadable_codex_file_warns() -> None:
+    global safe_path_is_file
+
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        home = Path(tmp) / "home"
+        make_fake_agentos(root)
+        codex_automation = home / ".codex" / "automations" / "agentos-doctor" / "automation.toml"
+        codex_automation.parent.mkdir(parents=True)
+        codex_automation.write_text(
+            'name = "AgentOS doctor health check"\n'
+            'status = "ACTIVE"\n'
+            'rrule = "RRULE:FREQ=WEEKLY"\n',
+            encoding="utf-8",
+        )
+        original_safe_path_is_file = safe_path_is_file
+
+        def fake_safe_path_is_file(path: Path) -> tuple[bool, OSError | None]:
+            if path == codex_automation:
+                return False, PermissionError("blocked for test")
+            return original_safe_path_is_file(path)
+
+        safe_path_is_file = fake_safe_path_is_file
+        try:
+            result = check_automations(root, root, home, verbose=False)
+        finally:
+            safe_path_is_file = original_safe_path_is_file
+
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "WARN", "unreadable Codex automation file should warn")
+        assert_true("could not be fully inspected" in result.summary, "unreadable Codex automation summary should be explicit")
+        assert_true("Codex automation scan" in joined, "unreadable Codex detail should name source")
 
 
 def test_automation_registry_mention_warns() -> None:
