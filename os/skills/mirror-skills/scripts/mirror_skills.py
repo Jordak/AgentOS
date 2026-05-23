@@ -42,6 +42,13 @@ class MirrorResult:
     notes: list[str]
 
 
+@dataclass
+class PreflightProblem:
+    name: str
+    canonical_source: str
+    note: str
+
+
 def find_agentos_root(start: Path) -> Path:
     for path in [start, *start.parents]:
         manifest_path = path / "os/skills/MANIFEST.md"
@@ -58,7 +65,12 @@ def lexical_absolute(path: Path) -> Path:
     return Path(os.path.abspath(expanded))
 
 
-def path_component_problems(path: Path, expected_kind: str | None, allow_missing: bool) -> list[str]:
+def path_component_problems(
+    path: Path,
+    expected_kind: str | None,
+    allow_missing: bool,
+    reject_symlink_ancestors: bool = True,
+) -> list[str]:
     absolute = lexical_absolute(path)
     if not absolute.is_absolute():
         return [f"{path} (path is not absolute after normalization)"]
@@ -77,8 +89,12 @@ def path_component_problems(path: Path, expected_kind: str | None, allow_missing
         except OSError as error:
             return [f"{current} ({error.__class__.__name__}: {error})"]
 
-        if stat.S_ISLNK(path_stat.st_mode):
+        if stat.S_ISLNK(path_stat.st_mode) and (reject_symlink_ancestors or is_final):
             return [f"{current} (symbolic link is not allowed)"]
+        if stat.S_ISLNK(path_stat.st_mode) and not reject_symlink_ancestors:
+            if not current.is_dir():
+                return [f"{current} (path component is not a directory)"]
+            continue
         if not is_final and not stat.S_ISDIR(path_stat.st_mode):
             return [f"{current} (path component is not a directory)"]
         if is_final and expected_kind == "directory" and not stat.S_ISDIR(path_stat.st_mode):
@@ -132,37 +148,76 @@ def parse_manifest(agentos_root: Path) -> list[SkillEntry]:
     return entries
 
 
-def discover_personal_overlay_entries(agentos_root: Path) -> tuple[list[SkillEntry], list[str]]:
+def discover_personal_overlay_entries(
+    agentos_root: Path,
+    requested_names: set[str] | None = None,
+) -> tuple[list[SkillEntry], list[PreflightProblem]]:
     personal_skills_root = agentos_root / "personal/os/skills"
     problems = path_component_problems(personal_skills_root, expected_kind="directory", allow_missing=True)
     if problems:
-        return [], problems
+        return [], [
+            PreflightProblem("personal-overlay", "personal/os/skills", problem)
+            for problem in problems
+        ]
     try:
         personal_stat = personal_skills_root.lstat()
     except FileNotFoundError:
         return [], []
     except OSError as error:
-        return [], [f"{personal_skills_root} ({error.__class__.__name__}: {error})"]
+        return [], [
+            PreflightProblem(
+                "personal-overlay",
+                "personal/os/skills",
+                f"{personal_skills_root} ({error.__class__.__name__}: {error})",
+            )
+        ]
     if not stat.S_ISDIR(personal_stat.st_mode):
-        return [], [f"{personal_skills_root} (not a directory)"]
+        return [], [
+            PreflightProblem(
+                "personal-overlay",
+                "personal/os/skills",
+                f"{personal_skills_root} (not a directory)",
+            )
+        ]
 
     try:
         skill_dirs = sorted(personal_skills_root.iterdir())
     except OSError as error:
-        return [], [f"{personal_skills_root} ({error.__class__.__name__}: {error})"]
+        return [], [
+            PreflightProblem(
+                "personal-overlay",
+                "personal/os/skills",
+                f"{personal_skills_root} ({error.__class__.__name__}: {error})",
+            )
+        ]
 
     entries: list[SkillEntry] = []
-    problems: list[str] = []
+    problems: list[PreflightProblem] = []
     for skill_dir in skill_dirs:
-        if skill_dir.name == ".gitkeep" or should_ignore(skill_dir.relative_to(personal_skills_root)):
+        if requested_names is not None and skill_dir.name not in requested_names:
             continue
+        skill_source = f"personal/os/skills/{skill_dir.name}"
         try:
             skill_dir_stat = skill_dir.lstat()
         except OSError as error:
-            problems.append(f"{skill_dir} ({error.__class__.__name__}: {error})")
+            problems.append(
+                PreflightProblem(
+                    skill_dir.name,
+                    skill_source,
+                    f"{skill_dir} ({error.__class__.__name__}: {error})",
+                )
+            )
             continue
         if stat.S_ISLNK(skill_dir_stat.st_mode):
-            problems.append(f"{skill_dir} (symbolic link is not allowed)")
+            problems.append(
+                PreflightProblem(
+                    skill_dir.name,
+                    skill_source,
+                    f"{skill_dir} (symbolic link is not allowed)",
+                )
+            )
+            continue
+        if skill_dir.name == ".gitkeep" or should_ignore(skill_dir.relative_to(personal_skills_root)):
             continue
         if not stat.S_ISDIR(skill_dir_stat.st_mode):
             continue
@@ -172,13 +227,31 @@ def discover_personal_overlay_entries(agentos_root: Path) -> tuple[list[SkillEnt
         except FileNotFoundError:
             continue
         except OSError as error:
-            problems.append(f"{skill_file} ({error.__class__.__name__}: {error})")
+            problems.append(
+                PreflightProblem(
+                    skill_dir.name,
+                    f"{skill_source}/SKILL.md",
+                    f"{skill_file} ({error.__class__.__name__}: {error})",
+                )
+            )
             continue
         if stat.S_ISLNK(skill_file_stat.st_mode):
-            problems.append(f"{skill_file} (symbolic link is not allowed)")
+            problems.append(
+                PreflightProblem(
+                    skill_dir.name,
+                    f"{skill_source}/SKILL.md",
+                    f"{skill_file} (symbolic link is not allowed)",
+                )
+            )
             continue
         if not stat.S_ISREG(skill_file_stat.st_mode):
-            problems.append(f"{skill_file} (not a regular file)")
+            problems.append(
+                PreflightProblem(
+                    skill_dir.name,
+                    f"{skill_source}/SKILL.md",
+                    f"{skill_file} (not a regular file)",
+                )
+            )
             continue
         name = skill_dir.name
         canonical_source = skill_file.relative_to(agentos_root).as_posix()
@@ -196,14 +269,40 @@ def discover_personal_overlay_entries(agentos_root: Path) -> tuple[list[SkillEnt
     return entries, problems
 
 
+def personal_preflight_results(problems: list[PreflightProblem], mirror_root: Path) -> list[MirrorResult]:
+    grouped: dict[tuple[str, str], list[str]] = {}
+    for problem in problems:
+        grouped.setdefault((problem.name, problem.canonical_source), []).append(problem.note)
+
+    return [
+        MirrorResult(
+            name=name,
+            source_kind="personal-overlay",
+            status="source-unreadable",
+            canonical_source=canonical_source,
+            mirror_path=str(mirror_root),
+            missing_files=[],
+            changed_files=[],
+            extra_files=[],
+            notes=notes,
+        )
+        for (name, canonical_source), notes in sorted(grouped.items())
+    ]
+
+
 def should_ignore(path: Path) -> bool:
     return any(part in IGNORED_NAMES or part.endswith(".pyc") for part in path.parts)
 
 
-def file_map(root: Path) -> tuple[dict[str, Path], list[str]]:
+def file_map(root: Path, reject_symlink_ancestors: bool = True) -> tuple[dict[str, Path], list[str]]:
     files: dict[str, Path] = {}
     problems: list[str] = []
-    component_problems = path_component_problems(root, expected_kind=None, allow_missing=True)
+    component_problems = path_component_problems(
+        root,
+        expected_kind=None,
+        allow_missing=True,
+        reject_symlink_ancestors=reject_symlink_ancestors,
+    )
     if component_problems:
         return files, component_problems
     try:
@@ -221,8 +320,6 @@ def file_map(root: Path) -> tuple[dict[str, Path], list[str]]:
 
     for path in root.rglob("*"):
         rel_path = path.relative_to(root)
-        if should_ignore(rel_path):
-            continue
         rel = rel_path.as_posix()
         try:
             path_stat = path.lstat()
@@ -231,6 +328,8 @@ def file_map(root: Path) -> tuple[dict[str, Path], list[str]]:
             continue
         if stat.S_ISLNK(path_stat.st_mode):
             problems.append(f"{rel} (symbolic link is not allowed)")
+        elif should_ignore(rel_path):
+            continue
         elif stat.S_ISDIR(path_stat.st_mode):
             continue
         elif stat.S_ISREG(path_stat.st_mode):
@@ -277,7 +376,16 @@ def existing_path_kind_problem(path: Path, expected_kind: str) -> str | None:
 
 
 def mirror_path_kind_problems(mirror_dir: Path, canonical_files: dict[str, Path]) -> list[str]:
-    component_problems = path_component_problems(mirror_dir, expected_kind="directory", allow_missing=True)
+    mirror_root = mirror_dir.parent
+    mirror_root_problem = existing_path_kind_problem(mirror_root, "directory")
+    if mirror_root_problem:
+        return [f". ({mirror_root}: {mirror_root_problem})"]
+    component_problems = path_component_problems(
+        mirror_dir,
+        expected_kind="directory",
+        allow_missing=True,
+        reject_symlink_ancestors=False,
+    )
     if component_problems:
         return component_problems
     try:
@@ -353,7 +461,7 @@ def compare_entry(entry: SkillEntry) -> MirrorResult:
         )
 
     canonical_files, source_problems = file_map(entry.source_root)
-    mirror_files, mirror_problems = file_map(entry.mirror_dir)
+    mirror_files, mirror_problems = file_map(entry.mirror_dir, reject_symlink_ancestors=False)
     source_unreadable = [*source_problems, *unreadable_files(canonical_files)]
     if source_unreadable:
         return MirrorResult(
@@ -427,7 +535,7 @@ def sync_entry(entry: SkillEntry, prune_extra: bool) -> None:
     canonical_files, source_problems = file_map(entry.source_root)
     if source_problems:
         return
-    _mirror_files, mirror_problems = file_map(entry.mirror_dir)
+    _mirror_files, mirror_problems = file_map(entry.mirror_dir, reject_symlink_ancestors=False)
     if mirror_problems:
         return
     if mirror_path_kind_problems(entry.mirror_dir, canonical_files):
@@ -443,7 +551,7 @@ def sync_entry(entry: SkillEntry, prune_extra: bool) -> None:
             shutil.copy2(source, destination)
 
     if prune_extra:
-        mirror_files, mirror_problems = file_map(entry.mirror_dir)
+        mirror_files, mirror_problems = file_map(entry.mirror_dir, reject_symlink_ancestors=False)
         if mirror_problems:
             return
         for rel in sorted(set(mirror_files) - set(canonical_files), reverse=True):
@@ -584,25 +692,16 @@ def main() -> int:
     personal_entries: list[SkillEntry] = []
     preflight_results: list[MirrorResult] = []
     if not args.core_only:
-        personal_entries, personal_problems = discover_personal_overlay_entries(agentos_root)
-        if personal_problems:
-            preflight_results.append(
-                MirrorResult(
-                    name="personal-overlay",
-                    source_kind="personal-overlay",
-                    status="source-unreadable",
-                    canonical_source="personal/os/skills",
-                    mirror_path=str(mirror_root),
-                    missing_files=[],
-                    changed_files=[],
-                    extra_files=[],
-                    notes=personal_problems,
-                )
-            )
+        requested_names = set(args.skill) if args.skill else None
+        personal_entries, personal_problems = discover_personal_overlay_entries(
+            agentos_root,
+            requested_names=requested_names,
+        )
+        preflight_results.extend(personal_preflight_results(personal_problems, mirror_root))
     try:
         entries = select_entries(core_entries, personal_entries, args.skill)
     except SystemExit:
-        if not preflight_results:
+        if not (preflight_results and args.skill):
             raise
         requested_set = set(args.skill)
         entries = [
@@ -625,8 +724,12 @@ def main() -> int:
         for entry in entries
     ]
 
-    if args.sync and not preflight_results:
+    if args.sync:
+        blocked_names = {result.name for result in preflight_results}
+        block_all_sync = "personal-overlay" in blocked_names
         for entry in entries:
+            if block_all_sync or entry.name in blocked_names:
+                continue
             sync_entry(entry, prune_extra=args.prune_extra)
 
     results = [*preflight_results, *[compare_entry(entry) for entry in entries]]

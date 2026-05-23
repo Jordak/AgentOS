@@ -6,7 +6,7 @@ This Core log records publishable AgentOS architecture decisions. Live personal 
 
 ## 2026-05-23
 
-- AgentOS-managed files and directories should not use symlinks; repository paths outside `personal/` and public exports reject symlinks, and scripts must fail closed instead of following symlinks during managed reads or writes, including when the relevant managed path is in Personal Overlay. See `docs/adr/0004-no-symlinks-in-agentos-managed-files.md`.
+- AgentOS-managed files and directories should not use symlinks; repository paths outside `personal/` and public exports reject symlinks, and scripts must fail closed instead of following symlinks during managed reads or writes, including when the relevant managed path is in Personal Overlay. See `docs/adr/0005-no-symlinks-in-agentos-managed-files.md`.
 - AgentOS executable scripts should stay thin, deterministic, and easy to audit across personal and work machines; ambiguous judgment, prose interpretation, and remediation orchestration belong in Markdown skills and playbooks unless executable complexity provides narrowly scoped deterministic value. See `docs/adr/0003-thin-trusted-scripts.md`.
 
 ## 2026-05-18
