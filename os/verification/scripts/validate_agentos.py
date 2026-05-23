@@ -155,6 +155,8 @@ class AgentOSValidator:
 
     def run_structural_checks(self) -> None:
         self.check_managed_symlinks()
+        if self.has_errors_for("managed symlink policy"):
+            return
         self.check_markdown_path_portability()
         self.check_source_map_path_health()
         self.check_skills_manifest_consistency()
@@ -170,6 +172,8 @@ class AgentOSValidator:
 
     def run_publication_precheck_checks(self) -> None:
         self.check_managed_symlinks()
+        if self.has_errors_for("managed symlink policy"):
+            return
         self.check_git_publication_source_set()
         self.check_private_overlay_files_are_ignored()
         self.check_personal_overlay_ignore_rules()
@@ -195,6 +199,9 @@ class AgentOSValidator:
 
     def add_warning(self, check: str, path: Path | str, message: str) -> None:
         self.warnings.append(Finding(check, self.display_path(path), self.redact_private_markers(message)))
+
+    def has_errors_for(self, check: str) -> bool:
+        return any(error.check == check for error in self.errors)
 
     def display_path(self, path: Path | str) -> str:
         if isinstance(path, Path):
@@ -1760,6 +1767,23 @@ def run_self_test() -> int:
             )
             for check in ["private overlay ignore coverage", "personal overlay skeleton"]
         )
+        managed_os_symlink_root = root / "_managed_os_symlink_fixture"
+        real_os = managed_os_symlink_root / "real-os"
+        (real_os / "verification/retrieval").mkdir(parents=True)
+        (real_os / "verification/retrieval/fixtures.json").write_text("{not json\n", encoding="utf-8")
+        (real_os / "verification/BENCHMARKS.json").write_text("{not json\n", encoding="utf-8")
+        (managed_os_symlink_root / "os").symlink_to("real-os")
+        managed_os_symlink_validator = AgentOSValidator(managed_os_symlink_root)
+        managed_os_symlink_validator.run_structural_checks()
+        managed_os_symlink_stops_reads = any(
+            error.check == "managed symlink policy"
+            and error.path == "os"
+            and "symbolic links" in error.message
+            for error in managed_os_symlink_validator.errors
+        ) and not any(
+            error.check != "managed symlink policy"
+            for error in managed_os_symlink_validator.errors
+        )
         non_os_symlink_rejected = any(
             error.path == "docs/linked.raw"
             and "AgentOS-managed paths outside personal/ must not contain symbolic links" in error.message
@@ -1807,7 +1831,8 @@ def run_self_test() -> int:
         symlink_validator = AgentOSValidator(symlink_root)
         symlink_validator.run_publication_precheck_checks()
         symlink_rejected_cleanly = any(
-            error.path == "os/linked.md" and "tracked file is a symbolic link" in error.message
+            error.path == "os/linked.md"
+            and "AgentOS-managed paths outside personal/ must not contain symbolic links" in error.message
             for error in symlink_validator.errors
         ) and not any(
             error.check in {"private marker scan", "secret-like token scan"}
@@ -1818,33 +1843,36 @@ def run_self_test() -> int:
             and "AgentOS-managed paths outside personal/ must not contain symbolic links" in error.message
             for error in symlink_validator.errors
         )
+        (symlink_root / "os/linked.md").unlink()
+        publication_validator = AgentOSValidator(symlink_root)
+        publication_validator.run_publication_precheck_checks()
         live_core_file_rejected = any(
             error.path == "os/context/CAREER.md" and "live personal context file" in error.message
-            for error in symlink_validator.errors
+            for error in publication_validator.errors
         )
         live_agent_path_rejected = any(
             error.path == "os/agents/current-awareness-agent/JOB.md"
             and "live personal agents file" in error.message
-            for error in symlink_validator.errors
+            for error in publication_validator.errors
         )
         generated_output_rejected = any(
             error.path == "os/reports/private.md" and "generated output" in error.message
-            for error in symlink_validator.errors
+            for error in publication_validator.errors
         )
         nested_live_core_rejected = any(
             error.path == "os/context/private-client/NOTES.md"
             and "nested high-risk Core path" in error.message
-            for error in symlink_validator.errors
+            for error in publication_validator.errors
         )
         core_gitkeep_rejected = any(
             error.path == "os/memory/weekly-review/.gitkeep"
             and "publishable .gitkeep must be empty" in error.message
-            for error in symlink_validator.errors
+            for error in publication_validator.errors
         )
         core_report_gitkeep_rejected = any(
             error.path == "os/verification/retrieval/reports/.gitkeep"
             and "generated output" in error.message
-            for error in symlink_validator.errors
+            for error in publication_validator.errors
         )
         default_validator = AgentOSValidator(symlink_root)
         default_validator.run_structural_checks()
@@ -1879,6 +1907,7 @@ def run_self_test() -> int:
             and marker_symlink_not_loaded
             and personal_symlink_rejected
             and nested_personal_symlink_rejected
+            and managed_os_symlink_stops_reads
             and non_os_symlink_rejected
             and symlink_rejected_cleanly
             and managed_symlink_rejected
@@ -1896,6 +1925,8 @@ def run_self_test() -> int:
                 print(f"EXPECTED {error.format()}")
             for error in symlink_validator.errors:
                 print(f"EXPECTED {error.format()}")
+            for error in publication_validator.errors:
+                print(f"EXPECTED {error.format()}")
             for error in broad_gitkeep_validator.errors:
                 print(f"EXPECTED {error.format()}")
             for error in marker_config_validator.errors:
@@ -1903,6 +1934,8 @@ def run_self_test() -> int:
             for error in personal_root_validator.errors:
                 print(f"EXPECTED {error.format()}")
             for error in nested_personal_validator.errors:
+                print(f"EXPECTED {error.format()}")
+            for error in managed_os_symlink_validator.errors:
                 print(f"EXPECTED {error.format()}")
             return 0
 
