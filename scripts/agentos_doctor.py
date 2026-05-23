@@ -1876,6 +1876,8 @@ def run_self_tests() -> int:
         test_mirror_nested_mirror_directory_error_fails,
         test_mirror_source_symlinks_fail_closed,
         test_mirror_source_root_symlinks_fail_closed,
+        test_mirror_manifest_source_escape_fails_closed,
+        test_mirror_personal_overlay_ancestor_symlinks_fail_closed,
         test_mirror_nested_path_kind_conflicts_fail_closed,
         test_mirror_unreadable_personal_skills_root_fails,
         test_mirror_failure_suppresses_private_names_without_verbose,
@@ -2599,6 +2601,87 @@ def test_mirror_source_root_symlinks_fail_closed() -> None:
         assert_true(result.status == "FAIL", "source root symlinks should fail closed")
         assert_true("source-unreadable=" in joined, "source root symlink evidence should be reported")
         assert_true("--sync" not in joined, "source root symlinks should not recommend sync")
+
+
+def test_mirror_manifest_source_escape_fails_closed() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        mirror_root = Path(tmp) / "mirrors"
+        external = Path(tmp) / "external-skill"
+        make_fake_agentos(root)
+        external.mkdir()
+        (external / "SKILL.md").write_text("# External Skill\n", encoding="utf-8")
+        manifest = root / "os" / "skills" / "MANIFEST.md"
+        manifest.write_text(
+            manifest.read_text(encoding="utf-8")
+            + f"""
+
+### `escape-skill`
+
+- Canonical source: `../external-skill/SKILL.md`.
+
+### `absolute-skill`
+
+- Canonical source: `{external / "SKILL.md"}`.
+""",
+            encoding="utf-8",
+        )
+        result = check_skill_mirrors(root, root, mirror_root, minimal_env(Path(tmp) / "home"), verbose=False)
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "FAIL", "manifest source escapes should fail closed")
+        assert_true("source-unreadable=" in joined, "manifest source escape evidence should be reported")
+        assert_true("--sync" not in joined, "manifest source escapes should not recommend sync")
+
+
+def test_mirror_personal_overlay_ancestor_symlinks_fail_closed() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        make_fake_agentos(root)
+
+        external_overlay = Path(tmp) / "external-overlay"
+        (external_overlay / "skills" / "external-private").mkdir(parents=True)
+        (external_overlay / "skills" / "external-private" / "SKILL.md").write_text(
+            "# External Private\n",
+            encoding="utf-8",
+        )
+        primary_root_symlink = Path(tmp) / "primary-root-symlink"
+        (primary_root_symlink / "personal").mkdir(parents=True)
+        (primary_root_symlink / "personal" / "os").symlink_to(external_overlay, target_is_directory=True)
+        result = check_skill_mirrors(
+            root,
+            primary_root_symlink,
+            Path(tmp) / "mirrors-root-symlink",
+            minimal_env(Path(tmp) / "home"),
+            verbose=False,
+        )
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "FAIL", "symlinked Personal Overlay root should fail closed")
+        assert_true("source-unreadable=1" in joined, "symlinked Personal Overlay root should be reported")
+        assert_true("--sync" not in joined, "symlinked Personal Overlay root should not recommend sync")
+
+        external_skills = Path(tmp) / "external-skills"
+        (external_skills / "external-private").mkdir(parents=True)
+        (external_skills / "external-private" / "SKILL.md").write_text(
+            "# External Private\n",
+            encoding="utf-8",
+        )
+        primary_skills_symlink = Path(tmp) / "primary-skills-symlink"
+        (primary_skills_symlink / "personal" / "os").mkdir(parents=True)
+        (primary_skills_symlink / "personal" / "os" / "skills").symlink_to(
+            external_skills,
+            target_is_directory=True,
+        )
+        result = check_skill_mirrors(
+            root,
+            primary_skills_symlink,
+            Path(tmp) / "mirrors-skills-symlink",
+            minimal_env(Path(tmp) / "home"),
+            verbose=False,
+        )
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "FAIL", "symlinked Personal Overlay skills root should fail closed")
+        assert_true("source-unreadable=1" in joined, "symlinked Personal Overlay skills root should be reported")
+        assert_true("--sync" not in joined, "symlinked Personal Overlay skills root should not recommend sync")
 
 
 def test_mirror_nested_path_kind_conflicts_fail_closed() -> None:
