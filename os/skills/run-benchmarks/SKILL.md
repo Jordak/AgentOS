@@ -7,7 +7,7 @@ description: "Run AgentOS benchmark scripts from the benchmark manifest, save st
 
 ## Goal
 
-Run AgentOS benchmarks end to end without embedding benchmark-specific internals: discover configured scripts from `os/verification/BENCHMARKS.json`, run only scripts that expose the expected CLI contract, save raw reports in the configured Personal Overlay report directories, and then invoke or follow `refresh-benchmark-status` so Core status is not left behind the evidence.
+Run AgentOS benchmarks end to end without embedding benchmark-specific internals: discover configured scripts from `os/verification/BENCHMARKS.json`, run only scripts that expose the expected CLI contract, save raw reports in the configured Personal Overlay report directories, and then invoke or follow `refresh-benchmark-status` so Core status is not left behind the evidence. External/model-call harnesses run from a sanitized Core-only checkout or export so private Personal Overlay state is not placed next to model prompts.
 
 ## Contract
 
@@ -39,6 +39,7 @@ Tools and connectors:
 Safety:
 
 - Ask before running external harnesses, model-call benchmarks, or any command that may spend credits or require authenticated CLIs.
+- Run external/model-call harnesses from a sanitized Core-only checkout or export, not from a primary checkout that has a live Personal Overlay nearby, unless the user explicitly accepts that risk for a diagnostic run.
 - Do not copy raw reports, `run.json` bodies, transcripts, stdout, stderr, local paths, prompts, session details, account details, private diagnostics, or private evidence into Core.
 - Do not update `os/verification/BENCHMARK_STATUS.md` directly; route all status interpretation and edits through `refresh-benchmark-status`.
 - If the checkout is not clean, current `main`, do not produce status-eligible evidence. Offer diagnostic/non-eligible runs only when useful and clearly label them.
@@ -64,7 +65,9 @@ Safety:
    Default to deterministic/local-safe work: run compatible scripts' `--self-test`, then run diagnostic previews with `--dry-run` when supported. Save status-eligible evidence only from behavior-bearing local runs advertised by the script help, or from approved real harness runs. If the next useful command could call external harnesses or spend credits, ask before running it.
 
 5. Ask before model-call harnesses.
-   If the user explicitly asked for model-call harnesses or all external benchmarks, summarize the commands and ask for confirmation unless the current request clearly approved spending model calls. For approved harness runs, use the compatible script contract, usually `python3 <script> --no-dry-run --check-remote-main --save-report`, adding `--harness all` only when advertised.
+   If the user explicitly asked for model-call harnesses or all external benchmarks, summarize the commands, the compatible harness choices advertised by each script's help, and any spending/authentication risk. Ask for confirmation unless the current request clearly approved spending model calls. Interpret `--harness all` as all configured harnesses advertised by that script, not every conceivable harness.
+
+   For approved external/model-call harness runs, create or use a sanitized Core-only checkout or export at the same clean, remote-fresh `main` commit. Verify it contains no live Personal Overlay files beyond tracked skeleton/placeholders before running commands. Run the compatible script contract from that sanitized root, usually `python3 <script> --no-dry-run --check-remote-main --save-report`, adding `--harness all` only when advertised. After the run, copy generated report directories back into the canonical or user-assigned Personal Overlay only after confirming the reports derive from public Core inputs.
 
 6. Refresh status.
    After scripts finish, run or follow `refresh-benchmark-status` in update, proposal, or report mode as allowed by the user's request and the available evidence. If the user asked for "run benchmarks and refresh status", continue through eligible updates allowed by that skill. If write authorization is unclear, run the refresh workflow in proposal/report mode rather than stopping at an offer. Leave refresh as a next step only when blocked, declined, or impossible; in that case state that the benchmark process is not complete until `refresh-benchmark-status` has run.
@@ -92,5 +95,7 @@ Before finishing:
 2. Confirm configured report directories were resolved through the Personal Overlay rule, script help was inspected, and compatibility was reported.
 3. Confirm Git preflight was performed before status-eligible saved runs.
 4. Confirm no model-call harness ran without approval.
-5. Confirm raw report content was not copied into Core.
-6. Confirm `refresh-benchmark-status` ran or was followed in proposal/report mode, or that a blocked/declined refresh was labeled incomplete with the next action.
+5. Confirm external/model-call harnesses ran from a sanitized Core-only checkout or export, or explicitly did not run.
+6. Confirm the configured harness choices were reported per script before any `--harness all` run.
+7. Confirm raw report content was not copied into Core.
+8. Confirm `refresh-benchmark-status` ran or was followed in proposal/report mode, or that a blocked/declined refresh was labeled incomplete with the next action.
