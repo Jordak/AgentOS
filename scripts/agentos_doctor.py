@@ -752,6 +752,7 @@ def check_skill_mirrors(
             ],
         )
 
+    audit_command = mirror_command(script_agentos_home, mirror_agentos_home, primary_agentos_home, mirror_root)
     bad_statuses = {
         "source-missing",
         "source-unreadable",
@@ -768,9 +769,19 @@ def check_skill_mirrors(
             "Skill mirrors are in sync for the checked mirror root.",
             details=details,
         )
+    if completed.returncode == 0:
+        return CheckResult(
+            "skill mirrors",
+            "FAIL",
+            "Mirror-skills audit returned contradictory successful evidence.",
+            details=details,
+            recommendations=[
+                "Fix the mirror-skills command or output format before trusting mirror status.",
+                "Inspect the audit: " + shell_command(audit_command, script_agentos_home),
+            ],
+        )
 
     hard_statuses = {"source-missing", "source-unreadable", "mirror-unreadable", "unknown"}
-    audit_command = mirror_command(script_agentos_home, mirror_agentos_home, primary_agentos_home, mirror_root)
     if any(status in hard_statuses for status in statuses):
         recommendations = [
             "Fix the reported source, readability, or audit-shape errors before syncing mirrors.",
@@ -1796,6 +1807,7 @@ def run_self_tests() -> int:
         test_mirror_source_failure_is_not_sync_advice,
         test_mirror_empty_success_output_fails,
         test_mirror_nonzero_without_actionable_status_fails,
+        test_mirror_zero_exit_with_drift_status_fails,
         test_mirror_unknown_status_fails,
         test_mirror_unknown_source_kind_fails,
         test_mirror_unreadable_personal_skills_root_fails,
@@ -2238,6 +2250,24 @@ def test_mirror_nonzero_without_actionable_status_fails() -> None:
         assert_true(result.status == "FAIL", "nonzero mirror output without actionable status should fail")
         assert_true("non-actionable unsuccessful evidence" in result.summary, "non-actionable mirror failure should be explicit")
         assert_true("--sync" not in joined, "non-actionable mirror failure should not recommend sync")
+
+
+def test_mirror_zero_exit_with_drift_status_fails() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        mirror_root = Path(tmp) / "mirrors"
+        make_fake_agentos(root)
+        script = root / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py"
+        script.write_text(
+            "import json\n"
+            "print(json.dumps([{'name': 'example-skill', 'source_kind': 'core', 'status': 'missing'}]))\n",
+            encoding="utf-8",
+        )
+        result = check_skill_mirrors(root, root, mirror_root, minimal_env(Path(tmp) / "home"), verbose=False)
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "FAIL", "successful mirror subprocess with drift status should fail")
+        assert_true("contradictory successful evidence" in result.summary, "contradictory mirror evidence should be explicit")
+        assert_true("--sync" not in joined, "contradictory mirror evidence should not recommend sync")
 
 
 def test_mirror_unknown_status_fails() -> None:
