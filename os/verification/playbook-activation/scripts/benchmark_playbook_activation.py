@@ -5,11 +5,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shlex
 import shutil
 import subprocess
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -41,6 +43,102 @@ HARNESS_UNAVAILABLE_PATTERNS = (
 
 def default_root() -> Path:
     return Path(__file__).resolve().parents[4]
+
+
+def git_value(root: Path, *args: str, timeout_seconds: int = 30) -> str | None:
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(root), *args],
+            check=False,
+            capture_output=True,
+            env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
+            text=True,
+            timeout=timeout_seconds,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if completed.returncode != 0:
+        return None
+    return completed.stdout.strip()
+
+
+def remote_main_commit(root: Path) -> str | None:
+    output = git_value(root, "ls-remote", "--heads", "origin", "main", timeout_seconds=10)
+    if not output:
+        return None
+    first_line = output.splitlines()[0]
+    parts = first_line.split()
+    return parts[0] if parts else None
+
+
+def collect_git_state(root: Path, check_remote: bool = False) -> dict[str, Any]:
+    status = git_value(root, "status", "--porcelain=v1")
+    branch = git_value(root, "branch", "--show-current")
+    commit = git_value(root, "rev-parse", "HEAD")
+    commit_time = git_value(root, "show", "-s", "--format=%cI", "HEAD")
+    upstream = git_value(root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
+    upstream_commit = git_value(root, "rev-parse", "@{u}") if upstream else None
+    ahead = behind = None
+    if upstream:
+        counts = git_value(root, "rev-list", "--left-right", "--count", "HEAD...@{u}")
+        if counts:
+            parts = counts.split()
+            if len(parts) == 2 and all(part.isdigit() for part in parts):
+                ahead = int(parts[0])
+                behind = int(parts[1])
+
+    worktree_clean = status == "" if status is not None else None
+    local_upstream_fresh = ahead == 0 and behind == 0 if ahead is not None and behind is not None else None
+    remote_commit = remote_main_commit(root) if check_remote else None
+    remote_fresh = commit == remote_commit if commit and remote_commit else None
+    eligible_fresh_main = (
+        branch == "main"
+        and upstream == "origin/main"
+        and worktree_clean is True
+        and local_upstream_fresh is True
+        and remote_fresh is True
+        and bool(commit)
+    )
+    return {
+        "branch": branch or "unknown",
+        "commit": commit or "unknown",
+        "commit_time": commit_time or "unknown",
+        "upstream": upstream or "none",
+        "upstream_commit": upstream_commit or "unknown",
+        "ahead": ahead,
+        "behind": behind,
+        "upstream_fresh": local_upstream_fresh,
+        "local_upstream_fresh": local_upstream_fresh,
+        "remote_main_commit": remote_commit or "unknown",
+        "remote_checked_at": datetime.now(timezone.utc).isoformat() if remote_commit else None,
+        "remote_fresh": remote_fresh,
+        "worktree_clean": worktree_clean,
+        "eligible_fresh_main": bool(eligible_fresh_main),
+    }
+
+
+def configure_test_repo(repo: Path, hooks_dir: Path) -> None:
+    subprocess.run(["git", "-C", str(repo), "config", "user.email", "agentos-test"], check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.name", "AgentOS Test"], check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "commit.gpgsign", "false"], check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "core.hooksPath", str(hooks_dir)], check=True)
+
+
+def commit_test_repo(repo: Path, *args: str) -> None:
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repo),
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "--no-gpg-sign",
+            "--no-verify",
+            *args,
+        ],
+        check=True,
+    )
 
 
 def resolve_under_root(root: Path, path: Path) -> Path:
@@ -360,6 +458,7 @@ def build_dry_run_report(
     harnesses: list[str],
     model: str | None = None,
     effort: str | None = None,
+    check_remote_main: bool = False,
 ) -> dict[str, Any]:
     planned_runs = [
         {
@@ -371,9 +470,11 @@ def build_dry_run_report(
         for harness in harnesses
         for fixture in fixtures
     ]
+    git_state = collect_git_state(root, check_remote=check_remote_main)
     return {
         "version": 1,
         "generated_at": datetime.now(timezone.utc).isoformat(),
+        "agentos_git": git_state,
         "root": str(root),
         "mode": "dry-run",
         "summary": {
@@ -394,13 +495,16 @@ def build_transcript_report(
     fixtures: list[dict[str, Any]],
     coverage: list[dict[str, Any]],
     transcript_paths: list[Path],
+    check_remote_main: bool = False,
 ) -> dict[str, Any]:
     transcript = load_transcript(transcript_paths)
     results = [grade_fixture(root, fixture, transcript) for fixture in fixtures]
     passed = sum(1 for result in results if result["overall_pass"])
+    git_state = collect_git_state(root, check_remote=check_remote_main)
     return {
         "version": 1,
         "generated_at": datetime.now(timezone.utc).isoformat(),
+        "agentos_git": git_state,
         "root": str(root),
         "mode": "transcript",
         "transcripts": [str(path) for path in transcript_paths],
@@ -422,6 +526,7 @@ def build_harness_report(
     timeout_seconds: int,
     model: str | None = None,
     effort: str | None = None,
+    check_remote_main: bool = False,
 ) -> dict[str, Any]:
     raw_results = [
         run_harness_fixture(harness, root, fixture, timeout_seconds, model=model, effort=effort)
@@ -445,9 +550,11 @@ def build_harness_report(
     behavioral_results = [result for result in results if result["status"] != "harness-unavailable"]
     passed = sum(1 for result in results if result["grade"]["overall_pass"])
     behavioral_passed = sum(1 for result in behavioral_results if result["grade"]["overall_pass"])
+    git_state = collect_git_state(root, check_remote=check_remote_main)
     return {
         "version": 1,
         "generated_at": datetime.now(timezone.utc).isoformat(),
+        "agentos_git": git_state,
         "root": str(root),
         "mode": "run",
         "summary": {
@@ -504,10 +611,16 @@ def coverage_report(coverage: list[dict[str, Any]], fixtures: list[dict[str, Any
 
 
 def render_markdown(report: dict[str, Any]) -> str:
+    git_state = report.get("agentos_git", {})
     lines = [
         "# AgentOS Playbook Activation Verification",
         "",
         f"- Generated: `{report['generated_at']}`",
+        f"- AgentOS commit: `{git_state.get('commit', 'unknown')}`",
+        f"- AgentOS branch: `{git_state.get('branch', 'unknown')}`",
+        f"- Worktree clean: `{render_bool(git_state.get('worktree_clean'))}`",
+        f"- Remote main fresh: `{render_bool(git_state.get('remote_fresh'))}`",
+        f"- Fresh main eligible: `{render_bool(git_state.get('eligible_fresh_main'))}`",
         f"- Mode: `{report['mode']}`",
         "",
         "> Scope: this benchmark grades only observed access to required guidance files. Task completion, write success, read-only sandbox failures, and final-answer quality are diagnostic context, not scoring inputs.",
@@ -637,6 +750,12 @@ def mark(value: bool) -> str:
     return "yes" if value else "no"
 
 
+def render_bool(value: Any) -> str:
+    if value is None:
+        return "unknown"
+    return str(value).lower()
+
+
 def one_line(text: str) -> str:
     return " ".join(text.split())
 
@@ -718,8 +837,65 @@ def run_self_test(root: Path) -> int:
     if reason is None:
         print("SELF-TEST FAIL: harness startup failure was not detected.")
         return 1
+    if not run_git_state_self_test():
+        return 1
     print("SELF-TEST PASS: playbook activation grader accepted observed tool access.")
     return 0
+
+
+def run_git_state_self_test() -> bool:
+    with tempfile.TemporaryDirectory(prefix="agentos-playbook-git-self-test-") as tmp:
+        root = Path(tmp)
+        repo = root / "repo"
+        remote = root / "origin.git"
+        sibling = root / "sibling"
+        hooks_dir = root / "empty-hooks"
+        hooks_dir.mkdir()
+        subprocess.run(["git", "init", "--bare", "-q", str(remote)], check=True)
+        subprocess.run(["git", "init", "-q", str(repo)], check=True)
+        subprocess.run(["git", "-C", str(repo), "checkout", "-q", "-b", "main"], check=True)
+        configure_test_repo(repo, hooks_dir)
+        (repo / "README.md").write_text("initial\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(repo), "add", "README.md"], check=True)
+        commit_test_repo(repo, "-q", "-m", "initial")
+        subprocess.run(["git", "-C", str(repo), "remote", "add", "origin", str(remote)], check=True)
+        subprocess.run(["git", "-C", str(repo), "push", "-q", "-u", "origin", "main"], check=True)
+        subprocess.run(["git", "--git-dir", str(remote), "symbolic-ref", "HEAD", "refs/heads/main"], check=True)
+        offline_state = collect_git_state(repo)
+        if offline_state["remote_fresh"] is not None or offline_state["eligible_fresh_main"]:
+            print("SELF-TEST FAIL: default git state unexpectedly performed remote freshness eligibility.")
+            print(json.dumps(offline_state, indent=2))
+            return False
+        clean_state = collect_git_state(repo, check_remote=True)
+        if clean_state["worktree_clean"] is not True:
+            print("SELF-TEST FAIL: clean git worktree was not detected.")
+            print(json.dumps(clean_state, indent=2))
+            return False
+        if clean_state["eligible_fresh_main"] is not True:
+            print("SELF-TEST FAIL: clean remote-fresh main was not eligible.")
+            print(json.dumps(clean_state, indent=2))
+            return False
+        subprocess.run(["git", "clone", "-q", str(remote), str(sibling)], check=True)
+        configure_test_repo(sibling, hooks_dir)
+        (sibling / "README.md").write_text("advanced\n", encoding="utf-8")
+        commit_test_repo(sibling, "-q", "-am", "advance remote")
+        subprocess.run(["git", "-C", str(sibling), "push", "-q", "origin", "main"], check=True)
+        stale_state = collect_git_state(repo, check_remote=True)
+        if stale_state["local_upstream_fresh"] is not True or stale_state["remote_fresh"] is not False:
+            print("SELF-TEST FAIL: stale remote main was not distinguished from local upstream parity.")
+            print(json.dumps(stale_state, indent=2))
+            return False
+        if stale_state["eligible_fresh_main"]:
+            print("SELF-TEST FAIL: stale remote main was eligible.")
+            print(json.dumps(stale_state, indent=2))
+            return False
+        (repo / "dirty.txt").write_text("dirty\n", encoding="utf-8")
+        dirty_state = collect_git_state(repo, check_remote=True)
+        if dirty_state["worktree_clean"] is not False:
+            print("SELF-TEST FAIL: dirty git worktree was not detected.")
+            print(json.dumps(dirty_state, indent=2))
+            return False
+    return True
 
 
 def report_exit_code(report: dict[str, Any]) -> int:
@@ -752,6 +928,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--timeout-seconds", type=int, default=600)
     parser.add_argument("--model", help="Optional model override passed through to selected harnesses.")
     parser.add_argument("--effort", help="Optional reasoning effort override passed through to selected harnesses.")
+    parser.add_argument(
+        "--check-remote-main",
+        action="store_true",
+        help="Contact origin/main and include remote freshness eligibility in report Git metadata.",
+    )
     parser.add_argument(
         "--dry-run",
         action=argparse.BooleanOptionalAction,
@@ -807,9 +988,23 @@ def main(argv: list[str] | None = None) -> int:
             return 2
 
     if transcript_paths:
-        report = build_transcript_report(root, fixtures, coverage, transcript_paths)
+        report = build_transcript_report(
+            root,
+            fixtures,
+            coverage,
+            transcript_paths,
+            check_remote_main=args.check_remote_main,
+        )
     elif dry_run:
-        report = build_dry_run_report(root, fixtures, coverage, harnesses, model=args.model, effort=args.effort)
+        report = build_dry_run_report(
+            root,
+            fixtures,
+            coverage,
+            harnesses,
+            model=args.model,
+            effort=args.effort,
+            check_remote_main=args.check_remote_main,
+        )
     else:
         report = build_harness_report(
             root,
@@ -819,6 +1014,7 @@ def main(argv: list[str] | None = None) -> int:
             timeout_seconds=args.timeout_seconds,
             model=args.model,
             effort=args.effort,
+            check_remote_main=args.check_remote_main,
         )
 
     markdown = render_markdown(report)

@@ -161,6 +161,23 @@
           ]
         }
       ]
+    },
+    {
+      "id": "benchmark-status",
+      "category": "benchmark status",
+      "prompt": "Find the current public-safe AgentOS benchmark status snapshot.",
+      "expected": {
+        "filing_path": "os/verification/BENCHMARK_STATUS.md"
+      },
+      "evidence": [
+        {
+          "path": "os/verification/BENCHMARK_STATUS.md",
+          "contains": [
+            "current public-safe benchmark posture",
+            "not raw evidence"
+          ]
+        }
+      ]
     }
   ]
 }

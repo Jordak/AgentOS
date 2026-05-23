@@ -14,6 +14,8 @@ The benchmark asks representative AgentOS lookup questions and checks whether th
 - support the answer with evidence from local files;
 - avoid eval fixtures, previous reports, and other answer-key files.
 
+`os/verification/BENCHMARK_STATUS.md` is excluded from ordinary retrieval evidence because it summarizes benchmark outcomes. A dedicated benchmark-status lookup question may target that file directly, but unrelated retrieval questions should not use it as answer evidence.
+
 This gives AgentOS one score to watch during maintenance: can the current harness find and support the right answer from the control plane?
 
 The goal is not to replace Codex, Claude Code, or any other harness with a homegrown retriever. The goal is to make AgentOS discoverability observable, so changes to file layout, routing language, skills, memory, and agent definitions can be checked before they silently make future agents worse.
@@ -48,6 +50,7 @@ Local lexical benchmark:
 - Compares whole-file keyword search with a lightweight Markdown section index.
 - Run by default, or alone with `python3 os/verification/retrieval/scripts/benchmark_retrieval.py --suite local`.
 - Offline and deterministic.
+- Report metadata records local Git state by default. Add `--check-remote-main` only when producing saved evidence intended to prove fresh `origin/main` eligibility for Core benchmark status.
 
 Harness answer evals:
 
@@ -76,6 +79,8 @@ Save the full safe report. This creates a timestamped directory containing `repo
 ```bash
 python3 os/verification/retrieval/scripts/benchmark_retrieval.py --save-report
 ```
+
+When producing evidence for `os/verification/BENCHMARK_STATUS.md`, run from a clean `main` checkout and add `--check-remote-main` so the saved report proves whether the reviewed commit matched live `origin/main` at run time.
 
 Run only the local lexical benchmark:
 

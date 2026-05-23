@@ -43,6 +43,8 @@ python3 os/verification/playbook-activation/scripts/benchmark_playbook_activatio
 
 That runs every configured harness. Right now, that means Codex.
 
+When producing evidence for `os/verification/BENCHMARK_STATUS.md`, run from a clean `main` checkout and add `--check-remote-main` so the saved report proves whether the reviewed commit matched live `origin/main` at run time. Default dry-run and transcript reports avoid remote network checks unless that flag is set.
+
 Run only one harness:
 
 ```bash

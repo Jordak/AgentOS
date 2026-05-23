@@ -10,7 +10,7 @@ Contract reference: `os/skills/SKILL_CONTRACT.md`.
 
 ## Summary
 
-- Canonical Core skills: 12.
+- Canonical Core skills: 13.
 
 ## Maintenance Fields
 
@@ -51,6 +51,18 @@ Each skill entry records:
 - Safety posture: do not treat a missing readiness marker as silently ready; infer and confirm with the user before implementation proceeds; ask before external tracker writes unless explicitly authorized; do not leave meaningful deferred questions only in chat, model memory, or unpersisted reports.
 - Verification coverage: confirms the target was classified as gated, exempt, or explicitly bypassed, the durable source and readiness marker were checked, unmarked readiness was not silently accepted, deferred follow-up artifacts were created where required, and external writes were approved; run `python3 os/verification/scripts/validate_agentos.py` after skill or manifest changes.
 - Upgrade notes: Core reusable gate for feature-sized implementation work.
+
+### `refresh-benchmark-status`
+
+- Canonical source: `os/skills/refresh-benchmark-status/SKILL.md`
+- Contract status: full.
+- Mutability: mixed: read-only when inspecting benchmark status and local evidence; local-write when updating `os/verification/BENCHMARK_STATUS.md` from eligible evidence after the user requested or approved the refresh; no external-write behavior.
+- Tools and connectors: local filesystem, local `git`, `os/verification/BENCHMARKS.json`, `os/verification/BENCHMARK_STATUS.md`, local Personal Overlay benchmark reports, and `os/playbook/PERSONAL_OVERLAY.md`.
+- Output artifact: an updated or proposed Core benchmark status snapshot plus a concise refresh report naming eligible evidence, ineligible evidence, stale entries, and unchanged entries.
+- Filing rule: Core status lives in `os/verification/BENCHMARK_STATUS.md`; raw reports and run histories stay in the Personal Overlay report directories configured by `os/verification/BENCHMARKS.json`; deterministic refresh-helper design is deferred to GitHub Issue #30.
+- Safety posture: do not copy raw reports, run JSON, transcripts, stdout, stderr, local paths, prompts, session details, account details, private diagnostics, or private evidence into Core; require clean, fresh `main` evidence before marking entries `passing`; ask before caveated or ambiguous updates.
+- Verification coverage: confirm benchmark manifest and status file were read, local report paths were resolved through the Personal Overlay rule, used reports had current-schema Git metadata, status labels are allowed, no raw/private evidence was copied into Core, and `python3 os/verification/scripts/validate_agentos.py` passes after skill or status changes.
+- Upgrade notes: Core workflow for maintaining the public-safe benchmark snapshot without introducing Core benchmark history.
 
 ### `mirror-skills`
 

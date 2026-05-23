@@ -11,9 +11,12 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import re
 import shlex
+import subprocess
 import sys
+import tempfile
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -52,6 +55,7 @@ STOPWORDS = {
     "with",
 }
 EXCLUDED_MARKDOWN_PATHS = set(harness_eval.DEFAULT_DISALLOWED_EXACT_PATHS)
+TARGETED_MARKDOWN_PATH_EXCEPTIONS = set(harness_eval.TARGETED_DISALLOWED_EXACT_PATH_EXCEPTIONS)
 EXCLUDED_MARKDOWN_PREFIXES = harness_eval.DEFAULT_DISALLOWED_PATH_PREFIXES
 
 
@@ -98,7 +102,104 @@ def tokenize(text: str) -> list[str]:
     return tokens
 
 
-def markdown_files(root: Path) -> list[Path]:
+def git_value(root: Path, *args: str, timeout_seconds: int = 30) -> str | None:
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(root), *args],
+            check=False,
+            capture_output=True,
+            env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
+            text=True,
+            timeout=timeout_seconds,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if completed.returncode != 0:
+        return None
+    return completed.stdout.strip()
+
+
+def remote_main_commit(root: Path) -> str | None:
+    output = git_value(root, "ls-remote", "--heads", "origin", "main", timeout_seconds=10)
+    if not output:
+        return None
+    first_line = output.splitlines()[0]
+    parts = first_line.split()
+    return parts[0] if parts else None
+
+
+def collect_git_state(root: Path, check_remote: bool = False) -> dict[str, Any]:
+    status = git_value(root, "status", "--porcelain=v1")
+    branch = git_value(root, "branch", "--show-current")
+    commit = git_value(root, "rev-parse", "HEAD")
+    commit_time = git_value(root, "show", "-s", "--format=%cI", "HEAD")
+    upstream = git_value(root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
+    upstream_commit = git_value(root, "rev-parse", "@{u}") if upstream else None
+    ahead = behind = None
+    if upstream:
+        counts = git_value(root, "rev-list", "--left-right", "--count", "HEAD...@{u}")
+        if counts:
+            parts = counts.split()
+            if len(parts) == 2 and all(part.isdigit() for part in parts):
+                ahead = int(parts[0])
+                behind = int(parts[1])
+
+    worktree_clean = status == "" if status is not None else None
+    local_upstream_fresh = ahead == 0 and behind == 0 if ahead is not None and behind is not None else None
+    remote_commit = remote_main_commit(root) if check_remote else None
+    remote_fresh = commit == remote_commit if commit and remote_commit else None
+    eligible_fresh_main = (
+        branch == "main"
+        and upstream == "origin/main"
+        and worktree_clean is True
+        and local_upstream_fresh is True
+        and remote_fresh is True
+        and bool(commit)
+    )
+    return {
+        "branch": branch or "unknown",
+        "commit": commit or "unknown",
+        "commit_time": commit_time or "unknown",
+        "upstream": upstream or "none",
+        "upstream_commit": upstream_commit or "unknown",
+        "ahead": ahead,
+        "behind": behind,
+        "upstream_fresh": local_upstream_fresh,
+        "local_upstream_fresh": local_upstream_fresh,
+        "remote_main_commit": remote_commit or "unknown",
+        "remote_checked_at": datetime.now(timezone.utc).isoformat() if remote_commit else None,
+        "remote_fresh": remote_fresh,
+        "worktree_clean": worktree_clean,
+        "eligible_fresh_main": bool(eligible_fresh_main),
+    }
+
+
+def configure_test_repo(repo: Path, hooks_dir: Path) -> None:
+    subprocess.run(["git", "-C", str(repo), "config", "user.email", "agentos-test"], check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.name", "AgentOS Test"], check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "commit.gpgsign", "false"], check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "core.hooksPath", str(hooks_dir)], check=True)
+
+
+def commit_test_repo(repo: Path, *args: str) -> None:
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repo),
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "--no-gpg-sign",
+            "--no-verify",
+            *args,
+        ],
+        check=True,
+    )
+
+
+def markdown_files(root: Path, allowed_exact_paths: set[str] | None = None) -> list[Path]:
+    allowed_exact_paths = allowed_exact_paths or set()
     root_markdown_files = ("AGENTS.md", "README.md", "DOMAIN.md")
     files = [root / name for name in root_markdown_files if (root / name).exists()]
     for source_dir in ("docs", "os"):
@@ -108,24 +209,29 @@ def markdown_files(root: Path) -> list[Path]:
     return sorted(
         path
         for path in files
-        if path.is_file() and should_index_markdown(root, path)
+        if path.is_file() and should_index_markdown(root, path, allowed_exact_paths)
     )
 
 
-def should_index_markdown(root: Path, path: Path) -> bool:
+def should_index_markdown(root: Path, path: Path, allowed_exact_paths: set[str] | None = None) -> bool:
+    allowed_exact_paths = allowed_exact_paths or set()
     rel_path = path.relative_to(root).as_posix()
-    if rel_path in EXCLUDED_MARKDOWN_PATHS:
+    if rel_path in EXCLUDED_MARKDOWN_PATHS and rel_path not in allowed_exact_paths:
         return False
     return not any(rel_path.startswith(prefix) for prefix in EXCLUDED_MARKDOWN_PREFIXES)
 
 
-def load_files(root: Path) -> list[MarkdownFile]:
+def load_files(root: Path, allowed_exact_paths: set[str] | None = None) -> list[MarkdownFile]:
     docs: list[MarkdownFile] = []
-    for path in markdown_files(root):
+    for path in markdown_files(root, allowed_exact_paths):
         rel_path = path.relative_to(root).as_posix()
         text = path.read_text(encoding="utf-8")
         docs.append(MarkdownFile(rel_path, text, Counter(tokenize(f"{rel_path}\n{text}"))))
     return docs
+
+
+def allowed_exact_paths_for_question(question: dict[str, Any]) -> set[str]:
+    return set(question.get("expected_paths", [])) & TARGETED_MARKDOWN_PATH_EXCEPTIONS
 
 
 def split_sections(doc: MarkdownFile) -> list[Section]:
@@ -250,12 +356,17 @@ def render_result_paths(results: list[dict[str, Any]]) -> str:
 
 
 def build_local_report(root: Path, questions: list[dict[str, Any]], limit: int) -> dict[str, Any]:
-    docs = load_files(root)
+    default_docs = load_files(root)
+    docs_by_allowed_paths: dict[tuple[str, ...], list[MarkdownFile]] = {(): default_docs}
     rows: list[dict[str, Any]] = []
     keyword_hits = 0
     section_hits = 0
 
     for item in questions:
+        allowed_key = tuple(sorted(allowed_exact_paths_for_question(item)))
+        if allowed_key not in docs_by_allowed_paths:
+            docs_by_allowed_paths[allowed_key] = load_files(root, set(allowed_key))
+        docs = docs_by_allowed_paths[allowed_key]
         expected = set(item["expected_paths"])
         keyword = keyword_file_search(docs, item["question"], limit)
         section = section_index_search(docs, item["question"], limit)
@@ -275,7 +386,7 @@ def build_local_report(root: Path, questions: list[dict[str, Any]], limit: int) 
         )
 
     return {
-        "docs_indexed": len(docs),
+        "docs_indexed": max(len(docs) for docs in docs_by_allowed_paths.values()),
         "questions": len(questions),
         "limit": limit,
         "keyword_hit": keyword_hits,
@@ -365,12 +476,15 @@ def build_report(
     responses_path: Path | None,
     model: str | None,
     effort: str | None,
+    check_remote_main: bool,
 ) -> dict[str, Any]:
     include_local = suite in {"all", "local"}
     include_harness = suite in {"all", "harness"}
+    git_state = collect_git_state(root, check_remote=check_remote_main)
     report: dict[str, Any] = {
         "version": 1,
         "generated_at": datetime.now(timezone.utc).isoformat(),
+        "agentos_git": git_state,
         "root": str(root),
         "suite": suite,
         "dry_run": dry_run,
@@ -399,10 +513,16 @@ def build_report(
 
 def render_markdown(report: dict[str, Any]) -> str:
     harness_dry_run = str(report["dry_run"]).lower() if "harness" in report else "n/a"
+    git_state = report.get("agentos_git", {})
     lines = [
         "# AgentOS Retrieval Benchmark",
         "",
         f"- Generated: `{report['generated_at']}`",
+        f"- AgentOS commit: `{git_state.get('commit', 'unknown')}`",
+        f"- AgentOS branch: `{git_state.get('branch', 'unknown')}`",
+        f"- Worktree clean: `{render_bool(git_state.get('worktree_clean'))}`",
+        f"- Remote main fresh: `{render_bool(git_state.get('remote_fresh'))}`",
+        f"- Fresh main eligible: `{render_bool(git_state.get('eligible_fresh_main'))}`",
         f"- Suite: `{report['suite']}`",
         f"- Harness dry run: `{harness_dry_run}`",
         f"- Harness model: `{report['model']}`",
@@ -546,6 +666,12 @@ def mark(value: bool) -> str:
     return "yes" if value else "no"
 
 
+def render_bool(value: Any) -> str:
+    if value is None:
+        return "unknown"
+    return str(value).lower()
+
+
 def write_report(path: Path, report: dict[str, Any], markdown: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.suffix == ".json":
@@ -577,6 +703,61 @@ def report_exit_code(report: dict[str, Any]) -> int:
     if harness and harness["mode"] in {"run", "responses"} and harness["summary"].get("behavioral_fail", harness["summary"]["overall_fail"]):
         return 1
     return 0
+
+
+def run_git_state_self_test() -> bool:
+    with tempfile.TemporaryDirectory(prefix="agentos-retrieval-git-self-test-") as tmp:
+        root = Path(tmp)
+        repo = root / "repo"
+        remote = root / "origin.git"
+        sibling = root / "sibling"
+        hooks_dir = root / "empty-hooks"
+        hooks_dir.mkdir()
+        subprocess.run(["git", "init", "--bare", "-q", str(remote)], check=True)
+        subprocess.run(["git", "init", "-q", str(repo)], check=True)
+        subprocess.run(["git", "-C", str(repo), "checkout", "-q", "-b", "main"], check=True)
+        configure_test_repo(repo, hooks_dir)
+        (repo / "README.md").write_text("initial\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(repo), "add", "README.md"], check=True)
+        commit_test_repo(repo, "-q", "-m", "initial")
+        subprocess.run(["git", "-C", str(repo), "remote", "add", "origin", str(remote)], check=True)
+        subprocess.run(["git", "-C", str(repo), "push", "-q", "-u", "origin", "main"], check=True)
+        subprocess.run(["git", "--git-dir", str(remote), "symbolic-ref", "HEAD", "refs/heads/main"], check=True)
+        offline_state = collect_git_state(repo)
+        if offline_state["remote_fresh"] is not None or offline_state["eligible_fresh_main"]:
+            print("SELF-TEST FAIL: default git state unexpectedly performed remote freshness eligibility.")
+            print(json.dumps(offline_state, indent=2))
+            return False
+        clean_state = collect_git_state(repo, check_remote=True)
+        if clean_state["worktree_clean"] is not True:
+            print("SELF-TEST FAIL: clean git worktree was not detected.")
+            print(json.dumps(clean_state, indent=2))
+            return False
+        if clean_state["eligible_fresh_main"] is not True:
+            print("SELF-TEST FAIL: clean remote-fresh main was not eligible.")
+            print(json.dumps(clean_state, indent=2))
+            return False
+        subprocess.run(["git", "clone", "-q", str(remote), str(sibling)], check=True)
+        configure_test_repo(sibling, hooks_dir)
+        (sibling / "README.md").write_text("advanced\n", encoding="utf-8")
+        commit_test_repo(sibling, "-q", "-am", "advance remote")
+        subprocess.run(["git", "-C", str(sibling), "push", "-q", "origin", "main"], check=True)
+        stale_state = collect_git_state(repo, check_remote=True)
+        if stale_state["local_upstream_fresh"] is not True or stale_state["remote_fresh"] is not False:
+            print("SELF-TEST FAIL: stale remote main was not distinguished from local upstream parity.")
+            print(json.dumps(stale_state, indent=2))
+            return False
+        if stale_state["eligible_fresh_main"]:
+            print("SELF-TEST FAIL: stale remote main was eligible.")
+            print(json.dumps(stale_state, indent=2))
+            return False
+        (repo / "dirty.txt").write_text("dirty\n", encoding="utf-8")
+        dirty_state = collect_git_state(repo, check_remote=True)
+        if dirty_state["worktree_clean"] is not False:
+            print("SELF-TEST FAIL: dirty git worktree was not detected.")
+            print(json.dumps(dirty_state, indent=2))
+            return False
+    return True
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -614,6 +795,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--model", help="Optional model override passed through to selected harnesses.")
     parser.add_argument("--effort", help="Optional reasoning effort override passed through to selected harnesses.")
     parser.add_argument(
+        "--check-remote-main",
+        action="store_true",
+        help="Contact origin/main and include remote freshness eligibility in report Git metadata.",
+    )
+    parser.add_argument(
         "--dry-run",
         action=argparse.BooleanOptionalAction,
         default=None,
@@ -630,6 +816,8 @@ def main(argv: list[str] | None = None) -> int:
     dry_run = args.dry_run if args.dry_run is not None else True
 
     if args.self_test:
+        if not run_git_state_self_test():
+            return 1
         return harness_eval.run_self_test(root, questions_path)
 
     if args.output and args.save_report:
@@ -659,6 +847,7 @@ def main(argv: list[str] | None = None) -> int:
             responses_path=responses_path,
             model=args.model,
             effort=args.effort,
+            check_remote_main=args.check_remote_main,
         )
     except ValueError as error:
         print(str(error), file=sys.stderr)
