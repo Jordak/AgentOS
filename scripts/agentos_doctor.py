@@ -88,6 +88,12 @@ AUTOMATION_NONRECURRING_SCHEDULE_MARKERS = (
     "todo",
     "unscheduled",
 )
+AUTOMATION_REGISTRY_SECTIONS = (
+    "Active Automations",
+    "Candidate Automations",
+    "Disabled Automations",
+    "Retired Automations",
+)
 
 @dataclass
 class CheckResult:
@@ -1016,12 +1022,7 @@ def personal_registry_active_agentos_check_evidence(text: str) -> bool:
 
 
 def personal_registry_negative_agentos_check_evidence(text: str) -> bool:
-    for section_name in (
-        "Active Automations",
-        "Candidate Automations",
-        "Disabled Automations",
-        "Retired Automations",
-    ):
+    for section_name in AUTOMATION_REGISTRY_SECTIONS:
         section = markdown_section(text, section_name)
         if not section:
             continue
@@ -1053,43 +1054,48 @@ def personal_registry_negative_agentos_check_evidence(text: str) -> bool:
                 return True
             if text_has_negative_automation_prose(entry_text):
                 return True
+    residual = markdown_without_sections(text, AUTOMATION_REGISTRY_SECTIONS)
+    if text_mentions_agentos_checks(residual) and text_has_negative_automation_prose(residual):
+        return True
     return False
 
 
 def personal_registry_possible_agentos_check_evidence(text: str) -> bool:
     active_section = markdown_section(text, "Active Automations")
-    if not active_section:
-        return False
-    for heading, body in markdown_subsections(active_section):
-        entry_marker = "\n".join(
-            value
-            for value in (heading.strip(), markdown_field_value(body, "Automation id"))
-            if value
-        )
-        entry_text = heading + "\n" + body
-        marker_mentions_checks = text_mentions_agentos_checks(entry_marker)
-        entry_mentions_checks = text_mentions_agentos_checks(entry_text)
-        if not entry_mentions_checks:
-            continue
-        if not marker_mentions_checks:
-            if not text_has_negative_automation_prose(entry_text):
+    if active_section:
+        for heading, body in markdown_subsections(active_section):
+            entry_marker = "\n".join(
+                value
+                for value in (heading.strip(), markdown_field_value(body, "Automation id"))
+                if value
+            )
+            entry_text = heading + "\n" + body
+            marker_mentions_checks = text_mentions_agentos_checks(entry_marker)
+            entry_mentions_checks = text_mentions_agentos_checks(entry_text)
+            if not entry_mentions_checks:
+                continue
+            if not marker_mentions_checks:
+                if not text_has_negative_automation_prose(entry_text):
+                    return True
+                continue
+            status = markdown_field_value(body, "Status")
+            schedule = markdown_field_value(body, "Schedule rule")
+            review_mode = markdown_field_value(body, "Review mode")
+            if text_has_negative_automation_marker(entry_marker):
+                continue
+            if automation_status_is_negative(status):
+                continue
+            if automation_schedule_is_negative_or_nonrecurring(schedule):
+                continue
+            if text_has_negative_automation_marker(review_mode):
+                continue
+            if text_has_negative_automation_prose(entry_text):
+                continue
+            if not (automation_status_is_active(status) and automation_schedule_is_recurring(schedule)):
                 return True
-            continue
-        status = markdown_field_value(body, "Status")
-        schedule = markdown_field_value(body, "Schedule rule")
-        review_mode = markdown_field_value(body, "Review mode")
-        if text_has_negative_automation_marker(entry_marker):
-            continue
-        if automation_status_is_negative(status):
-            continue
-        if automation_schedule_is_negative_or_nonrecurring(schedule):
-            continue
-        if text_has_negative_automation_marker(review_mode):
-            continue
-        if text_has_negative_automation_prose(entry_text):
-            continue
-        if not (automation_status_is_active(status) and automation_schedule_is_recurring(schedule)):
-            return True
+    residual = markdown_without_sections(text, AUTOMATION_REGISTRY_SECTIONS)
+    if text_mentions_agentos_checks(residual) and not text_has_negative_automation_prose(residual):
+        return True
     return False
 
 
@@ -1108,10 +1114,29 @@ def markdown_subsections(section: str) -> list[tuple[str, str]]:
     if not matches:
         return [("", section)]
     entries: list[tuple[str, str]] = []
+    prefix = section[: matches[0].start()]
+    if prefix.strip():
+        entries.append(("", prefix))
     for index, match in enumerate(matches):
         end = matches[index + 1].start() if index + 1 < len(matches) else len(section)
         entries.append((match.group(1), section[match.end() : end]))
     return entries
+
+
+def markdown_without_sections(text: str, headings: Iterable[str]) -> str:
+    heading_set = {heading.lower() for heading in headings}
+    matches = list(re.finditer(r"(?im)^##\s+(.+?)\s*$", text))
+    if not matches:
+        return text
+    chunks: list[str] = []
+    previous_end = 0
+    for index, match in enumerate(matches):
+        section_end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        if match.group(1).strip().lower() in heading_set:
+            chunks.append(text[previous_end : match.start()])
+            previous_end = section_end
+    chunks.append(text[previous_end:])
+    return "\n".join(chunks)
 
 
 def markdown_field_value(text: str, field: str) -> str:
@@ -1468,6 +1493,7 @@ def run_self_tests() -> int:
         test_personal_bounded_rrule_warns,
         test_personal_prompt_only_agentos_mention_warns,
         test_personal_prompt_only_agentos_mention_conflicts_with_codex_active_warns,
+        test_personal_registry_level_mentions_conflict_with_codex_active_warns,
         test_personal_disabled_registry_conflicts_with_codex_active_warns,
         test_personal_lifecycle_body_only_mentions_conflict_with_codex_active_warns,
         test_personal_prompt_only_negative_conflicts_with_codex_active_warns,
@@ -2229,6 +2255,67 @@ Run AgentOS Doctor.
         assert_true(result.status == "WARN", "prompt-only Personal Overlay mention should conflict with active Codex evidence")
         assert_true("Personal possible AgentOS check evidence: found" in joined, "prompt-only mention should be explicit possible evidence")
         assert_true("Recurring AgentOS check evidence: not found" in joined, "prompt-only ambiguity should not pass as recurring")
+
+
+def test_personal_registry_level_mentions_conflict_with_codex_active_warns() -> None:
+    cases = (
+        (
+            """# Automations
+
+AgentOS Doctor automation is only a candidate; do not run it yet.
+""",
+            "Personal negative AgentOS check evidence: found",
+            "negative preamble",
+        ),
+        (
+            """# Automations
+
+## Notes
+
+Run AgentOS Doctor after the recurring automation is confirmed.
+""",
+            "Personal possible AgentOS check evidence: found",
+            "notes-section possible mention",
+        ),
+        (
+            """# Automations
+
+AgentOS Doctor automation is only a candidate; do not run it yet.
+
+## Active Automations
+
+### Weekly AgentOS Doctor
+
+Automation id: weekly-agentos-doctor
+
+Status: Active
+
+Schedule rule: RRULE:FREQ=WEEKLY
+""",
+            "Personal negative AgentOS check evidence: found",
+            "negative preamble with structured active entry",
+        ),
+    )
+    for registry_text, expected_detail, label in cases:
+        with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+            root = Path(tmp) / "AgentOS"
+            home = Path(tmp) / "home"
+            make_fake_agentos(root)
+            registry = root / "personal" / "os" / "automations" / "AUTOMATIONS.md"
+            registry.write_text(registry_text, encoding="utf-8")
+            codex_automation = home / ".codex" / "automations" / "agentos-doctor" / "automation.toml"
+            codex_automation.parent.mkdir(parents=True)
+            codex_automation.write_text(
+                'name = "AgentOS doctor health check"\n'
+                'status = "ACTIVE"\n'
+                'rrule = "RRULE:FREQ=WEEKLY"\n',
+                encoding="utf-8",
+            )
+            result = check_automations(root, root, home, verbose=False)
+            joined = "\n".join(result.details)
+            assert_true(result.status == "WARN", f"{label} should conflict with active Codex evidence")
+            assert_true(expected_detail in joined, f"{label} should produce {expected_detail}")
+            assert_true("Recurring AgentOS check evidence: not found" in joined, f"{label} should not pass as recurring")
 
 
 def test_personal_disabled_registry_conflicts_with_codex_active_warns() -> None:
