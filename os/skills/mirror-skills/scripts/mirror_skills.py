@@ -471,6 +471,16 @@ def main() -> int:
     ]
 
     if args.sync:
+        pre_sync_results = list(discovery_results)
+        pre_sync_results.extend(compare_entry(entry) for entry in entries)
+        blocking_statuses = {"source-missing", "source-unreadable", "mirror-unreadable"}
+        if any(result.status in blocking_statuses for result in pre_sync_results):
+            if args.json:
+                print(json.dumps([asdict(result) for result in pre_sync_results], indent=2))
+            else:
+                print_table(pre_sync_results)
+            return 1
+
         for entry in entries:
             sync_entry(entry, prune_extra=args.prune_extra)
 

@@ -1850,6 +1850,7 @@ def run_self_tests() -> int:
         test_mirror_zero_exit_with_drift_status_fails,
         test_mirror_unknown_status_fails,
         test_mirror_unknown_source_kind_fails,
+        test_mirror_sync_blocks_writes_after_discovery_error,
         test_mirror_unreadable_personal_skills_root_fails,
         test_mirror_failure_suppresses_private_names_without_verbose,
         test_mirror_recommendations_quote_paths,
@@ -2350,6 +2351,36 @@ def test_mirror_unknown_source_kind_fails() -> None:
         assert_true("unknown structured evidence" in result.summary, "unknown source kind summary should be explicit")
         assert_true("plugin" in joined, "unknown mirror source kind should be reported")
         assert_true("--sync" not in joined, "unknown mirror source kind should not recommend sync")
+
+
+def test_mirror_sync_blocks_writes_after_discovery_error() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        mirror_root = Path(tmp) / "mirrors"
+        bad_personal_root = Path(tmp) / "bad-personal"
+        make_fake_agentos(root)
+        script = root / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py"
+        bad_personal_root.mkdir()
+        (bad_personal_root / "skills").write_text("not a directory\n", encoding="utf-8")
+        command = [
+            sys.executable,
+            str(script),
+            "--agentos-root",
+            str(root),
+            "--mirror-root",
+            str(mirror_root),
+            "--personal-overlay-root",
+            str(bad_personal_root),
+            "--sync",
+            "--json",
+        ]
+        completed = run_subprocess(command, cwd=root, env=minimal_env(Path(tmp) / "home"))
+        assert_true(completed.returncode == 1, "sync with unreadable discovery evidence should fail")
+        assert_true("source-unreadable" in completed.stdout, "discovery failure should be reported")
+        assert_true(
+            not (mirror_root / "example-skill").exists(),
+            "sync should not write mirrors after discovery failure",
+        )
 
 
 def test_mirror_unreadable_personal_skills_root_fails() -> None:
