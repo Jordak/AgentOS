@@ -178,6 +178,24 @@
           ]
         }
       ]
+    },
+    {
+      "id": "run-benchmarks",
+      "category": "benchmarks",
+      "prompt": "Run AgentOS benchmarks and make sure the Core benchmark status is refreshed afterward.",
+      "expected": {
+        "filing_path": "os/skills/run-benchmarks/SKILL.md"
+      },
+      "evidence": [
+        {
+          "path": "os/skills/run-benchmarks/SKILL.md",
+          "contains": [
+            "os/verification/BENCHMARKS.json",
+            "refresh-benchmark-status",
+            "not complete until"
+          ]
+        }
+      ]
     }
   ]
 }

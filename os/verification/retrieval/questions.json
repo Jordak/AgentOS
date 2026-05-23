@@ -81,5 +81,13 @@
     "expected_paths": [
       "os/verification/BENCHMARK_STATUS.md"
     ]
+  },
+  {
+    "id": "run-benchmarks",
+    "category": "benchmarks",
+    "question": "What workflow should an agent use when the user asks to run all configured AgentOS benchmark scripts?",
+    "expected_paths": [
+      "os/skills/run-benchmarks/SKILL.md"
+    ]
   }
 ]
