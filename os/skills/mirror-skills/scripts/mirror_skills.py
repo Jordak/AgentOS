@@ -114,6 +114,10 @@ def source_path_problem(boundary_root: Path, source_path: Path, expected_kind: s
     if any(part == ".." for part in rel.parts):
         return f"{rel.as_posix()}: parent-directory traversal is not allowed"
 
+    root_problem = destination_root_problem(boundary_root)
+    if root_problem:
+        return root_problem
+
     try:
         root_stat = boundary_root.lstat()
     except FileNotFoundError:

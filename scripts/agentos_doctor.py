@@ -1452,9 +1452,14 @@ def personal_registry_active_agentos_check_evidence(text: str) -> bool:
             continue
         if text_has_negative_automation_prose(entry_text):
             continue
-        status = markdown_field_value(body, "Status")
-        schedule = markdown_field_value(body, "Schedule rule")
-        if automation_status_is_active(status) and automation_schedule_is_recurring(schedule):
+        status_values = markdown_field_values(body, "Status")
+        schedule_values = markdown_field_values(body, "Schedule rule")
+        if (
+            len(status_values) == 1
+            and automation_status_is_active(status_values[0])
+            and len(schedule_values) == 1
+            and automation_schedule_is_recurring(schedule_values[0])
+        ):
             return True
     return False
 
@@ -1481,14 +1486,14 @@ def personal_registry_negative_agentos_check_evidence(text: str) -> bool:
                 if text_has_negative_automation_prose(entry_text):
                     return True
                 continue
-            status = markdown_field_value(body, "Status")
-            schedule = markdown_field_value(body, "Schedule rule")
-            review_mode = markdown_field_value(body, "Review mode")
-            if automation_status_is_negative(status):
+            status_values = markdown_field_values(body, "Status")
+            schedule_values = markdown_field_values(body, "Schedule rule")
+            review_mode_values = markdown_field_values(body, "Review mode")
+            if any(automation_status_is_negative(value) for value in status_values):
                 return True
-            if automation_schedule_is_negative_or_nonrecurring(schedule):
+            if any(automation_schedule_is_negative_or_nonrecurring(value) for value in schedule_values):
                 return True
-            if text_has_negative_automation_marker(review_mode):
+            if any(text_has_negative_automation_marker(value) for value in review_mode_values):
                 return True
             if text_has_negative_automation_prose(entry_text):
                 return True
@@ -1516,20 +1521,25 @@ def personal_registry_possible_agentos_check_evidence(text: str) -> bool:
                 if not text_has_negative_automation_prose(entry_text):
                     return True
                 continue
-            status = markdown_field_value(body, "Status")
-            schedule = markdown_field_value(body, "Schedule rule")
-            review_mode = markdown_field_value(body, "Review mode")
+            status_values = markdown_field_values(body, "Status")
+            schedule_values = markdown_field_values(body, "Schedule rule")
+            review_mode_values = markdown_field_values(body, "Review mode")
             if text_has_negative_automation_marker(entry_marker):
                 continue
-            if automation_status_is_negative(status):
+            if any(automation_status_is_negative(value) for value in status_values):
                 continue
-            if automation_schedule_is_negative_or_nonrecurring(schedule):
+            if any(automation_schedule_is_negative_or_nonrecurring(value) for value in schedule_values):
                 continue
-            if text_has_negative_automation_marker(review_mode):
+            if any(text_has_negative_automation_marker(value) for value in review_mode_values):
                 continue
             if text_has_negative_automation_prose(entry_text):
                 continue
-            if not (automation_status_is_active(status) and automation_schedule_is_recurring(schedule)):
+            if len(status_values) != 1 or len(schedule_values) != 1 or len(review_mode_values) > 1:
+                return True
+            if not (
+                automation_status_is_active(status_values[0])
+                and automation_schedule_is_recurring(schedule_values[0])
+            ):
                 return True
     residual = markdown_without_sections(text, AUTOMATION_REGISTRY_SECTIONS)
     if text_mentions_agentos_checks(residual) and not text_has_negative_automation_prose(residual):
@@ -1578,10 +1588,17 @@ def markdown_without_sections(text: str, headings: Iterable[str]) -> str:
 
 
 def markdown_field_value(text: str, field: str) -> str:
-    match = re.search(rf"(?im)^\s*{re.escape(field)}\s*:\s*(.*?)\s*$", text)
-    if not match:
+    values = markdown_field_values(text, field)
+    if not values:
         return ""
-    return match.group(1).strip()
+    return values[0]
+
+
+def markdown_field_values(text: str, field: str) -> list[str]:
+    return [
+        match.group(1).strip()
+        for match in re.finditer(rf"(?im)^\s*{re.escape(field)}\s*:\s*(.*?)\s*$", text)
+    ]
 
 
 def automation_status_is_active(status: str) -> bool:
@@ -1805,6 +1822,10 @@ def trusted_path_kind(boundary_root: Path, path: Path, expected_kind: str) -> tu
         return False, UnsafePathError(f"path is outside trusted root: {path}")
     if any(part == ".." for part in rel.parts):
         return False, UnsafePathError(f"parent-directory traversal is not allowed: {path}")
+
+    root_ancestor_error = destination_root_problem(boundary_root)
+    if root_ancestor_error:
+        return False, root_ancestor_error
 
     current = boundary_root
     try:
@@ -2155,6 +2176,7 @@ def run_self_tests() -> int:
         test_mirror_nested_mirror_directory_error_fails,
         test_mirror_source_symlinks_fail_closed,
         test_mirror_source_root_symlinks_fail_closed,
+        test_mirror_agentos_root_ancestor_symlink_fails_closed,
         test_mirror_manifest_source_escape_fails_closed,
         test_mirror_personal_overlay_ancestor_symlinks_fail_closed,
         test_mirror_nested_path_kind_conflicts_fail_closed,
@@ -2162,6 +2184,7 @@ def run_self_tests() -> int:
         test_mirror_failure_suppresses_private_names_without_verbose,
         test_mirror_recommendations_quote_paths,
         test_recommendations_are_cwd_stable,
+        test_agentos_home_ancestor_symlink_fails_closed,
         test_primary_agentos_home_supplies_private_skill_mirrors,
         test_primary_agentos_home_drives_current_machine_recommendations,
         test_linked_worktree_without_primary_suppresses_writes,
@@ -2185,6 +2208,7 @@ def run_self_tests() -> int:
         test_personal_disabled_automation_registry_warns,
         test_personal_negative_status_warns,
         test_personal_negative_schedule_warns,
+        test_personal_conflicting_registry_fields_warn,
         test_personal_draft_candidate_automation_registry_warns,
         test_personal_one_off_schedule_warns,
         test_personal_bounded_rrule_warns,
@@ -3039,6 +3063,34 @@ def test_mirror_source_root_symlinks_fail_closed() -> None:
         assert_true("--sync" not in joined, "source root symlinks should not recommend sync")
 
 
+def test_mirror_agentos_root_ancestor_symlink_fails_closed() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        real_parent = Path(tmp) / "real-parent"
+        linked_parent = Path(tmp) / "linked-parent"
+        real_root = real_parent / "AgentOS"
+        linked_root = linked_parent / "AgentOS"
+        mirror_root = Path(tmp) / "mirrors"
+        make_fake_agentos(real_root)
+        linked_parent.symlink_to(real_parent, target_is_directory=True)
+        script = real_root / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py"
+        completed = run_subprocess(
+            [
+                sys.executable,
+                str(script),
+                "--agentos-root",
+                str(linked_root),
+                "--mirror-root",
+                str(mirror_root),
+                "--json",
+            ],
+            cwd=real_root,
+            env=minimal_env(Path(tmp) / "home"),
+        )
+        assert_true(completed.returncode == 1, "symlinked AgentOS root ancestor should fail closed")
+        assert_true("Skills manifest could not be inspected" in completed.stderr, "symlinked source root should block manifest reads")
+        assert_true("symbolic link is not allowed" in completed.stderr, "symlinked source root ancestor should be reported")
+
+
 def test_mirror_manifest_source_escape_fails_closed() -> None:
     with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
         root = Path(tmp) / "AgentOS"
@@ -3238,6 +3290,20 @@ def test_recommendations_are_cwd_stable() -> None:
         assert_true(str(root / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py") in joined, "mirror recommendation should use an absolute script path")
         assert_true("python3 scripts/install_global_agent_instructions.py" not in joined, "adapter recommendation should not depend on caller cwd")
         assert_true("python3 os/skills/mirror-skills/scripts/mirror_skills.py" not in joined, "mirror recommendation should not depend on caller cwd")
+
+
+def test_agentos_home_ancestor_symlink_fails_closed() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        real_parent = Path(tmp) / "real-parent"
+        linked_parent = Path(tmp) / "linked-parent"
+        real_root = real_parent / "AgentOS"
+        linked_root = linked_parent / "AgentOS"
+        make_fake_agentos(real_root)
+        linked_parent.symlink_to(real_parent, target_is_directory=True)
+        result = check_agentos_home(linked_root)
+        joined = "\n".join(result.details)
+        assert_true(result.status == "FAIL", "AgentOS home below symlinked ancestor should fail closed")
+        assert_true("UnsafePathError" in joined, "symlinked AgentOS home ancestor should be reported")
 
 
 def test_primary_agentos_home_supplies_private_skill_mirrors() -> None:
@@ -3872,6 +3938,70 @@ Schedule rule: no weekly schedule yet
         assert_true(result.status == "WARN", "negative Personal Overlay schedule should not pass")
         assert_true("Personal negative AgentOS check evidence: found" in joined, "negative personal schedule should be explicit")
         assert_true("Recurring AgentOS check evidence: not found" in joined, "negative personal schedule should not be recurring")
+
+
+def test_personal_conflicting_registry_fields_warn() -> None:
+    cases = (
+        (
+            """Status: Active
+
+Status: pending
+
+Schedule rule: RRULE:FREQ=WEEKLY
+""",
+            "duplicate status",
+        ),
+        (
+            """Status: Active
+
+Status: Active
+
+Schedule rule: RRULE:FREQ=WEEKLY
+""",
+            "duplicate active status",
+        ),
+        (
+            """Status: Active
+
+Schedule rule: RRULE:FREQ=WEEKLY
+
+Schedule rule: manual
+""",
+            "conflicting schedule",
+        ),
+        (
+            """Status: Active
+
+Schedule rule: RRULE:FREQ=WEEKLY
+
+Schedule rule: RRULE:FREQ=WEEKLY
+""",
+            "duplicate recurring schedule",
+        ),
+    )
+    for field_text, label in cases:
+        with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+            root = Path(tmp) / "AgentOS"
+            make_fake_agentos(root)
+            registry = root / "personal" / "os" / "automations" / "AUTOMATIONS.md"
+            registry.write_text(
+                f"""# Automations
+
+## Active Automations
+
+### Weekly AgentOS Doctor
+
+Automation id: weekly-agentos-doctor
+
+{field_text}
+""",
+                encoding="utf-8",
+            )
+            result = check_automations(root, root, Path(tmp) / "home", verbose=False)
+            joined = "\n".join(result.details)
+            assert_true(result.status == "WARN", f"{label} should not pass as active recurring evidence")
+            assert_true("Personal active AgentOS check evidence: not found" in joined, f"{label} should not be active evidence")
+            assert_true("Recurring AgentOS check evidence: not found" in joined, f"{label} should suppress recurring PASS")
 
 
 def test_personal_draft_candidate_automation_registry_warns() -> None:
