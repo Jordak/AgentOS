@@ -24,6 +24,7 @@ class SkillEntry:
     name: str
     source_kind: str
     canonical_source: str
+    managed_root: Path
     source_path: Path
     source_root: Path
     mirror_dir: Path
@@ -52,7 +53,9 @@ class PreflightProblem:
 def find_agentos_root(start: Path) -> Path:
     for path in [start, *start.parents]:
         manifest_path = path / "os/skills/MANIFEST.md"
-        if not path_component_problems(manifest_path, expected_kind="file", allow_missing=False):
+        if final_path_kind_problem(path, expected_kind="directory", allow_missing=False):
+            continue
+        if not path_component_problems(manifest_path, expected_kind="file", allow_missing=False, boundary=path):
             return path
     raise SystemExit("Could not find AgentOS root containing os/skills/MANIFEST.md")
 
@@ -65,17 +68,59 @@ def lexical_absolute(path: Path) -> Path:
     return Path(os.path.abspath(expanded))
 
 
+def final_path_kind_problem(
+    path: Path,
+    expected_kind: str | None,
+    allow_missing: bool,
+) -> str | None:
+    absolute = lexical_absolute(path)
+    try:
+        path_stat = absolute.lstat()
+    except FileNotFoundError:
+        if allow_missing:
+            return None
+        return "path is missing"
+    except OSError as error:
+        return f"{error.__class__.__name__}: {error}"
+
+    if stat.S_ISLNK(path_stat.st_mode):
+        return "symbolic link is not allowed"
+    if expected_kind == "directory" and not stat.S_ISDIR(path_stat.st_mode):
+        return "not a directory"
+    if expected_kind == "file" and not stat.S_ISREG(path_stat.st_mode):
+        return "not a regular file"
+    return None
+
+
 def path_component_problems(
     path: Path,
     expected_kind: str | None,
     allow_missing: bool,
+    boundary: Path | None = None,
 ) -> list[str]:
     absolute = lexical_absolute(path)
     if not absolute.is_absolute():
         return [f"{path} (path is not absolute after normalization)"]
 
-    current = Path(absolute.anchor)
-    parts = absolute.parts[1:]
+    if boundary is None:
+        current = Path(absolute.anchor)
+        parts = absolute.parts[1:]
+    else:
+        boundary_absolute = lexical_absolute(boundary)
+        boundary_problem = final_path_kind_problem(boundary_absolute, expected_kind="directory", allow_missing=False)
+        if boundary_problem:
+            return [f"{boundary_absolute} ({boundary_problem})"]
+        try:
+            relative = absolute.relative_to(boundary_absolute)
+        except ValueError:
+            return [f"{absolute} (path is outside the managed root: {boundary_absolute})"]
+        current = boundary_absolute
+        parts = relative.parts
+
+    if not parts:
+        final_problem = final_path_kind_problem(current, expected_kind=expected_kind, allow_missing=allow_missing)
+        return [f"{current} ({final_problem})"] if final_problem else []
+
     for index, part in enumerate(parts):
         current = current / part
         is_final = index == len(parts) - 1
@@ -122,7 +167,12 @@ def managed_relative_path_problem(raw_path: str) -> str | None:
 
 def parse_manifest(agentos_root: Path) -> list[SkillEntry]:
     manifest_path = agentos_root / "os/skills/MANIFEST.md"
-    manifest_problems = path_component_problems(manifest_path, expected_kind="file", allow_missing=False)
+    manifest_problems = path_component_problems(
+        manifest_path,
+        expected_kind="file",
+        allow_missing=False,
+        boundary=agentos_root,
+    )
     if manifest_problems:
         raise SystemExit("Unsafe skills manifest: " + "; ".join(manifest_problems))
     manifest = manifest_path.read_text(encoding="utf-8")
@@ -148,6 +198,7 @@ def parse_manifest(agentos_root: Path) -> list[SkillEntry]:
                 name=name,
                 source_kind="core",
                 canonical_source=canonical_source,
+                managed_root=agentos_root,
                 source_path=source_path,
                 source_root=source_root,
                 mirror_dir=Path(),
@@ -162,7 +213,12 @@ def discover_personal_overlay_entries(
     requested_names: set[str] | None = None,
 ) -> tuple[list[SkillEntry], list[PreflightProblem]]:
     personal_skills_root = agentos_root / "personal/os/skills"
-    problems = path_component_problems(personal_skills_root, expected_kind="directory", allow_missing=True)
+    problems = path_component_problems(
+        personal_skills_root,
+        expected_kind="directory",
+        allow_missing=True,
+        boundary=agentos_root,
+    )
     if problems:
         return [], [
             PreflightProblem("personal-overlay", "personal/os/skills", problem)
@@ -269,6 +325,7 @@ def discover_personal_overlay_entries(
                 name=name,
                 source_kind="personal-overlay",
                 canonical_source=canonical_source,
+                managed_root=agentos_root,
                 source_path=skill_file,
                 source_root=skill_dir,
                 mirror_dir=Path(),
@@ -303,16 +360,18 @@ def should_ignore(path: Path) -> bool:
     return any(part in IGNORED_NAMES or part.endswith(".pyc") for part in path.parts)
 
 
-def file_map(root: Path) -> tuple[dict[str, Path], list[str]]:
+def file_map(root: Path, boundary: Path | None = None) -> tuple[dict[str, Path], list[str]]:
     files: dict[str, Path] = {}
     problems: list[str] = []
-    component_problems = path_component_problems(
-        root,
-        expected_kind=None,
-        allow_missing=True,
-    )
-    if component_problems:
-        return files, component_problems
+    if boundary is not None:
+        component_problems = path_component_problems(
+            root,
+            expected_kind=None,
+            allow_missing=True,
+            boundary=boundary,
+        )
+        if component_problems:
+            return files, component_problems
     try:
         root_stat = root.lstat()
     except FileNotFoundError:
@@ -385,26 +444,13 @@ def existing_path_kind_problem(path: Path, expected_kind: str) -> str | None:
 
 def mirror_path_kind_problems(mirror_dir: Path, canonical_files: dict[str, Path]) -> list[str]:
     mirror_root = mirror_dir.parent
-    mirror_root_problem = existing_path_kind_problem(mirror_root, "directory")
-    if mirror_root_problem:
-        return [f". ({mirror_root}: {mirror_root_problem})"]
-    component_problems = path_component_problems(
-        mirror_dir,
-        expected_kind="directory",
-        allow_missing=True,
-    )
-    if component_problems:
-        return component_problems
-    try:
-        mirror_root_stat = mirror_dir.lstat()
-    except FileNotFoundError:
+    if mirror_root.exists() and not mirror_root.is_dir():
+        return [f". ({mirror_root}: not a directory)"]
+    mirror_dir_problem = existing_path_kind_problem(mirror_dir, "directory")
+    if mirror_dir_problem:
+        return [f". ({mirror_dir}: {mirror_dir_problem})"]
+    if not mirror_dir.exists():
         return []
-    except OSError as error:
-        return [f". ({error.__class__.__name__}: {error})"]
-    if stat.S_ISLNK(mirror_root_stat.st_mode):
-        return [f". (symbolic link is not allowed: {mirror_dir})"]
-    if not stat.S_ISDIR(mirror_root_stat.st_mode):
-        return [f". (not a directory: {mirror_dir})"]
 
     problems: list[str] = []
     for rel in sorted(canonical_files):
@@ -467,7 +513,7 @@ def compare_entry(entry: SkillEntry) -> MirrorResult:
             notes=[f"canonical source is a symbolic link: {entry.source_path}"],
         )
 
-    canonical_files, source_problems = file_map(entry.source_root)
+    canonical_files, source_problems = file_map(entry.source_root, boundary=entry.managed_root)
     mirror_files: dict[str, Path] = {}
     source_unreadable = [*source_problems, *unreadable_files(canonical_files)]
     if source_unreadable:
@@ -552,7 +598,7 @@ def sync_entry(entry: SkillEntry, prune_extra: bool) -> None:
     if stat.S_ISLNK(source_stat.st_mode):
         return
 
-    canonical_files, source_problems = file_map(entry.source_root)
+    canonical_files, source_problems = file_map(entry.source_root, boundary=entry.managed_root)
     if source_problems:
         return
     if mirror_path_kind_problems(entry.mirror_dir, canonical_files):
@@ -706,9 +752,9 @@ def main() -> int:
 
     agentos_root = lexical_absolute(args.agentos_root) if args.agentos_root else find_agentos_root(lexical_absolute(Path.cwd()))
     mirror_root = lexical_absolute(args.mirror_root)
-    root_problems = path_component_problems(agentos_root, expected_kind="directory", allow_missing=False)
-    if root_problems:
-        raise SystemExit("Unsafe AgentOS root: " + "; ".join(root_problems))
+    root_problem = final_path_kind_problem(agentos_root, expected_kind="directory", allow_missing=False)
+    if root_problem:
+        raise SystemExit(f"Unsafe AgentOS root: {agentos_root} ({root_problem})")
 
     core_entries = parse_manifest(agentos_root)
     personal_entries: list[SkillEntry] = []
@@ -734,6 +780,7 @@ def main() -> int:
             name=entry.name,
             source_kind=entry.source_kind,
             canonical_source=entry.canonical_source,
+            managed_root=entry.managed_root,
             source_path=entry.source_path,
             source_root=entry.source_root,
             mirror_dir=mirror_root / entry.name,
