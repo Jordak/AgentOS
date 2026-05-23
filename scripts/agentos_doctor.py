@@ -37,6 +37,16 @@ INSTALLER_RESULT_STATUSES = (
     "skip",
     "ok",
 )
+MIRROR_RESULT_STATUSES = (
+    "source-missing",
+    "source-unreadable",
+    "mirror-unreadable",
+    "missing",
+    "stale",
+    "extra-files",
+    "in-sync",
+)
+MIRROR_SOURCE_KINDS = ("core", "personal-overlay")
 AUTOMATION_CHECK_TERMS = (
     "drift",
     "update",
@@ -725,6 +735,23 @@ def check_skill_mirrors(
         details.extend(verbose_mirror_details(results))
         details.extend(prefix_lines("mirror-skills", "", completed.stderr))
 
+    unknown_statuses = sorted(status for status in statuses if status not in MIRROR_RESULT_STATUSES)
+    unknown_source_kinds = sorted(source_kind for source_kind in source_kinds if source_kind not in MIRROR_SOURCE_KINDS)
+    if unknown_statuses or unknown_source_kinds:
+        if unknown_statuses:
+            details.append("Unknown statuses: " + ", ".join(unknown_statuses))
+        if unknown_source_kinds:
+            details.append("Unknown source kinds: " + ", ".join(unknown_source_kinds))
+        return CheckResult(
+            "skill mirrors",
+            "FAIL",
+            "Mirror-skills audit returned unknown structured evidence.",
+            details=details,
+            recommendations=[
+                "Fix the mirror-skills command or output format before trusting mirror status."
+            ],
+        )
+
     bad_statuses = {
         "source-missing",
         "source-unreadable",
@@ -734,7 +761,7 @@ def check_skill_mirrors(
         "extra-files",
         "unknown",
     }
-    if completed.returncode == 0 and not any(status in bad_statuses for status in statuses):
+    if completed.returncode == 0 and set(statuses) == {"in-sync"}:
         return CheckResult(
             "skill mirrors",
             "PASS",
@@ -1769,6 +1796,9 @@ def run_self_tests() -> int:
         test_mirror_source_failure_is_not_sync_advice,
         test_mirror_empty_success_output_fails,
         test_mirror_nonzero_without_actionable_status_fails,
+        test_mirror_unknown_status_fails,
+        test_mirror_unknown_source_kind_fails,
+        test_mirror_unreadable_personal_skills_root_fails,
         test_mirror_failure_suppresses_private_names_without_verbose,
         test_mirror_recommendations_quote_paths,
         test_recommendations_are_cwd_stable,
@@ -2208,6 +2238,73 @@ def test_mirror_nonzero_without_actionable_status_fails() -> None:
         assert_true(result.status == "FAIL", "nonzero mirror output without actionable status should fail")
         assert_true("non-actionable unsuccessful evidence" in result.summary, "non-actionable mirror failure should be explicit")
         assert_true("--sync" not in joined, "non-actionable mirror failure should not recommend sync")
+
+
+def test_mirror_unknown_status_fails() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        mirror_root = Path(tmp) / "mirrors"
+        make_fake_agentos(root)
+        script = root / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py"
+        script.write_text(
+            "import json\n"
+            "print(json.dumps([{'name': 'example-skill', 'source_kind': 'core', 'status': 'skipped'}]))\n",
+            encoding="utf-8",
+        )
+        result = check_skill_mirrors(root, root, mirror_root, minimal_env(Path(tmp) / "home"), verbose=False)
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "FAIL", "unknown mirror status should fail closed")
+        assert_true("unknown structured evidence" in result.summary, "unknown status summary should be explicit")
+        assert_true("skipped" in joined, "unknown mirror status should be reported")
+        assert_true("--sync" not in joined, "unknown mirror status should not recommend sync")
+
+
+def test_mirror_unknown_source_kind_fails() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        mirror_root = Path(tmp) / "mirrors"
+        make_fake_agentos(root)
+        script = root / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py"
+        script.write_text(
+            "import json\n"
+            "print(json.dumps([{'name': 'example-skill', 'source_kind': 'plugin', 'status': 'in-sync'}]))\n",
+            encoding="utf-8",
+        )
+        result = check_skill_mirrors(root, root, mirror_root, minimal_env(Path(tmp) / "home"), verbose=False)
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "FAIL", "unknown mirror source kind should fail closed")
+        assert_true("unknown structured evidence" in result.summary, "unknown source kind summary should be explicit")
+        assert_true("plugin" in joined, "unknown mirror source kind should be reported")
+        assert_true("--sync" not in joined, "unknown mirror source kind should not recommend sync")
+
+
+def test_mirror_unreadable_personal_skills_root_fails() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        mirror_root = Path(tmp) / "mirrors"
+        make_fake_agentos(root)
+        script = root / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py"
+        sync_command = [
+            sys.executable,
+            str(script),
+            "--agentos-root",
+            str(root),
+            "--mirror-root",
+            str(mirror_root),
+            "--sync",
+        ]
+        completed = run_subprocess(sync_command, cwd=root, env=minimal_env(Path(tmp) / "home"))
+        assert_true(completed.returncode == 0, completed.stderr or completed.stdout)
+        personal_skills_root = root / "personal" / "os" / "skills"
+        personal_skills_root.chmod(0)
+        try:
+            result = check_skill_mirrors(root, root, mirror_root, minimal_env(Path(tmp) / "home"), verbose=False)
+        finally:
+            personal_skills_root.chmod(0o755)
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "FAIL", "unreadable Personal Overlay skills root should fail closed")
+        assert_true("source-unreadable=1" in joined, "unreadable Personal Overlay skills root should be reported")
+        assert_true("--sync" not in joined, "unreadable Personal Overlay skills root should not recommend sync")
 
 
 def test_mirror_failure_suppresses_private_names_without_verbose() -> None:

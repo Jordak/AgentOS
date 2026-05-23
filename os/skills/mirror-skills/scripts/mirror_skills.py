@@ -7,6 +7,7 @@ import argparse
 import json
 import re
 import shutil
+import stat
 import sys
 from dataclasses import dataclass, asdict
 from pathlib import Path
@@ -113,6 +114,58 @@ def discover_personal_overlay_entries(agentos_root: Path, personal_overlay_root:
         )
 
     return entries
+
+
+def personal_overlay_skills_root_problem(personal_skills_root: Path) -> str | None:
+    try:
+        stat_result = personal_skills_root.stat()
+    except FileNotFoundError:
+        return None
+    except OSError as error:
+        return f"{error.__class__.__name__}: {error}"
+    if not stat.S_ISDIR(stat_result.st_mode):
+        return "not a directory"
+    try:
+        children = list(personal_skills_root.iterdir())
+    except OSError as error:
+        return f"{error.__class__.__name__}: {error}"
+    for child in children:
+        try:
+            child_stat = child.stat()
+        except OSError as error:
+            return f"{error.__class__.__name__}: {error}"
+        if not stat.S_ISDIR(child_stat.st_mode):
+            continue
+        try:
+            (child / "SKILL.md").stat()
+        except FileNotFoundError:
+            continue
+        except OSError as error:
+            return f"{error.__class__.__name__}: {error}"
+    return None
+
+
+def personal_overlay_discovery_error_result(
+    agentos_root: Path,
+    mirror_root: Path,
+    personal_skills_root: Path,
+    problem: str,
+) -> MirrorResult:
+    try:
+        canonical_source = personal_skills_root.relative_to(agentos_root).as_posix()
+    except ValueError:
+        canonical_source = str(personal_skills_root)
+    return MirrorResult(
+        name="personal-overlay-skills",
+        source_kind="personal-overlay",
+        status="source-unreadable",
+        canonical_source=canonical_source,
+        mirror_path=str(mirror_root / "personal-overlay-skills"),
+        missing_files=[],
+        changed_files=[],
+        extra_files=[],
+        notes=[f"Personal Overlay skills root could not be inspected: {problem}"],
+    )
 
 
 def should_ignore(path: Path) -> bool:
@@ -381,11 +434,28 @@ def main() -> int:
 
     core_entries = parse_manifest(agentos_root)
     personal_entries: list[SkillEntry] = []
+    discovery_results: list[MirrorResult] = []
     if not args.core_only:
-        personal_overlay_root = args.personal_overlay_root.expanduser().resolve() if args.personal_overlay_root else None
-        personal_entries = discover_personal_overlay_entries(agentos_root, personal_overlay_root)
+        personal_overlay_root = (
+            args.personal_overlay_root.expanduser().resolve()
+            if args.personal_overlay_root
+            else agentos_root / "personal/os"
+        )
+        personal_skills_root = personal_overlay_root / "skills"
+        problem = personal_overlay_skills_root_problem(personal_skills_root)
+        if problem:
+            discovery_results.append(
+                personal_overlay_discovery_error_result(
+                    agentos_root,
+                    mirror_root,
+                    personal_skills_root,
+                    problem,
+                )
+            )
+        else:
+            personal_entries = discover_personal_overlay_entries(agentos_root, personal_overlay_root)
     entries = select_entries(core_entries, personal_entries, args.skill)
-    if not entries:
+    if not entries and not discovery_results:
         raise SystemExit("No mirrorable Core or Personal Overlay skills found.")
 
     entries = [
@@ -404,7 +474,8 @@ def main() -> int:
         for entry in entries:
             sync_entry(entry, prune_extra=args.prune_extra)
 
-    results = [compare_entry(entry) for entry in entries]
+    results = list(discovery_results)
+    results.extend(compare_entry(entry) for entry in entries)
 
     if args.json:
         print(json.dumps([asdict(result) for result in results], indent=2))
