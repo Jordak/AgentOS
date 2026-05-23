@@ -638,6 +638,16 @@ def check_adapters(
                     "those harness adapters to be managed."
                 ],
             )
+        if completed.stderr.strip():
+            return CheckResult(
+                "adapter drift",
+                "WARN",
+                "Adapter drift check returned success with stderr diagnostics.",
+                details=details + subprocess_stderr_details(completed, verbose),
+                recommendations=[
+                    "Inspect the adapter helper diagnostics before trusting adapter status."
+                ],
+            )
         return CheckResult(
             "adapter drift",
             "PASS",
@@ -917,6 +927,16 @@ def check_skill_mirrors(
         "unknown",
     }
     if completed.returncode == 0 and set(statuses) == {"in-sync"}:
+        if completed.stderr.strip():
+            return CheckResult(
+                "skill mirrors",
+                "WARN",
+                "Mirror-skills audit returned success with stderr diagnostics.",
+                details=details + subprocess_stderr_details(completed, verbose),
+                recommendations=[
+                    "Inspect the mirror-skills diagnostics before trusting mirror status."
+                ],
+            )
         return CheckResult(
             "skill mirrors",
             "PASS",
@@ -2120,6 +2140,18 @@ def subprocess_failure_details(completed: subprocess.CompletedProcess[str], verb
     return details
 
 
+def subprocess_stderr_details(completed: subprocess.CompletedProcess[str], verbose: bool) -> list[str]:
+    if verbose:
+        return []
+    stderr_lines = [line for line in completed.stderr.splitlines() if line.strip()]
+    if not stderr_lines:
+        return []
+    details = ["Subprocess stderr: " + " / ".join(stderr_lines[:3])]
+    if len(stderr_lines) > 3:
+        details.append(f"Additional stderr lines suppressed: {len(stderr_lines) - 3}")
+    return details
+
+
 def shell_command(command: list[str], agentos_home: Path) -> str:
     rendered = []
     for part in command:
@@ -2196,6 +2228,7 @@ def run_self_tests() -> int:
         test_adapter_check_preflight_error_is_not_drift,
         test_adapter_check_empty_success_output_fails,
         test_adapter_check_success_with_fail_line_fails,
+        test_adapter_check_success_with_stderr_warns,
         test_adapter_check_skip_downgrades_pass,
         test_adapter_check_nonzero_without_actionable_drift_fails,
         test_subprocess_timeout_output_is_text,
@@ -2204,6 +2237,7 @@ def run_self_tests() -> int:
         test_mirror_command_failure_is_not_sync_advice,
         test_mirror_source_failure_is_not_sync_advice,
         test_mirror_empty_success_output_fails,
+        test_mirror_success_with_stderr_warns,
         test_mirror_nonzero_without_actionable_status_fails,
         test_mirror_zero_exit_with_drift_status_fails,
         test_mirror_unknown_status_fails,
@@ -2587,6 +2621,33 @@ def test_adapter_check_success_with_fail_line_fails() -> None:
         assert_true("contradictory" in result.summary, "contradictory adapter evidence should be explicit")
 
 
+def test_adapter_check_success_with_stderr_warns() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        home = Path(tmp) / "home"
+        make_fake_agentos(root)
+        home.mkdir()
+        installer = root / "scripts" / "install_global_agent_instructions.py"
+        installer.write_text(
+            "import sys\n"
+            "print('[OK] ok codex - managed block current')\n"
+            "print('warning: helper side channel', file=sys.stderr)\n"
+            "sys.exit(0)\n",
+            encoding="utf-8",
+        )
+        result = check_adapters(
+            agentos_home=root,
+            process_home=home,
+            env=minimal_env(home),
+            extra_args=[],
+            verbose=False,
+        )
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "WARN", "adapter helper stderr should block a hard PASS")
+        assert_true("stderr diagnostics" in result.summary, "adapter stderr warning should be explicit")
+        assert_true("helper side channel" in joined, "adapter stderr should be included as bounded detail")
+
+
 def test_adapter_check_skip_downgrades_pass() -> None:
     with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
         root = Path(tmp) / "AgentOS"
@@ -2770,6 +2831,29 @@ def test_mirror_empty_success_output_fails() -> None:
         assert_true(result.status == "FAIL", "empty successful mirror output should fail")
         assert_true("no mirror results" in result.summary, "empty mirror output should name missing evidence")
         assert_true("--sync" not in joined, "empty mirror output should not recommend mirror sync")
+
+
+def test_mirror_success_with_stderr_warns() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        mirror_root = Path(tmp) / "mirrors"
+        make_fake_agentos(root)
+        script = root / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py"
+        script.write_text(
+            "import json, sys\n"
+            "print(json.dumps([{'name': 'example-skill', 'source_kind': 'core', 'status': 'in-sync', "
+            "'canonical_source': 'os/skills/example-skill/SKILL.md', 'mirror_path': 'mirror', "
+            "'missing_files': [], 'changed_files': [], 'extra_files': [], 'notes': []}]))\n"
+            "print('warning: helper side channel', file=sys.stderr)\n"
+            "sys.exit(0)\n",
+            encoding="utf-8",
+        )
+        result = check_skill_mirrors(root, root, mirror_root, minimal_env(Path(tmp) / "home"), verbose=False)
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "WARN", "mirror helper stderr should block a hard PASS")
+        assert_true("stderr diagnostics" in result.summary, "mirror stderr warning should be explicit")
+        assert_true("helper side channel" in joined, "mirror stderr should be included as bounded detail")
+        assert_true("--sync" not in joined, "mirror helper stderr should not recommend sync")
 
 
 def test_mirror_nonzero_without_actionable_status_fails() -> None:
