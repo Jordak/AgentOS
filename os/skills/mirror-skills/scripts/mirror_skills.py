@@ -69,7 +69,6 @@ def path_component_problems(
     path: Path,
     expected_kind: str | None,
     allow_missing: bool,
-    reject_symlink_ancestors: bool = True,
 ) -> list[str]:
     absolute = lexical_absolute(path)
     if not absolute.is_absolute():
@@ -89,12 +88,8 @@ def path_component_problems(
         except OSError as error:
             return [f"{current} ({error.__class__.__name__}: {error})"]
 
-        if stat.S_ISLNK(path_stat.st_mode) and (reject_symlink_ancestors or is_final):
+        if stat.S_ISLNK(path_stat.st_mode):
             return [f"{current} (symbolic link is not allowed)"]
-        if stat.S_ISLNK(path_stat.st_mode) and not reject_symlink_ancestors:
-            if not current.is_dir():
-                return [f"{current} (path component is not a directory)"]
-            continue
         if not is_final and not stat.S_ISDIR(path_stat.st_mode):
             return [f"{current} (path component is not a directory)"]
         if is_final and expected_kind == "directory" and not stat.S_ISDIR(path_stat.st_mode):
@@ -294,14 +289,13 @@ def should_ignore(path: Path) -> bool:
     return any(part in IGNORED_NAMES or part.endswith(".pyc") for part in path.parts)
 
 
-def file_map(root: Path, reject_symlink_ancestors: bool = True) -> tuple[dict[str, Path], list[str]]:
+def file_map(root: Path) -> tuple[dict[str, Path], list[str]]:
     files: dict[str, Path] = {}
     problems: list[str] = []
     component_problems = path_component_problems(
         root,
         expected_kind=None,
         allow_missing=True,
-        reject_symlink_ancestors=reject_symlink_ancestors,
     )
     if component_problems:
         return files, component_problems
@@ -384,7 +378,6 @@ def mirror_path_kind_problems(mirror_dir: Path, canonical_files: dict[str, Path]
         mirror_dir,
         expected_kind="directory",
         allow_missing=True,
-        reject_symlink_ancestors=False,
     )
     if component_problems:
         return component_problems
@@ -488,7 +481,7 @@ def compare_entry(entry: SkillEntry) -> MirrorResult:
             extra_files=[],
             notes=mirror_kind_problems,
         )
-    mirror_files, mirror_problems = file_map(entry.mirror_dir, reject_symlink_ancestors=False)
+    mirror_files, mirror_problems = file_map(entry.mirror_dir)
     mirror_unreadable = [
         *mirror_problems,
         *unreadable_files(mirror_files),
@@ -550,7 +543,7 @@ def sync_entry(entry: SkillEntry, prune_extra: bool) -> None:
         return
     if mirror_path_kind_problems(entry.mirror_dir, canonical_files):
         return
-    _mirror_files, mirror_problems = file_map(entry.mirror_dir, reject_symlink_ancestors=False)
+    _mirror_files, mirror_problems = file_map(entry.mirror_dir)
     if mirror_problems:
         return
     entry.mirror_dir.mkdir(parents=True, exist_ok=True)
@@ -564,7 +557,7 @@ def sync_entry(entry: SkillEntry, prune_extra: bool) -> None:
             shutil.copy2(source, destination)
 
     if prune_extra:
-        mirror_files, mirror_problems = file_map(entry.mirror_dir, reject_symlink_ancestors=False)
+        mirror_files, mirror_problems = file_map(entry.mirror_dir)
         if mirror_problems:
             return
         for rel in sorted(set(mirror_files) - set(canonical_files), reverse=True):
