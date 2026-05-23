@@ -618,6 +618,8 @@ def parse_mirror_results(stdout: str) -> tuple[list[dict[str, object]] | None, l
 
 def count_files(root: Path, suffix: str | None = None) -> tuple[int | None, str | None]:
     try:
+        if root.is_symlink():
+            return None, "root is symlink"
         if not root.is_dir():
             return 0, None
         errors: list[str] = []
@@ -838,6 +840,7 @@ def run_self_tests() -> int:
         test_helper_output_is_bounded,
         test_count_files_ignores_placeholder_noise,
         test_count_files_warns_on_walk_errors,
+        test_count_files_warns_on_symlink_root,
         test_automation_locations_report_counts_not_contents,
         test_strict_warn_exit_code,
         test_adapter_home_notation_is_preserved,
@@ -1082,6 +1085,18 @@ def test_count_files_warns_on_walk_errors() -> None:
             os.walk = original_walk  # type: ignore[assignment]
         assert_true(count is None, "walk errors should make counts unknown")
         assert_true(error is not None and "walk error" in error, "walk error should be reported")
+
+
+def test_count_files_warns_on_symlink_root() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        target = Path(tmp) / "target"
+        target.mkdir()
+        (target / "automation.md").write_text("private", encoding="utf-8")
+        link = Path(tmp) / "linked-automations"
+        link.symlink_to(target, target_is_directory=True)
+        count, error = count_files(link)
+        assert_true(count is None, "symlink roots should make counts unknown")
+        assert_true(error == "root is symlink", "symlink root should be reported")
 
 
 def test_automation_locations_report_counts_not_contents() -> None:
