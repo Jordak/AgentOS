@@ -6,7 +6,7 @@ This file is the current public-safe benchmark posture for AgentOS Core. It is a
 
 Raw benchmark reports, generated run JSON, transcripts, local paths, session details, prompts, diagnostics, and private run evidence belong outside Core, usually under `personal/os/verification/<suite>/reports/`.
 
-Use `os/skills/refresh-benchmark-status/SKILL.md` to refresh this snapshot from eligible local evidence. Eligible evidence must come from current-schema benchmark reports produced on clean, fresh `main` at a committed AgentOS revision.
+Use `os/skills/refresh-benchmark-status/SKILL.md` to refresh this snapshot from eligible local evidence. Eligible evidence must come from current-schema benchmark reports produced on clean, remote-fresh `main` at a committed AgentOS revision.
 
 Allowed status labels:
 
@@ -23,28 +23,28 @@ Do not use `stale` as a Core status. Staleness is relative to the current checko
 
 - Status: `not run`
 - Reviewed Core revision: `not reviewed`
-- Last reviewed evidence: `not reviewed`
+- Last reviewed evidence: No eligible evidence reviewed as of `2026-05-22 17:07 PDT`
 - Evidence scope: `none`
-- Summary: No current-schema clean/fresh-main local lexical retrieval evidence has been reviewed for this snapshot.
-- Caveats: Run the current retrieval benchmark on clean, fresh `main` before marking this entry as `passing` or `attention needed`.
+- Summary: No current-schema clean, remote-fresh main local lexical retrieval evidence has been reviewed for this snapshot.
+- Caveats: Run the current retrieval benchmark on clean, remote-fresh `main` before marking this entry as `passing` or `attention needed`.
 
 ### Codex
 
 - Status: `not run`
 - Reviewed Core revision: `not reviewed`
-- Last reviewed evidence: `not reviewed`
+- Last reviewed evidence: No eligible evidence reviewed as of `2026-05-22 17:07 PDT`
 - Evidence scope: `none`
-- Summary: No current-schema clean/fresh-main Codex retrieval harness evidence has been reviewed for this snapshot.
-- Caveats: Run the current retrieval harness benchmark on clean, fresh `main` before marking this entry as `passing` or `attention needed`.
+- Summary: No current-schema clean, remote-fresh main Codex retrieval harness evidence has been reviewed for this snapshot.
+- Caveats: Run the current retrieval harness benchmark on clean, remote-fresh `main` before marking this entry as `passing` or `attention needed`.
 
 ### Claude
 
 - Status: `not run`
 - Reviewed Core revision: `not reviewed`
-- Last reviewed evidence: `not reviewed`
+- Last reviewed evidence: No eligible evidence reviewed as of `2026-05-22 17:07 PDT`
 - Evidence scope: `none`
-- Summary: No current-schema clean/fresh-main Claude retrieval harness evidence has been reviewed for this snapshot.
-- Caveats: Run the current retrieval harness benchmark on clean, fresh `main` before marking this entry as `passing` or `attention needed`.
+- Summary: No current-schema clean, remote-fresh main Claude retrieval harness evidence has been reviewed for this snapshot.
+- Caveats: Run the current retrieval harness benchmark on clean, remote-fresh `main` before marking this entry as `passing` or `attention needed`.
 
 ## Playbook Activation
 
@@ -52,7 +52,7 @@ Do not use `stale` as a Core status. Staleness is relative to the current checko
 
 - Status: `not run`
 - Reviewed Core revision: `not reviewed`
-- Last reviewed evidence: `not reviewed`
+- Last reviewed evidence: No eligible evidence reviewed as of `2026-05-22 17:07 PDT`
 - Evidence scope: `none`
-- Summary: No current-schema clean/fresh-main Codex playbook-activation evidence has been reviewed for this snapshot.
-- Caveats: Run the current playbook-activation benchmark on clean, fresh `main` before marking this entry as `passing` or `attention needed`.
+- Summary: No current-schema clean, remote-fresh main Codex playbook-activation evidence has been reviewed for this snapshot.
+- Caveats: Run the current playbook-activation benchmark on clean, remote-fresh `main` before marking this entry as `passing` or `attention needed`.

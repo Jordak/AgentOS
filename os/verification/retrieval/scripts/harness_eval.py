@@ -25,6 +25,9 @@ DEFAULT_DISALLOWED_EXACT_PATHS = (
     "os/verification/BENCHMARK_STATUS.md",
     "os/verification/retrieval/questions.json",
 )
+TARGETED_DISALLOWED_EXACT_PATH_EXCEPTIONS = (
+    "os/verification/BENCHMARK_STATUS.md",
+)
 DEFAULT_DISALLOWED_PATH_PREFIXES = (
     "os/verification/retrieval/reports/",
     "os/verification/playbook-activation/reports/",
@@ -76,7 +79,7 @@ def load_questions(path: Path, selected_ids: set[str] | None = None) -> list[dic
 
 def disallowed_paths_for_question(question: dict[str, Any]) -> tuple[str, ...]:
     expected_paths = set(question.get("expected_paths", []))
-    allowed_exact_paths = expected_paths & set(DEFAULT_DISALLOWED_EXACT_PATHS)
+    allowed_exact_paths = expected_paths & set(TARGETED_DISALLOWED_EXACT_PATH_EXCEPTIONS)
     return tuple(path for path in DEFAULT_DISALLOWED_PATHS if path not in allowed_exact_paths)
 
 
@@ -918,6 +921,56 @@ def run_self_test(root: Path, questions_path: Path) -> int:
         if not any("file is not readable UTF-8 text" in error for error in binary_core_grade["errors"]["paths"]):
             print("SELF-TEST FAIL: non-UTF-8 evidence path did not report a path error.")
             print(json.dumps(binary_core_grade, indent=2))
+            return 1
+
+        status_path = "os/verification/BENCHMARK_STATUS.md"
+        status_quote = "current public-safe benchmark posture"
+        synthetic_status = synthetic_root / status_path
+        synthetic_status.parent.mkdir(parents=True, exist_ok=True)
+        synthetic_status.write_text(status_quote + "\n", encoding="utf-8")
+        status_question = {**question, "id": "benchmark-status", "expected_paths": [status_path]}
+        status_response = {
+            "answer": "Use the benchmark status snapshot.",
+            "cited_paths": [status_path],
+            "evidence": [
+                {
+                    "path": status_path,
+                    "locator": "self-test",
+                    "quote": status_quote,
+                }
+            ],
+            "confidence": "high",
+            "notes": "Synthetic benchmark-status exception response.",
+        }
+        status_grade = grade_response(synthetic_root, status_question, status_response)
+        if not status_grade["overall_pass"]:
+            print("SELF-TEST FAIL: targeted benchmark status evidence was not allowed.")
+            print(json.dumps(status_grade, indent=2))
+            return 1
+
+        answer_key_path = "os/verification/retrieval/questions.json"
+        answer_key_quote = "answer key"
+        synthetic_answer_key = synthetic_root / answer_key_path
+        synthetic_answer_key.parent.mkdir(parents=True, exist_ok=True)
+        synthetic_answer_key.write_text(answer_key_quote + "\n", encoding="utf-8")
+        answer_key_question = {**question, "expected_paths": [answer_key_path]}
+        answer_key_response = {
+            "answer": "This should not be allowed even when expected.",
+            "cited_paths": [answer_key_path],
+            "evidence": [
+                {
+                    "path": answer_key_path,
+                    "locator": "self-test",
+                    "quote": answer_key_quote,
+                }
+            ],
+            "confidence": "high",
+            "notes": "Synthetic answer-key contamination response.",
+        }
+        answer_key_grade = grade_response(synthetic_root, answer_key_question, answer_key_response)
+        if answer_key_grade["overall_pass"] or answer_key_grade["disallowed_pass"]:
+            print("SELF-TEST FAIL: retrieval answer key was allowed as targeted evidence.")
+            print(json.dumps(answer_key_grade, indent=2))
             return 1
 
     synthetic_result = HarnessResult(

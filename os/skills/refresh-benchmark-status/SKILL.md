@@ -35,17 +35,18 @@ Mutability:
 Tools and connectors:
 
 - Local filesystem reads for Core files and Personal Overlay benchmark reports.
-- Local `git` for branch, commit, upstream, and dirty-state checks.
+- Local `git` for branch, commit, upstream, remote `origin/main`, and dirty-state checks.
 - `os/verification/BENCHMARKS.json` for benchmark suite configuration.
 - `os/playbook/PERSONAL_OVERLAY.md` for resolving local Personal Overlay report locations from a feature worktree.
-- No network or external connectors are needed.
+- No external connectors are needed. Use saved remote-freshness metadata from benchmark reports rather than making network calls unless the user asks to rerun benchmarks.
 
 Safety:
 
 - Do not copy raw benchmark reports, `run.json` bodies, transcripts, stdout, stderr, local paths, prompts, session details, account details, private diagnostics, or private evidence into Core.
-- Do not compare private raw evidence against curated Core prose. Compare only structured provenance fields such as reviewed Core revision and evidence timestamp.
+- Do not compare private raw evidence against curated Core prose. Compare only structured provenance fields such as status-evidence metadata, reviewed Core revision, and evidence timestamp.
 - Do not mutate Core status from missing, stale, incompatible, dirty-worktree, non-main, or non-fresh-main evidence by default.
-- Do not mark a status as `passing` unless eligible evidence was produced from clean, fresh `main` at a committed AgentOS revision.
+- Do not mark a status as `passing` unless eligible evidence was produced from clean, remote-fresh `main` at a committed AgentOS revision.
+- Do not treat local upstream parity alone as proof of fresh `main`; eligible evidence must prove remote `origin/main` freshness or remain ineligible.
 - Ask before applying a caveated update when evidence is technically present but ambiguous.
 
 ## Workflow Phases
@@ -54,15 +55,18 @@ Safety:
    Read `os/verification/BENCHMARKS.json`, `os/verification/BENCHMARK_STATUS.md`, and `os/playbook/PERSONAL_OVERLAY.md`. Resolve report directories relative to the AgentOS root, using the canonical primary checkout's Personal Overlay when running from a feature worktree.
 
 2. Find local evidence.
-   For each benchmark suite, inspect saved `run.json` files under the configured report directory and `run_glob`. Consider only current-schema reports that include Git state metadata.
+   For each benchmark suite, inspect saved `run.json` files under the configured report directory and `run_glob`. Consider only current-schema reports that include status-evidence metadata and Git state metadata.
 
 3. Check evidence eligibility.
-   Evidence is eligible only when its Git metadata shows:
+   Evidence is eligible only when its status-evidence metadata marks it as behavior-bearing evidence for Core status refresh, and its Git metadata shows:
    - branch `main`;
    - upstream `origin/main`;
    - clean worktree;
-   - no ahead/behind drift from upstream at run time;
+   - no ahead/behind drift from the local upstream tracking ref at run time;
+   - remote `origin/main` was checked and matched the reviewed commit at run time;
    - a committed AgentOS revision.
+
+   Treat dry-run plans, saved-response regrades, transcript regrades, missing status-evidence metadata, and reports without remote-freshness proof as ineligible. They may be useful diagnostics, but they are not enough to mark Core status as `passing` or `attention needed`.
 
 4. Compare provenance.
    Compare eligible evidence to the matching status entry by `Reviewed Core revision` and `Last reviewed evidence`, not by prose. A later local run against an older commit does not refresh current Core status.
@@ -79,7 +83,7 @@ Safety:
 
 ## Status Rules
 
-- `passing`: eligible evidence exists from clean, fresh `main`; behavioral checks meet the suite's pass criteria; and no caveat changes the reader's interpretation.
+- `passing`: eligible evidence exists from clean, remote-fresh `main`; behavioral checks meet the suite's pass criteria; and no caveat changes the reader's interpretation.
 - `attention needed`: eligible evidence exists, but behavior failed, degraded, partially passed meaningfully, or has a maintainer-relevant caveat.
 - `not run`: no eligible evidence has been reviewed for the suite/harness entry.
 - `unknown`: evidence exists but cannot be interpreted confidently, such as malformed metadata, unsupported report version, unclear harness availability, or missing Git-state fields.
@@ -107,7 +111,7 @@ Before finishing:
 
 1. Confirm `os/verification/BENCHMARKS.json` and `os/verification/BENCHMARK_STATUS.md` were read.
 2. Confirm local report paths were resolved through the Personal Overlay rule.
-3. Confirm each used report had current-schema Git metadata.
+3. Confirm each used report had current-schema status-evidence and Git metadata.
 4. Confirm no raw report body, run JSON, transcript, stdout, stderr, local path, prompt, session detail, or private diagnostic was copied into Core.
 5. Confirm status labels are limited to `passing`, `attention needed`, `not run`, and `unknown`.
 6. Run `python3 os/verification/scripts/validate_agentos.py` after skill or status-file changes.
