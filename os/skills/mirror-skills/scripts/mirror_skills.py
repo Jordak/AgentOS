@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shutil
 import stat
@@ -48,6 +49,44 @@ def find_agentos_root(start: Path) -> Path:
     raise SystemExit("Could not find AgentOS root containing os/skills/MANIFEST.md")
 
 
+def lexical_absolute(path: Path) -> Path:
+    """Make a path absolute without resolving symbolic links."""
+    expanded = path.expanduser()
+    if not expanded.is_absolute():
+        expanded = Path.cwd() / expanded
+    return Path(os.path.abspath(expanded))
+
+
+def path_component_problems(path: Path, expected_kind: str | None, allow_missing: bool) -> list[str]:
+    absolute = lexical_absolute(path)
+    if not absolute.is_absolute():
+        return [f"{path} (path is not absolute after normalization)"]
+
+    current = Path(absolute.anchor)
+    parts = absolute.parts[1:]
+    for index, part in enumerate(parts):
+        current = current / part
+        is_final = index == len(parts) - 1
+        try:
+            path_stat = current.lstat()
+        except FileNotFoundError:
+            if allow_missing:
+                return []
+            return [f"{current} (path component is missing)"]
+        except OSError as error:
+            return [f"{current} ({error.__class__.__name__}: {error})"]
+
+        if stat.S_ISLNK(path_stat.st_mode):
+            return [f"{current} (symbolic link is not allowed)"]
+        if not is_final and not stat.S_ISDIR(path_stat.st_mode):
+            return [f"{current} (path component is not a directory)"]
+        if is_final and expected_kind == "directory" and not stat.S_ISDIR(path_stat.st_mode):
+            return [f"{current} (not a directory)"]
+        if is_final and expected_kind == "file" and not stat.S_ISREG(path_stat.st_mode):
+            return [f"{current} (not a regular file)"]
+    return []
+
+
 def extract_field(section: str, field_name: str) -> str | None:
     pattern = re.compile(FIELD_RE_TEMPLATE.format(field=re.escape(field_name)), re.MULTILINE)
     match = pattern.search(section)
@@ -89,10 +128,19 @@ def parse_manifest(agentos_root: Path) -> list[SkillEntry]:
     return entries
 
 
-def discover_personal_overlay_entries(agentos_root: Path) -> list[SkillEntry]:
+def discover_personal_overlay_entries(agentos_root: Path) -> tuple[list[SkillEntry], list[str]]:
     personal_skills_root = agentos_root / "personal/os/skills"
-    if not personal_skills_root.exists():
-        return []
+    problems = path_component_problems(personal_skills_root, expected_kind="directory", allow_missing=True)
+    if problems:
+        return [], problems
+    try:
+        personal_stat = personal_skills_root.lstat()
+    except FileNotFoundError:
+        return [], []
+    except OSError as error:
+        return [], [f"{personal_skills_root} ({error.__class__.__name__}: {error})"]
+    if not stat.S_ISDIR(personal_stat.st_mode):
+        return [], [f"{personal_skills_root} (not a directory)"]
 
     entries: list[SkillEntry] = []
     for skill_file in sorted(personal_skills_root.glob("*/SKILL.md")):
@@ -110,7 +158,7 @@ def discover_personal_overlay_entries(agentos_root: Path) -> list[SkillEntry]:
             )
         )
 
-    return entries
+    return entries, []
 
 
 def should_ignore(path: Path) -> bool:
@@ -120,6 +168,9 @@ def should_ignore(path: Path) -> bool:
 def file_map(root: Path) -> tuple[dict[str, Path], list[str]]:
     files: dict[str, Path] = {}
     problems: list[str] = []
+    component_problems = path_component_problems(root, expected_kind=None, allow_missing=True)
+    if component_problems:
+        return files, component_problems
     try:
         root_stat = root.lstat()
     except FileNotFoundError:
@@ -191,6 +242,9 @@ def existing_path_kind_problem(path: Path, expected_kind: str) -> str | None:
 
 
 def mirror_path_kind_problems(mirror_dir: Path, canonical_files: dict[str, Path]) -> list[str]:
+    component_problems = path_component_problems(mirror_dir, expected_kind="directory", allow_missing=True)
+    if component_problems:
+        return component_problems
     try:
         mirror_root_stat = mirror_dir.lstat()
     except FileNotFoundError:
@@ -338,6 +392,9 @@ def sync_entry(entry: SkillEntry, prune_extra: bool) -> None:
     canonical_files, source_problems = file_map(entry.source_root)
     if source_problems:
         return
+    _mirror_files, mirror_problems = file_map(entry.mirror_dir)
+    if mirror_problems:
+        return
     if mirror_path_kind_problems(entry.mirror_dir, canonical_files):
         return
     entry.mirror_dir.mkdir(parents=True, exist_ok=True)
@@ -482,15 +539,33 @@ def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
 
-    agentos_root = args.agentos_root.resolve() if args.agentos_root else find_agentos_root(Path.cwd().resolve())
-    mirror_root = args.mirror_root.expanduser().resolve()
+    agentos_root = lexical_absolute(args.agentos_root) if args.agentos_root else find_agentos_root(lexical_absolute(Path.cwd()))
+    mirror_root = lexical_absolute(args.mirror_root)
+    root_problems = path_component_problems(agentos_root, expected_kind="directory", allow_missing=False)
+    if root_problems:
+        raise SystemExit("Unsafe AgentOS root: " + "; ".join(root_problems))
 
     core_entries = parse_manifest(agentos_root)
     personal_entries: list[SkillEntry] = []
+    preflight_results: list[MirrorResult] = []
     if not args.core_only:
-        personal_entries = discover_personal_overlay_entries(agentos_root)
+        personal_entries, personal_problems = discover_personal_overlay_entries(agentos_root)
+        if personal_problems:
+            preflight_results.append(
+                MirrorResult(
+                    name="personal-overlay",
+                    source_kind="personal-overlay",
+                    status="source-unreadable",
+                    canonical_source="personal/os/skills",
+                    mirror_path=str(mirror_root),
+                    missing_files=[],
+                    changed_files=[],
+                    extra_files=[],
+                    notes=personal_problems,
+                )
+            )
     entries = select_entries(core_entries, personal_entries, args.skill)
-    if not entries:
+    if not entries and not preflight_results:
         raise SystemExit("No mirrorable Core or Personal Overlay skills found.")
 
     entries = [
@@ -505,11 +580,11 @@ def main() -> int:
         for entry in entries
     ]
 
-    if args.sync:
+    if args.sync and not preflight_results:
         for entry in entries:
             sync_entry(entry, prune_extra=args.prune_extra)
 
-    results = [compare_entry(entry) for entry in entries]
+    results = [*preflight_results, *[compare_entry(entry) for entry in entries]]
 
     if args.json:
         print(json.dumps([asdict(result) for result in results], indent=2))
