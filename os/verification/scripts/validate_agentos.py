@@ -13,6 +13,7 @@ import argparse
 import json
 import os
 import re
+import stat
 import subprocess
 import sys
 import tempfile
@@ -137,10 +138,11 @@ class Finding:
 class AgentOSValidator:
     def __init__(self, root: Path) -> None:
         self.root = root.resolve()
-        self.private_marker_patterns = [*PRIVATE_MARKER_PATTERNS, *self.load_private_marker_patterns(self.root)]
         self.errors: list[Finding] = []
         self.warnings: list[Finding] = []
         self.checked: list[str] = []
+        self.private_marker_patterns = [*PRIVATE_MARKER_PATTERNS]
+        self.private_marker_patterns.extend(self.load_private_marker_patterns())
 
     def run(self) -> int:
         self.run_structural_checks()
@@ -259,9 +261,69 @@ class AgentOSValidator:
                 paths.append(Path(raw_path))
         return paths
 
-    def load_private_marker_patterns(self, root: Path) -> list[PrivateMarker]:
-        marker_file = root / "personal/os/verification/privacy-markers.txt"
-        if not marker_file.exists():
+    def no_follow_path_problem(
+        self,
+        path: Path,
+        expected_kind: str | None = None,
+        allow_missing: bool = True,
+    ) -> str | None:
+        try:
+            relative = path.relative_to(self.root)
+        except ValueError:
+            return "path is outside the AgentOS root"
+
+        current = self.root
+        for index, part in enumerate(relative.parts):
+            current = current / part
+            is_final = index == len(relative.parts) - 1
+            try:
+                path_stat = current.lstat()
+            except FileNotFoundError:
+                if allow_missing:
+                    return None
+                return "path component is missing"
+            except OSError as error:
+                return f"{error.__class__.__name__}: {error}"
+
+            if stat.S_ISLNK(path_stat.st_mode):
+                return "symbolic link is not allowed"
+            if not is_final and not current.is_dir():
+                return "path component is not a directory"
+            if is_final and expected_kind == "directory" and not current.is_dir():
+                return "not a directory"
+            if is_final and expected_kind == "file" and not current.is_file():
+                return "not a regular file"
+        return None
+
+    def personal_overlay_root_problem(self, personal: Path) -> str | None:
+        try:
+            personal_stat = personal.lstat()
+        except FileNotFoundError:
+            return "personal overlay skeleton is missing"
+        except OSError as error:
+            return f"{error.__class__.__name__}: {error}"
+        if stat.S_ISLNK(personal_stat.st_mode):
+            return "Personal Overlay path used by validator must not be a symbolic link"
+        if not personal.is_dir():
+            return "personal overlay skeleton is not a directory"
+        return None
+
+    def load_private_marker_patterns(self) -> list[PrivateMarker]:
+        check = "private marker config"
+        marker_file = self.root / "personal/os/verification/privacy-markers.txt"
+        marker_problem = self.no_follow_path_problem(marker_file, expected_kind="file", allow_missing=True)
+        if marker_problem:
+            self.add_error(check, marker_file, marker_problem)
+            return []
+        try:
+            marker_file_stat = marker_file.lstat()
+        except FileNotFoundError:
+            return []
+        except OSError as error:
+            self.add_error(check, marker_file, f"{error.__class__.__name__}: {error}")
+            return []
+        if not stat.S_ISREG(marker_file_stat.st_mode):
+            self.add_error(check, marker_file, "not a regular file")
             return []
         patterns: list[PrivateMarker] = []
         marker_index = 0
@@ -493,8 +555,9 @@ class AgentOSValidator:
     def check_private_overlay_files_are_ignored(self) -> None:
         check = "private overlay ignore coverage"
         personal = self.root / "personal"
-        if not personal.exists():
-            self.add_error(check, personal, "personal overlay skeleton is missing")
+        personal_problem = self.personal_overlay_root_problem(personal)
+        if personal_problem:
+            self.add_error(check, personal, personal_problem)
             self.checked.append(check)
             return
 
@@ -578,12 +641,17 @@ class AgentOSValidator:
     def check_personal_overlay_tracking(self, allow_private_files: bool) -> None:
         check = "personal overlay skeleton"
         personal = self.root / "personal"
-        if not personal.exists():
-            self.add_error(check, personal, "personal overlay skeleton is missing")
+        personal_problem = self.personal_overlay_root_problem(personal)
+        if personal_problem:
+            self.add_error(check, personal, personal_problem)
             self.checked.append(check)
             return
         for rel_text in sorted(PERSONAL_OVERLAY_SKELETON_FILES):
             skeleton_path = self.root / rel_text
+            skeleton_problem = self.no_follow_path_problem(skeleton_path)
+            if skeleton_problem:
+                self.add_error(check, rel_text, skeleton_problem)
+                continue
             if not skeleton_path.exists():
                 self.add_error(check, rel_text, "required Personal Overlay skeleton .gitkeep is missing")
                 continue
@@ -1629,6 +1697,34 @@ def run_self_test() -> int:
             and "required Personal Overlay skeleton .gitkeep is missing" in error.message
             for error in validator.errors
         )
+        marker_symlink_root = root / "_marker_symlink_fixture"
+        marker_symlink_file = marker_symlink_root / "personal/os/verification/privacy-markers.txt"
+        marker_symlink_file.parent.mkdir(parents=True)
+        marker_target = marker_symlink_root / "marker-target.txt"
+        marker_target.write_text("symlink-only-marker\n", encoding="utf-8")
+        marker_symlink_file.symlink_to("../../../marker-target.txt")
+        marker_config_validator = AgentOSValidator(marker_symlink_root)
+        marker_symlink_rejected = any(
+            error.check == "private marker config"
+            and error.path == "personal/os/verification/privacy-markers.txt"
+            and "symbolic link is not allowed" in error.message
+            for error in marker_config_validator.errors
+        )
+        marker_symlink_not_loaded = not any(
+            marker.label.startswith("configured private marker")
+            for marker in marker_config_validator.private_marker_patterns
+        )
+        personal_symlink_root = root / "_personal_symlink_fixture"
+        (personal_symlink_root / "real-personal").mkdir(parents=True)
+        (personal_symlink_root / "personal").symlink_to("real-personal")
+        personal_root_validator = AgentOSValidator(personal_symlink_root)
+        personal_root_validator.check_private_overlay_files_are_ignored()
+        personal_symlink_rejected = any(
+            error.check == "private overlay ignore coverage"
+            and error.path == "personal"
+            and "must not be a symbolic link" in error.message
+            for error in personal_root_validator.errors
+        )
         non_os_symlink_rejected = any(
             error.path == "docs/linked.raw"
             and "AgentOS-managed paths outside personal/ must not contain symbolic links" in error.message
@@ -1744,6 +1840,9 @@ def run_self_test() -> int:
             and configured_marker_redacted
             and built_in_marker_redacted
             and missing_skeleton_rejected
+            and marker_symlink_rejected
+            and marker_symlink_not_loaded
+            and personal_symlink_rejected
             and non_os_symlink_rejected
             and symlink_rejected_cleanly
             and managed_symlink_rejected
@@ -1762,6 +1861,10 @@ def run_self_test() -> int:
             for error in symlink_validator.errors:
                 print(f"EXPECTED {error.format()}")
             for error in broad_gitkeep_validator.errors:
+                print(f"EXPECTED {error.format()}")
+            for error in marker_config_validator.errors:
+                print(f"EXPECTED {error.format()}")
+            for error in personal_root_validator.errors:
                 print(f"EXPECTED {error.format()}")
             return 0
 
