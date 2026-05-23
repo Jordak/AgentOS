@@ -67,6 +67,16 @@
     ]
   },
   {
+    "id": "personal-overlay-false-empty",
+    "category": "personal-overlay",
+    "question": "If an ignore-aware search of personal/os/ returns only .gitkeep skeleton files, can an agent conclude that no matching Personal Overlay files exist?",
+    "expected_paths": [
+      "os/playbook/PERSONAL_OVERLAY.md",
+      "os/RESOLVER.md",
+      "docs/adr/0003-personal-overlay-discovery.md"
+    ]
+  },
+  {
     "id": "mapped-projects",
     "category": "mapped-projects",
     "question": "Where should an agent find the source map for project and artifact routing?",

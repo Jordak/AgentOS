@@ -25,7 +25,7 @@ Lookup order:
 7. Connected account data only when the request requires it and the relevant connection rules allow the read.
 8. External web or API sources only when local and mapped sources are insufficient, when the fact may have changed, or when a current-docs rule requires a current primary or official source.
 
-Use local search before manual wandering. Prefer `rg` for text and `rg --files` for paths.
+Use local search before manual wandering. Prefer `rg` for text and `rg --files` for paths, except when proving whether Personal Overlay files exist. For Personal Overlay absence checks, follow `os/playbook/PERSONAL_OVERLAY.md`: use direct filesystem discovery of the canonical Personal Overlay root and do not treat ignore-aware or git-aware indexes as absence evidence.
 
 ## Source Authority
 

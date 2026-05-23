@@ -1036,6 +1036,7 @@ def global_instructions_body(agentos_home: Path) -> str:
     agentos_home_text = prompt_path(agentos_home)
     agents_path_text = prompt_path(agentos_home / "AGENTS.md")
     index_path_text = prompt_path(agentos_home / "os" / "INDEX.md")
+    personal_overlay_path_text = prompt_path(agentos_home / "os" / "playbook" / "PERSONAL_OVERLAY.md")
     return f"""# Global Agent Instructions
 
 AgentOS is installed at:
@@ -1050,8 +1051,11 @@ Start with:
 
 1. `{agents_path_text}`
 2. `{index_path_text}`
+3. `{personal_overlay_path_text}`
 
 If that workspace is unavailable, continue with the current project's local instructions and say that AgentOS context could not be loaded.
+
+When looking for private Personal Overlay files under `personal/os/`, follow the Personal Overlay discovery rule before concluding that ignored private files are absent.
 
 Before answering questions about fast-moving tools, including Codex, ChatGPT, OpenAI APIs, Cursor, Claude Code, OpenClaw, GitHub Copilot, MCP, or similar agent tooling, check current official docs or primary sources.
 
