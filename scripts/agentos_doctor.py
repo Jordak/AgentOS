@@ -52,6 +52,8 @@ MIRROR_ALLOWED_STATUSES = {
     "mirror-unreadable",
 }
 MIRROR_ALLOWED_SOURCE_KINDS = {"core", "personal-overlay"}
+IGNORED_COUNT_FILE_NAMES = {".DS_Store", ".gitkeep"}
+IGNORED_COUNT_DIR_NAMES = {"__pycache__"}
 
 
 @dataclass
@@ -187,7 +189,7 @@ def run_doctor(
     results = [
         discovery,
         check_required_core_files(agentos_home),
-        check_adapters(primary_agentos_home, env, adapter_args, verbose),
+        check_adapters(agentos_home, env, adapter_args, verbose),
         check_skill_mirrors(agentos_home, mirror_root, env, verbose),
         check_personal_overlay_starters(agentos_home, primary_agentos_home),
         check_automation_locations(primary_agentos_home, process_home, env),
@@ -618,15 +620,32 @@ def count_files(root: Path, suffix: str | None = None) -> tuple[int | None, str 
     try:
         if not root.is_dir():
             return 0, None
+        errors: list[str] = []
+
+        def collect_error(error: OSError) -> None:
+            errors.append(error.__class__.__name__)
+
         count = 0
-        for current_root, dirs, files in os.walk(root, followlinks=False):
-            dirs[:] = [name for name in dirs if not (Path(current_root) / name).is_symlink()]
+        for current_root, dirs, files in os.walk(root, followlinks=False, onerror=collect_error):
+            dirs[:] = [
+                name
+                for name in dirs
+                if name not in IGNORED_COUNT_DIR_NAMES and not (Path(current_root) / name).is_symlink()
+            ]
             for name in files:
-                if suffix is None or name.endswith(suffix):
+                if should_count_file(name, suffix):
                     count += 1
+        if errors:
+            return None, "walk error: " + ", ".join(sorted(set(errors)))
         return count, None
     except OSError as exc:
         return None, exc.__class__.__name__
+
+
+def should_count_file(name: str, suffix: str | None) -> bool:
+    if name in IGNORED_COUNT_FILE_NAMES or name.endswith(".pyc"):
+        return False
+    return suffix is None or name.endswith(suffix)
 
 
 def count_or_unknown(count: int | None, error: str | None) -> str:
@@ -809,6 +828,7 @@ def run_self_tests() -> int:
         test_required_core_files_pass,
         test_personal_overlay_does_not_print_private_contents,
         test_adapter_check_is_read_only_check_only,
+        test_adapter_check_uses_audit_root_when_primary_differs,
         test_adapter_helper_failure_warns,
         test_mirror_audit_never_syncs,
         test_mirror_malformed_json_warns,
@@ -816,6 +836,8 @@ def run_self_tests() -> int:
         test_mirror_unknown_source_kind_warns_without_echo,
         test_mirror_output_does_not_print_private_metadata,
         test_helper_output_is_bounded,
+        test_count_files_ignores_placeholder_noise,
+        test_count_files_warns_on_walk_errors,
         test_automation_locations_report_counts_not_contents,
         test_strict_warn_exit_code,
         test_adapter_home_notation_is_preserved,
@@ -886,6 +908,35 @@ def test_adapter_check_is_read_only_check_only() -> None:
         assert_true(result.status == "PASS", "default fake adapter check should pass")
         assert_true("--check" in joined, "adapter command must use --check")
         assert_true("--no-dry-run" not in joined, "doctor must not request adapter writes")
+
+
+def test_adapter_check_uses_audit_root_when_primary_differs() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        audit_root = Path(tmp) / "audit-AgentOS"
+        primary_root = Path(tmp) / "primary-AgentOS"
+        make_fake_agentos(audit_root)
+        make_fake_agentos(primary_root)
+        (audit_root / "scripts" / "install_global_agent_instructions.py").write_text(
+            "print('AUDIT_HELPER')\n",
+            encoding="utf-8",
+        )
+        (primary_root / "scripts" / "install_global_agent_instructions.py").write_text(
+            "print('PRIMARY_HELPER')\n",
+            encoding="utf-8",
+        )
+        report = run_doctor(
+            requested_agentos_home=audit_root,
+            requested_primary_agentos_home=primary_root,
+            mirror_root=Path(tmp) / "mirrors",
+            cwd=audit_root,
+            process_home=Path(tmp) / "home",
+            env=minimal_env(Path(tmp) / "home"),
+            adapter_args=[],
+            verbose=True,
+        )
+        rendered = render_report_for_test(report, verbose=True)
+        assert_true("AUDIT_HELPER" in rendered, "adapter check should use the audited AgentOS root")
+        assert_true("PRIMARY_HELPER" not in rendered, "adapter check should not use the primary overlay root")
 
 
 def test_adapter_helper_failure_warns() -> None:
@@ -998,6 +1049,39 @@ def test_helper_output_is_bounded() -> None:
     rendered = "\n".join(lines)
     assert_true(len(lines) == OUTPUT_LINE_LIMIT + 1, "line count should be capped with an omission note")
     assert_true("char(s) omitted" in rendered, "long line should be capped")
+
+
+def test_count_files_ignores_placeholder_noise() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        make_fake_agentos(root)
+        personal_root = root / "personal" / "os" / "automations"
+        (personal_root / "AUTOMATIONS.md").unlink()
+        (personal_root / ".gitkeep").write_text("", encoding="utf-8")
+        (personal_root / ".DS_Store").write_text("noise", encoding="utf-8")
+        count, error = count_files(personal_root)
+        assert_true(error is None, "placeholder-only directory should be readable")
+        assert_true(count == 0, "placeholder/noise files should not count as automation files")
+
+
+def test_count_files_warns_on_walk_errors() -> None:
+    original_walk = os.walk
+
+    def fake_walk(root: Path, topdown: bool = True, onerror=None, followlinks: bool = False):
+        yield os.fspath(root), ["blocked"], ["visible.md"]
+        if onerror is not None:
+            onerror(OSError("blocked"))
+
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "automations"
+        root.mkdir()
+        try:
+            os.walk = fake_walk  # type: ignore[assignment]
+            count, error = count_files(root)
+        finally:
+            os.walk = original_walk  # type: ignore[assignment]
+        assert_true(count is None, "walk errors should make counts unknown")
+        assert_true(error is not None and "walk error" in error, "walk error should be reported")
 
 
 def test_automation_locations_report_counts_not_contents() -> None:
