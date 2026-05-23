@@ -135,14 +135,47 @@ class Finding:
         return f"[{self.check}] {self.path}: {self.message}"
 
 
+def lexical_absolute(path: Path) -> Path:
+    """Make a path absolute without resolving symbolic links."""
+    expanded = path.expanduser()
+    if not expanded.is_absolute():
+        expanded = Path.cwd() / expanded
+    return Path(os.path.abspath(expanded))
+
+
+def final_path_problem(
+    path: Path,
+    expected_kind: str | None = None,
+    allow_missing: bool = True,
+) -> str | None:
+    absolute = lexical_absolute(path)
+    try:
+        path_stat = absolute.lstat()
+    except FileNotFoundError:
+        if allow_missing:
+            return None
+        return "path is missing"
+    except OSError as error:
+        return f"{error.__class__.__name__}: {error}"
+
+    if stat.S_ISLNK(path_stat.st_mode):
+        return "symbolic link is not allowed"
+    if expected_kind == "directory" and not stat.S_ISDIR(path_stat.st_mode):
+        return "not a directory"
+    if expected_kind == "file" and not stat.S_ISREG(path_stat.st_mode):
+        return "not a regular file"
+    return None
+
+
 class AgentOSValidator:
     def __init__(self, root: Path) -> None:
-        self.root = root.resolve()
+        self.root = lexical_absolute(root)
         self.errors: list[Finding] = []
         self.warnings: list[Finding] = []
         self.checked: list[str] = []
         self.private_marker_patterns = [*PRIVATE_MARKER_PATTERNS]
-        self.private_marker_patterns.extend(self.load_private_marker_patterns())
+        if not self.root_path_problem():
+            self.private_marker_patterns.extend(self.load_private_marker_patterns())
 
     def run(self) -> int:
         self.run_structural_checks()
@@ -183,7 +216,17 @@ class AgentOSValidator:
         self.checked.append("publication precheck")
 
     def run_public_export_validation(self, export_root: Path) -> int:
-        self.root = export_root.resolve()
+        self.run_public_export_validation_checks(export_root)
+        return self.report()
+
+    def run_public_export_validation_checks(self, export_root: Path) -> None:
+        self.root = lexical_absolute(export_root)
+        root_problem = self.root_path_problem()
+        if root_problem:
+            self.add_error("public export allowlist", self.root, f"public export root is unsafe: {root_problem}")
+            self.checked.append("public export allowlist")
+            self.checked.append("public export validation")
+            return
         self.check_no_git_directory()
         self.check_public_export_allowlist()
         self.check_personal_overlay_ignore_file_rules()
@@ -192,7 +235,6 @@ class AgentOSValidator:
         self.check_secret_like_tokens()
         self.check_no_private_generated_outputs()
         self.checked.append("public export validation")
-        return self.report()
 
     def add_error(self, check: str, path: Path | str, message: str) -> None:
         self.errors.append(Finding(check, self.display_path(path), self.redact_private_markers(message)))
@@ -202,6 +244,9 @@ class AgentOSValidator:
 
     def has_errors_for(self, check: str) -> bool:
         return any(error.check == check for error in self.errors)
+
+    def root_path_problem(self) -> str | None:
+        return final_path_problem(self.root, expected_kind="directory", allow_missing=False)
 
     def display_path(self, path: Path | str) -> str:
         if isinstance(path, Path):
@@ -423,6 +468,12 @@ class AgentOSValidator:
     def check_managed_symlinks(self) -> None:
         check = "managed symlink policy"
         if check in self.checked:
+            return
+
+        root_problem = self.root_path_problem()
+        if root_problem:
+            self.add_error(check, self.root, f"AgentOS validation root is unsafe: {root_problem}")
+            self.checked.append(check)
             return
 
         os_dir = self.root / "os"
@@ -1829,6 +1880,29 @@ def run_self_test() -> int:
             error.check != "managed symlink policy"
             for error in managed_os_symlink_validator.errors
         )
+        symlinked_validation_root_target = root / "_symlinked_validation_root_target"
+        (symlinked_validation_root_target / "os").mkdir(parents=True)
+        (symlinked_validation_root_target / "personal").mkdir()
+        symlinked_validation_root = root / "_symlinked_validation_root"
+        symlinked_validation_root.symlink_to(symlinked_validation_root_target, target_is_directory=True)
+        symlinked_root_validator = AgentOSValidator(symlinked_validation_root)
+        symlinked_root_validator.run_structural_checks()
+        symlinked_root_rejected = any(
+            error.check == "managed symlink policy"
+            and error.path == "."
+            and "AgentOS validation root is unsafe" in error.message
+            and "symbolic link is not allowed" in error.message
+            for error in symlinked_root_validator.errors
+        )
+        public_export_root_validator = AgentOSValidator(root)
+        public_export_root_validator.run_public_export_validation_checks(symlinked_validation_root)
+        public_export_root_rejected = any(
+            error.check == "public export allowlist"
+            and error.path == "."
+            and "public export root is unsafe" in error.message
+            and "symbolic link is not allowed" in error.message
+            for error in public_export_root_validator.errors
+        )
         non_os_symlink_rejected = any(
             error.path == "docs/linked.raw"
             and "AgentOS-managed paths outside personal/ must not contain symbolic links" in error.message
@@ -1954,6 +2028,8 @@ def run_self_test() -> int:
             and personal_symlink_rejected
             and nested_personal_symlink_rejected
             and managed_os_symlink_stops_reads
+            and symlinked_root_rejected
+            and public_export_root_rejected
             and non_os_symlink_rejected
             and symlink_rejected_cleanly
             and managed_symlink_rejected
@@ -1984,6 +2060,10 @@ def run_self_test() -> int:
             for error in nested_personal_validator.errors:
                 print(f"EXPECTED {error.format()}")
             for error in managed_os_symlink_validator.errors:
+                print(f"EXPECTED {error.format()}")
+            for error in symlinked_root_validator.errors:
+                print(f"EXPECTED {error.format()}")
+            for error in public_export_root_validator.errors:
                 print(f"EXPECTED {error.format()}")
             return 0
 
@@ -2030,7 +2110,7 @@ def main(argv: list[str] | None = None) -> int:
 
     validator = AgentOSValidator(args.root)
     if args.public_export:
-        export_root = args.public_export.resolve()
+        export_root = lexical_absolute(args.public_export)
         if not (export_root / "os").exists():
             print(f"AgentOS validation failed: export root does not contain os/: {export_root}", file=sys.stderr)
             return 2
