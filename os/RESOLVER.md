@@ -59,6 +59,7 @@ Use the narrowest route that can answer the task.
 - Private run reports and benchmark results: `personal/os/verification/`.
 - Cross-cutting operating policy, artifact policy, portability, publication, or programming preferences: `os/playbook/`.
 - Feature-sized implementation requests: check `os/playbook/IMPLEMENT_FEATURES.md` and use `os/skills/check-implementation-readiness/SKILL.md` before coding unless the work is clearly gate-exempt.
+- GitHub issue drafting, pull request drafting/creation, branch handoffs, merge/landing notes, issue closure comments, or GitHub CLI authentication during those operations: `os/playbook/GITHUB_WORKFLOW.md`, even when the request is a follow-up to another skill's report or recommendation.
 - Live schedules, recurring jobs, or automation prompts: `personal/os/automations/`, using Core templates under `os/automations/`.
 - Live automation histories, queues, delivery records, and generated outputs: `personal/os/automations/` or the relevant Personal Overlay agent/memory directory.
 - Public repository publication, fresh-history export, privacy validation, or deletion/replacement of an old private GitHub repository: `os/playbook/PUBLICATION.md`.

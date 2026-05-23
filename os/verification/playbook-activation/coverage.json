@@ -22,10 +22,11 @@
   {
     "id": "github-workflow",
     "source_path": "os/playbook/AGENTOS_PLAYBOOK.md",
-    "trigger": "Use GITHUB_WORKFLOW.md for GitHub issue drafting, PR descriptions, branch handoffs, merge expectations, workflow labels, and issue closure.",
+    "trigger": "Use GITHUB_WORKFLOW.md for GitHub issue drafting, PR drafting/creation, PR descriptions, branch handoffs, merge expectations, workflow labels, and issue closure, including follow-ups from another skill's report.",
     "guidance_path": "os/playbook/GITHUB_WORKFLOW.md",
     "fixture_ids": [
-      "github-branch-handoff"
+      "github-branch-handoff",
+      "github-pr-from-skill-report"
     ],
     "status": "covered"
   },
