@@ -57,6 +57,8 @@ Safety:
 2. Find local evidence.
    For each benchmark suite, inspect saved `run.json` files under the configured report directory and `run_glob`. Consider only current-schema reports that include Git state metadata.
 
+   If eligible evidence is missing and the user asks to rerun benchmarks, run them from a clean `main` checkout with `--check-remote-main` and `--save-report`. Ordinary local, dry-run, transcript, or diagnostic reports may avoid remote network checks; those reports remain ineligible when remote freshness is unknown.
+
 3. Check evidence eligibility.
    Evidence is eligible only when the report mode and suite section represent behavior-bearing benchmark evidence for the target status entry, and its Git metadata shows:
    - branch `main`;

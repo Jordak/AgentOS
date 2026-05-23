@@ -50,6 +50,7 @@ Local lexical benchmark:
 - Compares whole-file keyword search with a lightweight Markdown section index.
 - Run by default, or alone with `python3 os/verification/retrieval/scripts/benchmark_retrieval.py --suite local`.
 - Offline and deterministic.
+- Report metadata records local Git state by default. Add `--check-remote-main` only when producing saved evidence intended to prove fresh `origin/main` eligibility for Core benchmark status.
 
 Harness answer evals:
 
@@ -78,6 +79,8 @@ Save the full safe report. This creates a timestamped directory containing `repo
 ```bash
 python3 os/verification/retrieval/scripts/benchmark_retrieval.py --save-report
 ```
+
+When producing evidence for `os/verification/BENCHMARK_STATUS.md`, run from a clean `main` checkout and add `--check-remote-main` so the saved report proves whether the reviewed commit matched live `origin/main` at run time.
 
 Run only the local lexical benchmark:
 
