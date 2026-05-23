@@ -308,6 +308,25 @@ class AgentOSValidator:
             return "personal overlay skeleton is not a directory"
         return None
 
+    def iter_personal_overlay_files(self, personal: Path, check: str) -> list[Path]:
+        files: list[Path] = []
+        for path in sorted(personal.rglob("*")):
+            try:
+                path_stat = path.lstat()
+            except OSError as error:
+                self.add_error(check, path, f"{error.__class__.__name__}: {error}")
+                continue
+            if stat.S_ISLNK(path_stat.st_mode):
+                self.add_error(
+                    check,
+                    path,
+                    "Personal Overlay path used by validator must not be a symbolic link",
+                )
+                continue
+            if stat.S_ISREG(path_stat.st_mode):
+                files.append(path)
+        return files
+
     def load_private_marker_patterns(self) -> list[PrivateMarker]:
         check = "private marker config"
         marker_file = self.root / "personal/os/verification/privacy-markers.txt"
@@ -562,7 +581,7 @@ class AgentOSValidator:
             return
 
         checked_private_files = 0
-        for path in sorted(p for p in personal.rglob("*") if self.is_file_or_symlink(p)):
+        for path in self.iter_personal_overlay_files(personal, check):
             rel_path = path.relative_to(self.root)
             if path.name == ".gitkeep" and is_personal_overlay_skeleton_path(rel_path):
                 continue
@@ -662,7 +681,7 @@ class AgentOSValidator:
                 tracked = self.run_git(["ls-files", "--error-unmatch", "--", rel_text])
                 if tracked.returncode != 0:
                     self.add_error(check, rel_text, "Personal Overlay skeleton .gitkeep must be tracked by git")
-        for path in sorted(p for p in personal.rglob("*") if self.is_file_or_symlink(p)):
+        for path in self.iter_personal_overlay_files(personal, check):
             rel_text = path.relative_to(self.root).as_posix()
             if path.name == ".gitkeep":
                 rel_path = path.relative_to(self.root)
@@ -1632,7 +1651,7 @@ def run_self_test() -> int:
         )
 
         symlink_diagnostic_safe = any(
-            error.path == "personal/bad.md" and "public export may contain only .gitkeep" in error.message
+            error.path == "personal/bad.md" and "must not be a symbolic link" in error.message
             for error in validator.errors
         ) and not any(
             "personal/private-project/secret.md" in error.path
@@ -1724,6 +1743,22 @@ def run_self_test() -> int:
             and error.path == "personal"
             and "must not be a symbolic link" in error.message
             for error in personal_root_validator.errors
+        )
+        nested_personal_symlink_root = root / "_personal_nested_symlink_fixture"
+        (nested_personal_symlink_root / "personal/os/skills").mkdir(parents=True)
+        (nested_personal_symlink_root / "outside").mkdir()
+        (nested_personal_symlink_root / "personal/os/skills/linkdir").symlink_to("../../../outside")
+        nested_personal_validator = AgentOSValidator(nested_personal_symlink_root)
+        nested_personal_validator.check_private_overlay_files_are_ignored()
+        nested_personal_validator.check_personal_overlay_tracking(allow_private_files=True)
+        nested_personal_symlink_rejected = all(
+            any(
+                error.check == check
+                and error.path == "personal/os/skills/linkdir"
+                and "must not be a symbolic link" in error.message
+                for error in nested_personal_validator.errors
+            )
+            for check in ["private overlay ignore coverage", "personal overlay skeleton"]
         )
         non_os_symlink_rejected = any(
             error.path == "docs/linked.raw"
@@ -1843,6 +1878,7 @@ def run_self_test() -> int:
             and marker_symlink_rejected
             and marker_symlink_not_loaded
             and personal_symlink_rejected
+            and nested_personal_symlink_rejected
             and non_os_symlink_rejected
             and symlink_rejected_cleanly
             and managed_symlink_rejected
@@ -1865,6 +1901,8 @@ def run_self_test() -> int:
             for error in marker_config_validator.errors:
                 print(f"EXPECTED {error.format()}")
             for error in personal_root_validator.errors:
+                print(f"EXPECTED {error.format()}")
+            for error in nested_personal_validator.errors:
                 print(f"EXPECTED {error.format()}")
             return 0
 
