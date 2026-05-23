@@ -862,10 +862,16 @@ def check_automations(
     registry_mentions_checks = text_mentions_agentos_checks(personal_registry_text)
     registry_active_checks = personal_registry_active_agentos_check_evidence(personal_registry_text)
     registry_negative_checks = personal_registry_negative_agentos_check_evidence(personal_registry_text)
+    registry_possible_checks = personal_registry_possible_agentos_check_evidence(personal_registry_text)
     codex_active_checks, codex_negative_checks, codex_possible_checks = codex_automation_evidence(codex_automations)
     negative_check_evidence = registry_negative_checks or codex_negative_checks
+    ambiguous_check_evidence = registry_possible_checks or codex_possible_checks
     possible_check_evidence = registry_mentions_checks or negative_check_evidence or codex_possible_checks
-    recurring_check_evidence = (registry_active_checks or codex_active_checks) and not negative_check_evidence
+    recurring_check_evidence = (
+        (registry_active_checks or codex_active_checks)
+        and not negative_check_evidence
+        and not ambiguous_check_evidence
+    )
 
     details = [
         "Core automation registry: " + ("present" if core_registry.is_file() else "missing"),
@@ -875,6 +881,7 @@ def check_automations(
         "Personal automation mention: " + ("found" if registry_mentions_checks else "not found"),
         "Personal active AgentOS check evidence: " + ("found" if registry_active_checks else "not found"),
         "Personal negative AgentOS check evidence: " + ("found" if registry_negative_checks else "not found"),
+        "Personal possible AgentOS check evidence: " + ("found" if registry_possible_checks else "not found"),
         "Codex active AgentOS check evidence: " + ("found" if codex_active_checks else "not found"),
         "Codex negative AgentOS check evidence: " + ("found" if codex_negative_checks else "not found"),
         "Possible AgentOS check mention: " + ("found" if possible_check_evidence else "not found"),
@@ -907,11 +914,11 @@ def check_automations(
                 "If those files are live automations, record the registry in personal/os/automations/AUTOMATIONS.md.",
             ),
         )
-    if negative_check_evidence and (registry_active_checks or codex_active_checks):
+    if (negative_check_evidence or ambiguous_check_evidence) and (registry_active_checks or codex_active_checks):
         return CheckResult(
             "automations",
             "WARN",
-            "Conflicting AgentOS automation evidence was found.",
+            "Conflicting or ambiguous AgentOS automation evidence was found.",
             details=details,
             recommendations=private_state_recommendations(
                 private_root_is_canonical,
@@ -1049,6 +1056,43 @@ def personal_registry_negative_agentos_check_evidence(text: str) -> bool:
     return False
 
 
+def personal_registry_possible_agentos_check_evidence(text: str) -> bool:
+    active_section = markdown_section(text, "Active Automations")
+    if not active_section:
+        return False
+    for heading, body in markdown_subsections(active_section):
+        entry_marker = "\n".join(
+            value
+            for value in (heading.strip(), markdown_field_value(body, "Automation id"))
+            if value
+        )
+        entry_text = heading + "\n" + body
+        marker_mentions_checks = text_mentions_agentos_checks(entry_marker)
+        entry_mentions_checks = text_mentions_agentos_checks(entry_text)
+        if not entry_mentions_checks:
+            continue
+        if not marker_mentions_checks:
+            if not text_has_negative_automation_prose(entry_text):
+                return True
+            continue
+        status = markdown_field_value(body, "Status")
+        schedule = markdown_field_value(body, "Schedule rule")
+        review_mode = markdown_field_value(body, "Review mode")
+        if text_has_negative_automation_marker(entry_marker):
+            continue
+        if automation_status_is_negative(status):
+            continue
+        if automation_schedule_is_negative_or_nonrecurring(schedule):
+            continue
+        if text_has_negative_automation_marker(review_mode):
+            continue
+        if text_has_negative_automation_prose(entry_text):
+            continue
+        if not (automation_status_is_active(status) and automation_schedule_is_recurring(schedule)):
+            return True
+    return False
+
+
 def markdown_section(text: str, heading: str) -> str:
     match = re.search(rf"(?im)^##\s+{re.escape(heading)}\s*$", text)
     if not match:
@@ -1137,7 +1181,10 @@ def codex_automation_evidence(root: Path) -> tuple[bool, bool, bool]:
                 and codex_automation_toml_has_active_agentos_marker(text)
             ):
                 active = True
-            elif text_has_negative_automation_prose(text) or (
+            elif (
+                text_has_negative_automation_prose(text)
+                or codex_automation_toml_has_negative_status(text)
+            ) or (
                 codex_automation_toml_has_agentos_marker(text)
                 and codex_automation_toml_has_active_status(text)
             ):
@@ -1163,6 +1210,10 @@ def codex_automation_toml_is_active_scheduled(text: str) -> bool:
 
 def codex_automation_toml_has_active_status(text: str) -> bool:
     return bool(re.search(r"(?im)^\s*status\s*=\s*[\"']ACTIVE[\"']\s*$", text))
+
+
+def codex_automation_toml_has_negative_status(text: str) -> bool:
+    return any(automation_status_is_negative(value) for value in simple_config_field_values(text, ("status",)))
 
 
 def codex_automation_toml_has_agentos_marker(text: str) -> bool:
@@ -1416,11 +1467,14 @@ def run_self_tests() -> int:
         test_personal_one_off_schedule_warns,
         test_personal_bounded_rrule_warns,
         test_personal_prompt_only_agentos_mention_warns,
+        test_personal_prompt_only_agentos_mention_conflicts_with_codex_active_warns,
         test_personal_disabled_registry_conflicts_with_codex_active_warns,
         test_personal_lifecycle_body_only_mentions_conflict_with_codex_active_warns,
         test_personal_prompt_only_negative_conflicts_with_codex_active_warns,
         test_active_personal_conflicts_with_negative_codex_warns,
         test_active_personal_conflicts_with_generic_negative_codex_warns,
+        test_active_personal_conflicts_with_generic_codex_prompt_only_warns,
+        test_active_personal_conflicts_with_negative_codex_status_warns,
         test_active_personal_conflicts_with_bounded_codex_warns,
         test_unrelated_codex_automation_does_not_pass,
         test_disabled_codex_agentos_automation_does_not_pass,
@@ -2135,6 +2189,48 @@ Run AgentOS Doctor.
         assert_true("Personal active AgentOS check evidence: not found" in joined, "prompt-only mention should not be active evidence")
 
 
+def test_personal_prompt_only_agentos_mention_conflicts_with_codex_active_warns() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        home = Path(tmp) / "home"
+        make_fake_agentos(root)
+        registry = root / "personal" / "os" / "automations" / "AUTOMATIONS.md"
+        registry.write_text(
+            """# Automations
+
+## Active Automations
+
+### Weekly Repository Check
+
+Automation id: weekly-repository-check
+
+Status: Active
+
+Schedule rule: RRULE:FREQ=WEEKLY
+
+Invocation prompt:
+
+```text
+Run AgentOS Doctor.
+```
+""",
+            encoding="utf-8",
+        )
+        codex_automation = home / ".codex" / "automations" / "agentos-doctor" / "automation.toml"
+        codex_automation.parent.mkdir(parents=True)
+        codex_automation.write_text(
+            'name = "AgentOS doctor health check"\n'
+            'status = "ACTIVE"\n'
+            'rrule = "RRULE:FREQ=WEEKLY"\n',
+            encoding="utf-8",
+        )
+        result = check_automations(root, root, home, verbose=False)
+        joined = "\n".join(result.details)
+        assert_true(result.status == "WARN", "prompt-only Personal Overlay mention should conflict with active Codex evidence")
+        assert_true("Personal possible AgentOS check evidence: found" in joined, "prompt-only mention should be explicit possible evidence")
+        assert_true("Recurring AgentOS check evidence: not found" in joined, "prompt-only ambiguity should not pass as recurring")
+
+
 def test_personal_disabled_registry_conflicts_with_codex_active_warns() -> None:
     with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
         root = Path(tmp) / "AgentOS"
@@ -2167,7 +2263,7 @@ Schedule rule: RRULE:FREQ=WEEKLY
         result = check_automations(root, root, home, verbose=False)
         joined = "\n".join(result.details)
         assert_true(result.status == "WARN", "disabled Personal Overlay registry should conflict with active Codex evidence")
-        assert_true("Conflicting AgentOS automation evidence" in result.summary, "conflict warning should be explicit")
+        assert_true("Conflicting or ambiguous AgentOS automation evidence" in result.summary, "conflict warning should be explicit")
         assert_true("Codex active AgentOS check evidence: found" in joined, "codex active evidence should remain visible")
         assert_true("Recurring AgentOS check evidence: not found" in joined, "conflicting evidence should not pass as recurring")
 
@@ -2319,6 +2415,80 @@ Schedule rule: RRULE:FREQ=WEEKLY
         assert_true(result.status == "WARN", "generic Codex negative prompt should conflict with active Personal Overlay evidence")
         assert_true("Codex negative AgentOS check evidence: found" in joined, "generic negative Codex prompt should be explicit")
         assert_true("Recurring AgentOS check evidence: not found" in joined, "generic Codex conflict should not pass as recurring")
+
+
+def test_active_personal_conflicts_with_generic_codex_prompt_only_warns() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        home = Path(tmp) / "home"
+        make_fake_agentos(root)
+        registry = root / "personal" / "os" / "automations" / "AUTOMATIONS.md"
+        registry.write_text(
+            """# Automations
+
+## Active Automations
+
+### Weekly AgentOS Doctor
+
+Automation id: weekly-agentos-doctor
+
+Status: Active
+
+Schedule rule: RRULE:FREQ=WEEKLY
+""",
+            encoding="utf-8",
+        )
+        codex_automation = home / ".codex" / "automations" / "agentos-doctor" / "automation.toml"
+        codex_automation.parent.mkdir(parents=True)
+        codex_automation.write_text(
+            'name = "Weekly repository check"\n'
+            'prompt = "Run AgentOS Doctor."\n'
+            'status = "ACTIVE"\n'
+            'rrule = "RRULE:FREQ=WEEKLY"\n',
+            encoding="utf-8",
+        )
+        result = check_automations(root, root, home, verbose=False)
+        joined = "\n".join(result.details)
+        assert_true(result.status == "WARN", "generic Codex prompt-only mention should conflict with active Personal Overlay evidence")
+        assert_true("Possible AgentOS check mention: found" in joined, "generic Codex prompt-only mention should remain possible evidence")
+        assert_true("Recurring AgentOS check evidence: not found" in joined, "generic Codex ambiguity should not pass as recurring")
+
+
+def test_active_personal_conflicts_with_negative_codex_status_warns() -> None:
+    for status in ("PENDING", "not enabled"):
+        with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+            root = Path(tmp) / "AgentOS"
+            home = Path(tmp) / "home"
+            make_fake_agentos(root)
+            registry = root / "personal" / "os" / "automations" / "AUTOMATIONS.md"
+            registry.write_text(
+                """# Automations
+
+## Active Automations
+
+### Weekly AgentOS Doctor
+
+Automation id: weekly-agentos-doctor
+
+Status: Active
+
+Schedule rule: RRULE:FREQ=WEEKLY
+""",
+                encoding="utf-8",
+            )
+            codex_automation = home / ".codex" / "automations" / "agentos-doctor" / "automation.toml"
+            codex_automation.parent.mkdir(parents=True)
+            codex_automation.write_text(
+                'name = "AgentOS doctor health check"\n'
+                f'status = "{status}"\n'
+                'rrule = "RRULE:FREQ=WEEKLY"\n',
+                encoding="utf-8",
+            )
+            result = check_automations(root, root, home, verbose=False)
+            joined = "\n".join(result.details)
+            assert_true(result.status == "WARN", f"negative Codex status {status!r} should conflict with active Personal Overlay evidence")
+            assert_true("Codex negative AgentOS check evidence: found" in joined, f"negative Codex status {status!r} should be explicit")
+            assert_true("Recurring AgentOS check evidence: not found" in joined, f"negative Codex status {status!r} should not pass as recurring")
 
 
 def test_active_personal_conflicts_with_bounded_codex_warns() -> None:
