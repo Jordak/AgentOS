@@ -51,6 +51,12 @@ Run only one harness:
 python3 os/verification/playbook-activation/scripts/benchmark_playbook_activation.py --harness codex --no-dry-run --save-report
 ```
 
+Run only one fixture:
+
+```bash
+python3 os/verification/playbook-activation/scripts/benchmark_playbook_activation.py --fixture-id github-pr-from-skill-report
+```
+
 Grade a saved transcript or run log:
 
 ```bash

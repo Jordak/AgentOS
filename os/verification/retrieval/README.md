@@ -88,6 +88,12 @@ Run only the local lexical benchmark:
 python3 os/verification/retrieval/scripts/benchmark_retrieval.py --suite local
 ```
 
+Run only one retrieval fixture. `--question-id` remains supported; `--fixture-id` is the generic benchmark alias:
+
+```bash
+python3 os/verification/retrieval/scripts/benchmark_retrieval.py --suite local --fixture-id run-benchmarks
+```
+
 Run only the harness dry-run plan across known harnesses:
 
 ```bash
