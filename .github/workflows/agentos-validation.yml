@@ -79,6 +79,9 @@ jobs:
       - name: Run global instruction installer self-test
         run: python3 scripts/install_global_agent_instructions.py --self-test
 
+      - name: Run AgentOS doctor self-test
+        run: python3 scripts/agentos_doctor.py --self-test
+
       - name: Run stale-instruction audit
         run: scripts/audit_agentos_leak_paths.sh
 
