@@ -438,36 +438,6 @@ def apply_requested_harness_fallbacks(report: dict[str, Any], model: str | None,
         report["summary"]["effort"] = effort
 
 
-def build_status_evidence(kind: str, git_state: dict[str, Any], can_refresh_status: bool) -> dict[str, Any]:
-    eligible = can_refresh_status and git_state.get("eligible_fresh_main") is True
-    reason = "eligible behavior-bearing run from clean, remote-fresh main" if eligible else "not eligible for Core status refresh"
-    if not can_refresh_status:
-        reason = f"{kind} is not behavior-bearing evidence for Core status refresh"
-    elif git_state.get("eligible_fresh_main") is not True:
-        reason = "Git metadata does not prove clean, remote-fresh main at run time"
-    return {
-        "kind": kind,
-        "eligible_for_status_refresh": eligible,
-        "reason": reason,
-    }
-
-
-def retrieval_status_evidence(
-    suite: str,
-    include_harness: bool,
-    dry_run: bool,
-    responses_path: Path | None,
-    git_state: dict[str, Any],
-) -> dict[str, Any]:
-    if responses_path:
-        return build_status_evidence("responses-regrade", git_state, False)
-    if include_harness and dry_run:
-        return build_status_evidence("dry-run-plan", git_state, False)
-    if suite == "local":
-        return build_status_evidence("local-run", git_state, True)
-    return build_status_evidence("live-harness-run", git_state, True)
-
-
 def build_report(
     root: Path,
     suite: str,
@@ -488,7 +458,6 @@ def build_report(
         "version": 1,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "agentos_git": git_state,
-        "status_evidence": retrieval_status_evidence(suite, include_harness, dry_run, responses_path, git_state),
         "root": str(root),
         "suite": suite,
         "dry_run": dry_run,
@@ -518,7 +487,6 @@ def build_report(
 def render_markdown(report: dict[str, Any]) -> str:
     harness_dry_run = str(report["dry_run"]).lower() if "harness" in report else "n/a"
     git_state = report.get("agentos_git", {})
-    status_evidence = report.get("status_evidence", {})
     lines = [
         "# AgentOS Retrieval Benchmark",
         "",
@@ -528,8 +496,6 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"- Worktree clean: `{render_bool(git_state.get('worktree_clean'))}`",
         f"- Remote main fresh: `{render_bool(git_state.get('remote_fresh'))}`",
         f"- Fresh main eligible: `{render_bool(git_state.get('eligible_fresh_main'))}`",
-        f"- Status evidence kind: `{status_evidence.get('kind', 'unknown')}`",
-        f"- Status refresh eligible: `{render_bool(status_evidence.get('eligible_for_status_refresh'))}`",
         f"- Suite: `{report['suite']}`",
         f"- Harness dry run: `{harness_dry_run}`",
         f"- Harness model: `{report['model']}`",

@@ -425,20 +425,6 @@ def summarize_field(results: list[dict[str, Any]], field: str) -> str:
     )
 
 
-def build_status_evidence(kind: str, git_state: dict[str, Any], can_refresh_status: bool) -> dict[str, Any]:
-    eligible = can_refresh_status and git_state.get("eligible_fresh_main") is True
-    reason = "eligible behavior-bearing run from clean, remote-fresh main" if eligible else "not eligible for Core status refresh"
-    if not can_refresh_status:
-        reason = f"{kind} is not behavior-bearing evidence for Core status refresh"
-    elif git_state.get("eligible_fresh_main") is not True:
-        reason = "Git metadata does not prove clean, remote-fresh main at run time"
-    return {
-        "kind": kind,
-        "eligible_for_status_refresh": eligible,
-        "reason": reason,
-    }
-
-
 def build_dry_run_report(
     root: Path,
     fixtures: list[dict[str, Any]],
@@ -462,7 +448,6 @@ def build_dry_run_report(
         "version": 1,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "agentos_git": git_state,
-        "status_evidence": build_status_evidence("dry-run-plan", git_state, False),
         "root": str(root),
         "mode": "dry-run",
         "summary": {
@@ -492,7 +477,6 @@ def build_transcript_report(
         "version": 1,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "agentos_git": git_state,
-        "status_evidence": build_status_evidence("transcript-regrade", git_state, False),
         "root": str(root),
         "mode": "transcript",
         "transcripts": [str(path) for path in transcript_paths],
@@ -542,7 +526,6 @@ def build_harness_report(
         "version": 1,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "agentos_git": git_state,
-        "status_evidence": build_status_evidence("live-harness-run", git_state, True),
         "root": str(root),
         "mode": "run",
         "summary": {
@@ -600,7 +583,6 @@ def coverage_report(coverage: list[dict[str, Any]], fixtures: list[dict[str, Any
 
 def render_markdown(report: dict[str, Any]) -> str:
     git_state = report.get("agentos_git", {})
-    status_evidence = report.get("status_evidence", {})
     lines = [
         "# AgentOS Playbook Activation Verification",
         "",
@@ -610,8 +592,6 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"- Worktree clean: `{render_bool(git_state.get('worktree_clean'))}`",
         f"- Remote main fresh: `{render_bool(git_state.get('remote_fresh'))}`",
         f"- Fresh main eligible: `{render_bool(git_state.get('eligible_fresh_main'))}`",
-        f"- Status evidence kind: `{status_evidence.get('kind', 'unknown')}`",
-        f"- Status refresh eligible: `{render_bool(status_evidence.get('eligible_for_status_refresh'))}`",
         f"- Mode: `{report['mode']}`",
         "",
         "> Scope: this benchmark grades only observed access to required guidance files. Task completion, write success, read-only sandbox failures, and final-answer quality are diagnostic context, not scoring inputs.",
