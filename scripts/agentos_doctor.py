@@ -26,7 +26,31 @@ NEXT_HEADING_RE = re.compile(r"^##\s+", re.MULTILINE)
 PERSONAL_PATH_RE = re.compile(r"`(personal/os/[^`]+)`")
 DEFAULT_TIMEOUT_SECONDS = 30
 OUTPUT_LINE_LIMIT = 20
+VERBOSE_OUTPUT_LINE_LIMIT = 80
+OUTPUT_LINE_CHAR_LIMIT = 240
+VERBOSE_OUTPUT_LINE_CHAR_LIMIT = 1000
 PRIVATE_CONTENT_SENTINEL = "DO_NOT_LEAK_AGENTOS_DOCTOR_SELF_TEST"
+MIRROR_REQUIRED_FIELDS = {
+    "name",
+    "source_kind",
+    "status",
+    "canonical_source",
+    "mirror_path",
+    "missing_files",
+    "changed_files",
+    "extra_files",
+    "notes",
+}
+MIRROR_LIST_FIELDS = {"missing_files", "changed_files", "extra_files", "notes"}
+MIRROR_ALLOWED_STATUSES = {
+    "in-sync",
+    "missing",
+    "stale",
+    "extra-files",
+    "source-missing",
+    "source-unreadable",
+    "mirror-unreadable",
+}
 
 
 @dataclass
@@ -201,7 +225,7 @@ def resolve_agentos_home(requested: Path | None, cwd: Path) -> tuple[Path, Check
         "Could not discover an AgentOS checkout from the current directory.",
         details=[f"Starting directory: {current}"],
         recommendations=[
-            "Re-run with --agentos-home <path-to-AgentOS>."
+            "Run: python3 scripts/agentos_doctor.py --agentos-home <path-to-AgentOS>"
         ],
     )
 
@@ -285,7 +309,15 @@ def check_adapters(
         *extra_args,
     ]
     completed = run_subprocess(command, cwd=setup_agentos_home, env=env)
-    details = subprocess_details(command, setup_agentos_home, completed, verbose)
+    details = subprocess_details(command, completed, verbose)
+    remediation = [
+        sys.executable,
+        str(script),
+        "--agentos-home",
+        str(setup_agentos_home),
+        *extra_args,
+        "--no-dry-run",
+    ]
     if completed.returncode in {124, 127}:
         return CheckResult(
             "adapter drift",
@@ -306,8 +338,8 @@ def check_adapters(
         "Adapter check helper reported output that needs review.",
         details=details,
         recommendations=[
-            "Use the Run AgentOS Doctor skill to interpret the adapter check output before applying adapter changes.",
-            "No adapter install or remediation was run.",
+            "Review the adapter check command and bounded output above.",
+            "After approval only, consider: " + shell_command(remediation),
         ],
     )
 
@@ -337,13 +369,15 @@ def check_skill_mirrors(
         "--json",
     ]
     completed = run_subprocess(command, cwd=agentos_home, env=env)
-    details = subprocess_details(command, agentos_home, completed, verbose)
-    parsed = parse_json_list(completed.stdout)
-    if parsed is None:
-        details.append("Mirror audit JSON: missing or malformed.")
+    details = mirror_subprocess_details(command, completed)
+    parsed, schema_errors = parse_mirror_results(completed.stdout)
+    mirror_needs_review = False
+    if schema_errors:
+        details.extend("Mirror audit JSON: " + error for error in schema_errors)
     else:
         statuses = Counter(str(item.get("status", "<missing>")) for item in parsed if isinstance(item, dict))
         source_kinds = Counter(str(item.get("source_kind", "<missing>")) for item in parsed if isinstance(item, dict))
+        mirror_needs_review = any(status != "in-sync" for status in statuses)
         details.append(f"Mirror results: {len(parsed)}")
         if statuses:
             details.append("Mirror statuses: " + format_counts(statuses))
@@ -357,7 +391,7 @@ def check_skill_mirrors(
             "Mirror-skills audit helper could not run.",
             details=details,
         )
-    if completed.returncode == 0 and parsed is not None and not completed.stderr.strip():
+    if completed.returncode == 0 and parsed is not None and not schema_errors and not mirror_needs_review and not completed.stderr.strip():
         return CheckResult(
             "skill mirrors",
             "PASS",
@@ -370,8 +404,8 @@ def check_skill_mirrors(
         "Mirror-skills audit output needs review.",
         details=details,
         recommendations=[
-            "Use the Run AgentOS Doctor skill or mirror-skills audit output to decide whether any mirror action is needed.",
-            "No mirror sync was run.",
+            "Review or rerun the audit command above; raw JSON is not printed by Doctor.",
+            "After approval only, consider: " + shell_command([*command, "--sync"]),
         ],
     )
 
@@ -443,7 +477,7 @@ def check_personal_overlay_starters(agentos_home: Path, primary_agentos_home: Pa
             "Some documented starter Personal Overlay paths are absent.",
             details=details,
             recommendations=[
-                "Use os/playbook/GETTING_STARTED.md to decide which private starter files to create."
+                "Review documented starter paths: os/playbook/GETTING_STARTED.md"
             ],
         )
     return CheckResult(
@@ -510,7 +544,7 @@ def check_automation_locations(
         summary,
         details=details,
         recommendations=[
-            "Use the Run AgentOS Doctor skill to interpret automation notes and metadata.",
+            "Review the automation locations listed above with the Run AgentOS Doctor skill.",
             "The helper did not read automation file contents or classify lifecycle state.",
         ],
     )
@@ -542,16 +576,38 @@ def extract_starter_paths(text: str) -> list[str]:
     return paths
 
 
-def parse_json_list(stdout: str) -> list[object] | None:
+def parse_mirror_results(stdout: str) -> tuple[list[dict[str, object]] | None, list[str]]:
     if not stdout.strip():
-        return None
+        return None, ["missing."]
     try:
         parsed = json.loads(stdout)
     except json.JSONDecodeError:
-        return None
+        return None, ["malformed."]
     if not isinstance(parsed, list):
-        return None
-    return parsed
+        return None, ["expected a JSON list."]
+    if not parsed:
+        return None, ["JSON list was empty."]
+
+    errors: list[str] = []
+    results: list[dict[str, object]] = []
+    for index, item in enumerate(parsed):
+        if not isinstance(item, dict):
+            errors.append(f"item {index} was not an object.")
+            continue
+        missing = sorted(MIRROR_REQUIRED_FIELDS - set(item))
+        if missing:
+            errors.append(f"item {index} missing fields: {', '.join(missing)}.")
+        for field in MIRROR_REQUIRED_FIELDS - MIRROR_LIST_FIELDS:
+            if field in item and not isinstance(item[field], str):
+                errors.append(f"item {index} field {field} was not a string.")
+        for field in MIRROR_LIST_FIELDS:
+            if field in item and not isinstance(item[field], list):
+                errors.append(f"item {index} field {field} was not a list.")
+        status = item.get("status")
+        if isinstance(status, str) and status not in MIRROR_ALLOWED_STATUSES:
+            errors.append(f"item {index} status {status!r} was not recognized.")
+        results.append(item)
+    return (results if results else None), errors
 
 
 def count_files(root: Path, suffix: str | None = None) -> tuple[int | None, str | None]:
@@ -621,32 +677,55 @@ def run_subprocess(
 
 def subprocess_details(
     command: list[str],
-    cwd: Path,
     completed: subprocess.CompletedProcess[str],
     verbose: bool,
 ) -> list[str]:
-    limit = None if verbose else OUTPUT_LINE_LIMIT
+    line_limit = VERBOSE_OUTPUT_LINE_LIMIT if verbose else OUTPUT_LINE_LIMIT
+    line_char_limit = VERBOSE_OUTPUT_LINE_CHAR_LIMIT if verbose else OUTPUT_LINE_CHAR_LIMIT
     details = [
-        "Command: " + shell_command(command, cwd),
+        "Command: " + shell_command(command),
         f"Exit code: {completed.returncode}",
     ]
-    details.extend(format_output("stdout", completed.stdout, limit))
-    details.extend(format_output("stderr", completed.stderr, limit))
+    details.extend(format_output("stdout", completed.stdout, line_limit, line_char_limit))
+    details.extend(format_output("stderr", completed.stderr, line_limit, line_char_limit))
     return details
 
 
-def format_output(label: str, text: str, limit: int | None) -> list[str]:
+def mirror_subprocess_details(command: list[str], completed: subprocess.CompletedProcess[str]) -> list[str]:
+    details = [
+        "Command: " + shell_command(command),
+        f"Exit code: {completed.returncode}",
+        output_summary("stdout", completed.stdout, "not printed; parsed as mirror audit JSON"),
+        output_summary("stderr", completed.stderr, "not printed to avoid leaking mirror metadata"),
+    ]
+    return details
+
+
+def output_summary(label: str, text: str, note: str) -> str:
+    if not text:
+        return f"{label}: <empty>"
+    return f"{label}: <{len(text.splitlines())} line(s), {len(text)} char(s); {note}>"
+
+
+def format_output(label: str, text: str, line_limit: int, line_char_limit: int) -> list[str]:
     lines = text.splitlines()
     if not lines:
         return [f"{label}: <empty>"]
-    shown = lines if limit is None else lines[:limit]
-    result = [f"{label}: {line}" for line in shown]
-    if limit is not None and len(lines) > limit:
-        result.append(f"{label}: <{len(lines) - limit} additional lines omitted; rerun with --verbose>")
+    shown = lines[:line_limit]
+    result = [f"{label}: {truncate_line(line, line_char_limit)}" for line in shown]
+    if len(lines) > line_limit:
+        result.append(f"{label}: <{len(lines) - line_limit} additional line(s) omitted; rerun with --verbose>")
     return result
 
 
-def shell_command(command: list[str], cwd: Path) -> str:
+def truncate_line(line: str, limit: int) -> str:
+    if len(line) <= limit:
+        return line
+    omitted = len(line) - limit
+    return line[:limit] + f"... <{omitted} char(s) omitted>"
+
+
+def shell_command(command: list[str]) -> str:
     rendered = []
     for part in command:
         if part == sys.executable:
@@ -729,6 +808,9 @@ def run_self_tests() -> int:
         test_adapter_helper_failure_warns,
         test_mirror_audit_never_syncs,
         test_mirror_malformed_json_warns,
+        test_mirror_valid_json_schema_errors_warn,
+        test_mirror_output_does_not_print_private_metadata,
+        test_helper_output_is_bounded,
         test_automation_locations_report_counts_not_contents,
         test_strict_warn_exit_code,
         test_adapter_home_notation_is_preserved,
@@ -838,6 +920,54 @@ def test_mirror_malformed_json_warns() -> None:
         assert_true(any("malformed" in detail for detail in result.details), "malformed JSON should be reported")
 
 
+def test_mirror_valid_json_schema_errors_warn() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        make_fake_agentos(root)
+        mirror = root / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py"
+        mirror.write_text("import json\nprint(json.dumps([{'name': 'partial'}]))\n", encoding="utf-8")
+        result = check_skill_mirrors(root, Path(tmp) / "mirrors", minimal_env(Path(tmp) / "home"), verbose=False)
+        joined = "\n".join(result.details)
+        assert_true(result.status == "WARN", "schema-invalid mirror JSON should warn")
+        assert_true("missing fields" in joined, "schema error should be reported")
+
+
+def test_mirror_output_does_not_print_private_metadata() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        make_fake_agentos(root)
+        mirror = root / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py"
+        mirror.write_text(
+            "import json\n"
+            "print(json.dumps([{\n"
+            "  'name': 'private-client-skill',\n"
+            "  'source_kind': 'personal-overlay',\n"
+            "  'status': 'stale',\n"
+            "  'canonical_source': 'personal/os/skills/private-client-skill/SKILL.md',\n"
+            "  'mirror_path': 'mirror/private-client-skill',\n"
+            "  'missing_files': ['secret-plan.md'],\n"
+            "  'changed_files': ['client-notes.md'],\n"
+            "  'extra_files': [],\n"
+            "  'notes': ['private note']\n"
+            "}]))\n",
+            encoding="utf-8",
+        )
+        result = check_skill_mirrors(root, Path(tmp) / "mirrors", minimal_env(Path(tmp) / "home"), verbose=True)
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "WARN", "stale mirror result should warn")
+        assert_true("private-client-skill" not in joined, "mirror skill name leaked")
+        assert_true("secret-plan.md" not in joined, "mirror file name leaked")
+        assert_true("Mirror statuses: stale=1" in joined, "safe aggregate status missing")
+
+
+def test_helper_output_is_bounded() -> None:
+    long_line = "x" * (OUTPUT_LINE_CHAR_LIMIT + 50)
+    lines = format_output("stdout", "\n".join([long_line] * (OUTPUT_LINE_LIMIT + 2)), OUTPUT_LINE_LIMIT, OUTPUT_LINE_CHAR_LIMIT)
+    rendered = "\n".join(lines)
+    assert_true(len(lines) == OUTPUT_LINE_LIMIT + 1, "line count should be capped with an omission note")
+    assert_true("char(s) omitted" in rendered, "long line should be capped")
+
+
 def test_automation_locations_report_counts_not_contents() -> None:
     with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
         root = Path(tmp) / "AgentOS"
@@ -903,7 +1033,17 @@ def make_fake_agentos(root: Path) -> None:
     )
     (root / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py").write_text(
         "import json\n"
-        "print(json.dumps([{'name': 'example-skill', 'source_kind': 'core', 'status': 'in-sync'}]))\n",
+        "print(json.dumps([{\n"
+        "  'name': 'example-skill',\n"
+        "  'source_kind': 'core',\n"
+        "  'status': 'in-sync',\n"
+        "  'canonical_source': 'os/skills/example-skill/SKILL.md',\n"
+        "  'mirror_path': 'mirror/example-skill',\n"
+        "  'missing_files': [],\n"
+        "  'changed_files': [],\n"
+        "  'extra_files': [],\n"
+        "  'notes': []\n"
+        "}]))\n",
         encoding="utf-8",
     )
 
