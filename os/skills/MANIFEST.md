@@ -10,7 +10,7 @@ Contract reference: `os/skills/SKILL_CONTRACT.md`.
 
 ## Summary
 
-- Canonical Core skills: 13.
+- Canonical Core skills: 14.
 
 ## Maintenance Fields
 
@@ -63,6 +63,18 @@ Each skill entry records:
 - Safety posture: do not copy raw reports, run JSON, transcripts, stdout, stderr, local paths, prompts, session details, account details, private diagnostics, or private evidence into Core; require clean, fresh `main` evidence before marking entries `passing`; ask before caveated or ambiguous updates.
 - Verification coverage: confirm benchmark manifest and status file were read, local report paths were resolved through the Personal Overlay rule, used reports had current-schema Git metadata, status labels are allowed, no raw/private evidence was copied into Core, and `python3 os/verification/scripts/validate_agentos.py` passes after skill or status changes.
 - Upgrade notes: Core workflow for maintaining the public-safe benchmark snapshot without introducing Core benchmark history.
+
+### `run-benchmarks`
+
+- Canonical source: `os/skills/run-benchmarks/SKILL.md`
+- Contract status: full.
+- Mutability: mixed: reads Core benchmark configuration and runs local benchmark scripts; local-write when scripts save reports under configured Personal Overlay report directories and when `refresh-benchmark-status` updates `os/verification/BENCHMARK_STATUS.md` after the user requested or approved the refresh; no external-write behavior.
+- Tools and connectors: local `git`, filesystem, `os/verification/BENCHMARKS.json`, configured benchmark scripts, `os/playbook/PERSONAL_OVERLAY.md`, and `os/skills/refresh-benchmark-status/SKILL.md`.
+- Output artifact: concise benchmark run report naming commands, saved report directories, incompatible scripts, visible pass/fail/unavailable posture, and status-refresh outcome.
+- Filing rule: raw reports and run histories stay in Personal Overlay report directories configured by `BENCHMARKS.json`; Core status changes only through `refresh-benchmark-status`; benchmark CLI standardization is deferred to GitHub Issue #33 and deterministic refresh-helper work to #30.
+- Safety posture: ask before external harnesses, model-call benchmarks, or commands that may spend credits or require authenticated CLIs; do not copy raw/private benchmark evidence into Core; do not produce status-eligible evidence unless the checkout is clean, current `main`.
+- Verification coverage: confirm benchmark manifest and Personal Overlay policy were read, configured script help was inspected, compatible scripts were selected from the CLI contract, Git preflight ran before status-eligible saved reports, model-call work was approved, and status refresh ran, was offered, or was left as the explicit next step.
+- Upgrade notes: thin orchestration layer for Issue #32; avoids benchmark-specific internals and delegates status interpretation to `refresh-benchmark-status`.
 
 ### `mirror-skills`
 
