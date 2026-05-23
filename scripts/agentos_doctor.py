@@ -569,6 +569,22 @@ def check_adapters(
             ],
         )
 
+    actionable_adapter_drift = any(
+        line.startswith("[FAIL]") and installer_result_status(line) in {"missing", "drift"}
+        for line in check_lines
+    )
+    if not actionable_adapter_drift:
+        details.extend(subprocess_failure_details(completed, verbose))
+        return CheckResult(
+            "adapter drift",
+            "FAIL",
+            "Adapter drift check returned non-actionable unsuccessful evidence.",
+            details=details,
+            recommendations=[
+                "Fix the adapter check command or output format before applying adapter remediation."
+            ],
+        )
+
     if allow_remediation:
         dry_run_command = [
             sys.executable,
@@ -737,6 +753,20 @@ def check_skill_mirrors(
             "skill mirrors",
             "FAIL",
             "Mirror-skills audit found source, readability, or output-shape errors.",
+            details=details,
+            recommendations=recommendations,
+        )
+
+    actionable_mirror_statuses = {"missing", "stale", "extra-files"}
+    if completed.returncode != 0 and not any(status in actionable_mirror_statuses for status in statuses):
+        recommendations = [
+            "Fix the mirror-skills command or output format before syncing mirrors.",
+            "Inspect the audit: " + shell_command(audit_command, script_agentos_home),
+        ]
+        return CheckResult(
+            "skill mirrors",
+            "FAIL",
+            "Mirror-skills audit returned non-actionable unsuccessful evidence.",
             details=details,
             recommendations=recommendations,
         )
@@ -1414,7 +1444,7 @@ def codex_automation_toml_is_active_scheduled(text: str) -> bool:
 
 
 def codex_automation_toml_has_active_status(text: str) -> bool:
-    return bool(re.search(r"(?im)^\s*status\s*=\s*[\"']ACTIVE[\"']\s*$", text))
+    return any(automation_status_is_active(value) for value in simple_config_field_values(text, ("status",)))
 
 
 def codex_automation_toml_has_negative_status(text: str) -> bool:
@@ -1732,11 +1762,13 @@ def run_self_tests() -> int:
         test_adapter_check_preflight_error_is_not_drift,
         test_adapter_check_empty_success_output_fails,
         test_adapter_check_success_with_fail_line_fails,
+        test_adapter_check_nonzero_without_actionable_drift_fails,
         test_subprocess_timeout_output_is_text,
         test_mirror_smoke_uses_temp_dirs,
         test_mirror_command_failure_is_not_sync_advice,
         test_mirror_source_failure_is_not_sync_advice,
         test_mirror_empty_success_output_fails,
+        test_mirror_nonzero_without_actionable_status_fails,
         test_mirror_failure_suppresses_private_names_without_verbose,
         test_mirror_recommendations_quote_paths,
         test_recommendations_are_cwd_stable,
@@ -1775,6 +1807,7 @@ def run_self_tests() -> int:
         test_codex_one_off_schedule_warns,
         test_codex_bounded_rrule_warns,
         test_codex_draft_candidate_automation_toml_warns,
+        test_codex_agentos_automation_status_is_normalized,
         test_codex_agentos_automation_evidence_passes,
         test_automation_files_without_registry_warns,
         test_primary_agentos_home_supplies_personal_overlay,
@@ -2025,6 +2058,30 @@ def test_adapter_check_success_with_fail_line_fails() -> None:
         assert_true("contradictory" in result.summary, "contradictory adapter evidence should be explicit")
 
 
+def test_adapter_check_nonzero_without_actionable_drift_fails() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        home = Path(tmp) / "home"
+        make_fake_agentos(root)
+        home.mkdir()
+        installer = root / "scripts" / "install_global_agent_instructions.py"
+        installer.write_text(
+            "import sys\nprint('[OK] ok codex - managed block current')\nsys.exit(1)\n",
+            encoding="utf-8",
+        )
+        result = check_adapters(
+            agentos_home=root,
+            process_home=home,
+            env=minimal_env(home),
+            extra_args=[],
+            verbose=False,
+        )
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "FAIL", "nonzero adapter output without actionable drift should fail")
+        assert_true("non-actionable unsuccessful evidence" in result.summary, "non-actionable adapter failure should be explicit")
+        assert_true("--no-dry-run" not in joined, "non-actionable adapter failure should not recommend writes")
+
+
 def test_subprocess_timeout_output_is_text() -> None:
     global DEFAULT_TIMEOUT_SECONDS
     with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
@@ -2132,6 +2189,25 @@ def test_mirror_empty_success_output_fails() -> None:
         assert_true(result.status == "FAIL", "empty successful mirror output should fail")
         assert_true("no mirror results" in result.summary, "empty mirror output should name missing evidence")
         assert_true("--sync" not in joined, "empty mirror output should not recommend mirror sync")
+
+
+def test_mirror_nonzero_without_actionable_status_fails() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        mirror_root = Path(tmp) / "mirrors"
+        make_fake_agentos(root)
+        script = root / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py"
+        script.write_text(
+            "import json, sys\n"
+            "print(json.dumps([{'skill': 'example-skill', 'source_kind': 'core', 'status': 'in-sync'}]))\n"
+            "sys.exit(1)\n",
+            encoding="utf-8",
+        )
+        result = check_skill_mirrors(root, root, mirror_root, minimal_env(Path(tmp) / "home"), verbose=False)
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "FAIL", "nonzero mirror output without actionable status should fail")
+        assert_true("non-actionable unsuccessful evidence" in result.summary, "non-actionable mirror failure should be explicit")
+        assert_true("--sync" not in joined, "non-actionable mirror failure should not recommend sync")
 
 
 def test_mirror_failure_suppresses_private_names_without_verbose() -> None:
@@ -3241,6 +3317,27 @@ def test_codex_draft_candidate_automation_toml_warns() -> None:
         assert_true(result.status == "WARN", "draft candidate Codex TOML should not pass")
         assert_true("Possible AgentOS check mention: found" in joined, "draft candidate TOML should remain possible evidence")
         assert_true("Codex active AgentOS check evidence: not found" in joined, "draft candidate TOML should not be active evidence")
+
+
+def test_codex_agentos_automation_status_is_normalized() -> None:
+    for status in ("active", "Enabled"):
+        with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+            root = Path(tmp) / "AgentOS"
+            home = Path(tmp) / "home"
+            make_fake_agentos(root)
+            codex_automation = home / ".codex" / "automations" / f"agentos-{status.lower()}-check" / "automation.toml"
+            codex_automation.parent.mkdir(parents=True)
+            codex_automation.write_text(
+                'name = "AgentOS drift check"\n'
+                'prompt = "Check AgentOS repository updates and adapter drift."\n'
+                f'status = "{status}"\n'
+                'rrule = "RRULE:FREQ=WEEKLY"\n',
+                encoding="utf-8",
+            )
+            result = check_automations(root, root, home, verbose=False)
+            joined = "\n".join(result.details)
+            assert_true(result.status == "PASS", f"{status} Codex automation status should pass")
+            assert_true("Codex active AgentOS check evidence: found" in joined, f"{status} Codex evidence should be explicit")
 
 
 def test_codex_agentos_automation_evidence_passes() -> None:
