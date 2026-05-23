@@ -51,6 +51,7 @@ MIRROR_ALLOWED_STATUSES = {
     "source-unreadable",
     "mirror-unreadable",
 }
+MIRROR_ALLOWED_SOURCE_KINDS = {"core", "personal-overlay"}
 
 
 @dataclass
@@ -605,7 +606,10 @@ def parse_mirror_results(stdout: str) -> tuple[list[dict[str, object]] | None, l
                 errors.append(f"item {index} field {field} was not a list.")
         status = item.get("status")
         if isinstance(status, str) and status not in MIRROR_ALLOWED_STATUSES:
-            errors.append(f"item {index} status {status!r} was not recognized.")
+            errors.append(f"item {index} status was not recognized.")
+        source_kind = item.get("source_kind")
+        if isinstance(source_kind, str) and source_kind not in MIRROR_ALLOWED_SOURCE_KINDS:
+            errors.append(f"item {index} source_kind was not recognized.")
         results.append(item)
     return (results if results else None), errors
 
@@ -809,6 +813,7 @@ def run_self_tests() -> int:
         test_mirror_audit_never_syncs,
         test_mirror_malformed_json_warns,
         test_mirror_valid_json_schema_errors_warn,
+        test_mirror_unknown_source_kind_warns_without_echo,
         test_mirror_output_does_not_print_private_metadata,
         test_helper_output_is_bounded,
         test_automation_locations_report_counts_not_contents,
@@ -930,6 +935,33 @@ def test_mirror_valid_json_schema_errors_warn() -> None:
         joined = "\n".join(result.details)
         assert_true(result.status == "WARN", "schema-invalid mirror JSON should warn")
         assert_true("missing fields" in joined, "schema error should be reported")
+
+
+def test_mirror_unknown_source_kind_warns_without_echo() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        make_fake_agentos(root)
+        mirror = root / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py"
+        mirror.write_text(
+            "import json\n"
+            "print(json.dumps([{\n"
+            "  'name': 'example-skill',\n"
+            "  'source_kind': 'private-client-secret',\n"
+            "  'status': 'in-sync',\n"
+            "  'canonical_source': 'os/skills/example-skill/SKILL.md',\n"
+            "  'mirror_path': 'mirror/example-skill',\n"
+            "  'missing_files': [],\n"
+            "  'changed_files': [],\n"
+            "  'extra_files': [],\n"
+            "  'notes': []\n"
+            "}]))\n",
+            encoding="utf-8",
+        )
+        result = check_skill_mirrors(root, Path(tmp) / "mirrors", minimal_env(Path(tmp) / "home"), verbose=True)
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "WARN", "unknown source_kind should warn")
+        assert_true("source_kind was not recognized" in joined, "source_kind schema error should be reported")
+        assert_true("private-client-secret" not in joined, "unknown source_kind value leaked")
 
 
 def test_mirror_output_does_not_print_private_metadata() -> None:
