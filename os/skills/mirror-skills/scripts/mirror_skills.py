@@ -44,7 +44,8 @@ class MirrorResult:
 
 def find_agentos_root(start: Path) -> Path:
     for path in [start, *start.parents]:
-        if (path / "os/skills/MANIFEST.md").exists():
+        manifest_path = path / "os/skills/MANIFEST.md"
+        if not path_component_problems(manifest_path, expected_kind="file", allow_missing=False):
             return path
     raise SystemExit("Could not find AgentOS root containing os/skills/MANIFEST.md")
 
@@ -99,6 +100,9 @@ def extract_field(section: str, field_name: str) -> str | None:
 
 def parse_manifest(agentos_root: Path) -> list[SkillEntry]:
     manifest_path = agentos_root / "os/skills/MANIFEST.md"
+    manifest_problems = path_component_problems(manifest_path, expected_kind="file", allow_missing=False)
+    if manifest_problems:
+        raise SystemExit("Unsafe skills manifest: " + "; ".join(manifest_problems))
     manifest = manifest_path.read_text(encoding="utf-8")
     matches = list(SKILL_HEADING_RE.finditer(manifest))
     entries: list[SkillEntry] = []
@@ -142,9 +146,40 @@ def discover_personal_overlay_entries(agentos_root: Path) -> tuple[list[SkillEnt
     if not stat.S_ISDIR(personal_stat.st_mode):
         return [], [f"{personal_skills_root} (not a directory)"]
 
+    try:
+        skill_dirs = sorted(personal_skills_root.iterdir())
+    except OSError as error:
+        return [], [f"{personal_skills_root} ({error.__class__.__name__}: {error})"]
+
     entries: list[SkillEntry] = []
-    for skill_file in sorted(personal_skills_root.glob("*/SKILL.md")):
-        skill_dir = skill_file.parent
+    problems: list[str] = []
+    for skill_dir in skill_dirs:
+        if skill_dir.name == ".gitkeep" or should_ignore(skill_dir.relative_to(personal_skills_root)):
+            continue
+        try:
+            skill_dir_stat = skill_dir.lstat()
+        except OSError as error:
+            problems.append(f"{skill_dir} ({error.__class__.__name__}: {error})")
+            continue
+        if stat.S_ISLNK(skill_dir_stat.st_mode):
+            problems.append(f"{skill_dir} (symbolic link is not allowed)")
+            continue
+        if not stat.S_ISDIR(skill_dir_stat.st_mode):
+            continue
+        skill_file = skill_dir / "SKILL.md"
+        try:
+            skill_file_stat = skill_file.lstat()
+        except FileNotFoundError:
+            continue
+        except OSError as error:
+            problems.append(f"{skill_file} ({error.__class__.__name__}: {error})")
+            continue
+        if stat.S_ISLNK(skill_file_stat.st_mode):
+            problems.append(f"{skill_file} (symbolic link is not allowed)")
+            continue
+        if not stat.S_ISREG(skill_file_stat.st_mode):
+            problems.append(f"{skill_file} (not a regular file)")
+            continue
         name = skill_dir.name
         canonical_source = skill_file.relative_to(agentos_root).as_posix()
         entries.append(
@@ -158,7 +193,7 @@ def discover_personal_overlay_entries(agentos_root: Path) -> tuple[list[SkillEnt
             )
         )
 
-    return entries, []
+    return entries, problems
 
 
 def should_ignore(path: Path) -> bool:
