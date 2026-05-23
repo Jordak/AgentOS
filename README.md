@@ -88,7 +88,7 @@ The helper script discovers the AgentOS checkout from the current directory, or 
 
 When your setup uses `--all-default-adapters` or custom `--adapter <path>` targets, pass those same flags to Run AgentOS Doctor or the helper script so the adapter drift result covers the same harness instruction files as your installer check.
 
-When running the doctor from an isolated feature worktree, pass `--primary-agentos-home <primary-agentos-home>` so Personal Overlay starter presence and automation location counts refer to the canonical checkout. The helper still runs read-only checks only; any adapter writes, mirror syncs, Personal Overlay edits, or automation changes belong to the Run AgentOS Doctor skill after explicit approval.
+When running the doctor from an isolated feature worktree, pass `--primary-agentos-home <primary-agentos-home>` so Personal Overlay skill mirrors, starter presence, and automation location counts refer to the canonical checkout. The helper still runs read-only checks only; it suppresses feature-worktree write commands when the audit root and primary checkout differ. Any adapter writes, mirror syncs, Personal Overlay edits, or automation changes belong to the Run AgentOS Doctor skill after explicit approval.
 
 Use the tools this way:
 

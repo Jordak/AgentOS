@@ -30,6 +30,7 @@ Use this boundary:
 - The helper runs `install_global_agent_instructions.py --check` only and reports command/output/exit status without applying remediation.
 - The helper runs `mirror_skills.py --json` only and never passes `--sync`.
 - Personal Overlay checks report documented path presence without reading or printing private file contents.
+- Feature-worktree checks keep Core evidence tied to the audited checkout and Personal Overlay evidence tied to the primary checkout.
 - Automation checks report registry/file/directory presence, counts, and locations only.
 - Ambiguous or missing evidence produces WARN/FAIL rather than false PASS.
 - The Run AgentOS Doctor skill explains how agents interpret ambiguous facts and ask before writes.

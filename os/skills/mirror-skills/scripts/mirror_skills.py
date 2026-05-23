@@ -220,15 +220,15 @@ def parse_manifest(agentos_root: Path) -> list[SkillEntry]:
 
 
 def discover_personal_overlay_entries(
-    agentos_root: Path,
+    personal_agentos_root: Path,
     requested_names: set[str] | None = None,
 ) -> tuple[list[SkillEntry], list[PreflightProblem]]:
-    personal_skills_root = agentos_root / "personal/os/skills"
+    personal_skills_root = personal_agentos_root / "personal/os/skills"
     problems = path_component_problems(
         personal_skills_root,
         expected_kind="directory",
         allow_missing=True,
-        boundary=agentos_root,
+        boundary=personal_agentos_root,
     )
     if problems:
         return [], [
@@ -330,13 +330,13 @@ def discover_personal_overlay_entries(
             )
             continue
         name = skill_dir.name
-        canonical_source = skill_file.relative_to(agentos_root).as_posix()
+        canonical_source = skill_file.relative_to(personal_agentos_root).as_posix()
         entries.append(
             SkillEntry(
                 name=name,
                 source_kind="personal-overlay",
                 canonical_source=canonical_source,
-                managed_root=agentos_root,
+                managed_root=personal_agentos_root,
                 source_path=skill_file,
                 source_root=skill_dir,
                 mirror_dir=Path(),
@@ -733,6 +733,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Current-machine skill mirror root. Default: the user's .agents/skills directory.",
     )
     parser.add_argument(
+        "--personal-agentos-root",
+        type=Path,
+        default=None,
+        help="AgentOS root whose personal/os/skills supplies Personal Overlay skills. Defaults to --agentos-root.",
+    )
+    parser.add_argument(
         "--sync",
         action="store_true",
         help="Create missing mirrors and copy changed canonical files.",
@@ -769,16 +775,26 @@ def main() -> int:
     mirror_root_problem = final_path_kind_problem(mirror_root, expected_kind="directory", allow_missing=True)
     if mirror_root_problem:
         raise SystemExit(f"Unsafe mirror root: {mirror_root} ({mirror_root_problem})")
+    personal_agentos_root = lexical_absolute(args.personal_agentos_root) if args.personal_agentos_root else agentos_root
 
     core_entries = parse_manifest(agentos_root)
     personal_entries: list[SkillEntry] = []
     preflight_results: list[MirrorResult] = []
     if not args.core_only:
+        personal_root_problem = final_path_kind_problem(
+            personal_agentos_root,
+            expected_kind="directory",
+            allow_missing=False,
+        )
+        if personal_root_problem:
+            raise SystemExit(
+                f"Unsafe Personal Overlay AgentOS root: {personal_agentos_root} ({personal_root_problem})"
+            )
         requested_names = set(args.skill) if args.skill else None
         core_names = {entry.name for entry in core_entries}
         if requested_names is None or not requested_names <= core_names:
             personal_entries, personal_problems = discover_personal_overlay_entries(
-                agentos_root,
+                personal_agentos_root,
                 requested_names=requested_names,
             )
             preflight_results.extend(personal_preflight_results(personal_problems, mirror_root))

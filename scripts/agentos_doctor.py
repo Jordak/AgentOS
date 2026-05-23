@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import re
+import stat
 import subprocess
 import sys
 import tempfile
@@ -185,15 +186,46 @@ def run_doctor(
     agentos_home, discovery = resolve_agentos_home(requested_agentos_home, cwd)
     primary_agentos_home = absolute_path(requested_primary_agentos_home, cwd) if requested_primary_agentos_home else agentos_home
     mirror_root = absolute_path(mirror_root, cwd)
+    home_structure = check_required_core_files(agentos_home)
+    split_roots = agentos_home != primary_agentos_home
 
     results = [
         discovery,
-        check_required_core_files(agentos_home),
-        check_adapters(agentos_home, env, adapter_args, verbose),
-        check_skill_mirrors(agentos_home, mirror_root, env, verbose),
-        check_personal_overlay_starters(agentos_home, primary_agentos_home),
-        check_automation_locations(primary_agentos_home, process_home, env),
+        home_structure,
     ]
+    if home_structure.status == "PASS":
+        results.extend(
+            [
+                check_adapters(
+                    agentos_home,
+                    env,
+                    adapter_args,
+                    verbose,
+                    suppress_write_commands=split_roots,
+                ),
+                check_skill_mirrors(
+                    agentos_home,
+                    primary_agentos_home,
+                    mirror_root,
+                    env,
+                    verbose,
+                    suppress_sync_commands=split_roots,
+                ),
+            ]
+        )
+    else:
+        results.extend(
+            [
+                skipped_subprocess_check("adapter drift", home_structure),
+                skipped_subprocess_check("skill mirrors", home_structure),
+            ]
+        )
+    results.extend(
+        [
+            check_personal_overlay_starters(agentos_home, primary_agentos_home),
+            check_automation_locations(agentos_home, primary_agentos_home, process_home, env),
+        ]
+    )
     return DoctorReport(
         agentos_home=agentos_home,
         primary_agentos_home=primary_agentos_home,
@@ -244,7 +276,11 @@ def check_required_core_files(agentos_home: Path) -> CheckResult:
             if path.is_symlink():
                 symlinks.append(rel)
             if path.is_file():
-                present.append(rel)
+                read_error = read_probe(path)
+                if read_error:
+                    unreadable.append(f"{rel} ({read_error})")
+                else:
+                    present.append(rel)
             else:
                 missing.append(rel)
         except OSError as exc:
@@ -285,23 +321,34 @@ def check_required_core_files(agentos_home: Path) -> CheckResult:
     )
 
 
+def skipped_subprocess_check(name: str, home_structure: CheckResult) -> CheckResult:
+    status = "FAIL" if home_structure.status == "FAIL" else "WARN"
+    return CheckResult(
+        name,
+        status,
+        "Skipped because the AgentOS checkout structure is not trusted enough to execute helper scripts.",
+        details=[
+            f"Home structure status: {home_structure.status}",
+            "Inspect the checkout before running nested helper scripts.",
+        ],
+    )
+
+
 def check_adapters(
     setup_agentos_home: Path,
     env: Mapping[str, str],
     extra_args: list[str],
     verbose: bool,
+    suppress_write_commands: bool = False,
 ) -> CheckResult:
-    script = setup_agentos_home / "scripts" / "install_global_agent_instructions.py"
-    if not script.is_file():
-        return CheckResult(
-            "adapter drift",
-            "FAIL",
-            "Adapter check helper is missing.",
-            details=[f"Expected helper: {script}"],
-            recommendations=[
-                "Inspect the AgentOS checkout path or run the installer helper manually from the intended checkout."
-            ],
-        )
+    script, invalid = trusted_helper_script(
+        setup_agentos_home,
+        "scripts/install_global_agent_instructions.py",
+        "adapter drift",
+        "Adapter check helper",
+    )
+    if invalid:
+        return invalid
 
     command = [
         sys.executable,
@@ -312,7 +359,7 @@ def check_adapters(
         *extra_args,
     ]
     completed = run_subprocess(command, cwd=setup_agentos_home, env=env)
-    details = subprocess_details(command, completed, verbose)
+    details = subprocess_details(command, completed, verbose, suppress_write_commands=suppress_write_commands)
     remediation = [
         sys.executable,
         str(script),
@@ -335,38 +382,49 @@ def check_adapters(
             "Adapter check helper exited successfully.",
             details=details,
         )
+    recommendations = ["Review the adapter check command and bounded output above."]
+    if suppress_write_commands:
+        recommendations.extend(
+            [
+                "Feature-worktree split detected; Doctor omitted current-machine write commands for the audit root.",
+                "Before any adapter write, rerun the adapter check from the primary checkout.",
+            ]
+        )
+    else:
+        recommendations.append("After approval only, consider: " + shell_command(remediation))
     return CheckResult(
         "adapter drift",
         "WARN",
         "Adapter check helper reported output that needs review.",
         details=details,
-        recommendations=[
-            "Review the adapter check command and bounded output above.",
-            "After approval only, consider: " + shell_command(remediation),
-        ],
+        recommendations=recommendations,
     )
 
 
 def check_skill_mirrors(
     agentos_home: Path,
+    primary_agentos_home: Path,
     mirror_root: Path,
     env: Mapping[str, str],
     verbose: bool,
+    suppress_sync_commands: bool = False,
 ) -> CheckResult:
-    script = agentos_home / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py"
-    if not script.is_file():
-        return CheckResult(
-            "skill mirrors",
-            "FAIL",
-            "Mirror-skills audit helper is missing.",
-            details=[f"Expected helper: {script}"],
-        )
+    script, invalid = trusted_helper_script(
+        agentos_home,
+        "os/skills/mirror-skills/scripts/mirror_skills.py",
+        "skill mirrors",
+        "Mirror-skills audit helper",
+    )
+    if invalid:
+        return invalid
 
     command = [
         sys.executable,
         str(script),
         "--agentos-root",
         str(agentos_home),
+        "--personal-agentos-root",
+        str(primary_agentos_home),
         "--mirror-root",
         str(mirror_root),
         "--json",
@@ -401,15 +459,22 @@ def check_skill_mirrors(
             "Mirror-skills audit helper exited successfully.",
             details=details,
         )
+    recommendations = ["Review or rerun the audit command above; raw JSON is not printed by Doctor."]
+    if suppress_sync_commands:
+        recommendations.extend(
+            [
+                "Feature-worktree split detected; Doctor omitted mirror sync commands for the audit root.",
+                "Before any mirror sync, rerun the audit from the primary checkout or after this branch lands.",
+            ]
+        )
+    else:
+        recommendations.append("After approval only, consider: " + shell_command([*command, "--sync"]))
     return CheckResult(
         "skill mirrors",
         "WARN",
         "Mirror-skills audit output needs review.",
         details=details,
-        recommendations=[
-            "Review or rerun the audit command above; raw JSON is not printed by Doctor.",
-            "After approval only, consider: " + shell_command([*command, "--sync"]),
-        ],
+        recommendations=recommendations,
     )
 
 
@@ -444,20 +509,26 @@ def check_personal_overlay_starters(agentos_home: Path, primary_agentos_home: Pa
     present: list[str] = []
     missing: list[str] = []
     unreadable: list[str] = []
+    non_regular: list[str] = []
     for rel in starter_paths:
         path = primary_agentos_home / rel
         try:
-            if path.exists():
+            state = lstat_path_state(path)
+            if state == "regular file":
                 present.append(rel)
-            else:
+            elif state == "absent":
                 missing.append(rel)
+            elif state == "unreadable":
+                unreadable.append(rel)
+            else:
+                non_regular.append(f"{rel} ({state})")
         except OSError as exc:
             unreadable.append(f"{rel} ({exc.__class__.__name__})")
 
     details = [
         f"Starter source: {source}",
         f"Primary Personal Overlay root: {primary_agentos_home / 'personal' / 'os'}",
-        f"Starter paths present: {len(present)}/{len(starter_paths)}",
+        f"Starter paths regular files: {len(present)}/{len(starter_paths)}",
     ]
     if present:
         details.append("Present starter paths: " + ", ".join(present))
@@ -465,12 +536,14 @@ def check_personal_overlay_starters(agentos_home: Path, primary_agentos_home: Pa
         details.append("Missing starter paths: " + ", ".join(missing))
     if unreadable:
         details.append("Unreadable starter paths: " + ", ".join(unreadable))
+    if non_regular:
+        details.append("Non-regular starter paths: " + ", ".join(non_regular))
 
-    if unreadable:
+    if unreadable or non_regular:
         return CheckResult(
             "Personal Overlay starters",
             "WARN",
-            "Some documented starter paths could not be inspected.",
+            "Some documented starter paths are unreadable or not regular files.",
             details=details,
         )
     if missing:
@@ -492,11 +565,12 @@ def check_personal_overlay_starters(agentos_home: Path, primary_agentos_home: Pa
 
 
 def check_automation_locations(
+    agentos_home: Path,
     primary_agentos_home: Path,
     process_home: Path,
     env: Mapping[str, str],
 ) -> CheckResult:
-    core_registry = primary_agentos_home / "os" / "automations" / "AUTOMATIONS.md"
+    core_registry = agentos_home / "os" / "automations" / "AUTOMATIONS.md"
     personal_root = primary_agentos_home / "personal" / "os" / "automations"
     personal_registry = personal_root / "AUTOMATIONS.md"
     codex_home = absolute_path(Path(env.get("CODEX_HOME", process_home / ".codex")), process_home)
@@ -566,17 +640,90 @@ def absolute_path(path: Path, cwd: Path) -> Path:
 
 def extract_starter_paths(text: str) -> list[str]:
     match = STARTER_HEADING_RE.search(text)
-    section = text
-    if match:
-        start = match.end()
-        next_heading = NEXT_HEADING_RE.search(text, start)
-        section = text[start : next_heading.start() if next_heading else len(text)]
+    if not match:
+        return []
+    start = match.end()
+    next_heading = NEXT_HEADING_RE.search(text, start)
+    section = text[start : next_heading.start() if next_heading else len(text)]
     paths = []
     for path in PERSONAL_PATH_RE.findall(section):
         clean = path.rstrip(".,)")
         if clean not in paths:
             paths.append(clean)
     return paths
+
+
+def trusted_helper_script(
+    agentos_home: Path,
+    rel: str,
+    check_name: str,
+    helper_label: str,
+) -> tuple[Path | None, CheckResult | None]:
+    script = agentos_home / rel
+    try:
+        mode = script.lstat().st_mode
+    except FileNotFoundError:
+        return None, CheckResult(
+            check_name,
+            "FAIL",
+            f"{helper_label} is missing.",
+            details=[f"Expected helper: {script}"],
+            recommendations=[
+                "Inspect the AgentOS checkout path before running nested helper scripts."
+            ],
+        )
+    except OSError as exc:
+        return None, CheckResult(
+            check_name,
+            "FAIL",
+            f"{helper_label} could not be inspected.",
+            details=[f"Expected helper: {script} ({exc.__class__.__name__})"],
+        )
+
+    if stat.S_ISLNK(mode):
+        state = "symlink"
+    elif not stat.S_ISREG(mode):
+        state = "not a regular file"
+    else:
+        read_error = read_probe(script)
+        if not read_error:
+            return script, None
+        state = f"unreadable ({read_error})"
+
+    return None, CheckResult(
+        check_name,
+        "FAIL",
+        f"{helper_label} is not trusted for execution.",
+        details=[f"Expected regular non-symlink helper: {script}", f"Observed state: {state}"],
+        recommendations=[
+            "Inspect the helper path before running it manually."
+        ],
+    )
+
+
+def read_probe(path: Path) -> str | None:
+    try:
+        with path.open("rb") as handle:
+            handle.read(1)
+    except OSError as exc:
+        return exc.__class__.__name__
+    return None
+
+
+def lstat_path_state(path: Path) -> str:
+    try:
+        mode = path.lstat().st_mode
+    except FileNotFoundError:
+        return "absent"
+    except OSError:
+        return "unreadable"
+    if stat.S_ISLNK(mode):
+        return "symlink"
+    if stat.S_ISREG(mode):
+        return "regular file"
+    if stat.S_ISDIR(mode):
+        return "directory"
+    return "other"
 
 
 def parse_mirror_results(stdout: str) -> tuple[list[dict[str, object]] | None, list[str]]:
@@ -704,16 +851,38 @@ def subprocess_details(
     command: list[str],
     completed: subprocess.CompletedProcess[str],
     verbose: bool,
+    suppress_write_commands: bool = False,
 ) -> list[str]:
     line_limit = VERBOSE_OUTPUT_LINE_LIMIT if verbose else OUTPUT_LINE_LIMIT
     line_char_limit = VERBOSE_OUTPUT_LINE_CHAR_LIMIT if verbose else OUTPUT_LINE_CHAR_LIMIT
+    stdout = completed.stdout
+    stderr = completed.stderr
+    if suppress_write_commands:
+        stdout = redact_write_commands(stdout)
+        stderr = redact_write_commands(stderr)
     details = [
         "Command: " + shell_command(command),
         f"Exit code: {completed.returncode}",
     ]
-    details.extend(format_output("stdout", completed.stdout, line_limit, line_char_limit))
-    details.extend(format_output("stderr", completed.stderr, line_limit, line_char_limit))
+    details.extend(format_output("stdout", stdout, line_limit, line_char_limit))
+    details.extend(format_output("stderr", stderr, line_limit, line_char_limit))
     return details
+
+
+def redact_write_commands(text: str) -> str:
+    if not text:
+        return text
+    redacted: list[str] = []
+    omitted = False
+    for line in text.splitlines():
+        stripped = line.strip().lower()
+        if "--no-dry-run" in line or "remediation" in stripped:
+            if not omitted:
+                redacted.append("<write remediation omitted because audit root differs from primary AgentOS home>")
+                omitted = True
+            continue
+        redacted.append(line)
+    return "\n".join(redacted)
 
 
 def mirror_subprocess_details(command: list[str], completed: subprocess.CompletedProcess[str]) -> list[str]:
@@ -828,20 +997,27 @@ def run_self_tests() -> int:
     tests = [
         test_invalid_home_is_graceful,
         test_required_core_files_pass,
+        test_required_core_files_unreadable_fails,
+        test_untrusted_home_skips_subprocess_helpers,
         test_personal_overlay_does_not_print_private_contents,
         test_adapter_check_is_read_only_check_only,
         test_adapter_check_uses_audit_root_when_primary_differs,
+        test_split_root_adapter_output_omits_write_commands,
         test_adapter_helper_failure_warns,
         test_mirror_audit_never_syncs,
+        test_mirror_audit_passes_primary_personal_root,
         test_mirror_malformed_json_warns,
         test_mirror_valid_json_schema_errors_warn,
         test_mirror_unknown_source_kind_warns_without_echo,
         test_mirror_output_does_not_print_private_metadata,
         test_helper_output_is_bounded,
+        test_starter_heading_missing_fails_closed,
+        test_starter_non_regular_paths_warn,
         test_count_files_ignores_placeholder_noise,
         test_count_files_warns_on_walk_errors,
         test_count_files_warns_on_symlink_root,
         test_automation_locations_report_counts_not_contents,
+        test_automation_locations_split_roots,
         test_strict_warn_exit_code,
         test_adapter_home_notation_is_preserved,
     ]
@@ -878,6 +1054,51 @@ def test_required_core_files_pass() -> None:
         make_fake_agentos(root)
         result = check_required_core_files(root)
         assert_true(result.status == "PASS", "fake AgentOS should have required files")
+
+
+def test_required_core_files_unreadable_fails() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        make_fake_agentos(root)
+        target = root / "AGENTS.md"
+        original_mode = target.stat().st_mode
+        try:
+            target.chmod(0)
+            unreadable_for_process = not os.access(target, os.R_OK)
+            result = check_required_core_files(root)
+        finally:
+            target.chmod(original_mode)
+        if not unreadable_for_process:
+            return
+        assert_true(result.status == "FAIL", "unreadable required files should fail")
+
+
+def test_untrusted_home_skips_subprocess_helpers() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        make_fake_agentos(root)
+        target = root / "linked-agents.md"
+        target.write_text("# Linked\n", encoding="utf-8")
+        (root / "AGENTS.md").unlink()
+        (root / "AGENTS.md").symlink_to(target)
+        (root / "scripts" / "install_global_agent_instructions.py").write_text(
+            "print('SHOULD_NOT_RUN')\n",
+            encoding="utf-8",
+        )
+        report = run_doctor(
+            requested_agentos_home=root,
+            requested_primary_agentos_home=root,
+            mirror_root=Path(tmp) / "mirrors",
+            cwd=root,
+            process_home=Path(tmp) / "home",
+            env=minimal_env(Path(tmp) / "home"),
+            adapter_args=[],
+            verbose=True,
+        )
+        rendered = render_report_for_test(report, verbose=True)
+        assert_true(result_named(report, "home structure").status == "WARN", "symlinked home should warn")
+        assert_true(result_named(report, "adapter drift").status == "WARN", "adapter check should be skipped")
+        assert_true("SHOULD_NOT_RUN" not in rendered, "untrusted helper should not execute")
 
 
 def test_personal_overlay_does_not_print_private_contents() -> None:
@@ -942,6 +1163,35 @@ def test_adapter_check_uses_audit_root_when_primary_differs() -> None:
         assert_true("PRIMARY_HELPER" not in rendered, "adapter check should not use the primary overlay root")
 
 
+def test_split_root_adapter_output_omits_write_commands() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        audit_root = Path(tmp) / "audit-AgentOS"
+        primary_root = Path(tmp) / "primary-AgentOS"
+        make_fake_agentos(audit_root)
+        make_fake_agentos(primary_root)
+        (audit_root / "scripts" / "install_global_agent_instructions.py").write_text(
+            "import sys\n"
+            "print('Drift detected. Remediation:')\n"
+            "print('python3 scripts/install_global_agent_instructions.py --no-dry-run')\n"
+            "sys.exit(1)\n",
+            encoding="utf-8",
+        )
+        report = run_doctor(
+            requested_agentos_home=audit_root,
+            requested_primary_agentos_home=primary_root,
+            mirror_root=Path(tmp) / "mirrors",
+            cwd=audit_root,
+            process_home=Path(tmp) / "home",
+            env=minimal_env(Path(tmp) / "home"),
+            adapter_args=[],
+            verbose=True,
+        )
+        rendered = render_report_for_test(report, verbose=True)
+        assert_true("--no-dry-run" not in rendered, "split-root doctor should omit write commands")
+        assert_true("write remediation omitted" in rendered, "redaction note should be shown")
+        assert_true("Feature-worktree split detected" in rendered, "split-root limitation should be explicit")
+
+
 def test_adapter_helper_failure_warns() -> None:
     with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
         root = Path(tmp) / "AgentOS"
@@ -961,11 +1211,60 @@ def test_mirror_audit_never_syncs() -> None:
     with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
         root = Path(tmp) / "AgentOS"
         make_fake_agentos(root)
-        result = check_skill_mirrors(root, Path(tmp) / "mirrors", minimal_env(Path(tmp) / "home"), verbose=True)
+        result = check_skill_mirrors(root, root, Path(tmp) / "mirrors", minimal_env(Path(tmp) / "home"), verbose=True)
         joined = "\n".join(result.details + result.recommendations)
         assert_true(result.status == "PASS", "default fake mirror audit should pass")
         assert_true("--json" in joined, "mirror audit should request JSON")
         assert_true("--sync" not in joined, "doctor must not sync mirrors")
+
+
+def test_mirror_audit_passes_primary_personal_root() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        audit_root = Path(tmp) / "audit-AgentOS"
+        primary_root = Path(tmp) / "primary-AgentOS"
+        make_fake_agentos(audit_root)
+        make_fake_agentos(primary_root)
+        mirror = audit_root / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py"
+        mirror.write_text(
+            "import json, sys\n"
+            "has_primary = '--personal-agentos-root' in sys.argv and sys.argv[sys.argv.index('--personal-agentos-root') + 1].endswith('primary-AgentOS')\n"
+            "results = [{\n"
+            "  'name': 'example-skill',\n"
+            "  'source_kind': 'core',\n"
+            "  'status': 'in-sync',\n"
+            "  'canonical_source': 'os/skills/example-skill/SKILL.md',\n"
+            "  'mirror_path': 'mirror/example-skill',\n"
+            "  'missing_files': [],\n"
+            "  'changed_files': [],\n"
+            "  'extra_files': [],\n"
+            "  'notes': []\n"
+            "}]\n"
+            "if has_primary:\n"
+            "  results.append({\n"
+            "    'name': 'private-skill',\n"
+            "    'source_kind': 'personal-overlay',\n"
+            "    'status': 'in-sync',\n"
+            "    'canonical_source': 'personal/os/skills/private-skill/SKILL.md',\n"
+            "    'mirror_path': 'mirror/private-skill',\n"
+            "    'missing_files': [],\n"
+            "    'changed_files': [],\n"
+            "    'extra_files': [],\n"
+            "    'notes': []\n"
+            "  })\n"
+            "print(json.dumps(results))\n",
+            encoding="utf-8",
+        )
+        result = check_skill_mirrors(
+            audit_root,
+            primary_root,
+            Path(tmp) / "mirrors",
+            minimal_env(Path(tmp) / "home"),
+            verbose=True,
+            suppress_sync_commands=True,
+        )
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true("Mirror source kinds: core=1, personal-overlay=1" in joined, "primary Personal Overlay root should be audited")
+        assert_true("--sync" not in joined, "split-root mirror audit should omit sync commands")
 
 
 def test_mirror_malformed_json_warns() -> None:
@@ -974,7 +1273,7 @@ def test_mirror_malformed_json_warns() -> None:
         make_fake_agentos(root)
         mirror = root / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py"
         mirror.write_text("print('not json')\n", encoding="utf-8")
-        result = check_skill_mirrors(root, Path(tmp) / "mirrors", minimal_env(Path(tmp) / "home"), verbose=False)
+        result = check_skill_mirrors(root, root, Path(tmp) / "mirrors", minimal_env(Path(tmp) / "home"), verbose=False)
         assert_true(result.status == "WARN", "malformed mirror JSON should warn")
         assert_true(any("malformed" in detail for detail in result.details), "malformed JSON should be reported")
 
@@ -985,7 +1284,7 @@ def test_mirror_valid_json_schema_errors_warn() -> None:
         make_fake_agentos(root)
         mirror = root / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py"
         mirror.write_text("import json\nprint(json.dumps([{'name': 'partial'}]))\n", encoding="utf-8")
-        result = check_skill_mirrors(root, Path(tmp) / "mirrors", minimal_env(Path(tmp) / "home"), verbose=False)
+        result = check_skill_mirrors(root, root, Path(tmp) / "mirrors", minimal_env(Path(tmp) / "home"), verbose=False)
         joined = "\n".join(result.details)
         assert_true(result.status == "WARN", "schema-invalid mirror JSON should warn")
         assert_true("missing fields" in joined, "schema error should be reported")
@@ -1011,7 +1310,7 @@ def test_mirror_unknown_source_kind_warns_without_echo() -> None:
             "}]))\n",
             encoding="utf-8",
         )
-        result = check_skill_mirrors(root, Path(tmp) / "mirrors", minimal_env(Path(tmp) / "home"), verbose=True)
+        result = check_skill_mirrors(root, root, Path(tmp) / "mirrors", minimal_env(Path(tmp) / "home"), verbose=True)
         joined = "\n".join(result.details + result.recommendations)
         assert_true(result.status == "WARN", "unknown source_kind should warn")
         assert_true("source_kind was not recognized" in joined, "source_kind schema error should be reported")
@@ -1038,7 +1337,7 @@ def test_mirror_output_does_not_print_private_metadata() -> None:
             "}]))\n",
             encoding="utf-8",
         )
-        result = check_skill_mirrors(root, Path(tmp) / "mirrors", minimal_env(Path(tmp) / "home"), verbose=True)
+        result = check_skill_mirrors(root, root, Path(tmp) / "mirrors", minimal_env(Path(tmp) / "home"), verbose=True)
         joined = "\n".join(result.details + result.recommendations)
         assert_true(result.status == "WARN", "stale mirror result should warn")
         assert_true("private-client-skill" not in joined, "mirror skill name leaked")
@@ -1052,6 +1351,23 @@ def test_helper_output_is_bounded() -> None:
     rendered = "\n".join(lines)
     assert_true(len(lines) == OUTPUT_LINE_LIMIT + 1, "line count should be capped with an omission note")
     assert_true("char(s) omitted" in rendered, "long line should be capped")
+
+
+def test_starter_heading_missing_fails_closed() -> None:
+    text = "# Getting Started\n\nExample: `personal/os/identity/USER.md`\n"
+    assert_true(extract_starter_paths(text) == [], "missing Starter Files heading should not scan whole document")
+
+
+def test_starter_non_regular_paths_warn() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        make_fake_agentos(root)
+        starter = root / "personal" / "os" / "identity" / "USER.md"
+        starter.mkdir(parents=True)
+        result = check_personal_overlay_starters(root, root)
+        joined = "\n".join(result.details)
+        assert_true(result.status == "WARN", "directory at starter file path should warn")
+        assert_true("Non-regular starter paths" in joined, "non-regular starter state should be reported")
 
 
 def test_count_files_ignores_placeholder_noise() -> None:
@@ -1124,6 +1440,23 @@ def test_automation_locations_report_counts_not_contents() -> None:
         assert_true(PRIVATE_CONTENT_SENTINEL not in rendered, "automation file contents leaked")
         assert_true("Personal automation files: 2" in rendered, "personal automation count missing")
         assert_true("Codex automation TOML files: 1" in rendered, "Codex TOML count missing")
+
+
+def test_automation_locations_split_roots() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        audit_root = Path(tmp) / "audit-AgentOS"
+        primary_root = Path(tmp) / "primary-AgentOS"
+        make_fake_agentos(audit_root)
+        make_fake_agentos(primary_root)
+        result = check_automation_locations(
+            audit_root,
+            primary_root,
+            Path(tmp) / "home",
+            minimal_env(Path(tmp) / "home"),
+        )
+        joined = "\n".join(result.details)
+        assert_true(f"Core automation registry: present file ({audit_root / 'os' / 'automations' / 'AUTOMATIONS.md'})" in joined, "Core registry should use audit root")
+        assert_true(f"Personal automation registry: present file ({primary_root / 'personal' / 'os' / 'automations' / 'AUTOMATIONS.md'})" in joined, "Personal registry should use primary root")
 
 
 def test_strict_warn_exit_code() -> None:

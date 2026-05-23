@@ -44,7 +44,7 @@ Safety:
    Read `AGENTS.md`, `os/INDEX.md`, `os/playbook/PERSONAL_OVERLAY.md`, and `os/playbook/GETTING_STARTED.md`. If current-machine setup boundaries are unclear, also read `os/RESOLVER.md`.
 
 2. Choose roots.
-   Use the current checkout as the Core audit root via `--agentos-home`. If running from an isolated Git worktree, find or ask for the primary checkout and pass `--primary-agentos-home <primary-agentos-home>` so private Personal Overlay presence checks refer to the canonical checkout. Treat missing primary-root context as a limitation, not as permission to write into the worktree.
+   Use the current checkout as the Core audit root via `--agentos-home`. If running from an isolated Git worktree, find or ask for the primary checkout and pass `--primary-agentos-home <primary-agentos-home>` so private Personal Overlay skill mirrors, starter paths, and automation locations refer to the canonical checkout. Treat missing primary-root context as a limitation, not as permission to write into the worktree.
 
 3. Run the deterministic helper.
    Use:
@@ -77,6 +77,7 @@ Safety:
 
 - The report distinguishes script facts from agent interpretation.
 - Feature-worktree runs do not recommend writing durable setup state to the worktree.
+- Split-root runs keep Core audit evidence tied to `--agentos-home` and Personal Overlay evidence tied to `--primary-agentos-home`.
 - Ambiguous automation prose or metadata is not treated as active recurring evidence.
 - Private file contents are not exposed.
 - No writes occur without explicit user approval.
