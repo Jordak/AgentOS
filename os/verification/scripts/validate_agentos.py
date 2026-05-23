@@ -152,6 +152,7 @@ class AgentOSValidator:
         return self.report()
 
     def run_structural_checks(self) -> None:
+        self.check_core_symlinks()
         self.check_markdown_path_portability()
         self.check_source_map_path_health()
         self.check_skills_manifest_consistency()
@@ -166,6 +167,7 @@ class AgentOSValidator:
         return self.report()
 
     def run_publication_precheck_checks(self) -> None:
+        self.check_core_symlinks()
         self.check_git_publication_source_set()
         self.check_private_overlay_files_are_ignored()
         self.check_personal_overlay_ignore_rules()
@@ -329,6 +331,27 @@ class AgentOSValidator:
             if self.is_regular_file(path)
             and ".git" not in path.parts
         )
+
+    def check_core_symlinks(self) -> None:
+        check = "core symlink policy"
+        if check in self.checked:
+            return
+
+        core = self.root / "os"
+        if core.is_symlink():
+            self.add_error(check, core, "AgentOS Core directory must not be a symbolic link")
+            self.checked.append(check)
+            return
+        if not core.exists():
+            self.add_error(check, core, "AgentOS Core directory is missing")
+            self.checked.append(check)
+            return
+
+        for path in sorted(core.rglob("*")):
+            if path.is_symlink():
+                self.add_error(check, path, "AgentOS Core must not contain symbolic links")
+
+        self.checked.append(check)
 
     def check_no_git_directory(self) -> None:
         check = "no git history"
@@ -1438,6 +1461,7 @@ def run_self_test() -> int:
         (root / "personal/bad.md").symlink_to("private-project/secret.md")
 
         validator = AgentOSValidator(root)
+        validator.check_core_symlinks()
         validator.check_markdown_path_portability()
         validator.check_source_map_path_health()
         validator.check_benchmark_manifest()
@@ -1460,6 +1484,7 @@ def run_self_test() -> int:
             "private marker matched",
             "missing required Personal Overlay ignore rule",
             "unexpected Personal Overlay unignore rule",
+            "AgentOS Core must not contain symbolic links",
             "root file is not allowlisted for public export",
             "GitHub metadata outside the public-safe CI workflow allowlist",
             "public export contains a symbolic link",
@@ -1643,6 +1668,10 @@ def run_self_test() -> int:
             error.check in {"private marker scan", "secret-like token scan"}
             for error in symlink_validator.errors
         )
+        core_symlink_rejected = any(
+            error.path == "os/linked.md" and "AgentOS Core must not contain symbolic links" in error.message
+            for error in symlink_validator.errors
+        )
         live_core_file_rejected = any(
             error.path == "os/context/CAREER.md" and "live personal context file" in error.message
             for error in symlink_validator.errors
@@ -1701,6 +1730,7 @@ def run_self_test() -> int:
             and built_in_marker_redacted
             and missing_skeleton_rejected
             and symlink_rejected_cleanly
+            and core_symlink_rejected
             and live_core_file_rejected
             and live_agent_path_rejected
             and generated_output_rejected

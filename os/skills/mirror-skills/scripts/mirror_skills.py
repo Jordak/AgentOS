@@ -7,6 +7,7 @@ import argparse
 import json
 import re
 import shutil
+import stat
 import sys
 from dataclasses import dataclass, asdict
 from pathlib import Path
@@ -72,7 +73,7 @@ def parse_manifest(agentos_root: Path) -> list[SkillEntry]:
         if not canonical_source:
             continue
 
-        source_path = (agentos_root / canonical_source).resolve()
+        source_path = agentos_root / canonical_source
         source_root = source_path.parent if source_path.name == "SKILL.md" else source_path
         entries.append(
             SkillEntry(
@@ -103,8 +104,8 @@ def discover_personal_overlay_entries(agentos_root: Path) -> list[SkillEntry]:
                 name=name,
                 source_kind="personal-overlay",
                 canonical_source=canonical_source,
-                source_path=skill_file.resolve(),
-                source_root=skill_dir.resolve(),
+                source_path=skill_file,
+                source_root=skill_dir,
                 mirror_dir=Path(),
             )
         )
@@ -116,19 +117,41 @@ def should_ignore(path: Path) -> bool:
     return any(part in IGNORED_NAMES or part.endswith(".pyc") for part in path.parts)
 
 
-def file_map(root: Path) -> dict[str, Path]:
-    if not root.exists():
-        return {}
-    if root.is_file():
-        return {"SKILL.md": root}
-
+def file_map(root: Path) -> tuple[dict[str, Path], list[str]]:
     files: dict[str, Path] = {}
+    problems: list[str] = []
+    try:
+        root_stat = root.lstat()
+    except FileNotFoundError:
+        return files, problems
+    except OSError as error:
+        return files, [f". ({error.__class__.__name__}: {error})"]
+    if stat.S_ISLNK(root_stat.st_mode):
+        return files, [f". (symbolic link is not allowed: {root})"]
+    if stat.S_ISREG(root_stat.st_mode):
+        return {"SKILL.md": root}, problems
+    if not stat.S_ISDIR(root_stat.st_mode):
+        return files, [f". (not a regular file or directory: {root})"]
+
     for path in root.rglob("*"):
-        if path.is_file():
-            rel = path.relative_to(root)
-            if not should_ignore(rel):
-                files[rel.as_posix()] = path
-    return files
+        rel_path = path.relative_to(root)
+        if should_ignore(rel_path):
+            continue
+        rel = rel_path.as_posix()
+        try:
+            path_stat = path.lstat()
+        except OSError as error:
+            problems.append(f"{rel} ({error.__class__.__name__}: {error})")
+            continue
+        if stat.S_ISLNK(path_stat.st_mode):
+            problems.append(f"{rel} (symbolic link is not allowed)")
+        elif stat.S_ISDIR(path_stat.st_mode):
+            continue
+        elif stat.S_ISREG(path_stat.st_mode):
+            files[rel] = path
+        else:
+            problems.append(f"{rel} (not a regular file or directory)")
+    return files, problems
 
 
 def file_read_problem(path: Path) -> str | None:
@@ -151,9 +174,59 @@ def unreadable_files(files: dict[str, Path]) -> list[str]:
     return problems
 
 
+def existing_path_kind_problem(path: Path, expected_kind: str) -> str | None:
+    try:
+        path_stat = path.lstat()
+    except FileNotFoundError:
+        return None
+    except OSError as error:
+        return f"{error.__class__.__name__}: {error}"
+    if stat.S_ISLNK(path_stat.st_mode):
+        return "symbolic link is not allowed"
+    if expected_kind == "directory" and not stat.S_ISDIR(path_stat.st_mode):
+        return "not a directory"
+    if expected_kind == "file" and not stat.S_ISREG(path_stat.st_mode):
+        return "not a regular file"
+    return None
+
+
+def mirror_path_kind_problems(mirror_dir: Path, canonical_files: dict[str, Path]) -> list[str]:
+    try:
+        mirror_root_stat = mirror_dir.lstat()
+    except FileNotFoundError:
+        return []
+    except OSError as error:
+        return [f". ({error.__class__.__name__}: {error})"]
+    if stat.S_ISLNK(mirror_root_stat.st_mode):
+        return [f". (symbolic link is not allowed: {mirror_dir})"]
+    if not stat.S_ISDIR(mirror_root_stat.st_mode):
+        return [f". (not a directory: {mirror_dir})"]
+
+    problems: list[str] = []
+    for rel in sorted(canonical_files):
+        current = mirror_dir
+        parts = Path(rel).parts
+        for part in parts[:-1]:
+            current = current / part
+            problem = existing_path_kind_problem(current, "directory")
+            if problem:
+                problems.append(f"{rel} ({current.relative_to(mirror_dir).as_posix()}: {problem})")
+                break
+            if not current.exists():
+                break
+        else:
+            destination = mirror_dir / rel
+            problem = existing_path_kind_problem(destination, "file")
+            if problem:
+                problems.append(f"{rel} ({rel}: {problem})")
+    return problems
+
+
 def compare_entry(entry: SkillEntry) -> MirrorResult:
     notes: list[str] = []
-    if not entry.source_path.exists():
+    try:
+        source_stat = entry.source_path.lstat()
+    except FileNotFoundError:
         return MirrorResult(
             name=entry.name,
             source_kind=entry.source_kind,
@@ -165,10 +238,34 @@ def compare_entry(entry: SkillEntry) -> MirrorResult:
             extra_files=[],
             notes=[f"canonical source does not exist: {entry.source_path}"],
         )
+    except OSError as error:
+        return MirrorResult(
+            name=entry.name,
+            source_kind=entry.source_kind,
+            status="source-unreadable",
+            canonical_source=entry.canonical_source,
+            mirror_path=str(entry.mirror_dir),
+            missing_files=[],
+            changed_files=[],
+            extra_files=[],
+            notes=[f"{error.__class__.__name__}: {error}"],
+        )
+    if stat.S_ISLNK(source_stat.st_mode):
+        return MirrorResult(
+            name=entry.name,
+            source_kind=entry.source_kind,
+            status="source-unreadable",
+            canonical_source=entry.canonical_source,
+            mirror_path=str(entry.mirror_dir),
+            missing_files=[],
+            changed_files=[],
+            extra_files=[],
+            notes=[f"canonical source is a symbolic link: {entry.source_path}"],
+        )
 
-    canonical_files = file_map(entry.source_root)
-    mirror_files = file_map(entry.mirror_dir)
-    source_unreadable = unreadable_files(canonical_files)
+    canonical_files, source_problems = file_map(entry.source_root)
+    mirror_files, mirror_problems = file_map(entry.mirror_dir)
+    source_unreadable = [*source_problems, *unreadable_files(canonical_files)]
     if source_unreadable:
         return MirrorResult(
             name=entry.name,
@@ -181,7 +278,11 @@ def compare_entry(entry: SkillEntry) -> MirrorResult:
             extra_files=sorted(set(mirror_files) - set(canonical_files)),
             notes=source_unreadable,
         )
-    mirror_unreadable = unreadable_files(mirror_files)
+    mirror_unreadable = [
+        *mirror_problems,
+        *mirror_path_kind_problems(entry.mirror_dir, canonical_files),
+        *unreadable_files(mirror_files),
+    ]
     if mirror_unreadable:
         return MirrorResult(
             name=entry.name,
@@ -227,10 +328,18 @@ def compare_entry(entry: SkillEntry) -> MirrorResult:
 
 
 def sync_entry(entry: SkillEntry, prune_extra: bool) -> None:
-    if not entry.source_path.exists():
+    try:
+        source_stat = entry.source_path.lstat()
+    except OSError:
+        return
+    if stat.S_ISLNK(source_stat.st_mode):
         return
 
-    canonical_files = file_map(entry.source_root)
+    canonical_files, source_problems = file_map(entry.source_root)
+    if source_problems:
+        return
+    if mirror_path_kind_problems(entry.mirror_dir, canonical_files):
+        return
     entry.mirror_dir.mkdir(parents=True, exist_ok=True)
 
     for rel, source in canonical_files.items():
@@ -242,7 +351,9 @@ def sync_entry(entry: SkillEntry, prune_extra: bool) -> None:
             shutil.copy2(source, destination)
 
     if prune_extra:
-        mirror_files = file_map(entry.mirror_dir)
+        mirror_files, mirror_problems = file_map(entry.mirror_dir)
+        if mirror_problems:
+            return
         for rel in sorted(set(mirror_files) - set(canonical_files), reverse=True):
             mirror_files[rel].unlink()
         remove_empty_dirs(entry.mirror_dir)
