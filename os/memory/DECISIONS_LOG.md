@@ -4,6 +4,10 @@ Status: Core architecture decisions.
 
 This Core log records publishable AgentOS architecture decisions. Live personal decisions belong in `personal/os/memory/DECISIONS_LOG.md`.
 
+## 2026-05-23
+
+- AgentOS executable scripts should stay thin, deterministic, and easy to audit across personal and work machines; ambiguous judgment, prose interpretation, and remediation orchestration belong in Markdown skills and playbooks unless executable complexity provides narrowly scoped deterministic value. See `docs/adr/0003-thin-trusted-scripts.md`.
+
 ## 2026-05-18
 
 - AgentOS publishing architecture uses AgentOS Core under `$root/os/` plus a Personal Overlay under `$root/personal/os/`, with Core read first and matching Personal Overlay files read after it.
