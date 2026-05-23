@@ -461,7 +461,7 @@ def compare_entry(entry: SkillEntry) -> MirrorResult:
         )
 
     canonical_files, source_problems = file_map(entry.source_root)
-    mirror_files, mirror_problems = file_map(entry.mirror_dir, reject_symlink_ancestors=False)
+    mirror_files: dict[str, Path] = {}
     source_unreadable = [*source_problems, *unreadable_files(canonical_files)]
     if source_unreadable:
         return MirrorResult(
@@ -475,9 +475,22 @@ def compare_entry(entry: SkillEntry) -> MirrorResult:
             extra_files=sorted(set(mirror_files) - set(canonical_files)),
             notes=source_unreadable,
         )
+    mirror_kind_problems = mirror_path_kind_problems(entry.mirror_dir, canonical_files)
+    if mirror_kind_problems:
+        return MirrorResult(
+            name=entry.name,
+            source_kind=entry.source_kind,
+            status="mirror-unreadable",
+            canonical_source=entry.canonical_source,
+            mirror_path=str(entry.mirror_dir),
+            missing_files=[],
+            changed_files=[],
+            extra_files=[],
+            notes=mirror_kind_problems,
+        )
+    mirror_files, mirror_problems = file_map(entry.mirror_dir, reject_symlink_ancestors=False)
     mirror_unreadable = [
         *mirror_problems,
-        *mirror_path_kind_problems(entry.mirror_dir, canonical_files),
         *unreadable_files(mirror_files),
     ]
     if mirror_unreadable:
@@ -535,10 +548,10 @@ def sync_entry(entry: SkillEntry, prune_extra: bool) -> None:
     canonical_files, source_problems = file_map(entry.source_root)
     if source_problems:
         return
+    if mirror_path_kind_problems(entry.mirror_dir, canonical_files):
+        return
     _mirror_files, mirror_problems = file_map(entry.mirror_dir, reject_symlink_ancestors=False)
     if mirror_problems:
-        return
-    if mirror_path_kind_problems(entry.mirror_dir, canonical_files):
         return
     entry.mirror_dir.mkdir(parents=True, exist_ok=True)
 
@@ -571,7 +584,9 @@ def select_entries(
     core_entries: list[SkillEntry],
     personal_entries: list[SkillEntry],
     requested_names: list[str],
+    blocked_names: set[str] | None = None,
 ) -> list[SkillEntry]:
+    blocked_names = blocked_names or set()
     core_names = {entry.name for entry in core_entries}
     personal_names = {entry.name for entry in personal_entries}
 
@@ -587,7 +602,7 @@ def select_entries(
         return [*core_entries, *personal_entries]
 
     requested = list(dict.fromkeys(requested_names))
-    available = core_names | personal_names
+    available = core_names | personal_names | blocked_names
     missing = [name for name in requested if name not in available]
     if missing:
         missing_list = ", ".join(missing)
@@ -698,17 +713,8 @@ def main() -> int:
             requested_names=requested_names,
         )
         preflight_results.extend(personal_preflight_results(personal_problems, mirror_root))
-    try:
-        entries = select_entries(core_entries, personal_entries, args.skill)
-    except SystemExit:
-        if not (preflight_results and args.skill):
-            raise
-        requested_set = set(args.skill)
-        entries = [
-            entry
-            for entry in [*core_entries, *personal_entries]
-            if not requested_set or entry.name in requested_set
-        ]
+    blocked_names = {result.name for result in preflight_results}
+    entries = select_entries(core_entries, personal_entries, args.skill, blocked_names=blocked_names)
     if not entries and not preflight_results:
         raise SystemExit("No mirrorable Core or Personal Overlay skills found.")
 
@@ -725,7 +731,6 @@ def main() -> int:
     ]
 
     if args.sync:
-        blocked_names = {result.name for result in preflight_results}
         block_all_sync = "personal-overlay" in blocked_names
         for entry in entries:
             if block_all_sync or entry.name in blocked_names:
