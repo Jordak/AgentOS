@@ -1277,12 +1277,13 @@ def check_automations(
         and not read_error_evidence
     )
 
+    codex_automation_presence = "unreadable" if codex_read_error else presence_with_count(codex_automations)
     details = [
         "Core automation registry: " + ("present" if core_registry_is_file else "missing"),
         "Personal automation registry: " + ("present" if personal_registry_is_file else "missing"),
         "Personal automation files: "
         + ("unreadable" if personal_file_count_error else str(personal_file_count)),
-        "Codex automation mirror dir: " + presence_with_count(codex_automations),
+        "Codex automation mirror dir: " + codex_automation_presence,
         "Personal automation mention: " + ("found" if registry_mentions_checks else "not found"),
         "Personal active AgentOS check evidence: " + ("found" if registry_active_checks else "not found"),
         "Personal negative AgentOS check evidence: " + ("found" if registry_negative_checks else "not found"),
@@ -1629,6 +1630,9 @@ def codex_automation_evidence(root: Path) -> tuple[bool, bool, bool, OSError | U
     active = False
     negative = False
     possible = False
+    root_ancestor_error = destination_root_problem(root)
+    if root_ancestor_error:
+        return active, negative, possible, root_ancestor_error
     root_exists, root_exists_error = safe_path_exists(root)
     if root_exists_error:
         return active, negative, possible, root_exists_error
@@ -1681,12 +1685,13 @@ def codex_automation_evidence(root: Path) -> tuple[bool, bool, bool, OSError | U
 
 
 def codex_automation_toml_is_active_scheduled(text: str) -> bool:
+    status_values = simple_config_field_values(text, ("status",))
+    schedule_values = simple_config_field_values(text, ("rrule", "schedule"))
     return bool(
-        codex_automation_toml_has_active_status(text)
-        and any(
-            automation_schedule_is_recurring(value)
-            for value in simple_config_field_values(text, ("rrule", "schedule"))
-        )
+        len(status_values) == 1
+        and automation_status_is_active(status_values[0])
+        and len(schedule_values) == 1
+        and automation_schedule_is_recurring(schedule_values[0])
     )
 
 
@@ -2172,6 +2177,8 @@ def run_self_tests() -> int:
         test_automation_codex_root_file_blocks_pass,
         test_automation_personal_root_file_blocks_pass,
         test_automation_symlink_evidence_blocks_pass,
+        test_automation_codex_home_symlink_blocks_pass,
+        test_automation_default_codex_ancestor_symlink_blocks_pass,
         test_automation_nested_symlink_blocks_pass,
         test_automation_registry_mention_warns,
         test_personal_active_automation_registry_passes,
@@ -2200,6 +2207,7 @@ def run_self_tests() -> int:
         test_codex_one_off_schedule_warns,
         test_codex_bounded_rrule_warns,
         test_codex_draft_candidate_automation_toml_warns,
+        test_codex_conflicting_toml_fields_warn,
         test_codex_agentos_automation_status_is_normalized,
         test_codex_agentos_automation_evidence_passes,
         test_automation_files_without_registry_warns,
@@ -3651,6 +3659,58 @@ Schedule rule: RRULE:FREQ=WEEKLY
         assert_true("Recurring AgentOS check evidence: not found" in joined, "unsafe evidence should suppress PASS")
 
 
+def test_automation_codex_home_symlink_blocks_pass() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        home = Path(tmp) / "home"
+        real_codex_home = Path(tmp) / "real-codex"
+        linked_codex_home = Path(tmp) / "linked-codex"
+        make_fake_agentos(root)
+        codex_automation = real_codex_home / "automations" / "agentos-doctor" / "automation.toml"
+        codex_automation.parent.mkdir(parents=True)
+        codex_automation.write_text(
+            'name = "AgentOS doctor health check"\n'
+            'status = "ACTIVE"\n'
+            'rrule = "RRULE:FREQ=WEEKLY"\n',
+            encoding="utf-8",
+        )
+        linked_codex_home.symlink_to(real_codex_home, target_is_directory=True)
+        env = minimal_env(home)
+        env["CODEX_HOME"] = str(linked_codex_home)
+        result = check_automations(root, root, home, verbose=False, env=env, cwd=root)
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "WARN", "symlinked CODEX_HOME should block PASS")
+        assert_true("could not be fully inspected" in result.summary, "symlinked CODEX_HOME should warn")
+        assert_true("Codex automation mirror dir: unreadable" in joined, "symlinked CODEX_HOME should not be counted")
+        assert_true("Codex active AgentOS check evidence: not found" in joined, "symlinked CODEX_HOME should not be active evidence")
+        assert_true("Recurring AgentOS check evidence: not found" in joined, "symlinked CODEX_HOME should suppress PASS")
+
+
+def test_automation_default_codex_ancestor_symlink_blocks_pass() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        home = Path(tmp) / "home"
+        real_codex_home = Path(tmp) / "real-codex"
+        make_fake_agentos(root)
+        home.mkdir()
+        codex_automation = real_codex_home / "automations" / "agentos-doctor" / "automation.toml"
+        codex_automation.parent.mkdir(parents=True)
+        codex_automation.write_text(
+            'name = "AgentOS doctor health check"\n'
+            'status = "ACTIVE"\n'
+            'rrule = "RRULE:FREQ=WEEKLY"\n',
+            encoding="utf-8",
+        )
+        (home / ".codex").symlink_to(real_codex_home, target_is_directory=True)
+        result = check_automations(root, root, home, verbose=False)
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "WARN", "symlinked default .codex root should block PASS")
+        assert_true("could not be fully inspected" in result.summary, "symlinked default .codex root should warn")
+        assert_true("Codex automation mirror dir: unreadable" in joined, "symlinked default .codex root should not be counted")
+        assert_true("Codex active AgentOS check evidence: not found" in joined, "symlinked default .codex root should not be active evidence")
+        assert_true("Recurring AgentOS check evidence: not found" in joined, "symlinked default .codex root should suppress PASS")
+
+
 def test_automation_nested_symlink_blocks_pass() -> None:
     with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
         root = Path(tmp) / "AgentOS"
@@ -4500,6 +4560,38 @@ def test_codex_draft_candidate_automation_toml_warns() -> None:
         assert_true(result.status == "WARN", "draft candidate Codex TOML should not pass")
         assert_true("Possible AgentOS check mention: found" in joined, "draft candidate TOML should remain possible evidence")
         assert_true("Codex active AgentOS check evidence: not found" in joined, "draft candidate TOML should not be active evidence")
+
+
+def test_codex_conflicting_toml_fields_warn() -> None:
+    cases = (
+        (
+            'name = "AgentOS doctor health check"\n'
+            'status = "ACTIVE"\n'
+            'status = "PENDING"\n'
+            'rrule = "RRULE:FREQ=WEEKLY"\n',
+            "duplicate status",
+        ),
+        (
+            'name = "AgentOS doctor health check"\n'
+            'status = "ACTIVE"\n'
+            'rrule = "RRULE:FREQ=WEEKLY"\n'
+            'rrule = "RRULE:FREQ=WEEKLY;COUNT=1"\n',
+            "conflicting schedule",
+        ),
+    )
+    for toml_text, label in cases:
+        with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+            root = Path(tmp) / "AgentOS"
+            home = Path(tmp) / "home"
+            make_fake_agentos(root)
+            codex_automation = home / ".codex" / "automations" / f"{label.replace(' ', '-')}" / "automation.toml"
+            codex_automation.parent.mkdir(parents=True)
+            codex_automation.write_text(toml_text, encoding="utf-8")
+            result = check_automations(root, root, home, verbose=False)
+            joined = "\n".join(result.details)
+            assert_true(result.status == "WARN", f"{label} should not pass as active recurring evidence")
+            assert_true("Codex active AgentOS check evidence: not found" in joined, f"{label} should not be active evidence")
+            assert_true("Recurring AgentOS check evidence: not found" in joined, f"{label} should suppress recurring PASS")
 
 
 def test_codex_agentos_automation_status_is_normalized() -> None:
