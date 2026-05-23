@@ -67,6 +67,14 @@
     ]
   },
   {
+    "id": "personal-overlay-false-empty",
+    "category": "personal-overlay",
+    "question": "Which AgentOS playbook file defines the operational rule for handling ignore-aware personal/os/ discovery that returns only .gitkeep skeleton files?",
+    "expected_paths": [
+      "os/playbook/PERSONAL_OVERLAY.md"
+    ]
+  },
+  {
     "id": "mapped-projects",
     "category": "mapped-projects",
     "question": "Where should an agent find the source map for project and artifact routing?",

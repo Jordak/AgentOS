@@ -330,7 +330,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--agentos-root",
         type=Path,
         default=None,
-        help="AgentOS root containing os/skills/MANIFEST.md. Defaults to discovery from cwd.",
+        help=(
+            "AgentOS root containing os/skills/MANIFEST.md. Defaults to discovery from cwd. "
+            "When including Personal Overlay skills from a feature worktree, pass the primary "
+            "AgentOS checkout root or use --core-only."
+        ),
     )
     parser.add_argument(
         "--mirror-root",

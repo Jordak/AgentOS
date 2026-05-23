@@ -15,7 +15,7 @@ At the start of work in this workspace:
 1. Read this file.
 2. Read `os/INDEX.md`.
 3. Read `os/playbook/PERSONAL_OVERLAY.md`.
-4. If `personal/os/` contains matching files for the task, read those after the Core files.
+4. If `personal/os/` contains matching files for the task, read those after the Core files. Use the Personal Overlay discovery rule before concluding ignored private files are absent.
 5. For broad or ambiguous AgentOS routing, source authority, safety, or durable state placement, read `os/RESOLVER.md`.
 6. Read the narrowest relevant files for the user's request.
 

@@ -15,6 +15,16 @@ Read AgentOS Core first. Then read matching files under the Personal Overlay whe
 
 If both roots contain guidance for the same topic, the Personal Overlay may add private detail or override user-specific facts. It should not silently replace Core behavior unless the personal file says that it does.
 
+## Discovery Rule
+
+The Personal Overlay is intentionally ignored local state. Do not treat ignore-aware or git-aware discovery as evidence that Personal Overlay files are absent.
+
+Absence must be proven with a direct filesystem read or listing of the canonical Personal Overlay root that does not apply git ignore rules. If discovery returns only tracked skeleton files such as `.gitkeep`, treat the result as inconclusive until a direct filesystem check has also found no matching private files.
+
+Use any direct filesystem mechanism available in the current environment. Examples include reading a known expected path directly, using a filesystem API that recursively lists regular files under `personal/os/`, POSIX `find personal/os -type f`, PowerShell `Get-ChildItem -Path personal/os -File -Recurse -Force`, or ignore-including search flags such as `rg --files -uuu personal/os/` when ripgrep is installed.
+
+Do not use default ignore-aware searches, IDE indexes, Git file APIs, or MCP/resource indexes as absence evidence unless they are known to include ignored files.
+
 ## Canonical Local Overlay
 
 The Personal Overlay is ignored local state. In a multi-worktree setup, ignored files under `personal/os/` are not copied or synchronized into feature worktrees.

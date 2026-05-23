@@ -13,7 +13,7 @@ Keep AgentOS skill sources portable while making the current machine usable. The
 
 Inputs:
 
-- AgentOS root, defaulting to the current workspace.
+- AgentOS root, defaulting to the current workspace for Core-only audits. When including Personal Overlay skills from a feature worktree, run from the canonical primary AgentOS checkout or pass `--agentos-root <primary AgentOS checkout>` so the feature worktree's ignored-file skeleton is not treated as authoritative.
 - `os/skills/MANIFEST.md` with canonical skill entries and `Canonical source` fields.
 - Personal Overlay skill directories under `personal/os/skills/<skill-name>/SKILL.md`, when present.
 - A current-machine mirror root, defaulting to the user's `.agents/skills` directory.
@@ -46,12 +46,14 @@ Safety:
 ## Workflow Phases
 
 1. Inspect policy:
-   - Read `os/skills/MANIFEST.md`, `os/skills/README.md`, and `os/skills/SKILL_CONTRACT.md`.
+   - Read `os/skills/MANIFEST.md`, `os/skills/README.md`, `os/skills/SKILL_CONTRACT.md`, and `os/playbook/PERSONAL_OVERLAY.md`.
    - Confirm the manifest remains portable and contains canonical skill metadata only.
    - Check for Personal Overlay skills under `personal/os/skills/<skill-name>/SKILL.md`. These are private canonical sources for the current user and should be mirrored alongside Core skills when present.
+   - If running from a feature worktree and the audit includes Personal Overlay skills, resolve the canonical primary checkout's `personal/os/skills/` by running this skill from that checkout or by passing `--agentos-root <primary AgentOS checkout>`. Use the current feature worktree root only for Core-only audits, or when the user explicitly assigned that worktree as the private overlay workspace.
 
 2. Run an audit:
    - Use `python3 os/skills/mirror-skills/scripts/mirror_skills.py`.
+   - From a feature worktree, pass `--agentos-root <primary AgentOS checkout>` unless using `--core-only`.
    - Pass `--mirror-root <path>` if checking somewhere other than the default current-machine mirror root.
    - Pass repeated `--skill <name>` arguments to check only a named subset of canonical skills.
    - Report missing, stale, and extra-file mirrors before syncing.
@@ -87,6 +89,12 @@ Audit or sync only a named canonical skill:
 ```bash
 python3 os/skills/mirror-skills/scripts/mirror_skills.py --skill mirror-skills
 python3 os/skills/mirror-skills/scripts/mirror_skills.py --skill mirror-skills --sync
+```
+
+Audit Personal Overlay skills from a feature worktree by pointing at the primary AgentOS checkout:
+
+```bash
+python3 os/skills/mirror-skills/scripts/mirror_skills.py --agentos-root <primary-agentos-root>
 ```
 
 Test against a temporary mirror root:
