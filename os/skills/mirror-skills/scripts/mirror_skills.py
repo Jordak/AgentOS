@@ -73,7 +73,7 @@ def parse_manifest(agentos_root: Path) -> list[SkillEntry]:
         if not canonical_source:
             continue
 
-        source_path = (agentos_root / canonical_source).resolve()
+        source_path = agentos_root / canonical_source
         source_root = source_path.parent if source_path.name == "SKILL.md" else source_path
         entries.append(
             SkillEntry(
@@ -107,8 +107,8 @@ def discover_personal_overlay_entries(agentos_root: Path, personal_overlay_root:
                 name=name,
                 source_kind="personal-overlay",
                 canonical_source=canonical_source,
-                source_path=skill_file.resolve(),
-                source_root=skill_dir.resolve(),
+                source_path=skill_file,
+                source_root=skill_dir,
                 mirror_dir=Path(),
             )
         )

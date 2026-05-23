@@ -1875,6 +1875,7 @@ def run_self_tests() -> int:
         test_mirror_nested_source_directory_error_fails,
         test_mirror_nested_mirror_directory_error_fails,
         test_mirror_source_symlinks_fail_closed,
+        test_mirror_source_root_symlinks_fail_closed,
         test_mirror_nested_path_kind_conflicts_fail_closed,
         test_mirror_unreadable_personal_skills_root_fails,
         test_mirror_failure_suppresses_private_names_without_verbose,
@@ -2553,6 +2554,51 @@ def test_mirror_source_symlinks_fail_closed() -> None:
         assert_true(result.status == "FAIL", "source symlinks should fail closed")
         assert_true("source-unreadable=1" in joined, "source symlink evidence should be reported")
         assert_true("--sync" not in joined, "source symlinks should not recommend sync")
+
+
+def test_mirror_source_root_symlinks_fail_closed() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        mirror_root = Path(tmp) / "mirrors"
+        external = Path(tmp) / "external"
+        make_fake_agentos(root)
+        external.mkdir()
+
+        linked_skill_file = external / "linked-skill.md"
+        linked_skill_file.write_text("# Linked Skill\n", encoding="utf-8")
+        (root / "os" / "skills" / "example-skill" / "SKILL.md").unlink()
+        (root / "os" / "skills" / "example-skill" / "SKILL.md").symlink_to(linked_skill_file)
+
+        linked_core_dir = external / "linked-core"
+        linked_core_dir.mkdir()
+        (linked_core_dir / "SKILL.md").write_text("# Linked Core\n", encoding="utf-8")
+        (linked_core_dir / "secret.txt").write_text("secret\n", encoding="utf-8")
+        (root / "os" / "skills" / "linked-core").symlink_to(linked_core_dir, target_is_directory=True)
+        manifest = root / "os" / "skills" / "MANIFEST.md"
+        manifest.write_text(
+            manifest.read_text(encoding="utf-8")
+            + """
+
+### `linked-core`
+
+- Canonical source: `os/skills/linked-core/SKILL.md`.
+""",
+            encoding="utf-8",
+        )
+
+        linked_personal_dir = external / "linked-personal"
+        linked_personal_dir.mkdir()
+        (linked_personal_dir / "SKILL.md").write_text("# Linked Personal\n", encoding="utf-8")
+        private_skill = root / "personal" / "os" / "skills" / "private-skill"
+        (private_skill / "SKILL.md").unlink()
+        private_skill.rmdir()
+        private_skill.symlink_to(linked_personal_dir, target_is_directory=True)
+
+        result = check_skill_mirrors(root, root, mirror_root, minimal_env(Path(tmp) / "home"), verbose=False)
+        joined = "\n".join(result.details + result.recommendations)
+        assert_true(result.status == "FAIL", "source root symlinks should fail closed")
+        assert_true("source-unreadable=" in joined, "source root symlink evidence should be reported")
+        assert_true("--sync" not in joined, "source root symlinks should not recommend sync")
 
 
 def test_mirror_nested_path_kind_conflicts_fail_closed() -> None:
