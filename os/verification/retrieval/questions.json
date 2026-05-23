@@ -85,10 +85,9 @@
   {
     "id": "run-benchmarks",
     "category": "benchmarks",
-    "question": "What workflow should an agent use to run AgentOS benchmarks and then refresh Core benchmark status?",
+    "question": "What workflow should an agent use when the user asks to run all configured AgentOS benchmark scripts?",
     "expected_paths": [
-      "os/skills/run-benchmarks/SKILL.md",
-      "os/skills/refresh-benchmark-status/SKILL.md"
+      "os/skills/run-benchmarks/SKILL.md"
     ]
   }
 ]

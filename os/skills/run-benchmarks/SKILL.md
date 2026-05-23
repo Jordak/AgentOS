@@ -52,22 +52,22 @@ Safety:
    Treat a script as compatible only when its help exposes the flags needed for the requested mode:
    - status-eligible saved evidence: `--save-report` and `--check-remote-main`;
    - deterministic validation: `--self-test`;
-   - safe preview: `--dry-run` when the script can avoid external harness calls;
+   - diagnostic preview: `--dry-run` when the script can avoid external harness calls;
    - external/model-call harnesses: `--no-dry-run`, plus `--harness all` only when the help advertises that option.
 
-   Report incompatible scripts instead of carrying benchmark-specific command knowledge. Do not infer suite-specific flags or fixture names in this skill.
+   Report incompatible scripts instead of carrying benchmark-specific command knowledge. Do not infer suite-specific flags or fixture names in this skill. Treat dry-run output as diagnostic and ineligible for Core status updates, even when it is saved with Git metadata.
 
 3. Preflight Git state.
    Before status-eligible saved runs, confirm the checkout is on `main`, clean, and aligned with `origin/main` after fetching when network is available. The scripts' own `--check-remote-main` metadata remains the evidence of remote freshness at run time.
 
 4. Run safe checks first.
-   Default to deterministic/local-safe work: run compatible scripts' `--self-test`, then run safe saved reports with `--dry-run --check-remote-main --save-report` when supported. If a script has no safe preview flag, ask before running it.
+   Default to deterministic/local-safe work: run compatible scripts' `--self-test`, then run diagnostic previews with `--dry-run` when supported. Save status-eligible evidence only from behavior-bearing local runs advertised by the script help, or from approved real harness runs. If the next useful command could call external harnesses or spend credits, ask before running it.
 
 5. Ask before model-call harnesses.
    If the user explicitly asked for model-call harnesses or all external benchmarks, summarize the commands and ask for confirmation unless the current request clearly approved spending model calls. For approved harness runs, use the compatible script contract, usually `python3 <script> --no-dry-run --check-remote-main --save-report`, adding `--harness all` only when advertised.
 
 6. Refresh status.
-   After scripts finish, run or follow `refresh-benchmark-status`. If the user asked for "run benchmarks and refresh status", continue through eligible updates allowed by that skill. If the user only asked to "run benchmarks", state that the benchmark process is not complete until `refresh-benchmark-status` has run, then offer the refresh or run it in proposal/report mode when write authorization is unclear.
+   After scripts finish, run or follow `refresh-benchmark-status` in update, proposal, or report mode as allowed by the user's request and the available evidence. If the user asked for "run benchmarks and refresh status", continue through eligible updates allowed by that skill. If write authorization is unclear, run the refresh workflow in proposal/report mode rather than stopping at an offer. Leave refresh as a next step only when blocked, declined, or impossible; in that case state that the benchmark process is not complete until `refresh-benchmark-status` has run.
 
 ## Filing Rules
 
@@ -93,4 +93,4 @@ Before finishing:
 3. Confirm Git preflight was performed before status-eligible saved runs.
 4. Confirm no model-call harness ran without approval.
 5. Confirm raw report content was not copied into Core.
-6. Confirm `refresh-benchmark-status` ran, was offered, or was explicitly left as the next step.
+6. Confirm `refresh-benchmark-status` ran or was followed in proposal/report mode, or that a blocked/declined refresh was labeled incomplete with the next action.

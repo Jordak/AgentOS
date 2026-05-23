@@ -73,7 +73,7 @@ Each skill entry records:
 - Output artifact: concise benchmark run report naming commands, saved report directories, incompatible scripts, visible pass/fail/unavailable posture, and status-refresh outcome.
 - Filing rule: raw reports and run histories stay in Personal Overlay report directories configured by `BENCHMARKS.json`; Core status changes only through `refresh-benchmark-status`; benchmark CLI standardization is deferred to GitHub Issue #33 and deterministic refresh-helper work to #30.
 - Safety posture: ask before external harnesses, model-call benchmarks, or commands that may spend credits or require authenticated CLIs; do not copy raw/private benchmark evidence into Core; do not produce status-eligible evidence unless the checkout is clean, current `main`.
-- Verification coverage: confirm benchmark manifest and Personal Overlay policy were read, configured script help was inspected, compatible scripts were selected from the CLI contract, Git preflight ran before status-eligible saved reports, model-call work was approved, and status refresh ran, was offered, or was left as the explicit next step.
+- Verification coverage: confirm benchmark manifest and Personal Overlay policy were read, configured script help was inspected, compatible scripts were selected from the CLI contract, dry-runs were treated as diagnostic/ineligible, Git preflight ran before status-eligible saved reports, model-call work was approved, and status refresh ran or was followed in proposal/report mode unless blocked or declined.
 - Upgrade notes: thin orchestration layer for Issue #32; avoids benchmark-specific internals and delegates status interpretation to `refresh-benchmark-status`.
 
 ### `mirror-skills`
