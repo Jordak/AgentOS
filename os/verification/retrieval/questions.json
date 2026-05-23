@@ -69,7 +69,7 @@
   {
     "id": "personal-overlay-false-empty",
     "category": "personal-overlay",
-    "question": "If an ignore-aware search of personal/os/ returns only .gitkeep skeleton files, can an agent conclude that no matching Personal Overlay files exist?",
+    "question": "Which AgentOS files define the rule for handling ignore-aware personal/os/ discovery that returns only .gitkeep skeleton files?",
     "expected_paths": [
       "os/playbook/PERSONAL_OVERLAY.md",
       "os/RESOLVER.md",
