@@ -279,8 +279,16 @@ def publishable_sources(root: Path, *, git_source_set: bool = True) -> list[Path
     return sources
 
 
-def run_publication_precheck(root: Path) -> int:
+def current_validator_script() -> Path:
     validator = Path(__file__).resolve().parents[1] / "os/verification/scripts/validate_agentos.py"
+    validator_problem = final_path_problem(validator, expected_kind="file", allow_missing=False)
+    if validator_problem:
+        raise RuntimeError(f"unsafe validator script: {validator} ({validator_problem})")
+    return validator
+
+
+def run_publication_precheck(root: Path) -> int:
+    validator = current_validator_script()
     result = subprocess.run(
         [sys.executable, str(validator), "--root", str(root), "--publication-precheck"],
         text=True,
@@ -301,12 +309,7 @@ def copy_public_tree(root: Path, output: Path, sources: list[Path]) -> None:
 
 
 def run_validation(root: Path, output: Path) -> int:
-    validator_source = Path(__file__).resolve().parents[1]
-    validator = validator_source / "os/verification/scripts/validate_agentos.py"
-    validator_problem = final_path_problem(validator, expected_kind="file", allow_missing=False)
-    if validator_problem:
-        print(f"error: unsafe validator script: {validator} ({validator_problem})", file=sys.stderr)
-        return 2
+    validator = current_validator_script()
     result = subprocess.run(
         [sys.executable, str(validator), "--root", str(root), "--public-export", str(output)],
         text=True,
