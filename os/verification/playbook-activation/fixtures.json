@@ -27,6 +27,15 @@
     "rationale": "GitHub handoffs, PR descriptions, merge expectations, and issue closure notes should activate the GitHub workflow policy."
   },
   {
+    "id": "github-pr-from-skill-report",
+    "category": "github",
+    "task": "After an architecture skill produced a report and the user says, \"Draft a PR for suggestion one,\" decide the workflow before using connectors or telling the user to reauthenticate.",
+    "must_access": [
+      "os/playbook/GITHUB_WORKFLOW.md"
+    ],
+    "rationale": "Follow-up requests to draft/create/open a PR from another skill's candidate must activate the GitHub workflow so branch discipline and sandboxed `gh` auth handling are applied."
+  },
+  {
     "id": "github-cli-sandbox-auth",
     "category": "github",
     "task": "A sandboxed agent command says `gh auth status` has an invalid token, but the user says `gh auth login` keeps reporting they are already logged in and GitHub actions work after the auth flow. Decide what to do before asking the user to reauthenticate.",

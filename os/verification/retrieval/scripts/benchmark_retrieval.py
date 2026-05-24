@@ -776,7 +776,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--limit", type=int, default=5)
     parser.add_argument("--harness", action="append", choices=["codex", "claude", "all"], default=[])
-    parser.add_argument("--question-id", action="append", dest="question_ids")
+    parser.add_argument(
+        "--question-id",
+        "--fixture-id",
+        action="append",
+        dest="question_ids",
+        help="Run only the named retrieval question/fixture id. Repeat to select more than one.",
+    )
     parser.add_argument("--responses", type=Path, help="Grade saved harness response records.")
     parser.add_argument("--output", type=Path, help="Write the combined report to this path.")
     parser.add_argument(
@@ -828,8 +834,15 @@ def main(argv: list[str] | None = None) -> int:
         print("--responses requires --suite harness or --suite all", file=sys.stderr)
         return 2
 
+    all_questions = harness_eval.load_questions(questions_path)
     selected_ids = set(args.question_ids) if args.question_ids else None
-    questions = harness_eval.load_questions(questions_path, selected_ids)
+    if selected_ids:
+        available_ids = {question["id"] for question in all_questions}
+        unknown_ids = sorted(selected_ids - available_ids)
+        if unknown_ids:
+            print(f"Unknown question/fixture id(s): {', '.join(unknown_ids)}", file=sys.stderr)
+            return 2
+    questions = [question for question in all_questions if selected_ids is None or question["id"] in selected_ids]
     if not questions:
         print("No questions selected.", file=sys.stderr)
         return 2

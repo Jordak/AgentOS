@@ -2,7 +2,9 @@
 
 Status: operational policy v2.
 
-Use this file when drafting GitHub issues, PRDs, pull request descriptions, branch handoffs, merge/landing notes, or issue closure comments.
+Use this file when drafting GitHub issues, PRDs, pull requests, pull request descriptions, branch handoffs, merge/landing notes, or issue closure comments.
+
+Also use this file when another workflow produces a report, candidate list, branch, or implementation slice and the next user request asks to draft, open, create, or retry a pull request. The earlier workflow supplies context; this workflow owns GitHub routing, branch/PR discipline, and GitHub CLI authentication handling.
 
 ## Workflow Skill Routing
 
