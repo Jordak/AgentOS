@@ -498,6 +498,8 @@ class AgentOSValidator:
             return False
         if rel.parts[0] in {".git", "personal"}:
             return True
+        if any(part in PUBLIC_EXPORT_EXCLUDED_DIRS for part in rel.parts):
+            return True
         if not self.is_git_ignored(rel):
             return False
         if len(rel.parts) == 1 and (
@@ -1742,6 +1744,19 @@ def run_self_test() -> int:
             for error in ignored_validator.errors
         )
 
+        no_git_artifact_root = root / "_no_git_artifacts_fixture"
+        (no_git_artifact_root / "os").mkdir(parents=True)
+        no_git_venv_link = no_git_artifact_root / ".venv/bin/python"
+        no_git_venv_link.parent.mkdir(parents=True)
+        no_git_venv_link.symlink_to("/usr/bin/python3")
+        no_git_artifact_validator = AgentOSValidator(no_git_artifact_root)
+        no_git_artifact_validator.check_managed_symlinks()
+        no_git_artifact_symlink_clean = not any(
+            error.check == "managed symlink policy"
+            and ".venv/bin/python" in error.path
+            for error in no_git_artifact_validator.errors
+        )
+
         broad_gitkeep_root = root / "_broad_gitkeep_ignore_fixture"
         broad_gitkeep_root.mkdir()
         (broad_gitkeep_root / ".gitignore").write_text(
@@ -2048,6 +2063,7 @@ def run_self_test() -> int:
             and ignored_artifacts_clean
             and ignored_agent_clean
             and ignored_artifact_symlink_clean
+            and no_git_artifact_symlink_clean
             and broad_gitkeep_unignore_rejected
             and symlink_diagnostic_safe
             and csv_private_marker_rejected
