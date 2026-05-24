@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import io
 import os
 import shutil
@@ -13,16 +14,6 @@ import sys
 import tarfile
 import tempfile
 from pathlib import Path
-
-from agentos_publication_rules import (
-    PUBLIC_EXPORT_EXCLUDED_DIRS as EXCLUDED_DIRS,
-    PUBLIC_EXPORT_ROOT_DIRS as ROOT_DIRS,
-    PUBLIC_EXPORT_ROOT_FILES as ROOT_FILES,
-    gitkeep_file_reason,
-    is_personal_overlay_skeleton_path,
-    personal_overlay_skeleton_file_reason,
-    publication_path_reason,
-)
 
 
 def parse_args() -> argparse.Namespace:
@@ -122,6 +113,98 @@ def final_path_problem(path: Path, expected_kind: str | None = None, allow_missi
     if expected_kind == "file" and not stat.S_ISREG(path_stat.st_mode):
         return "not a regular file"
     return None
+
+
+def no_follow_path_problem(
+    path: Path,
+    expected_kind: str | None,
+    allow_missing: bool,
+    boundary: Path,
+) -> str | None:
+    boundary_absolute = lexical_absolute(boundary)
+    boundary_problem = final_path_problem(boundary_absolute, expected_kind="directory", allow_missing=False)
+    if boundary_problem:
+        return f"{boundary_absolute} ({boundary_problem})"
+
+    absolute = lexical_absolute(path)
+    try:
+        relative = absolute.relative_to(boundary_absolute)
+    except ValueError:
+        return f"{absolute} (path is outside the managed root: {boundary_absolute})"
+
+    current = boundary_absolute
+    if not relative.parts:
+        final_problem = final_path_problem(current, expected_kind=expected_kind, allow_missing=allow_missing)
+        return f"{current} ({final_problem})" if final_problem else None
+
+    for index, part in enumerate(relative.parts):
+        current = current / part
+        is_final = index == len(relative.parts) - 1
+        try:
+            path_stat = current.lstat()
+        except FileNotFoundError:
+            if allow_missing:
+                return None
+            return f"{current} (path component is missing)"
+        except OSError as error:
+            return f"{current} ({error.__class__.__name__}: {error})"
+
+        if stat.S_ISLNK(path_stat.st_mode):
+            return f"{current} (symbolic link is not allowed)"
+        if not is_final and not stat.S_ISDIR(path_stat.st_mode):
+            return f"{current} (path component is not a directory)"
+        if is_final and expected_kind == "directory" and not stat.S_ISDIR(path_stat.st_mode):
+            return f"{current} (not a directory)"
+        if is_final and expected_kind == "file" and not stat.S_ISREG(path_stat.st_mode):
+            return f"{current} (not a regular file)"
+    return None
+
+
+def current_script_root() -> Path:
+    return lexical_absolute(Path(__file__).parent.parent)
+
+
+_PUBLICATION_RULES_LOADED = False
+
+
+def load_publication_rules() -> None:
+    global EXCLUDED_DIRS
+    global ROOT_DIRS
+    global ROOT_FILES
+    global gitkeep_file_reason
+    global is_personal_overlay_skeleton_path
+    global personal_overlay_skeleton_file_reason
+    global publication_path_reason
+    global _PUBLICATION_RULES_LOADED
+
+    if _PUBLICATION_RULES_LOADED:
+        return
+
+    root = current_script_root()
+    rules_path = root / "scripts/agentos_publication_rules.py"
+    rules_problem = no_follow_path_problem(
+        rules_path,
+        expected_kind="file",
+        allow_missing=False,
+        boundary=root,
+    )
+    if rules_problem:
+        raise RuntimeError(f"unsafe publication rules script: {rules_problem}")
+
+    spec = importlib.util.spec_from_file_location("agentos_publication_rules_checked", rules_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"could not load publication rules script: {rules_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    EXCLUDED_DIRS = module.PUBLIC_EXPORT_EXCLUDED_DIRS
+    ROOT_DIRS = module.PUBLIC_EXPORT_ROOT_DIRS
+    ROOT_FILES = module.PUBLIC_EXPORT_ROOT_FILES
+    gitkeep_file_reason = module.gitkeep_file_reason
+    is_personal_overlay_skeleton_path = module.is_personal_overlay_skeleton_path
+    personal_overlay_skeleton_file_reason = module.personal_overlay_skeleton_file_reason
+    publication_path_reason = module.publication_path_reason
+    _PUBLICATION_RULES_LOADED = True
 
 
 def looks_like_export_dir(path: Path) -> bool:
@@ -280,10 +363,16 @@ def publishable_sources(root: Path, *, git_source_set: bool = True) -> list[Path
 
 
 def current_validator_script() -> Path:
-    validator = Path(__file__).resolve().parents[1] / "os/verification/scripts/validate_agentos.py"
-    validator_problem = final_path_problem(validator, expected_kind="file", allow_missing=False)
+    root = current_script_root()
+    validator = root / "os/verification/scripts/validate_agentos.py"
+    validator_problem = no_follow_path_problem(
+        validator,
+        expected_kind="file",
+        allow_missing=False,
+        boundary=root,
+    )
     if validator_problem:
-        raise RuntimeError(f"unsafe validator script: {validator} ({validator_problem})")
+        raise RuntimeError(f"unsafe validator script: {validator_problem}")
     return validator
 
 
@@ -330,6 +419,11 @@ def main() -> int:
         return 2
     if not (root / "os").is_dir():
         print(f"error: root does not contain os/: {root}", file=sys.stderr)
+        return 2
+    try:
+        load_publication_rules()
+    except RuntimeError as error:
+        print(f"error: {error}", file=sys.stderr)
         return 2
 
     staged_snapshot: Path | None = None

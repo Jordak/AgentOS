@@ -272,6 +272,8 @@ def discover_personal_overlay_entries(
     for skill_dir in skill_dirs:
         if requested_names is not None and skill_dir.name not in requested_names:
             continue
+        if skill_dir.name == ".gitkeep" or should_ignore(skill_dir.relative_to(personal_skills_root)):
+            continue
         skill_source = f"personal/os/skills/{skill_dir.name}"
         try:
             skill_dir_stat = skill_dir.lstat()
@@ -292,8 +294,6 @@ def discover_personal_overlay_entries(
                     f"{skill_dir} (symbolic link is not allowed)",
                 )
             )
-            continue
-        if skill_dir.name == ".gitkeep" or should_ignore(skill_dir.relative_to(personal_skills_root)):
             continue
         if not stat.S_ISDIR(skill_dir_stat.st_mode):
             continue
