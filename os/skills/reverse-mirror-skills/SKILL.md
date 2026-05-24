@@ -124,7 +124,7 @@ Filing Rules:
 
 8. Verify and mirror:
    - Run skill validation when available for imported or changed skill directories.
-   - Run `python3 os/verification/scripts/validate_agentos.py` after Core changes.
+   - Run `scripts/run-validator` after Core changes.
    - Run the `mirror-skills` workflow scoped to the imported or changed skill names after approval.
    - For Personal Overlay imports made from a feature worktree, run `mirror-skills` from the primary checkout or with the primary checkout as the AgentOS root.
    - Report validation status, mirror status, and backup paths.
@@ -171,7 +171,7 @@ Before finishing:
 
 1. Confirm no bundled `reverse-mirror-skills` script was added.
 2. Run skill validation for `reverse-mirror-skills` when available.
-3. Run `python3 os/verification/scripts/validate_agentos.py` after Core changes.
+3. Run `scripts/run-validator` after Core changes.
 4. Run `mirror-skills` scoped to `reverse-mirror-skills`.
 5. Run a scoped `mirror-skills` regression check on at least one existing Core skill.
 6. Confirm `os/skills/MANIFEST.md` includes `reverse-mirror-skills` and no machine-local mirror state.

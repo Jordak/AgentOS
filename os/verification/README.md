@@ -9,7 +9,7 @@ Use this when changing AgentOS Core, reviewing a pull request, or preparing a pu
 Run the local validator:
 
 ```bash
-python3 os/verification/scripts/validate_agentos.py
+scripts/run-validator
 ```
 
 The default validator reads local files only and runs structural checks plus deterministic publication/privacy checks.

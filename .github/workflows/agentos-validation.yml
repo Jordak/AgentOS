@@ -41,7 +41,7 @@ jobs:
               "  git fetch origin" \
               "  git rebase origin/${BASE_REF}" \
               "  # resolve conflicts if prompted, then run:" \
-              "  python3 os/verification/scripts/validate_agentos.py" \
+              "  scripts/run-validator" \
               "  scripts/agent-push --force-with-lease origin <feature-branch>"
             exit 1
           fi
@@ -71,10 +71,10 @@ jobs:
           gitleaks version
 
       - name: Run AgentOS validator
-        run: python3 os/verification/scripts/validate_agentos.py
+        run: scripts/run-validator
 
       - name: Run AgentOS validator self-test
-        run: python3 os/verification/scripts/validate_agentos.py --self-test
+        run: scripts/run-validator --self-test
 
       - name: Run global instruction installer self-test
         run: python3 scripts/install_global_agent_instructions.py --self-test

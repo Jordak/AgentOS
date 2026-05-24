@@ -4,23 +4,16 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import io
+import os
 import shutil
+import stat
 import subprocess
 import sys
 import tarfile
 import tempfile
 from pathlib import Path
-
-from agentos_publication_rules import (
-    PUBLIC_EXPORT_EXCLUDED_DIRS as EXCLUDED_DIRS,
-    PUBLIC_EXPORT_ROOT_DIRS as ROOT_DIRS,
-    PUBLIC_EXPORT_ROOT_FILES as ROOT_FILES,
-    gitkeep_file_reason,
-    is_personal_overlay_skeleton_path,
-    personal_overlay_skeleton_file_reason,
-    publication_path_reason,
-)
 
 
 def parse_args() -> argparse.Namespace:
@@ -94,6 +87,126 @@ def is_relative_to(path: Path, base: Path) -> bool:
     return True
 
 
+def lexical_absolute(path: Path) -> Path:
+    """Make a path absolute without resolving symbolic links."""
+    expanded = path.expanduser()
+    if not expanded.is_absolute():
+        expanded = Path.cwd() / expanded
+    return Path(os.path.abspath(expanded))
+
+
+def final_path_problem(path: Path, expected_kind: str | None = None, allow_missing: bool = True) -> str | None:
+    absolute = lexical_absolute(path)
+    try:
+        path_stat = absolute.lstat()
+    except FileNotFoundError:
+        if allow_missing:
+            return None
+        return "path is missing"
+    except OSError as error:
+        return f"{error.__class__.__name__}: {error}"
+
+    if stat.S_ISLNK(path_stat.st_mode):
+        return "symbolic link is not allowed"
+    if expected_kind == "directory" and not stat.S_ISDIR(path_stat.st_mode):
+        return "not a directory"
+    if expected_kind == "file" and not stat.S_ISREG(path_stat.st_mode):
+        return "not a regular file"
+    return None
+
+
+def no_follow_path_problem(
+    path: Path,
+    expected_kind: str | None,
+    allow_missing: bool,
+    boundary: Path,
+) -> str | None:
+    boundary_absolute = lexical_absolute(boundary)
+    boundary_problem = final_path_problem(boundary_absolute, expected_kind="directory", allow_missing=False)
+    if boundary_problem:
+        return f"{boundary_absolute} ({boundary_problem})"
+
+    absolute = lexical_absolute(path)
+    try:
+        relative = absolute.relative_to(boundary_absolute)
+    except ValueError:
+        return f"{absolute} (path is outside the managed root: {boundary_absolute})"
+
+    current = boundary_absolute
+    if not relative.parts:
+        final_problem = final_path_problem(current, expected_kind=expected_kind, allow_missing=allow_missing)
+        return f"{current} ({final_problem})" if final_problem else None
+
+    for index, part in enumerate(relative.parts):
+        current = current / part
+        is_final = index == len(relative.parts) - 1
+        try:
+            path_stat = current.lstat()
+        except FileNotFoundError:
+            if allow_missing:
+                return None
+            return f"{current} (path component is missing)"
+        except OSError as error:
+            return f"{current} ({error.__class__.__name__}: {error})"
+
+        if stat.S_ISLNK(path_stat.st_mode):
+            return f"{current} (symbolic link is not allowed)"
+        if not is_final and not stat.S_ISDIR(path_stat.st_mode):
+            return f"{current} (path component is not a directory)"
+        if is_final and expected_kind == "directory" and not stat.S_ISDIR(path_stat.st_mode):
+            return f"{current} (not a directory)"
+        if is_final and expected_kind == "file" and not stat.S_ISREG(path_stat.st_mode):
+            return f"{current} (not a regular file)"
+    return None
+
+
+def current_script_root() -> Path:
+    return lexical_absolute(Path(__file__).parent.parent)
+
+
+_PUBLICATION_RULES_LOADED = False
+
+
+def load_publication_rules() -> None:
+    global EXCLUDED_DIRS
+    global ROOT_DIRS
+    global ROOT_FILES
+    global gitkeep_file_reason
+    global is_personal_overlay_skeleton_path
+    global personal_overlay_skeleton_file_reason
+    global publication_path_reason
+    global _PUBLICATION_RULES_LOADED
+
+    if _PUBLICATION_RULES_LOADED:
+        return
+
+    root = current_script_root()
+    rules_path = root / "scripts/agentos_publication_rules.py"
+    rules_problem = no_follow_path_problem(
+        rules_path,
+        expected_kind="file",
+        allow_missing=False,
+        boundary=root,
+    )
+    if rules_problem:
+        raise RuntimeError(f"unsafe publication rules script: {rules_problem}")
+
+    spec = importlib.util.spec_from_file_location("agentos_publication_rules_checked", rules_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"could not load publication rules script: {rules_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    EXCLUDED_DIRS = module.PUBLIC_EXPORT_EXCLUDED_DIRS
+    ROOT_DIRS = module.PUBLIC_EXPORT_ROOT_DIRS
+    ROOT_FILES = module.PUBLIC_EXPORT_ROOT_FILES
+    gitkeep_file_reason = module.gitkeep_file_reason
+    is_personal_overlay_skeleton_path = module.is_personal_overlay_skeleton_path
+    personal_overlay_skeleton_file_reason = module.personal_overlay_skeleton_file_reason
+    publication_path_reason = module.publication_path_reason
+    _PUBLICATION_RULES_LOADED = True
+
+
 def looks_like_export_dir(path: Path) -> bool:
     name = path.name.lower()
     return "agentos" in name and any(
@@ -103,18 +216,20 @@ def looks_like_export_dir(path: Path) -> bool:
 
 def output_safety_errors(root: Path, output: Path) -> list[str]:
     errors: list[str] = []
-    filesystem_root = Path(output.anchor).resolve()
+    resolved_root = root.resolve()
+    resolved_output = output.resolve(strict=False)
+    filesystem_root = Path(resolved_output.anchor).resolve()
     home = Path.home().resolve()
 
-    if output == filesystem_root:
+    if resolved_output == filesystem_root:
         errors.append("output may not be the filesystem root")
-    if output == home:
+    if resolved_output == home:
         errors.append("output may not be the current user's home directory")
-    if output == root:
+    if resolved_output == resolved_root:
         errors.append("output may not be the AgentOS repository root")
-    elif is_relative_to(output, root):
+    elif is_relative_to(resolved_output, resolved_root):
         errors.append("output may not be inside the AgentOS repository root")
-    if output in root.parents:
+    if resolved_output in resolved_root.parents:
         errors.append("output may not be an ancestor of the AgentOS repository root")
     if not looks_like_export_dir(output):
         errors.append("output directory name must look like a dedicated AgentOS export directory")
@@ -247,8 +362,22 @@ def publishable_sources(root: Path, *, git_source_set: bool = True) -> list[Path
     return sources
 
 
+def current_validator_script() -> Path:
+    root = current_script_root()
+    validator = root / "os/verification/scripts/validate_agentos.py"
+    validator_problem = no_follow_path_problem(
+        validator,
+        expected_kind="file",
+        allow_missing=False,
+        boundary=root,
+    )
+    if validator_problem:
+        raise RuntimeError(f"unsafe validator script: {validator_problem}")
+    return validator
+
+
 def run_publication_precheck(root: Path) -> int:
-    validator = Path(__file__).resolve().parents[1] / "os/verification/scripts/validate_agentos.py"
+    validator = current_validator_script()
     result = subprocess.run(
         [sys.executable, str(validator), "--root", str(root), "--publication-precheck"],
         text=True,
@@ -268,9 +397,8 @@ def copy_public_tree(root: Path, output: Path, sources: list[Path]) -> None:
         shutil.copy2(source, target)
 
 
-def run_validation(root: Path, output: Path, validator_root: Path | None = None) -> int:
-    validator_source = validator_root or root
-    validator = validator_source / "os/verification/scripts/validate_agentos.py"
+def run_validation(root: Path, output: Path) -> int:
+    validator = current_validator_script()
     result = subprocess.run(
         [sys.executable, str(validator), "--root", str(root), "--public-export", str(output)],
         text=True,
@@ -284,29 +412,45 @@ def run_validation(root: Path, output: Path, validator_root: Path | None = None)
 
 def main() -> int:
     args = parse_args()
-    root = args.root.resolve()
+    root = lexical_absolute(args.root)
+    root_problem = final_path_problem(root, expected_kind="directory", allow_missing=False)
+    if root_problem:
+        print(f"error: unsafe AgentOS root: {root} ({root_problem})", file=sys.stderr)
+        return 2
     if not (root / "os").is_dir():
         print(f"error: root does not contain os/: {root}", file=sys.stderr)
+        return 2
+    try:
+        load_publication_rules()
+    except RuntimeError as error:
+        print(f"error: {error}", file=sys.stderr)
         return 2
 
     staged_snapshot: Path | None = None
     try:
         source_root = root
         git_source_set = True
+        sources: list[Path] | None = None
         if args.staged:
             staged_snapshot = materialize_staged_tree(root)
             source_root = staged_snapshot
             git_source_set = False
-            precheck_status = run_validation(root, source_root, validator_root=source_root)
+            sources = publishable_sources(source_root, git_source_set=git_source_set)
+            precheck_status = run_validation(root, source_root)
         else:
             precheck_status = run_publication_precheck(root)
         if precheck_status != 0:
             return precheck_status
 
-        sources = publishable_sources(source_root, git_source_set=git_source_set)
+        if sources is None:
+            sources = publishable_sources(source_root, git_source_set=git_source_set)
 
         if args.output:
-            output = args.output.resolve()
+            output = lexical_absolute(args.output)
+            output_problem = final_path_problem(output, expected_kind="directory", allow_missing=True)
+            if output_problem:
+                print(f"error: unsafe output directory: {output} ({output_problem})", file=sys.stderr)
+                return 2
             safety_errors = output_safety_errors(root, output)
             if safety_errors:
                 print(f"error: unsafe output directory: {output}", file=sys.stderr)
@@ -327,8 +471,7 @@ def main() -> int:
 
         if args.skip_validation:
             return 0
-        validator_root = output if args.staged else root
-        return run_validation(root, output, validator_root=validator_root)
+        return run_validation(root, output)
     except RuntimeError as error:
         print(f"error: {error}", file=sys.stderr)
         return 2

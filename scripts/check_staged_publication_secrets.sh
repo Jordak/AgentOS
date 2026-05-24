@@ -8,7 +8,7 @@ trap 'rm -rf "$SNAPSHOT_DIR"' EXIT
 TREE="$(git -C "$ROOT" write-tree)"
 git -C "$ROOT" archive --format=tar "$TREE" | tar -xf - -C "$SNAPSHOT_DIR"
 
-python3 "$SNAPSHOT_DIR/os/verification/scripts/validate_agentos.py" --root "$ROOT" --public-export "$SNAPSHOT_DIR"
+"$ROOT/scripts/run-validator" --root "$ROOT" --public-export "$SNAPSHOT_DIR"
 
 if ! command -v gitleaks >/dev/null 2>&1; then
   echo "error: gitleaks is required for the staged publication secret scan" >&2

@@ -153,7 +153,7 @@ fi
 PUSH_ARGS+=("$REMOTE" "$BRANCH")
 
 echo "Running AgentOS default validation..."
-python3 "$ROOT/os/verification/scripts/validate_agentos.py"
+"$ROOT/scripts/run-validator"
 
 echo "Scanning HEAD publication tree..."
 "$ROOT/scripts/check_publication_tree_secrets.sh" HEAD

@@ -63,7 +63,7 @@ git switch <feature-branch>
 git branch backup/<feature-branch>-before-rebase
 git fetch origin
 git rebase origin/main
-python3 os/verification/scripts/validate_agentos.py
+scripts/run-validator
 scripts/agent-push --force-with-lease origin <feature-branch>
 ```
 

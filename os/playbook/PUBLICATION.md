@@ -132,7 +132,7 @@ LLM review may supplement this process, but it is not the release gate.
 Run publication validation in the working tree by default:
 
 ```bash
-python3 os/verification/scripts/validate_agentos.py --publication-precheck
+scripts/run-validator --publication-precheck
 scripts/check_working_tree_secrets.sh
 scripts/audit_agentos_leak_paths.sh
 ```
@@ -143,7 +143,7 @@ When performing the final release operation, optionally build and validate a pub
 
 ```bash
 python3 scripts/export_public_agentos.py --staged --output <export-dir> --force
-python3 os/verification/scripts/validate_agentos.py --public-export <export-dir>
+scripts/run-validator --public-export <export-dir>
 ```
 
 The staged export validates the exact Git index contents that can become the fresh public initial commit. The candidate is a dry run, not the default day-to-day gate.

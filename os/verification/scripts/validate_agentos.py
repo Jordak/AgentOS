@@ -10,9 +10,11 @@ skill instead of this portable validator.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import os
 import re
+import stat
 import subprocess
 import sys
 import tempfile
@@ -21,21 +23,113 @@ from pathlib import Path
 
 sys.dont_write_bytecode = True
 
-PUBLICATION_RULES_DIR = Path(__file__).resolve().parents[3] / "scripts"
-if str(PUBLICATION_RULES_DIR) not in sys.path:
-    sys.path.insert(0, str(PUBLICATION_RULES_DIR))
+def lexical_absolute(path: Path) -> Path:
+    """Make a path absolute without resolving symbolic links."""
+    expanded = path.expanduser()
+    if not expanded.is_absolute():
+        expanded = Path.cwd() / expanded
+    return Path(os.path.abspath(expanded))
 
-from agentos_publication_rules import (  # noqa: E402
-    GENERATED_OUTPUT_PARTS,
-    PERSONAL_OVERLAY_SKELETON_FILES,
-    PUBLIC_EXPORT_EXCLUDED_DIRS,
-    PUBLIC_EXPORT_ROOT_DIRS,
-    PUBLIC_EXPORT_ROOT_FILES,
-    gitkeep_file_reason,
-    is_personal_overlay_skeleton_path,
-    personal_overlay_skeleton_file_reason,
-    publication_path_reason,
-)
+
+def final_path_problem(
+    path: Path,
+    expected_kind: str | None = None,
+    allow_missing: bool = True,
+) -> str | None:
+    absolute = lexical_absolute(path)
+    try:
+        path_stat = absolute.lstat()
+    except FileNotFoundError:
+        if allow_missing:
+            return None
+        return "path is missing"
+    except OSError as error:
+        return f"{error.__class__.__name__}: {error}"
+
+    if stat.S_ISLNK(path_stat.st_mode):
+        return "symbolic link is not allowed"
+    if expected_kind == "directory" and not stat.S_ISDIR(path_stat.st_mode):
+        return "not a directory"
+    if expected_kind == "file" and not stat.S_ISREG(path_stat.st_mode):
+        return "not a regular file"
+    return None
+
+
+def bootstrap_path_problem(
+    path: Path,
+    expected_kind: str,
+    boundary: Path,
+) -> str | None:
+    boundary_absolute = lexical_absolute(boundary)
+    boundary_problem = final_path_problem(boundary_absolute, expected_kind="directory", allow_missing=False)
+    if boundary_problem:
+        return f"{boundary_absolute} ({boundary_problem})"
+    absolute = lexical_absolute(path)
+    try:
+        relative = absolute.relative_to(boundary_absolute)
+    except ValueError:
+        return f"{absolute} (path is outside the managed root: {boundary_absolute})"
+
+    current = boundary_absolute
+    for index, part in enumerate(relative.parts):
+        current = current / part
+        is_final = index == len(relative.parts) - 1
+        try:
+            path_stat = current.lstat()
+        except FileNotFoundError:
+            return f"{current} (path component is missing)"
+        except OSError as error:
+            return f"{current} ({error.__class__.__name__}: {error})"
+        if stat.S_ISLNK(path_stat.st_mode):
+            return f"{current} (symbolic link is not allowed)"
+        if not is_final and not stat.S_ISDIR(path_stat.st_mode):
+            return f"{current} (path component is not a directory)"
+        if is_final and expected_kind == "file" and not stat.S_ISREG(path_stat.st_mode):
+            return f"{current} (not a regular file)"
+        if is_final and expected_kind == "directory" and not stat.S_ISDIR(path_stat.st_mode):
+            return f"{current} (not a directory)"
+    return None
+
+
+def load_publication_rules() -> None:
+    global GENERATED_OUTPUT_PARTS
+    global PERSONAL_OVERLAY_SKELETON_FILES
+    global PUBLIC_EXPORT_EXCLUDED_DIRS
+    global PUBLIC_EXPORT_ROOT_DIRS
+    global PUBLIC_EXPORT_ROOT_FILES
+    global gitkeep_file_reason
+    global is_personal_overlay_skeleton_path
+    global personal_overlay_skeleton_file_reason
+    global publication_path_reason
+
+    root = lexical_absolute(Path(__file__).parents[3])
+    rules_path = root / "scripts/agentos_publication_rules.py"
+    rules_problem = bootstrap_path_problem(rules_path, expected_kind="file", boundary=root)
+    if rules_problem:
+        raise RuntimeError(f"unsafe publication rules script: {rules_problem}")
+
+    spec = importlib.util.spec_from_file_location("agentos_publication_rules_checked", rules_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"could not load publication rules script: {rules_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    GENERATED_OUTPUT_PARTS = module.GENERATED_OUTPUT_PARTS
+    PERSONAL_OVERLAY_SKELETON_FILES = module.PERSONAL_OVERLAY_SKELETON_FILES
+    PUBLIC_EXPORT_EXCLUDED_DIRS = module.PUBLIC_EXPORT_EXCLUDED_DIRS
+    PUBLIC_EXPORT_ROOT_DIRS = module.PUBLIC_EXPORT_ROOT_DIRS
+    PUBLIC_EXPORT_ROOT_FILES = module.PUBLIC_EXPORT_ROOT_FILES
+    gitkeep_file_reason = module.gitkeep_file_reason
+    is_personal_overlay_skeleton_path = module.is_personal_overlay_skeleton_path
+    personal_overlay_skeleton_file_reason = module.personal_overlay_skeleton_file_reason
+    publication_path_reason = module.publication_path_reason
+
+
+try:
+    load_publication_rules()
+except RuntimeError as error:
+    print(f"AgentOS validation failed: {error}", file=sys.stderr)
+    raise SystemExit(2)
 
 
 CODE_SPAN_RE = re.compile(r"`([^`]+)`")
@@ -133,14 +227,15 @@ class Finding:
     def format(self) -> str:
         return f"[{self.check}] {self.path}: {self.message}"
 
-
 class AgentOSValidator:
     def __init__(self, root: Path) -> None:
-        self.root = root.resolve()
-        self.private_marker_patterns = [*PRIVATE_MARKER_PATTERNS, *self.load_private_marker_patterns(self.root)]
+        self.root = lexical_absolute(root)
         self.errors: list[Finding] = []
         self.warnings: list[Finding] = []
         self.checked: list[str] = []
+        self.private_marker_patterns = [*PRIVATE_MARKER_PATTERNS]
+        if not self.root_path_problem():
+            self.private_marker_patterns.extend(self.load_private_marker_patterns())
 
     def run(self) -> int:
         self.run_structural_checks()
@@ -152,6 +247,9 @@ class AgentOSValidator:
         return self.report()
 
     def run_structural_checks(self) -> None:
+        self.check_managed_symlinks()
+        if self.has_errors_for("managed symlink policy"):
+            return
         self.check_markdown_path_portability()
         self.check_source_map_path_health()
         self.check_skills_manifest_consistency()
@@ -166,6 +264,9 @@ class AgentOSValidator:
         return self.report()
 
     def run_publication_precheck_checks(self) -> None:
+        self.check_managed_symlinks()
+        if self.has_errors_for("managed symlink policy"):
+            return
         self.check_git_publication_source_set()
         self.check_private_overlay_files_are_ignored()
         self.check_personal_overlay_ignore_rules()
@@ -175,7 +276,17 @@ class AgentOSValidator:
         self.checked.append("publication precheck")
 
     def run_public_export_validation(self, export_root: Path) -> int:
-        self.root = export_root.resolve()
+        self.run_public_export_validation_checks(export_root)
+        return self.report()
+
+    def run_public_export_validation_checks(self, export_root: Path) -> None:
+        self.root = lexical_absolute(export_root)
+        root_problem = self.root_path_problem()
+        if root_problem:
+            self.add_error("public export allowlist", self.root, f"public export root is unsafe: {root_problem}")
+            self.checked.append("public export allowlist")
+            self.checked.append("public export validation")
+            return
         self.check_no_git_directory()
         self.check_public_export_allowlist()
         self.check_personal_overlay_ignore_file_rules()
@@ -184,13 +295,18 @@ class AgentOSValidator:
         self.check_secret_like_tokens()
         self.check_no_private_generated_outputs()
         self.checked.append("public export validation")
-        return self.report()
 
     def add_error(self, check: str, path: Path | str, message: str) -> None:
         self.errors.append(Finding(check, self.display_path(path), self.redact_private_markers(message)))
 
     def add_warning(self, check: str, path: Path | str, message: str) -> None:
         self.warnings.append(Finding(check, self.display_path(path), self.redact_private_markers(message)))
+
+    def has_errors_for(self, check: str) -> bool:
+        return any(error.check == check for error in self.errors)
+
+    def root_path_problem(self) -> str | None:
+        return final_path_problem(self.root, expected_kind="directory", allow_missing=False)
 
     def display_path(self, path: Path | str) -> str:
         if isinstance(path, Path):
@@ -257,9 +373,81 @@ class AgentOSValidator:
                 paths.append(Path(raw_path))
         return paths
 
-    def load_private_marker_patterns(self, root: Path) -> list[PrivateMarker]:
-        marker_file = root / "personal/os/verification/privacy-markers.txt"
-        if not marker_file.exists():
+    def no_follow_path_problem(
+        self,
+        path: Path,
+        expected_kind: str | None = None,
+        allow_missing: bool = True,
+    ) -> str | None:
+        try:
+            relative = path.relative_to(self.root)
+        except ValueError:
+            return "path is outside the AgentOS root"
+
+        current = self.root
+        for index, part in enumerate(relative.parts):
+            current = current / part
+            is_final = index == len(relative.parts) - 1
+            try:
+                path_stat = current.lstat()
+            except FileNotFoundError:
+                if allow_missing:
+                    return None
+                return "path component is missing"
+            except OSError as error:
+                return f"{error.__class__.__name__}: {error}"
+
+            if stat.S_ISLNK(path_stat.st_mode):
+                return "symbolic link is not allowed"
+            if not is_final and not current.is_dir():
+                return "path component is not a directory"
+            if is_final and expected_kind == "directory" and not current.is_dir():
+                return "not a directory"
+            if is_final and expected_kind == "file" and not current.is_file():
+                return "not a regular file"
+        return None
+
+    def personal_overlay_root_problem(self, personal: Path) -> str | None:
+        try:
+            personal_stat = personal.lstat()
+        except FileNotFoundError:
+            return "personal overlay skeleton is missing"
+        except OSError as error:
+            return f"{error.__class__.__name__}: {error}"
+        if stat.S_ISLNK(personal_stat.st_mode):
+            return "Personal Overlay path used by validator must not be a symbolic link"
+        if not personal.is_dir():
+            return "personal overlay skeleton is not a directory"
+        return None
+
+    def iter_personal_overlay_files(self, personal: Path, check: str) -> list[Path]:
+        files: list[Path] = []
+        for path in sorted(personal.rglob("*")):
+            try:
+                path_stat = path.lstat()
+            except OSError as error:
+                self.add_error(check, path, f"{error.__class__.__name__}: {error}")
+                continue
+            if stat.S_ISLNK(path_stat.st_mode) or stat.S_ISREG(path_stat.st_mode):
+                files.append(path)
+        return files
+
+    def load_private_marker_patterns(self) -> list[PrivateMarker]:
+        check = "private marker config"
+        marker_file = self.root / "personal/os/verification/privacy-markers.txt"
+        marker_problem = self.no_follow_path_problem(marker_file, expected_kind="file", allow_missing=True)
+        if marker_problem:
+            self.add_error(check, marker_file, marker_problem)
+            return []
+        try:
+            marker_file_stat = marker_file.lstat()
+        except FileNotFoundError:
+            return []
+        except OSError as error:
+            self.add_error(check, marker_file, f"{error.__class__.__name__}: {error}")
+            return []
+        if not stat.S_ISREG(marker_file_stat.st_mode):
+            self.add_error(check, marker_file, "not a regular file")
             return []
         patterns: list[PrivateMarker] = []
         marker_index = 0
@@ -329,6 +517,60 @@ class AgentOSValidator:
             if self.is_regular_file(path)
             and ".git" not in path.parts
         )
+
+    def check_managed_symlinks(self) -> None:
+        check = "managed symlink policy"
+        if check in self.checked:
+            return
+
+        root_problem = self.root_path_problem()
+        if root_problem:
+            self.add_error(check, self.root, f"AgentOS validation root is unsafe: {root_problem}")
+            self.checked.append(check)
+            return
+
+        os_dir = self.root / "os"
+        if not os_dir.exists() and not os_dir.is_symlink():
+            self.add_error(check, os_dir, "AgentOS Core directory is missing")
+            self.checked.append(check)
+            return
+
+        for entry in sorted(self.root.iterdir()):
+            if self.should_skip_managed_symlink_scan(entry):
+                continue
+            self.check_managed_symlink_tree(entry, check)
+
+        self.checked.append(check)
+
+    def should_skip_managed_symlink_scan(self, path: Path) -> bool:
+        try:
+            rel = path.relative_to(self.root)
+        except ValueError:
+            return False
+        if not rel.parts:
+            return False
+        if rel.parts[0] in {".git", "personal"}:
+            return True
+        if any(part in PUBLIC_EXPORT_EXCLUDED_DIRS for part in rel.parts):
+            return True
+        return False
+
+    def check_managed_symlink_tree(self, root: Path, check: str) -> None:
+        message = "AgentOS-managed paths outside personal/ must not contain symbolic links"
+        pending = [root]
+        while pending:
+            path = pending.pop()
+            if self.should_skip_managed_symlink_scan(path):
+                continue
+            if path.is_symlink():
+                self.add_error(check, path, message)
+                continue
+            if not path.is_dir():
+                continue
+            try:
+                pending.extend(reversed(sorted(path.iterdir())))
+            except OSError as error:
+                self.add_error(check, path, f"{error.__class__.__name__}: {error}")
 
     def check_no_git_directory(self) -> None:
         check = "no git history"
@@ -462,13 +704,14 @@ class AgentOSValidator:
     def check_private_overlay_files_are_ignored(self) -> None:
         check = "private overlay ignore coverage"
         personal = self.root / "personal"
-        if not personal.exists():
-            self.add_error(check, personal, "personal overlay skeleton is missing")
+        personal_problem = self.personal_overlay_root_problem(personal)
+        if personal_problem:
+            self.add_error(check, personal, personal_problem)
             self.checked.append(check)
             return
 
         checked_private_files = 0
-        for path in sorted(p for p in personal.rglob("*") if self.is_file_or_symlink(p)):
+        for path in self.iter_personal_overlay_files(personal, check):
             rel_path = path.relative_to(self.root)
             if path.name == ".gitkeep" and is_personal_overlay_skeleton_path(rel_path):
                 continue
@@ -547,12 +790,17 @@ class AgentOSValidator:
     def check_personal_overlay_tracking(self, allow_private_files: bool) -> None:
         check = "personal overlay skeleton"
         personal = self.root / "personal"
-        if not personal.exists():
-            self.add_error(check, personal, "personal overlay skeleton is missing")
+        personal_problem = self.personal_overlay_root_problem(personal)
+        if personal_problem:
+            self.add_error(check, personal, personal_problem)
             self.checked.append(check)
             return
         for rel_text in sorted(PERSONAL_OVERLAY_SKELETON_FILES):
             skeleton_path = self.root / rel_text
+            skeleton_problem = self.no_follow_path_problem(skeleton_path)
+            if skeleton_problem:
+                self.add_error(check, rel_text, skeleton_problem)
+                continue
             if not skeleton_path.exists():
                 self.add_error(check, rel_text, "required Personal Overlay skeleton .gitkeep is missing")
                 continue
@@ -563,7 +811,7 @@ class AgentOSValidator:
                 tracked = self.run_git(["ls-files", "--error-unmatch", "--", rel_text])
                 if tracked.returncode != 0:
                     self.add_error(check, rel_text, "Personal Overlay skeleton .gitkeep must be tracked by git")
-        for path in sorted(p for p in personal.rglob("*") if self.is_file_or_symlink(p)):
+        for path in self.iter_personal_overlay_files(personal, check):
             rel_text = path.relative_to(self.root).as_posix()
             if path.name == ".gitkeep":
                 rel_path = path.relative_to(self.root)
@@ -773,7 +1021,14 @@ class AgentOSValidator:
                     self.add_error(check, manifest_path, f"{skill_name}: missing {field_name}")
 
             if canonical:
-                canonical_path = self.resolve_path(canonical)
+                canonical_path = self.managed_relative_path(
+                    canonical,
+                    check,
+                    manifest_path,
+                    f"{skill_name}: Canonical source",
+                )
+                if not canonical_path:
+                    continue
                 if not canonical_path.exists():
                     self.add_error(
                         check,
@@ -815,6 +1070,19 @@ class AgentOSValidator:
         if code_span:
             return code_span.group(1)
         return value.rstrip(".").strip()
+
+    def managed_relative_path(self, raw_path: str, check: str, source: Path, label: str) -> Path | None:
+        path = Path(raw_path)
+        if path.is_absolute():
+            self.add_error(check, source, f"{label} must be root-relative, not absolute: {raw_path}")
+            return None
+        if raw_path.startswith("~"):
+            self.add_error(check, source, f"{label} must be root-relative, not home-relative: {raw_path}")
+            return None
+        if ".." in path.parts:
+            self.add_error(check, source, f"{label} must not contain parent-directory segments: {raw_path}")
+            return None
+        return self.root / path
 
     def resolve_path(self, raw_path: str) -> Path:
         path = Path(raw_path).expanduser()
@@ -1426,6 +1694,7 @@ def run_self_test() -> int:
         disallowed_github_metadata = root / ".github/dependabot.yml"
         disallowed_github_metadata.write_text("version: 2\n", encoding="utf-8")
         (root / "os/linked.raw").symlink_to("../unexpected.txt")
+        (root / "docs/linked.raw").symlink_to("../unexpected.txt")
         nonempty_core_gitkeep = root / "os/memory/weekly-review/.gitkeep"
         nonempty_core_gitkeep.parent.mkdir(parents=True)
         nonempty_core_gitkeep.write_text("not empty\n", encoding="utf-8")
@@ -1438,6 +1707,7 @@ def run_self_test() -> int:
         (root / "personal/bad.md").symlink_to("private-project/secret.md")
 
         validator = AgentOSValidator(root)
+        validator.check_managed_symlinks()
         validator.check_markdown_path_portability()
         validator.check_source_map_path_health()
         validator.check_benchmark_manifest()
@@ -1460,6 +1730,7 @@ def run_self_test() -> int:
             "private marker matched",
             "missing required Personal Overlay ignore rule",
             "unexpected Personal Overlay unignore rule",
+            "AgentOS-managed paths outside personal/ must not contain symbolic links",
             "root file is not allowlisted for public export",
             "GitHub metadata outside the public-safe CI workflow allowlist",
             "public export contains a symbolic link",
@@ -1486,6 +1757,8 @@ def run_self_test() -> int:
             "/" + "Users" + "/private\n" + "sk-" + "fakeignoredfixture1234567890\n",
             encoding="utf-8",
         )
+        ignored_artifact_symlink = ignored_root / "output/private-link.md"
+        ignored_artifact_symlink.symlink_to("../local-artifacts/private.txt")
         ignored_agent_dir = ignored_root / "os/agents/ignored-agent"
         ignored_agent_dir.mkdir(parents=True)
         (ignored_agent_dir / ".DS_Store").write_text("ignored local artifact\n", encoding="utf-8")
@@ -1500,12 +1773,56 @@ def run_self_test() -> int:
         ignored_validator.check_core_private_markers()
         ignored_validator.check_secret_like_tokens()
         ignored_validator.check_agent_contract_completeness()
+        ignored_validator.check_managed_symlinks()
         ignored_artifacts_clean = not any(
             "output/private.txt" in error.path or "local-artifacts/private.txt" in error.path
             for error in ignored_validator.errors
         )
         ignored_agent_clean = not any(
             "os/agents/ignored-agent" in error.path for error in ignored_validator.errors
+        )
+        ignored_artifact_symlink_clean = not any(
+            error.check == "managed symlink policy"
+            and (
+                "output/private-link.md" in error.path
+                or "local-artifacts/private.txt" in error.path
+            )
+            for error in ignored_validator.errors
+        )
+
+        no_git_artifact_root = root / "_no_git_artifacts_fixture"
+        (no_git_artifact_root / "os").mkdir(parents=True)
+        no_git_venv_link = no_git_artifact_root / ".venv/bin/python"
+        no_git_venv_link.parent.mkdir(parents=True)
+        no_git_venv_link.symlink_to("/usr/bin/python3")
+        no_git_artifact_validator = AgentOSValidator(no_git_artifact_root)
+        no_git_artifact_validator.check_managed_symlinks()
+        no_git_artifact_symlink_clean = not any(
+            error.check == "managed symlink policy"
+            and ".venv/bin/python" in error.path
+            for error in no_git_artifact_validator.errors
+        )
+
+        gitignored_managed_symlink_root = root / "_gitignored_managed_symlink_fixture"
+        (gitignored_managed_symlink_root / "os").mkdir(parents=True)
+        (gitignored_managed_symlink_root / "docs").mkdir()
+        (gitignored_managed_symlink_root / ".gitignore").write_text("docs/ignored-link.md\n", encoding="utf-8")
+        (gitignored_managed_symlink_root / "target.txt").write_text("target\n", encoding="utf-8")
+        (gitignored_managed_symlink_root / "docs/ignored-link.md").symlink_to("../target.txt")
+        subprocess.run(
+            ["git", "-C", str(gitignored_managed_symlink_root), "init"],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        gitignored_managed_symlink_validator = AgentOSValidator(gitignored_managed_symlink_root)
+        gitignored_managed_symlink_validator.check_managed_symlinks()
+        gitignored_managed_symlink_rejected = any(
+            error.check == "managed symlink policy"
+            and error.path == "docs/ignored-link.md"
+            and "symbolic links" in error.message
+            for error in gitignored_managed_symlink_validator.errors
         )
 
         broad_gitkeep_root = root / "_broad_gitkeep_ignore_fixture"
@@ -1529,8 +1846,8 @@ def run_self_test() -> int:
             for error in broad_gitkeep_validator.errors
         )
 
-        symlink_diagnostic_safe = any(
-            error.path == "personal/bad.md" and "public export may contain only .gitkeep" in error.message
+        personal_symlink_diagnostic_scoped = not any(
+            error.path == "personal/bad.md" and "must not be a symbolic link" in error.message
             for error in validator.errors
         ) and not any(
             "personal/private-project/secret.md" in error.path
@@ -1595,6 +1912,124 @@ def run_self_test() -> int:
             and "required Personal Overlay skeleton .gitkeep is missing" in error.message
             for error in validator.errors
         )
+        canonical_escape_root = root / "_canonical_escape_fixture"
+        (canonical_escape_root / "os/skills").mkdir(parents=True)
+        (canonical_escape_root / "personal").mkdir()
+        (canonical_escape_root / "os/skills/MANIFEST.md").write_text(
+            "# Skills\n\n"
+            "### `escape`\n\n"
+            "- Canonical source: `/agentos-fixture-outside/SKILL.md`\n"
+            "- Contract status: `partial`\n"
+            "- Mutability: read-only\n"
+            "- Tools and connectors: none\n"
+            "- Output artifact: none\n"
+            "- Filing rule: none\n"
+            "- Safety posture: safe\n"
+            "- Verification coverage: none\n"
+            "- Upgrade notes: none\n",
+            encoding="utf-8",
+        )
+        canonical_escape_validator = AgentOSValidator(canonical_escape_root)
+        canonical_escape_validator.check_skills_manifest_consistency()
+        canonical_escape_rejected = any(
+            error.check == "skills manifest consistency"
+            and error.path == "os/skills/MANIFEST.md"
+            and "Canonical source must be root-relative" in error.message
+            for error in canonical_escape_validator.errors
+        )
+        marker_symlink_root = root / "_marker_symlink_fixture"
+        marker_symlink_file = marker_symlink_root / "personal/os/verification/privacy-markers.txt"
+        marker_symlink_file.parent.mkdir(parents=True)
+        marker_target = marker_symlink_root / "marker-target.txt"
+        marker_target.write_text("symlink-only-marker\n", encoding="utf-8")
+        marker_symlink_file.symlink_to("../../../marker-target.txt")
+        marker_config_validator = AgentOSValidator(marker_symlink_root)
+        marker_symlink_rejected = any(
+            error.check == "private marker config"
+            and error.path == "personal/os/verification/privacy-markers.txt"
+            and "symbolic link is not allowed" in error.message
+            for error in marker_config_validator.errors
+        )
+        marker_symlink_not_loaded = not any(
+            marker.label.startswith("configured private marker")
+            for marker in marker_config_validator.private_marker_patterns
+        )
+        personal_symlink_root = root / "_personal_symlink_fixture"
+        (personal_symlink_root / "real-personal").mkdir(parents=True)
+        (personal_symlink_root / "personal").symlink_to("real-personal")
+        personal_root_validator = AgentOSValidator(personal_symlink_root)
+        personal_root_validator.check_private_overlay_files_are_ignored()
+        personal_symlink_rejected = any(
+            error.check == "private overlay ignore coverage"
+            and error.path == "personal"
+            and "must not be a symbolic link" in error.message
+            for error in personal_root_validator.errors
+        )
+        nested_personal_symlink_root = root / "_personal_nested_symlink_fixture"
+        (nested_personal_symlink_root / "personal/os/skills").mkdir(parents=True)
+        (nested_personal_symlink_root / "outside").mkdir()
+        (nested_personal_symlink_root / ".gitignore").write_text("personal/**/*\n!personal/**/\n", encoding="utf-8")
+        (nested_personal_symlink_root / "personal/os/skills/linkdir").symlink_to("../../../outside")
+        subprocess.run(
+            ["git", "-C", str(nested_personal_symlink_root), "init"],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        nested_personal_validator = AgentOSValidator(nested_personal_symlink_root)
+        nested_personal_validator.check_private_overlay_files_are_ignored()
+        nested_personal_validator.check_personal_overlay_tracking(allow_private_files=True)
+        nested_personal_symlink_allowed = not any(
+            error.path == "personal/os/skills/linkdir"
+            and "must not be a symbolic link" in error.message
+            for error in nested_personal_validator.errors
+        )
+        managed_os_symlink_root = root / "_managed_os_symlink_fixture"
+        real_os = managed_os_symlink_root / "real-os"
+        (real_os / "verification/retrieval").mkdir(parents=True)
+        (real_os / "verification/retrieval/fixtures.json").write_text("{not json\n", encoding="utf-8")
+        (real_os / "verification/BENCHMARKS.json").write_text("{not json\n", encoding="utf-8")
+        (managed_os_symlink_root / "os").symlink_to("real-os")
+        managed_os_symlink_validator = AgentOSValidator(managed_os_symlink_root)
+        managed_os_symlink_validator.run_structural_checks()
+        managed_os_symlink_stops_reads = any(
+            error.check == "managed symlink policy"
+            and error.path == "os"
+            and "symbolic links" in error.message
+            for error in managed_os_symlink_validator.errors
+        ) and not any(
+            error.check != "managed symlink policy"
+            for error in managed_os_symlink_validator.errors
+        )
+        symlinked_validation_root_target = root / "_symlinked_validation_root_target"
+        (symlinked_validation_root_target / "os").mkdir(parents=True)
+        (symlinked_validation_root_target / "personal").mkdir()
+        symlinked_validation_root = root / "_symlinked_validation_root"
+        symlinked_validation_root.symlink_to(symlinked_validation_root_target, target_is_directory=True)
+        symlinked_root_validator = AgentOSValidator(symlinked_validation_root)
+        symlinked_root_validator.run_structural_checks()
+        symlinked_root_rejected = any(
+            error.check == "managed symlink policy"
+            and error.path == "."
+            and "AgentOS validation root is unsafe" in error.message
+            and "symbolic link is not allowed" in error.message
+            for error in symlinked_root_validator.errors
+        )
+        public_export_root_validator = AgentOSValidator(root)
+        public_export_root_validator.run_public_export_validation_checks(symlinked_validation_root)
+        public_export_root_rejected = any(
+            error.check == "public export allowlist"
+            and error.path == "."
+            and "public export root is unsafe" in error.message
+            and "symbolic link is not allowed" in error.message
+            for error in public_export_root_validator.errors
+        )
+        non_os_symlink_rejected = any(
+            error.path == "docs/linked.raw"
+            and "AgentOS-managed paths outside personal/ must not contain symbolic links" in error.message
+            for error in validator.errors
+        )
 
         symlink_root = root / "_publication_symlink_fixture"
         (symlink_root / "os/context").mkdir(parents=True)
@@ -1637,39 +2072,48 @@ def run_self_test() -> int:
         symlink_validator = AgentOSValidator(symlink_root)
         symlink_validator.run_publication_precheck_checks()
         symlink_rejected_cleanly = any(
-            error.path == "os/linked.md" and "tracked file is a symbolic link" in error.message
+            error.path == "os/linked.md"
+            and "AgentOS-managed paths outside personal/ must not contain symbolic links" in error.message
             for error in symlink_validator.errors
         ) and not any(
             error.check in {"private marker scan", "secret-like token scan"}
             for error in symlink_validator.errors
         )
+        managed_symlink_rejected = any(
+            error.path == "os/linked.md"
+            and "AgentOS-managed paths outside personal/ must not contain symbolic links" in error.message
+            for error in symlink_validator.errors
+        )
+        (symlink_root / "os/linked.md").unlink()
+        publication_validator = AgentOSValidator(symlink_root)
+        publication_validator.run_publication_precheck_checks()
         live_core_file_rejected = any(
             error.path == "os/context/CAREER.md" and "live personal context file" in error.message
-            for error in symlink_validator.errors
+            for error in publication_validator.errors
         )
         live_agent_path_rejected = any(
             error.path == "os/agents/current-awareness-agent/JOB.md"
             and "live personal agents file" in error.message
-            for error in symlink_validator.errors
+            for error in publication_validator.errors
         )
         generated_output_rejected = any(
             error.path == "os/reports/private.md" and "generated output" in error.message
-            for error in symlink_validator.errors
+            for error in publication_validator.errors
         )
         nested_live_core_rejected = any(
             error.path == "os/context/private-client/NOTES.md"
             and "nested high-risk Core path" in error.message
-            for error in symlink_validator.errors
+            for error in publication_validator.errors
         )
         core_gitkeep_rejected = any(
             error.path == "os/memory/weekly-review/.gitkeep"
             and "publishable .gitkeep must be empty" in error.message
-            for error in symlink_validator.errors
+            for error in publication_validator.errors
         )
         core_report_gitkeep_rejected = any(
             error.path == "os/verification/retrieval/reports/.gitkeep"
             and "generated output" in error.message
-            for error in symlink_validator.errors
+            for error in publication_validator.errors
         )
         default_validator = AgentOSValidator(symlink_root)
         default_validator.run_structural_checks()
@@ -1690,8 +2134,11 @@ def run_self_test() -> int:
             )
             and ignored_artifacts_clean
             and ignored_agent_clean
+            and ignored_artifact_symlink_clean
+            and no_git_artifact_symlink_clean
+            and gitignored_managed_symlink_rejected
             and broad_gitkeep_unignore_rejected
-            and symlink_diagnostic_safe
+            and personal_symlink_diagnostic_scoped
             and csv_private_marker_rejected
             and local_path_variants_rejected
             and configured_marker_variant_rejected
@@ -1700,7 +2147,17 @@ def run_self_test() -> int:
             and configured_marker_redacted
             and built_in_marker_redacted
             and missing_skeleton_rejected
+            and canonical_escape_rejected
+            and marker_symlink_rejected
+            and marker_symlink_not_loaded
+            and personal_symlink_rejected
+            and nested_personal_symlink_allowed
+            and managed_os_symlink_stops_reads
+            and symlinked_root_rejected
+            and public_export_root_rejected
+            and non_os_symlink_rejected
             and symlink_rejected_cleanly
+            and managed_symlink_rejected
             and live_core_file_rejected
             and live_agent_path_rejected
             and generated_output_rejected
@@ -1715,7 +2172,23 @@ def run_self_test() -> int:
                 print(f"EXPECTED {error.format()}")
             for error in symlink_validator.errors:
                 print(f"EXPECTED {error.format()}")
+            for error in publication_validator.errors:
+                print(f"EXPECTED {error.format()}")
             for error in broad_gitkeep_validator.errors:
+                print(f"EXPECTED {error.format()}")
+            for error in canonical_escape_validator.errors:
+                print(f"EXPECTED {error.format()}")
+            for error in marker_config_validator.errors:
+                print(f"EXPECTED {error.format()}")
+            for error in personal_root_validator.errors:
+                print(f"EXPECTED {error.format()}")
+            for error in nested_personal_validator.errors:
+                print(f"EXPECTED {error.format()}")
+            for error in managed_os_symlink_validator.errors:
+                print(f"EXPECTED {error.format()}")
+            for error in symlinked_root_validator.errors:
+                print(f"EXPECTED {error.format()}")
+            for error in public_export_root_validator.errors:
                 print(f"EXPECTED {error.format()}")
             return 0
 
@@ -1762,7 +2235,7 @@ def main(argv: list[str] | None = None) -> int:
 
     validator = AgentOSValidator(args.root)
     if args.public_export:
-        export_root = args.public_export.resolve()
+        export_root = lexical_absolute(args.public_export)
         if not (export_root / "os").exists():
             print(f"AgentOS validation failed: export root does not contain os/: {export_root}", file=sys.stderr)
             return 2

@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="$(git rev-parse --show-toplevel)"
 
-python3 "$ROOT/os/verification/scripts/validate_agentos.py"
+"$ROOT/scripts/run-validator"
 
 if git -C "$ROOT" diff --cached --quiet --; then
   echo "No staged changes; skipping staged publication scan."

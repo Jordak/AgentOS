@@ -118,4 +118,4 @@ Before finishing:
 3. Confirm each used report had current-schema Git metadata.
 4. Confirm no raw report body, run JSON, transcript, stdout, stderr, local path, prompt, session detail, or private diagnostic was copied into Core.
 5. Confirm status labels are limited to `passing`, `attention needed`, `not run`, and `unknown`.
-6. Run `python3 os/verification/scripts/validate_agentos.py` after skill or status-file changes.
+6. Run `scripts/run-validator` after skill or status-file changes.

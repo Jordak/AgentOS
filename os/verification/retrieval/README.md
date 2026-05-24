@@ -42,7 +42,7 @@ Use this verification when:
 Structural fixtures:
 
 - Validate that local files contain the evidence needed to route common prompts.
-- Run with `python3 os/verification/scripts/validate_agentos.py`.
+- Run with `scripts/run-validator`.
 - Offline and deterministic.
 
 Local lexical benchmark:
@@ -65,7 +65,7 @@ Harness answer evals:
 Run deterministic maintenance validation:
 
 ```bash
-python3 os/verification/scripts/validate_agentos.py
+scripts/run-validator
 ```
 
 Run the full safe retrieval benchmark report:

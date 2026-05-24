@@ -124,7 +124,7 @@ Before finishing:
 1. Confirm the concrete example is named in the work summary or encoded in a smoke fixture.
 2. Confirm `os/skills/MANIFEST.md` reflects any skill changes.
 3. Confirm resolver or directory-resolver edits were made only for real tie-breakers.
-4. Run `python3 os/verification/scripts/validate_agentos.py`.
-5. If the validator changed, also run `python3 os/verification/scripts/validate_agentos.py --self-test`.
+4. Run `scripts/run-validator`.
+5. If the validator changed, also run `scripts/run-validator --self-test`.
 6. Run any skill-specific verification named by the changed skill.
 7. Confirm no private connector data, literal private contact details, or external write happened without approval.
