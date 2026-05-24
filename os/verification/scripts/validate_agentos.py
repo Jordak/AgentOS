@@ -10,6 +10,7 @@ skill instead of this portable validator.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import os
 import re
@@ -22,21 +23,113 @@ from pathlib import Path
 
 sys.dont_write_bytecode = True
 
-PUBLICATION_RULES_DIR = Path(__file__).resolve().parents[3] / "scripts"
-if str(PUBLICATION_RULES_DIR) not in sys.path:
-    sys.path.insert(0, str(PUBLICATION_RULES_DIR))
+def lexical_absolute(path: Path) -> Path:
+    """Make a path absolute without resolving symbolic links."""
+    expanded = path.expanduser()
+    if not expanded.is_absolute():
+        expanded = Path.cwd() / expanded
+    return Path(os.path.abspath(expanded))
 
-from agentos_publication_rules import (  # noqa: E402
-    GENERATED_OUTPUT_PARTS,
-    PERSONAL_OVERLAY_SKELETON_FILES,
-    PUBLIC_EXPORT_EXCLUDED_DIRS,
-    PUBLIC_EXPORT_ROOT_DIRS,
-    PUBLIC_EXPORT_ROOT_FILES,
-    gitkeep_file_reason,
-    is_personal_overlay_skeleton_path,
-    personal_overlay_skeleton_file_reason,
-    publication_path_reason,
-)
+
+def final_path_problem(
+    path: Path,
+    expected_kind: str | None = None,
+    allow_missing: bool = True,
+) -> str | None:
+    absolute = lexical_absolute(path)
+    try:
+        path_stat = absolute.lstat()
+    except FileNotFoundError:
+        if allow_missing:
+            return None
+        return "path is missing"
+    except OSError as error:
+        return f"{error.__class__.__name__}: {error}"
+
+    if stat.S_ISLNK(path_stat.st_mode):
+        return "symbolic link is not allowed"
+    if expected_kind == "directory" and not stat.S_ISDIR(path_stat.st_mode):
+        return "not a directory"
+    if expected_kind == "file" and not stat.S_ISREG(path_stat.st_mode):
+        return "not a regular file"
+    return None
+
+
+def bootstrap_path_problem(
+    path: Path,
+    expected_kind: str,
+    boundary: Path,
+) -> str | None:
+    boundary_absolute = lexical_absolute(boundary)
+    boundary_problem = final_path_problem(boundary_absolute, expected_kind="directory", allow_missing=False)
+    if boundary_problem:
+        return f"{boundary_absolute} ({boundary_problem})"
+    absolute = lexical_absolute(path)
+    try:
+        relative = absolute.relative_to(boundary_absolute)
+    except ValueError:
+        return f"{absolute} (path is outside the managed root: {boundary_absolute})"
+
+    current = boundary_absolute
+    for index, part in enumerate(relative.parts):
+        current = current / part
+        is_final = index == len(relative.parts) - 1
+        try:
+            path_stat = current.lstat()
+        except FileNotFoundError:
+            return f"{current} (path component is missing)"
+        except OSError as error:
+            return f"{current} ({error.__class__.__name__}: {error})"
+        if stat.S_ISLNK(path_stat.st_mode):
+            return f"{current} (symbolic link is not allowed)"
+        if not is_final and not stat.S_ISDIR(path_stat.st_mode):
+            return f"{current} (path component is not a directory)"
+        if is_final and expected_kind == "file" and not stat.S_ISREG(path_stat.st_mode):
+            return f"{current} (not a regular file)"
+        if is_final and expected_kind == "directory" and not stat.S_ISDIR(path_stat.st_mode):
+            return f"{current} (not a directory)"
+    return None
+
+
+def load_publication_rules() -> None:
+    global GENERATED_OUTPUT_PARTS
+    global PERSONAL_OVERLAY_SKELETON_FILES
+    global PUBLIC_EXPORT_EXCLUDED_DIRS
+    global PUBLIC_EXPORT_ROOT_DIRS
+    global PUBLIC_EXPORT_ROOT_FILES
+    global gitkeep_file_reason
+    global is_personal_overlay_skeleton_path
+    global personal_overlay_skeleton_file_reason
+    global publication_path_reason
+
+    root = lexical_absolute(Path(__file__).parents[3])
+    rules_path = root / "scripts/agentos_publication_rules.py"
+    rules_problem = bootstrap_path_problem(rules_path, expected_kind="file", boundary=root)
+    if rules_problem:
+        raise RuntimeError(f"unsafe publication rules script: {rules_problem}")
+
+    spec = importlib.util.spec_from_file_location("agentos_publication_rules_checked", rules_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"could not load publication rules script: {rules_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    GENERATED_OUTPUT_PARTS = module.GENERATED_OUTPUT_PARTS
+    PERSONAL_OVERLAY_SKELETON_FILES = module.PERSONAL_OVERLAY_SKELETON_FILES
+    PUBLIC_EXPORT_EXCLUDED_DIRS = module.PUBLIC_EXPORT_EXCLUDED_DIRS
+    PUBLIC_EXPORT_ROOT_DIRS = module.PUBLIC_EXPORT_ROOT_DIRS
+    PUBLIC_EXPORT_ROOT_FILES = module.PUBLIC_EXPORT_ROOT_FILES
+    gitkeep_file_reason = module.gitkeep_file_reason
+    is_personal_overlay_skeleton_path = module.is_personal_overlay_skeleton_path
+    personal_overlay_skeleton_file_reason = module.personal_overlay_skeleton_file_reason
+    publication_path_reason = module.publication_path_reason
+
+
+try:
+    load_publication_rules()
+except RuntimeError as error:
+    print(f"AgentOS validation failed: {error}", file=sys.stderr)
+    raise SystemExit(2)
 
 
 CODE_SPAN_RE = re.compile(r"`([^`]+)`")
@@ -133,39 +226,6 @@ class Finding:
 
     def format(self) -> str:
         return f"[{self.check}] {self.path}: {self.message}"
-
-
-def lexical_absolute(path: Path) -> Path:
-    """Make a path absolute without resolving symbolic links."""
-    expanded = path.expanduser()
-    if not expanded.is_absolute():
-        expanded = Path.cwd() / expanded
-    return Path(os.path.abspath(expanded))
-
-
-def final_path_problem(
-    path: Path,
-    expected_kind: str | None = None,
-    allow_missing: bool = True,
-) -> str | None:
-    absolute = lexical_absolute(path)
-    try:
-        path_stat = absolute.lstat()
-    except FileNotFoundError:
-        if allow_missing:
-            return None
-        return "path is missing"
-    except OSError as error:
-        return f"{error.__class__.__name__}: {error}"
-
-    if stat.S_ISLNK(path_stat.st_mode):
-        return "symbolic link is not allowed"
-    if expected_kind == "directory" and not stat.S_ISDIR(path_stat.st_mode):
-        return "not a directory"
-    if expected_kind == "file" and not stat.S_ISREG(path_stat.st_mode):
-        return "not a regular file"
-    return None
-
 
 class AgentOSValidator:
     def __init__(self, root: Path) -> None:

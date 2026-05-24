@@ -20,12 +20,7 @@ trap 'rm -rf "$SNAPSHOT_DIR"' EXIT
 
 git -C "$ROOT" archive --format=tar "$TREE" | tar -xf - -C "$SNAPSHOT_DIR"
 
-if [[ ! -f "$SNAPSHOT_DIR/os/verification/scripts/validate_agentos.py" ]]; then
-  echo "error: snapshot is missing os/verification/scripts/validate_agentos.py" >&2
-  exit 2
-fi
-
-python3 "$SNAPSHOT_DIR/os/verification/scripts/validate_agentos.py" --public-export "$SNAPSHOT_DIR"
+python3 "$ROOT/os/verification/scripts/validate_agentos.py" --root "$ROOT" --public-export "$SNAPSHOT_DIR"
 
 if ! command -v gitleaks >/dev/null 2>&1; then
   echo "error: gitleaks is required for the publication tree secret scan" >&2
