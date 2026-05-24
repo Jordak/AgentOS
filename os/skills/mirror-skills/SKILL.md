@@ -129,5 +129,5 @@ Before finishing:
 3. Run scoped audit and sync smoke tests with `--skill <name>`, including repeated `--skill` arguments when more than one canonical skill is available.
 4. Run an unknown-skill failure check and confirm it fails clearly.
 5. Run any private validator path named in `personal/os/skills/mirror-skills/CONFIG.md` when available.
-6. Run `python3 os/verification/scripts/validate_agentos.py`.
+6. Run `scripts/run-validator`.
 7. Confirm no machine-local mirror state was added to the manifest.

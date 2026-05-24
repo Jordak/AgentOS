@@ -59,7 +59,7 @@ Use local filesystem reads, `git`, `rg`, AgentOS validators, Gitleaks, and optio
    - If AgentOS publication or commit safety is in scope, treat the staged snapshot as the main gate and the generated candidate as an optional final dry run.
 
 2. Run deterministic gates.
-   - For AgentOS, run `python3 os/verification/scripts/validate_agentos.py --publication-precheck` for advisory working-tree migration checks.
+   - For AgentOS, run `scripts/run-validator --publication-precheck` for advisory working-tree migration checks.
    - Run the repo's staged snapshot privacy scan when publication or commit safety is in scope, such as `scripts/check_staged_publication_secrets.sh`.
    - Run the repo's working-tree secret scan only as an advisory mixed-working-tree sweep, such as `scripts/check_working_tree_secrets.sh`.
    - If auditing an AgentOS candidate, run `scripts/check_public_export_secrets.sh` or validate the candidate directly.

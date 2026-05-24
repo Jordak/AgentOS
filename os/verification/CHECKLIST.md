@@ -12,13 +12,13 @@ Use this before trusting agent output.
 4. Is any private or sensitive information handled safely?
 5. Is there a clear next action?
 6. If fixing a local failure, was the root cause diagnosed before adding app-level workarounds? Environment and configuration failures should usually be fixed in the environment or configuration.
-7. For AgentOS maintenance changes, run the deterministic local validator: `python3 os/verification/scripts/validate_agentos.py`.
+7. For AgentOS maintenance changes, run the deterministic local validator: `scripts/run-validator`.
 
 ## AgentOS Maintenance Checks
 
 For AgentOS maintenance validation, use:
 
-`python3 os/verification/scripts/validate_agentos.py`
+`scripts/run-validator`
 
 This includes structural retrieval fixtures under `os/verification/retrieval/`. They check route evidence, not final model prose.
 
@@ -30,7 +30,7 @@ This audit checks `os/`, `personal/os/`, installed skill mirrors, and Codex auto
 
 Safe smoke fixture:
 
-`python3 os/verification/scripts/validate_agentos.py --self-test`
+`scripts/run-validator --self-test`
 
 ## High-Risk Work
 

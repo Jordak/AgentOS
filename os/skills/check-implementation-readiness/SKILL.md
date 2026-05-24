@@ -93,4 +93,4 @@ Before finishing:
 5. Confirm unmarked readiness was not silently accepted.
 6. Confirm deferred follow-up artifacts were created where required.
 7. Confirm external tracker writes were approved before they happened.
-8. If this skill or its manifest entry changed, run `python3 os/verification/scripts/validate_agentos.py`.
+8. If this skill or its manifest entry changed, run `scripts/run-validator`.

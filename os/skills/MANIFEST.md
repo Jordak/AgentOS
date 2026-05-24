@@ -49,7 +49,7 @@ Each skill entry records:
 - Output artifact: readiness report with exactly one verdict, `Ready to Implement`, `Needs Design Consensus`, or `Gate Skipped`, plus optional durable follow-up artifacts and approved source-design updates.
 - Filing rule: canonical policy lives in `os/playbook/IMPLEMENT_FEATURES.md`; local design artifacts default to the mapped project's design-doc convention or `docs/design/issue-<number>-implementation-readiness.md`; private/personal design notes belong in the Personal Overlay; approved GitHub updates stay in GitHub.
 - Safety posture: do not treat a missing readiness marker as silently ready; infer and confirm with the user before implementation proceeds; ask before external tracker writes unless explicitly authorized; do not leave meaningful deferred questions only in chat, model memory, or unpersisted reports.
-- Verification coverage: confirms the target was classified as gated, exempt, or explicitly bypassed, the durable source and readiness marker were checked, unmarked readiness was not silently accepted, deferred follow-up artifacts were created where required, and external writes were approved; run `python3 os/verification/scripts/validate_agentos.py` after skill or manifest changes.
+- Verification coverage: confirms the target was classified as gated, exempt, or explicitly bypassed, the durable source and readiness marker were checked, unmarked readiness was not silently accepted, deferred follow-up artifacts were created where required, and external writes were approved; run `scripts/run-validator` after skill or manifest changes.
 - Upgrade notes: Core reusable gate for feature-sized implementation work.
 
 ### `refresh-benchmark-status`
@@ -61,7 +61,7 @@ Each skill entry records:
 - Output artifact: an updated or proposed Core benchmark status snapshot plus a concise refresh report naming eligible evidence, ineligible evidence, stale entries, and unchanged entries.
 - Filing rule: Core status lives in `os/verification/BENCHMARK_STATUS.md`; raw reports and run histories stay in the Personal Overlay report directories configured by `os/verification/BENCHMARKS.json`; deterministic refresh-helper design is deferred to GitHub Issue #30.
 - Safety posture: do not copy raw reports, run JSON, transcripts, stdout, stderr, local paths, prompts, session details, account details, private diagnostics, or private evidence into Core; require clean, fresh `main` evidence before marking entries `passing`; ask before caveated or ambiguous updates.
-- Verification coverage: confirm benchmark manifest and status file were read, local report paths were resolved through the Personal Overlay rule, used reports had current-schema Git metadata, status labels are allowed, no raw/private evidence was copied into Core, and `python3 os/verification/scripts/validate_agentos.py` passes after skill or status changes.
+- Verification coverage: confirm benchmark manifest and status file were read, local report paths were resolved through the Personal Overlay rule, used reports had current-schema Git metadata, status labels are allowed, no raw/private evidence was copied into Core, and `scripts/run-validator` passes after skill or status changes.
 - Upgrade notes: Core workflow for maintaining the public-safe benchmark snapshot without introducing Core benchmark history.
 
 ### `run-benchmarks`
@@ -97,7 +97,7 @@ Each skill entry records:
 - Output artifact: prioritized recommendation table for local skills and optional canonical skill files, Core manifest entry, backup/archive directories, refreshed mirror files, and user-approved follow-up issues.
 - Filing rule: reusable public-safe imports live under `os/skills/` and get manifest entries; private user-specific imports live under `personal/os/skills/` and do not get Core manifest entries; local mirror backups stay under the mirror root archive; Personal Overlay backups stay under the Personal Overlay skills archive; audit output stays in chat unless the user asks for a local report.
 - Safety posture: treat local skills as potentially private or externally owned until reviewed; require approval before import, overwrite, archive, delete, permanent delete, mirror sync, or issue creation; default local deletion to archive/move; do not overwrite canonical skills automatically; do not record machine-local mirror state in the manifest; do not import externally sourced skills without explicit vendor/fork approval.
-- Verification coverage: validate the skill with `quick_validate.py` when available; run `python3 os/verification/scripts/validate_agentos.py`; run scoped `mirror-skills` audit/sync smoke checks; manually confirm no bundled reverse mirror script, no future Personal Overlay governance dependency, no specific-person reference, backup behavior, bulk approval behavior, external-origin exclusion behavior, and protected-main behavior.
+- Verification coverage: validate the skill with `quick_validate.py` when available; run `scripts/run-validator`; run scoped `mirror-skills` audit/sync smoke checks; manually confirm no bundled reverse mirror script, no future Personal Overlay governance dependency, no specific-person reference, backup behavior, bulk approval behavior, external-origin exclusion behavior, and protected-main behavior.
 - Upgrade notes: complements `mirror-skills` by reviewing local harness skills before promoting approved ones into AgentOS; revisit after the deferred Personal Overlay skills governance design lands.
 
 ### `review-loop`
@@ -169,7 +169,7 @@ Each skill entry records:
 - Output artifact: new or updated skill, resolver guidance, manifest entry, deterministic validator, retrieval fixture, smoke example, or propagation queue proposal.
 - Filing rule: canonical skills live under `os/skills/`; deterministic checks live in `os/verification/scripts/validate_agentos.py` or a clearly warranted local script; retrieval/smoke fixtures live under `os/verification/retrieval/`; unapproved durable state proposals live in the appropriate Personal Overlay propagation queue.
 - Safety posture: require at least one concrete example; do not copy private connector data into durable artifacts; ask before external writes, automation activation, destructive edits, or installing harness mirrors.
-- Verification coverage: run `python3 os/verification/scripts/validate_agentos.py`; run `python3 os/verification/scripts/validate_agentos.py --self-test` when validator behavior changes; add or update a safe smoke example for new durable behavior.
+- Verification coverage: run `scripts/run-validator`; run `scripts/run-validator --self-test` when validator behavior changes; add or update a safe smoke example for new durable behavior.
 - Upgrade notes: Core reusable workflow for turning repeated work into durable AgentOS behavior.
 
 ### `verify-privacy`

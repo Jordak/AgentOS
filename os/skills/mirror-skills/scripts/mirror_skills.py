@@ -775,11 +775,13 @@ def main() -> int:
     preflight_results: list[MirrorResult] = []
     if not args.core_only:
         requested_names = set(args.skill) if args.skill else None
-        personal_entries, personal_problems = discover_personal_overlay_entries(
-            agentos_root,
-            requested_names=requested_names,
-        )
-        preflight_results.extend(personal_preflight_results(personal_problems, mirror_root))
+        core_names = {entry.name for entry in core_entries}
+        if requested_names is None or not requested_names <= core_names:
+            personal_entries, personal_problems = discover_personal_overlay_entries(
+                agentos_root,
+                requested_names=requested_names,
+            )
+            preflight_results.extend(personal_preflight_results(personal_problems, mirror_root))
     blocked_names = {result.name for result in preflight_results}
     if "personal-overlay" in blocked_names and args.skill:
         requested_set = set(args.skill)
