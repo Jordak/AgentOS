@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import argparse
 import io
+import os
 import shutil
+import stat
 import subprocess
 import sys
 import tarfile
@@ -94,6 +96,34 @@ def is_relative_to(path: Path, base: Path) -> bool:
     return True
 
 
+def lexical_absolute(path: Path) -> Path:
+    """Make a path absolute without resolving symbolic links."""
+    expanded = path.expanduser()
+    if not expanded.is_absolute():
+        expanded = Path.cwd() / expanded
+    return Path(os.path.abspath(expanded))
+
+
+def final_path_problem(path: Path, expected_kind: str | None = None, allow_missing: bool = True) -> str | None:
+    absolute = lexical_absolute(path)
+    try:
+        path_stat = absolute.lstat()
+    except FileNotFoundError:
+        if allow_missing:
+            return None
+        return "path is missing"
+    except OSError as error:
+        return f"{error.__class__.__name__}: {error}"
+
+    if stat.S_ISLNK(path_stat.st_mode):
+        return "symbolic link is not allowed"
+    if expected_kind == "directory" and not stat.S_ISDIR(path_stat.st_mode):
+        return "not a directory"
+    if expected_kind == "file" and not stat.S_ISREG(path_stat.st_mode):
+        return "not a regular file"
+    return None
+
+
 def looks_like_export_dir(path: Path) -> bool:
     name = path.name.lower()
     return "agentos" in name and any(
@@ -103,18 +133,20 @@ def looks_like_export_dir(path: Path) -> bool:
 
 def output_safety_errors(root: Path, output: Path) -> list[str]:
     errors: list[str] = []
-    filesystem_root = Path(output.anchor).resolve()
+    resolved_root = root.resolve()
+    resolved_output = output.resolve(strict=False)
+    filesystem_root = Path(resolved_output.anchor).resolve()
     home = Path.home().resolve()
 
-    if output == filesystem_root:
+    if resolved_output == filesystem_root:
         errors.append("output may not be the filesystem root")
-    if output == home:
+    if resolved_output == home:
         errors.append("output may not be the current user's home directory")
-    if output == root:
+    if resolved_output == resolved_root:
         errors.append("output may not be the AgentOS repository root")
-    elif is_relative_to(output, root):
+    elif is_relative_to(resolved_output, resolved_root):
         errors.append("output may not be inside the AgentOS repository root")
-    if output in root.parents:
+    if resolved_output in resolved_root.parents:
         errors.append("output may not be an ancestor of the AgentOS repository root")
     if not looks_like_export_dir(output):
         errors.append("output directory name must look like a dedicated AgentOS export directory")
@@ -284,7 +316,11 @@ def run_validation(root: Path, output: Path, validator_root: Path | None = None)
 
 def main() -> int:
     args = parse_args()
-    root = args.root.resolve()
+    root = lexical_absolute(args.root)
+    root_problem = final_path_problem(root, expected_kind="directory", allow_missing=False)
+    if root_problem:
+        print(f"error: unsafe AgentOS root: {root} ({root_problem})", file=sys.stderr)
+        return 2
     if not (root / "os").is_dir():
         print(f"error: root does not contain os/: {root}", file=sys.stderr)
         return 2
@@ -306,7 +342,11 @@ def main() -> int:
         sources = publishable_sources(source_root, git_source_set=git_source_set)
 
         if args.output:
-            output = args.output.resolve()
+            output = lexical_absolute(args.output)
+            output_problem = final_path_problem(output, expected_kind="directory", allow_missing=True)
+            if output_problem:
+                print(f"error: unsafe output directory: {output} ({output_problem})", file=sys.stderr)
+                return 2
             safety_errors = output_safety_errors(root, output)
             if safety_errors:
                 print(f"error: unsafe output directory: {output}", file=sys.stderr)

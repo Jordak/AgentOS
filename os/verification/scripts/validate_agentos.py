@@ -483,22 +483,46 @@ class AgentOSValidator:
             return
 
         for entry in sorted(self.root.iterdir()):
-            if entry.name in {".git", "personal"}:
+            if self.should_skip_managed_symlink_scan(entry):
                 continue
             self.check_managed_symlink_tree(entry, check)
 
         self.checked.append(check)
 
+    def should_skip_managed_symlink_scan(self, path: Path) -> bool:
+        try:
+            rel = path.relative_to(self.root)
+        except ValueError:
+            return False
+        if not rel.parts:
+            return False
+        if rel.parts[0] in {".git", "personal"}:
+            return True
+        if not self.is_git_ignored(rel):
+            return False
+        if len(rel.parts) == 1 and (
+            rel.as_posix() in PUBLIC_EXPORT_ROOT_FILES
+            or rel.parts[0] in (PUBLIC_EXPORT_ROOT_DIRS - {"personal"})
+        ):
+            return False
+        return True
+
     def check_managed_symlink_tree(self, root: Path, check: str) -> None:
         message = "AgentOS-managed paths outside personal/ must not contain symbolic links"
-        if root.is_symlink():
-            self.add_error(check, root, message)
-            return
-        if not root.is_dir():
-            return
-        for path in sorted(root.rglob("*")):
+        pending = [root]
+        while pending:
+            path = pending.pop()
+            if self.should_skip_managed_symlink_scan(path):
+                continue
             if path.is_symlink():
                 self.add_error(check, path, message)
+                continue
+            if not path.is_dir():
+                continue
+            try:
+                pending.extend(reversed(sorted(path.iterdir())))
+            except OSError as error:
+                self.add_error(check, path, f"{error.__class__.__name__}: {error}")
 
     def check_no_git_directory(self) -> None:
         check = "no git history"
@@ -1685,6 +1709,8 @@ def run_self_test() -> int:
             "/" + "Users" + "/private\n" + "sk-" + "fakeignoredfixture1234567890\n",
             encoding="utf-8",
         )
+        ignored_artifact_symlink = ignored_root / "output/private-link.md"
+        ignored_artifact_symlink.symlink_to("../local-artifacts/private.txt")
         ignored_agent_dir = ignored_root / "os/agents/ignored-agent"
         ignored_agent_dir.mkdir(parents=True)
         (ignored_agent_dir / ".DS_Store").write_text("ignored local artifact\n", encoding="utf-8")
@@ -1699,12 +1725,21 @@ def run_self_test() -> int:
         ignored_validator.check_core_private_markers()
         ignored_validator.check_secret_like_tokens()
         ignored_validator.check_agent_contract_completeness()
+        ignored_validator.check_managed_symlinks()
         ignored_artifacts_clean = not any(
             "output/private.txt" in error.path or "local-artifacts/private.txt" in error.path
             for error in ignored_validator.errors
         )
         ignored_agent_clean = not any(
             "os/agents/ignored-agent" in error.path for error in ignored_validator.errors
+        )
+        ignored_artifact_symlink_clean = not any(
+            error.check == "managed symlink policy"
+            and (
+                "output/private-link.md" in error.path
+                or "local-artifacts/private.txt" in error.path
+            )
+            for error in ignored_validator.errors
         )
 
         broad_gitkeep_root = root / "_broad_gitkeep_ignore_fixture"
@@ -2012,6 +2047,7 @@ def run_self_test() -> int:
             )
             and ignored_artifacts_clean
             and ignored_agent_clean
+            and ignored_artifact_symlink_clean
             and broad_gitkeep_unignore_rejected
             and symlink_diagnostic_safe
             and csv_private_marker_rejected
