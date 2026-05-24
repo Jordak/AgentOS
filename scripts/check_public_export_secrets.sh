@@ -11,7 +11,7 @@ else
   FORCE_EXPORT=0
 fi
 
-python3 "$ROOT/os/verification/scripts/validate_agentos.py" --publication-precheck
+"$ROOT/scripts/run-validator" --publication-precheck
 if [[ "$FORCE_EXPORT" == "1" ]]; then
   python3 "$ROOT/scripts/export_public_agentos.py" --staged --output "$EXPORT_DIR" --force
 else

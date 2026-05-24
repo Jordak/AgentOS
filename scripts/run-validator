@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+VALIDATOR="$ROOT"
+
+for part in os verification scripts validate_agentos.py; do
+  VALIDATOR="$VALIDATOR/$part"
+  if [[ -L "$VALIDATOR" ]]; then
+    echo "error: unsafe validator path: $VALIDATOR is a symbolic link" >&2
+    exit 2
+  fi
+  if [[ "$part" == "validate_agentos.py" ]]; then
+    if [[ ! -f "$VALIDATOR" ]]; then
+      echo "error: unsafe validator path: $VALIDATOR is not a regular file" >&2
+      exit 2
+    fi
+  elif [[ ! -d "$VALIDATOR" ]]; then
+    echo "error: unsafe validator path: $VALIDATOR is not a directory" >&2
+    exit 2
+  fi
+done
+
+exec python3 "$VALIDATOR" "$@"

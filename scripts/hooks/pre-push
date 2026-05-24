@@ -38,7 +38,7 @@ MESSAGE
   LOCAL_SHAS+=("$local_sha")
 done
 
-python3 "$ROOT/os/verification/scripts/validate_agentos.py"
+"$ROOT/scripts/run-validator"
 
 if [[ "${#LOCAL_SHAS[@]}" -eq 0 ]]; then
   "$ROOT/scripts/check_publication_tree_secrets.sh" HEAD
