@@ -368,14 +368,7 @@ class AgentOSValidator:
             except OSError as error:
                 self.add_error(check, path, f"{error.__class__.__name__}: {error}")
                 continue
-            if stat.S_ISLNK(path_stat.st_mode):
-                self.add_error(
-                    check,
-                    path,
-                    "Personal Overlay path used by validator must not be a symbolic link",
-                )
-                continue
-            if stat.S_ISREG(path_stat.st_mode):
+            if stat.S_ISLNK(path_stat.st_mode) or stat.S_ISREG(path_stat.st_mode):
                 files.append(path)
         return files
 
@@ -500,14 +493,7 @@ class AgentOSValidator:
             return True
         if any(part in PUBLIC_EXPORT_EXCLUDED_DIRS for part in rel.parts):
             return True
-        if not self.is_git_ignored(rel):
-            return False
-        if len(rel.parts) == 1 and (
-            rel.as_posix() in PUBLIC_EXPORT_ROOT_FILES
-            or rel.parts[0] in (PUBLIC_EXPORT_ROOT_DIRS - {"personal"})
-        ):
-            return False
-        return True
+        return False
 
     def check_managed_symlink_tree(self, root: Path, check: str) -> None:
         message = "AgentOS-managed paths outside personal/ must not contain symbolic links"
@@ -1757,6 +1743,28 @@ def run_self_test() -> int:
             for error in no_git_artifact_validator.errors
         )
 
+        gitignored_managed_symlink_root = root / "_gitignored_managed_symlink_fixture"
+        (gitignored_managed_symlink_root / "os").mkdir(parents=True)
+        (gitignored_managed_symlink_root / "docs").mkdir()
+        (gitignored_managed_symlink_root / ".gitignore").write_text("docs/ignored-link.md\n", encoding="utf-8")
+        (gitignored_managed_symlink_root / "target.txt").write_text("target\n", encoding="utf-8")
+        (gitignored_managed_symlink_root / "docs/ignored-link.md").symlink_to("../target.txt")
+        subprocess.run(
+            ["git", "-C", str(gitignored_managed_symlink_root), "init"],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        gitignored_managed_symlink_validator = AgentOSValidator(gitignored_managed_symlink_root)
+        gitignored_managed_symlink_validator.check_managed_symlinks()
+        gitignored_managed_symlink_rejected = any(
+            error.check == "managed symlink policy"
+            and error.path == "docs/ignored-link.md"
+            and "symbolic links" in error.message
+            for error in gitignored_managed_symlink_validator.errors
+        )
+
         broad_gitkeep_root = root / "_broad_gitkeep_ignore_fixture"
         broad_gitkeep_root.mkdir()
         (broad_gitkeep_root / ".gitignore").write_text(
@@ -1778,7 +1786,7 @@ def run_self_test() -> int:
             for error in broad_gitkeep_validator.errors
         )
 
-        symlink_diagnostic_safe = any(
+        personal_symlink_diagnostic_scoped = not any(
             error.path == "personal/bad.md" and "must not be a symbolic link" in error.message
             for error in validator.errors
         ) and not any(
@@ -1900,18 +1908,22 @@ def run_self_test() -> int:
         nested_personal_symlink_root = root / "_personal_nested_symlink_fixture"
         (nested_personal_symlink_root / "personal/os/skills").mkdir(parents=True)
         (nested_personal_symlink_root / "outside").mkdir()
+        (nested_personal_symlink_root / ".gitignore").write_text("personal/**/*\n!personal/**/\n", encoding="utf-8")
         (nested_personal_symlink_root / "personal/os/skills/linkdir").symlink_to("../../../outside")
+        subprocess.run(
+            ["git", "-C", str(nested_personal_symlink_root), "init"],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
         nested_personal_validator = AgentOSValidator(nested_personal_symlink_root)
         nested_personal_validator.check_private_overlay_files_are_ignored()
         nested_personal_validator.check_personal_overlay_tracking(allow_private_files=True)
-        nested_personal_symlink_rejected = all(
-            any(
-                error.check == check
-                and error.path == "personal/os/skills/linkdir"
-                and "must not be a symbolic link" in error.message
-                for error in nested_personal_validator.errors
-            )
-            for check in ["private overlay ignore coverage", "personal overlay skeleton"]
+        nested_personal_symlink_allowed = not any(
+            error.path == "personal/os/skills/linkdir"
+            and "must not be a symbolic link" in error.message
+            for error in nested_personal_validator.errors
         )
         managed_os_symlink_root = root / "_managed_os_symlink_fixture"
         real_os = managed_os_symlink_root / "real-os"
@@ -2064,8 +2076,9 @@ def run_self_test() -> int:
             and ignored_agent_clean
             and ignored_artifact_symlink_clean
             and no_git_artifact_symlink_clean
+            and gitignored_managed_symlink_rejected
             and broad_gitkeep_unignore_rejected
-            and symlink_diagnostic_safe
+            and personal_symlink_diagnostic_scoped
             and csv_private_marker_rejected
             and local_path_variants_rejected
             and configured_marker_variant_rejected
@@ -2078,7 +2091,7 @@ def run_self_test() -> int:
             and marker_symlink_rejected
             and marker_symlink_not_loaded
             and personal_symlink_rejected
-            and nested_personal_symlink_rejected
+            and nested_personal_symlink_allowed
             and managed_os_symlink_stops_reads
             and symlinked_root_rejected
             and public_export_root_rejected

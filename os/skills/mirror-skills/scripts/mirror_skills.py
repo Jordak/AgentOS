@@ -16,7 +16,18 @@ from pathlib import Path
 
 SKILL_HEADING_RE = re.compile(r"^### `([^`]+)`\s*$", re.MULTILINE)
 FIELD_RE_TEMPLATE = r"^- {field}:\s*(.*)$"
-IGNORED_NAMES = {".DS_Store", "__pycache__"}
+IGNORED_NAMES = {
+    ".DS_Store",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist",
+    "node_modules",
+    "output",
+    "venv",
+}
 
 
 @dataclass
@@ -388,6 +399,8 @@ def file_map(root: Path, boundary: Path | None = None) -> tuple[dict[str, Path],
     for path in root.rglob("*"):
         rel_path = path.relative_to(root)
         rel = rel_path.as_posix()
+        if should_ignore(rel_path):
+            continue
         try:
             path_stat = path.lstat()
         except OSError as error:
@@ -395,8 +408,6 @@ def file_map(root: Path, boundary: Path | None = None) -> tuple[dict[str, Path],
             continue
         if stat.S_ISLNK(path_stat.st_mode):
             problems.append(f"{rel} (symbolic link is not allowed)")
-        elif should_ignore(rel_path):
-            continue
         elif stat.S_ISDIR(path_stat.st_mode):
             continue
         elif stat.S_ISREG(path_stat.st_mode):

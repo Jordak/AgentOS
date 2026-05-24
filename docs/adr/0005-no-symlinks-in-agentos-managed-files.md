@@ -1,6 +1,6 @@
 # No Symlinks in AgentOS-Managed Files
 
-AgentOS-managed files and directories outside `personal/` should be concrete filesystem entries, not symbolic links. The validator rejects symlinks anywhere in the AgentOS checkout except under top-level `personal/`, and public export must reject symlinks rather than preserving or following them.
+AgentOS-managed files and directories outside `personal/` should be concrete filesystem entries, not symbolic links. The validator rejects symlinks in managed repository files outside top-level `personal/`, while ignoring ordinary local artifact directories that are not part of the managed AgentOS file set, such as `.venv/`, `node_modules/`, `dist/`, `build/`, `output/`, and `__pycache__/`. Public export must reject symlinks rather than preserving or following them.
 
 The same rule applies when AgentOS scripts perform managed reads or writes. If a script is asked to read from, copy from, write to, update, prune, or validate an AgentOS-managed file tree, it must not silently follow symlinks in that source or destination tree. When a symlink is encountered, the script should fail closed with a clear diagnostic instead of treating the linked target as part of the managed file set.
 

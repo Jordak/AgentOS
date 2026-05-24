@@ -300,9 +300,13 @@ def copy_public_tree(root: Path, output: Path, sources: list[Path]) -> None:
         shutil.copy2(source, target)
 
 
-def run_validation(root: Path, output: Path, validator_root: Path | None = None) -> int:
-    validator_source = validator_root or root
+def run_validation(root: Path, output: Path) -> int:
+    validator_source = Path(__file__).resolve().parents[1]
     validator = validator_source / "os/verification/scripts/validate_agentos.py"
+    validator_problem = final_path_problem(validator, expected_kind="file", allow_missing=False)
+    if validator_problem:
+        print(f"error: unsafe validator script: {validator} ({validator_problem})", file=sys.stderr)
+        return 2
     result = subprocess.run(
         [sys.executable, str(validator), "--root", str(root), "--public-export", str(output)],
         text=True,
@@ -329,17 +333,20 @@ def main() -> int:
     try:
         source_root = root
         git_source_set = True
+        sources: list[Path] | None = None
         if args.staged:
             staged_snapshot = materialize_staged_tree(root)
             source_root = staged_snapshot
             git_source_set = False
-            precheck_status = run_validation(root, source_root, validator_root=source_root)
+            sources = publishable_sources(source_root, git_source_set=git_source_set)
+            precheck_status = run_validation(root, source_root)
         else:
             precheck_status = run_publication_precheck(root)
         if precheck_status != 0:
             return precheck_status
 
-        sources = publishable_sources(source_root, git_source_set=git_source_set)
+        if sources is None:
+            sources = publishable_sources(source_root, git_source_set=git_source_set)
 
         if args.output:
             output = lexical_absolute(args.output)
@@ -367,8 +374,7 @@ def main() -> int:
 
         if args.skip_validation:
             return 0
-        validator_root = output if args.staged else root
-        return run_validation(root, output, validator_root=validator_root)
+        return run_validation(root, output)
     except RuntimeError as error:
         print(f"error: {error}", file=sys.stderr)
         return 2
