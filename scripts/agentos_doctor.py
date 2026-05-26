@@ -201,7 +201,7 @@ def run_doctor(
                     env,
                     adapter_args,
                     verbose,
-                    suppress_write_commands=split_roots,
+                    omit_current_machine_write_guidance=split_roots,
                 ),
                 check_skill_mirrors(
                     agentos_home,
@@ -339,7 +339,7 @@ def check_adapters(
     env: Mapping[str, str],
     extra_args: list[str],
     verbose: bool,
-    suppress_write_commands: bool = False,
+    omit_current_machine_write_guidance: bool = False,
 ) -> CheckResult:
     script, invalid = trusted_helper_script(
         setup_agentos_home,
@@ -356,10 +356,11 @@ def check_adapters(
         "--agentos-home",
         str(setup_agentos_home),
         "--check",
+        "--no-remediation",
         *extra_args,
     ]
     completed = run_subprocess(command, cwd=setup_agentos_home, env=env)
-    details = subprocess_details(command, completed, verbose, suppress_write_commands=True)
+    details = subprocess_details(command, completed, verbose)
     if completed.returncode in {124, 127}:
         return CheckResult(
             "adapter drift",
@@ -378,7 +379,7 @@ def check_adapters(
         "Review the adapter check command and bounded output above.",
         "Ask through Run AgentOS Doctor before changing adapter files.",
     ]
-    if suppress_write_commands:
+    if omit_current_machine_write_guidance:
         recommendations.extend(
             [
                 "Feature-worktree split detected; Doctor omitted current-machine write guidance for the audit root.",
@@ -893,15 +894,11 @@ def subprocess_details(
     command: list[str],
     completed: subprocess.CompletedProcess[str],
     verbose: bool,
-    suppress_write_commands: bool = False,
 ) -> list[str]:
     line_limit = VERBOSE_OUTPUT_LINE_LIMIT if verbose else OUTPUT_LINE_LIMIT
     line_char_limit = VERBOSE_OUTPUT_LINE_CHAR_LIMIT if verbose else OUTPUT_LINE_CHAR_LIMIT
     stdout = completed.stdout
     stderr = completed.stderr
-    if suppress_write_commands:
-        stdout = redact_write_commands(stdout)
-        stderr = redact_write_commands(stderr)
     details = [
         "Command: " + shell_command(command),
         f"Exit code: {completed.returncode}",
@@ -909,22 +906,6 @@ def subprocess_details(
     details.extend(format_output("stdout", stdout, line_limit, line_char_limit))
     details.extend(format_output("stderr", stderr, line_limit, line_char_limit))
     return details
-
-
-def redact_write_commands(text: str) -> str:
-    if not text:
-        return text
-    redacted: list[str] = []
-    omitted = False
-    for line in text.splitlines():
-        stripped = line.strip().lower()
-        if "--no-dry-run" in line or "remediation" in stripped:
-            if not omitted:
-                redacted.append("<write guidance omitted; use Run AgentOS Doctor before any writes>")
-                omitted = True
-            continue
-        redacted.append(line)
-    return "\n".join(redacted)
 
 
 def mirror_subprocess_details(command: list[str], completed: subprocess.CompletedProcess[str]) -> list[str]:
@@ -1204,6 +1185,7 @@ def test_adapter_check_is_read_only_check_only() -> None:
         joined = "\n".join(result.details + result.recommendations)
         assert_true(result.status == "PASS", "default fake adapter check should pass")
         assert_true("--check" in joined, "adapter command must use --check")
+        assert_true("--no-remediation" in joined, "adapter command must request fact-only check output")
         assert_true("--no-dry-run" not in joined, "doctor must not request adapter writes")
 
 
@@ -1242,8 +1224,12 @@ def test_same_root_adapter_output_omits_write_commands() -> None:
         make_fake_agentos(root)
         (root / "scripts" / "install_global_agent_instructions.py").write_text(
             "import sys\n"
-            "print('Drift detected. Remediation:')\n"
-            "print('python3 scripts/install_global_agent_instructions.py --no-dry-run')\n"
+            "if '--no-remediation' in sys.argv:\n"
+            "    print('Drift detected.')\n"
+            "else:\n"
+            "    print('Drift detected. Remediation:')\n"
+            "    print('python3 scripts/install_global_agent_instructions.py --no-dry-run')\n"
+            "    print('run --remove to clean it')\n"
             "sys.exit(1)\n",
             encoding="utf-8",
         )
@@ -1259,8 +1245,9 @@ def test_same_root_adapter_output_omits_write_commands() -> None:
         )
         rendered = render_report_for_test(report, verbose=True)
         assert_true("--no-dry-run" not in rendered, "same-root doctor should omit write commands")
+        assert_true("--remove" not in rendered, "same-root doctor should omit removal commands")
         assert_true("Remediation:" not in rendered, "same-root doctor should omit remediation labels")
-        assert_true("write guidance omitted" in rendered, "redaction note should be shown")
+        assert_true("write guidance omitted" not in rendered, "doctor should rely on helper fact-only output")
 
 
 def test_split_root_adapter_output_omits_write_commands() -> None:
@@ -1271,8 +1258,12 @@ def test_split_root_adapter_output_omits_write_commands() -> None:
         make_fake_agentos(primary_root)
         (audit_root / "scripts" / "install_global_agent_instructions.py").write_text(
             "import sys\n"
-            "print('Drift detected. Remediation:')\n"
-            "print('python3 scripts/install_global_agent_instructions.py --no-dry-run')\n"
+            "if '--no-remediation' in sys.argv:\n"
+            "    print('Drift detected.')\n"
+            "else:\n"
+            "    print('Drift detected. Remediation:')\n"
+            "    print('python3 scripts/install_global_agent_instructions.py --no-dry-run')\n"
+            "    print('run --remove to clean it')\n"
             "sys.exit(1)\n",
             encoding="utf-8",
         )
@@ -1288,8 +1279,9 @@ def test_split_root_adapter_output_omits_write_commands() -> None:
         )
         rendered = render_report_for_test(report, verbose=True)
         assert_true("--no-dry-run" not in rendered, "split-root doctor should omit write commands")
+        assert_true("--remove" not in rendered, "split-root doctor should omit removal commands")
         assert_true("Remediation:" not in rendered, "split-root doctor should omit remediation labels")
-        assert_true("write guidance omitted" in rendered, "redaction note should be shown")
+        assert_true("write guidance omitted" not in rendered, "doctor should rely on helper fact-only output")
         assert_true("Feature-worktree split detected" in rendered, "split-root limitation should be explicit")
 
 

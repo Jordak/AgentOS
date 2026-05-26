@@ -164,6 +164,11 @@ def parser() -> argparse.ArgumentParser:
         help="Check existing managed blocks for drift without writing.",
     )
     p.add_argument(
+        "--no-remediation",
+        action="store_true",
+        help="In --check mode, suppress exact remediation commands and write/removal hints.",
+    )
+    p.add_argument(
         "--remove",
         action="store_true",
         help="Remove only AgentOS managed blocks without deleting files.",
@@ -195,6 +200,7 @@ def main(argv: list[str] | None = None) -> int:
             args.agentos_home
             or args.no_dry_run
             or args.check
+            or args.no_remediation
             or args.remove
             or args.all_default_adapters
             or args.adapter
@@ -226,6 +232,9 @@ def run(
         return 2
     if args.check and args.no_dry_run:
         print("error: --check is read-only; do not combine it with --no-dry-run", file=out)
+        return 2
+    if args.no_remediation and not args.check:
+        print("error: --no-remediation is only valid with --check", file=out)
         return 2
     if not args.agentos_home and mode != "remove":
         print("error: --agentos-home is required", file=out)
@@ -264,6 +273,7 @@ def run(
         mode=mode,
         include_all_default_adapters=args.all_default_adapters,
         extra_adapters=args.adapter,
+        include_remediation=not args.no_remediation,
     )
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
@@ -412,10 +422,16 @@ def run(
         print("", file=out)
         if mode == "check":
             if any(result.status == "error" for result in failures):
-                print("Check failed. Resolve the errors above before running an install remediation.", file=out)
+                if args.no_remediation:
+                    print("Check failed. Review the errors above.", file=out)
+                else:
+                    print("Check failed. Resolve the errors above before running an install remediation.", file=out)
             else:
-                print("Drift detected. Remediation:", file=out)
-                print(remediation_command(args, agentos_home), file=out)
+                if args.no_remediation:
+                    print("Drift detected. Review the check results before making changes.", file=out)
+                else:
+                    print("Drift detected. Remediation:", file=out)
+                    print(remediation_command(args, agentos_home), file=out)
         elif rolled_back:
             if rollback_errors:
                 print(
@@ -694,6 +710,7 @@ def collect_targets(
     mode: str,
     include_all_default_adapters: bool,
     extra_adapters: Iterable[str],
+    include_remediation: bool = True,
 ) -> list[Target]:
     targets: list[Target] = []
     seen: dict[Path, int] = {}
@@ -783,13 +800,18 @@ def collect_targets(
                     continue
                 if should_check_sibling_target(sibling, mode):
                     if mode == "check":
+                        reason = "inactive adapter sibling contains an AgentOS managed block"
+                        if include_remediation:
+                            reason = f"{reason}; run --remove to clean it or inspect it before relying on --check"
+                        else:
+                            reason = f"{reason}; inspect it before relying on --check"
                         add_target(
                             Target(
                                 f"{spec.name}:sibling",
                                 sibling,
                                 "adapter",
                                 spec.import_style,
-                                error_reason="inactive adapter sibling contains an AgentOS managed block; run --remove to clean it or inspect it before relying on --check",
+                                error_reason=reason,
                             )
                         )
                     else:
@@ -1511,6 +1533,7 @@ def run_self_tests() -> int:
         test_install_preserves_content_and_targets_existing_default_adapters,
         test_idempotent_rerun_and_path_update,
         test_check_pass_and_fail,
+        test_check_no_remediation_suppresses_write_guidance,
         test_remove_preserves_unmanaged_content,
         test_remove_does_not_require_live_agentos_home,
         test_inline_adapters_mirror_effective_global_file,
@@ -1623,6 +1646,26 @@ def test_check_pass_and_fail() -> None:
         code, output = run_args(["--agentos-home", str(agentos), "--check"], home)
         assert_true(code == 1, "check should fail on stale adapter")
         assert_true("Drift detected" in output, "check did not print remediation")
+
+
+def test_check_no_remediation_suppresses_write_guidance() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-global-installer-") as tmp:
+        root = Path(tmp)
+        home = root / "home"
+        home.mkdir()
+        (home / ".gemini").mkdir()
+        agentos = make_fake_agentos(root)
+        code, output = run_args(["--agentos-home", str(agentos), "--no-dry-run"], home)
+        assert_true(code == 0, output)
+
+        gemini = home / ".gemini" / "GEMINI.md"
+        gemini.write_text("stale\n", encoding="utf-8")
+        code, output = run_args(["--agentos-home", str(agentos), "--check", "--no-remediation"], home)
+        assert_true(code == 1, "check should fail on stale adapter")
+        assert_true("Drift detected" in output, "check should still report drift")
+        assert_true("Remediation:" not in output, "fact-only check should not print remediation labels")
+        assert_true("--no-dry-run" not in output, "fact-only check should not print install write commands")
+        assert_true("--remove" not in output, "fact-only check should not print removal commands")
 
 
 def test_remove_preserves_unmanaged_content() -> None:
@@ -2670,6 +2713,8 @@ def test_mode_conflicts() -> None:
         assert_true(code == 2, "--check --remove should fail")
         code, _output = run_args(["--agentos-home", str(agentos), "--check", "--no-dry-run"], home)
         assert_true(code == 2, "--check --no-dry-run should fail")
+        code, _output = run_args(["--agentos-home", str(agentos), "--no-remediation"], home)
+        assert_true(code == 2, "--no-remediation without --check should fail")
         code, _output = run_args([], home)
         assert_true(code == 2, "missing --agentos-home should fail")
         stderr = io.StringIO()
