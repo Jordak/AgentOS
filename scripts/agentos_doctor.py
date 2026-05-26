@@ -359,15 +359,7 @@ def check_adapters(
         *extra_args,
     ]
     completed = run_subprocess(command, cwd=setup_agentos_home, env=env)
-    details = subprocess_details(command, completed, verbose, suppress_write_commands=suppress_write_commands)
-    remediation = [
-        sys.executable,
-        str(script),
-        "--agentos-home",
-        str(setup_agentos_home),
-        *extra_args,
-        "--no-dry-run",
-    ]
+    details = subprocess_details(command, completed, verbose, suppress_write_commands=True)
     if completed.returncode in {124, 127}:
         return CheckResult(
             "adapter drift",
@@ -382,16 +374,17 @@ def check_adapters(
             "Adapter check helper exited successfully.",
             details=details,
         )
-    recommendations = ["Review the adapter check command and bounded output above."]
+    recommendations = [
+        "Review the adapter check command and bounded output above.",
+        "Ask through Run AgentOS Doctor before changing adapter files.",
+    ]
     if suppress_write_commands:
         recommendations.extend(
             [
-                "Feature-worktree split detected; Doctor omitted current-machine write commands for the audit root.",
+                "Feature-worktree split detected; Doctor omitted current-machine write guidance for the audit root.",
                 "Before any adapter write, rerun the adapter check from the primary checkout.",
             ]
         )
-    else:
-        recommendations.append("After approval only, consider: " + shell_command(remediation))
     return CheckResult(
         "adapter drift",
         "WARN",
@@ -459,16 +452,17 @@ def check_skill_mirrors(
             "Mirror-skills audit helper exited successfully.",
             details=details,
         )
-    recommendations = ["Review or rerun the audit command above; raw JSON is not printed by Doctor."]
+    recommendations = [
+        "Review or rerun the audit command above; raw JSON is not printed by Doctor.",
+        "Ask through Run AgentOS Doctor before syncing skill mirrors.",
+    ]
     if suppress_sync_commands:
         recommendations.extend(
             [
-                "Feature-worktree split detected; Doctor omitted mirror sync commands for the audit root.",
+                "Feature-worktree split detected; Doctor omitted mirror sync guidance for the audit root.",
                 "Before any mirror sync, rerun the audit from the primary checkout or after this branch lands.",
             ]
         )
-    else:
-        recommendations.append("After approval only, consider: " + shell_command([*command, "--sync"]))
     return CheckResult(
         "skill mirrors",
         "WARN",
@@ -659,7 +653,22 @@ def trusted_helper_script(
     check_name: str,
     helper_label: str,
 ) -> tuple[Path | None, CheckResult | None]:
-    script = agentos_home / rel
+    rel_path = Path(rel)
+    script = agentos_home / rel_path
+    component_problem = helper_path_component_problem(agentos_home, rel_path)
+    if component_problem:
+        return None, CheckResult(
+            check_name,
+            "FAIL",
+            f"{helper_label} is not trusted for execution.",
+            details=[
+                f"Expected helper with non-symlink path components: {script}",
+                f"Observed state: {component_problem}",
+            ],
+            recommendations=[
+                "Inspect the helper path before running it manually."
+            ],
+        )
     try:
         mode = script.lstat().st_mode
     except FileNotFoundError:
@@ -699,6 +708,39 @@ def trusted_helper_script(
             "Inspect the helper path before running it manually."
         ],
     )
+
+
+def helper_path_component_problem(agentos_home: Path, rel_path: Path) -> str | None:
+    # Runtime execution guard only: this checks the exact helper path Doctor will execute,
+    # not the repository-wide symlink policy owned by AgentOS validation.
+    if rel_path.is_absolute() or ".." in rel_path.parts:
+        return "helper path must be root-relative and stay inside AgentOS home"
+
+    try:
+        root_mode = agentos_home.lstat().st_mode
+    except FileNotFoundError:
+        return f"AgentOS home is missing: {agentos_home}"
+    except OSError as exc:
+        return f"AgentOS home could not be inspected: {agentos_home} ({exc.__class__.__name__})"
+    if stat.S_ISLNK(root_mode):
+        return f"AgentOS home is a symlink: {agentos_home}"
+    if not stat.S_ISDIR(root_mode):
+        return f"AgentOS home is not a directory: {agentos_home}"
+
+    current = agentos_home
+    for part in rel_path.parts[:-1]:
+        current = current / part
+        try:
+            mode = current.lstat().st_mode
+        except FileNotFoundError:
+            return f"parent directory is missing: {current}"
+        except OSError as exc:
+            return f"parent directory could not be inspected: {current} ({exc.__class__.__name__})"
+        if stat.S_ISLNK(mode):
+            return f"parent directory is a symlink: {current}"
+        if not stat.S_ISDIR(mode):
+            return f"parent path is not a directory: {current}"
+    return None
 
 
 def read_probe(path: Path) -> str | None:
@@ -878,7 +920,7 @@ def redact_write_commands(text: str) -> str:
         stripped = line.strip().lower()
         if "--no-dry-run" in line or "remediation" in stripped:
             if not omitted:
-                redacted.append("<write remediation omitted because audit root differs from primary AgentOS home>")
+                redacted.append("<write guidance omitted; use Run AgentOS Doctor before any writes>")
                 omitted = True
             continue
         redacted.append(line)
@@ -999,9 +1041,11 @@ def run_self_tests() -> int:
         test_required_core_files_pass,
         test_required_core_files_unreadable_fails,
         test_untrusted_home_skips_subprocess_helpers,
+        test_helper_parent_symlink_does_not_execute,
         test_personal_overlay_does_not_print_private_contents,
         test_adapter_check_is_read_only_check_only,
         test_adapter_check_uses_audit_root_when_primary_differs,
+        test_same_root_adapter_output_omits_write_commands,
         test_split_root_adapter_output_omits_write_commands,
         test_adapter_helper_failure_warns,
         test_mirror_audit_never_syncs,
@@ -1101,6 +1145,35 @@ def test_untrusted_home_skips_subprocess_helpers() -> None:
         assert_true("SHOULD_NOT_RUN" not in rendered, "untrusted helper should not execute")
 
 
+def test_helper_parent_symlink_does_not_execute() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        outside = Path(tmp) / "outside"
+        make_fake_agentos(root)
+        outside.mkdir()
+        (outside / "install_global_agent_instructions.py").write_text(
+            "print('SHOULD_NOT_RUN')\n",
+            encoding="utf-8",
+        )
+        (root / "scripts" / "install_global_agent_instructions.py").unlink()
+        (root / "scripts").rmdir()
+        (root / "scripts").symlink_to(outside, target_is_directory=True)
+        report = run_doctor(
+            requested_agentos_home=root,
+            requested_primary_agentos_home=root,
+            mirror_root=Path(tmp) / "mirrors",
+            cwd=root,
+            process_home=Path(tmp) / "home",
+            env=minimal_env(Path(tmp) / "home"),
+            adapter_args=[],
+            verbose=True,
+        )
+        rendered = render_report_for_test(report, verbose=True)
+        assert_true(result_named(report, "adapter drift").status == "FAIL", "symlinked helper parent should fail closed")
+        assert_true("parent directory is a symlink" in rendered, "symlinked parent should be reported")
+        assert_true("SHOULD_NOT_RUN" not in rendered, "helper behind symlinked parent should not execute")
+
+
 def test_personal_overlay_does_not_print_private_contents() -> None:
     with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
         root = Path(tmp) / "AgentOS"
@@ -1163,6 +1236,33 @@ def test_adapter_check_uses_audit_root_when_primary_differs() -> None:
         assert_true("PRIMARY_HELPER" not in rendered, "adapter check should not use the primary overlay root")
 
 
+def test_same_root_adapter_output_omits_write_commands() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        make_fake_agentos(root)
+        (root / "scripts" / "install_global_agent_instructions.py").write_text(
+            "import sys\n"
+            "print('Drift detected. Remediation:')\n"
+            "print('python3 scripts/install_global_agent_instructions.py --no-dry-run')\n"
+            "sys.exit(1)\n",
+            encoding="utf-8",
+        )
+        report = run_doctor(
+            requested_agentos_home=root,
+            requested_primary_agentos_home=root,
+            mirror_root=Path(tmp) / "mirrors",
+            cwd=root,
+            process_home=Path(tmp) / "home",
+            env=minimal_env(Path(tmp) / "home"),
+            adapter_args=[],
+            verbose=True,
+        )
+        rendered = render_report_for_test(report, verbose=True)
+        assert_true("--no-dry-run" not in rendered, "same-root doctor should omit write commands")
+        assert_true("Remediation:" not in rendered, "same-root doctor should omit remediation labels")
+        assert_true("write guidance omitted" in rendered, "redaction note should be shown")
+
+
 def test_split_root_adapter_output_omits_write_commands() -> None:
     with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
         audit_root = Path(tmp) / "audit-AgentOS"
@@ -1188,7 +1288,8 @@ def test_split_root_adapter_output_omits_write_commands() -> None:
         )
         rendered = render_report_for_test(report, verbose=True)
         assert_true("--no-dry-run" not in rendered, "split-root doctor should omit write commands")
-        assert_true("write remediation omitted" in rendered, "redaction note should be shown")
+        assert_true("Remediation:" not in rendered, "split-root doctor should omit remediation labels")
+        assert_true("write guidance omitted" in rendered, "redaction note should be shown")
         assert_true("Feature-worktree split detected" in rendered, "split-root limitation should be explicit")
 
 
@@ -1343,6 +1444,7 @@ def test_mirror_output_does_not_print_private_metadata() -> None:
         assert_true("private-client-skill" not in joined, "mirror skill name leaked")
         assert_true("secret-plan.md" not in joined, "mirror file name leaked")
         assert_true("Mirror statuses: stale=1" in joined, "safe aggregate status missing")
+        assert_true("--sync" not in joined, "doctor must not suggest mirror sync commands")
 
 
 def test_helper_output_is_bounded() -> None:
