@@ -71,6 +71,27 @@ Useful first Personal Overlay files include:
 
 Use the matching Core templates under `os/` when the user wants structure but has not supplied private facts yet.
 
+## Run AgentOS Doctor
+
+Use the Run AgentOS Doctor skill when the user wants a read-only setup health check with agent judgment for ambiguous local state. The Doctor helper is skill-local and should be run as part of that workflow, not as a standalone diagnosis. The skill uses this deterministic helper script for setup facts:
+
+```bash
+python3 os/skills/run-agentos-doctor/scripts/agentos_doctor.py
+```
+
+The helper script discovers `$root` from the current directory, or accepts `--agentos-home <root>`. It reports the resolved AgentOS home, checks adapter drift through `scripts/install_global_agent_instructions.py --check`, and reports automation registry/file locations and counts only. It prints bounded facts and helper output only; it must not audit skill mirrors, parse this Markdown for starter paths, print Personal Overlay file contents, or classify automation lifecycle state.
+
+If the installer or adapter check used `--all-default-adapters` or any custom `--adapter <path>` flags, repeat those exact flags when using Run AgentOS Doctor or the helper script so the read-only adapter drift result covers the same harness files.
+
+If the command is running from an isolated feature worktree, pass `--primary-agentos-home <primary-agentos-home>` so Personal Overlay automation location counts refer to the canonical checkout. The helper still runs read-only checks only and suppresses feature-worktree write commands when the audit root and primary checkout differ; starter-file interpretation, skill mirror diagnosis, adapter writes, mirror syncs, Personal Overlay edits, and automation changes require the Run AgentOS Doctor skill and explicit approval.
+
+Run AgentOS Doctor is not the installer and not mirror sync:
+
+- Use `os/skills/run-agentos-doctor/SKILL.md` for setup-health workflow and judgment over ambiguous notes.
+- Use `os/skills/run-agentos-doctor/scripts/agentos_doctor.py` for skill-local deterministic setup facts and exact read-only check commands.
+- Use `scripts/install_global_agent_instructions.py` when the user has approved creating, updating, checking, or removing global instruction adapters.
+- Use `os/skills/mirror-skills/scripts/mirror_skills.py` when the user wants to audit or, after approval, sync harness-discoverable skill mirrors.
+
 ## Skill Mirrors
 
 AgentOS Core skills live under `os/skills/`. Private skills can live under `personal/os/skills/<skill-name>/SKILL.md`.
@@ -114,5 +135,5 @@ Or:
 ```text
 Audit my AgentOS setup.
 
-Check whether the global instruction adapters point at this AgentOS checkout, whether AgentOS skills are discoverable from my harness, and whether my Personal Overlay has starter identity, context, memory, tool, and boundary files. Report gaps and ask before making changes.
+Use the Run AgentOS Doctor skill from my AgentOS checkout. As part of that skill workflow, run `python3 os/skills/run-agentos-doctor/scripts/agentos_doctor.py` for deterministic setup facts, then check whether the global instruction adapters point at this AgentOS checkout, whether AgentOS skills are discoverable from my harness, whether my Personal Overlay has starter identity, context, memory, tool, and boundary files, and whether automation state appears actively configured or only ambiguously mentioned. Report gaps and ask before making changes.
 ```

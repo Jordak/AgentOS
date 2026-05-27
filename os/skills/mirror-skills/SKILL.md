@@ -13,7 +13,7 @@ Keep AgentOS skill sources portable while making the current machine usable. The
 
 Inputs:
 
-- AgentOS root, defaulting to the current workspace for Core-only audits. When including Personal Overlay skills from a feature worktree, run from the canonical primary AgentOS checkout or pass `--agentos-root <primary AgentOS checkout>` so the feature worktree's ignored-file skeleton is not treated as authoritative.
+- AgentOS root, defaulting to the current workspace for Core audits. When including Personal Overlay skills from a feature worktree, keep `--agentos-root` pointed at the audited worktree and pass `--personal-agentos-root <primary AgentOS checkout>` so private skill sources come from the canonical primary checkout.
 - `os/skills/MANIFEST.md` with canonical skill entries and `Canonical source` fields.
 - Personal Overlay skill directories under `personal/os/skills/<skill-name>/SKILL.md`, when present.
 - A current-machine mirror root, defaulting to the user's `.agents/skills` directory.
@@ -49,11 +49,11 @@ Safety:
    - Read `os/skills/MANIFEST.md`, `os/skills/README.md`, `os/skills/SKILL_CONTRACT.md`, and `os/playbook/PERSONAL_OVERLAY.md`.
    - Confirm the manifest remains portable and contains canonical skill metadata only.
    - Check for Personal Overlay skills under `personal/os/skills/<skill-name>/SKILL.md`. These are private canonical sources for the current user and should be mirrored alongside Core skills when present.
-   - If running from a feature worktree and the audit includes Personal Overlay skills, resolve the canonical primary checkout's `personal/os/skills/` by running this skill from that checkout or by passing `--agentos-root <primary AgentOS checkout>`. Use the current feature worktree root only for Core-only audits, or when the user explicitly assigned that worktree as the private overlay workspace.
+   - If running from a feature worktree and the audit includes Personal Overlay skills, keep Core evidence tied to the feature worktree with `--agentos-root <feature-worktree-root>` and resolve private skills from the canonical primary checkout with `--personal-agentos-root <primary-agentos-root>`. Run from the primary checkout only when the user intentionally wants to audit primary Core rather than the feature worktree.
 
 2. Run an audit:
    - Use `python3 os/skills/mirror-skills/scripts/mirror_skills.py`.
-   - From a feature worktree, pass `--agentos-root <primary AgentOS checkout>` unless using `--core-only`.
+   - From a feature worktree, pass `--agentos-root <feature-worktree-root> --personal-agentos-root <primary-agentos-root>` unless using `--core-only`.
    - Pass `--mirror-root <path>` if checking somewhere other than the default current-machine mirror root.
    - Pass repeated `--skill <name>` arguments to check only a named subset of canonical skills.
    - Report missing, stale, and extra-file mirrors before syncing.
@@ -91,10 +91,10 @@ python3 os/skills/mirror-skills/scripts/mirror_skills.py --skill mirror-skills
 python3 os/skills/mirror-skills/scripts/mirror_skills.py --skill mirror-skills --sync
 ```
 
-Audit Personal Overlay skills from a feature worktree by pointing at the primary AgentOS checkout:
+Audit feature-worktree Core skills while reading Personal Overlay skills from the primary checkout:
 
 ```bash
-python3 os/skills/mirror-skills/scripts/mirror_skills.py --agentos-root <primary-agentos-root>
+python3 os/skills/mirror-skills/scripts/mirror_skills.py --agentos-root <feature-worktree-root> --personal-agentos-root <primary-agentos-root>
 ```
 
 Test against a temporary mirror root:
@@ -107,9 +107,9 @@ python3 os/skills/mirror-skills/scripts/mirror_skills.py --mirror-root <mirror-r
 
 - The audit derives canonical skills from the manifest, Personal Overlay skill paths, and canonical source paths, not from machine-local mirror records.
 - The audit includes both Core manifest skills and Personal Overlay skills, unless `--core-only` is used.
-- Skill filters only select from canonical skills discovered in the selected scope and fail clearly when a requested skill is unknown or directly collides between Core and the Personal Overlay.
-- Scoped skill filters should not fail because of unrelated Personal Overlay collisions outside the requested skill names.
-- Personal Overlay skill names must not collide with Core skill names; use `personal/os/skills/<core-skill>/CONFIG.md` for private inputs to a Core skill.
+- Skill filters only select from requested canonical skill names and fail clearly when a requested skill is unknown or directly collides between Core and the Personal Overlay.
+- Scoped skill filters should not fail because of unrelated Personal Overlay collisions or invalid private roots outside the requested skill names.
+- Unscoped audits fail on any Personal Overlay skill name that collides with Core. Use `personal/os/skills/<core-skill>/CONFIG.md` for private inputs to a Core skill.
 - Sync mode copies all required canonical skill files for directory-backed skills, including `os/agents/`, `scripts/`, `assets/`, and `references/` when present.
 - The report clearly separates missing/stale mirrors from extra mirror files.
 - No external account or network state is touched.
