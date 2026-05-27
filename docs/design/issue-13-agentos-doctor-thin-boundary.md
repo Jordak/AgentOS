@@ -12,7 +12,7 @@ Use this boundary:
 
 **Scripts gather deterministic facts. Markdown skills interpret those facts.**
 
-`scripts/agentos_doctor.py` should be a thin read-only helper. It may discover/report roots, confirm required Core entry files, run helper commands in audit/check mode, count automation locations, print bounded helper output, and return conservative WARN/FAIL when evidence is missing, unreadable, malformed, or ambiguous.
+`os/skills/run-agentos-doctor/scripts/agentos_doctor.py` should be a thin skill-local read-only helper. It may discover/report roots, confirm required Core entry files, run helper commands in audit/check mode, count automation locations, print bounded helper output, and return conservative WARN/FAIL when evidence is missing, unreadable, malformed, or ambiguous.
 
 `os/skills/run-agentos-doctor/SKILL.md` owns fuzzy judgment: starter-file interpretation from getting-started guidance, automation lifecycle interpretation, deciding whether prose mentions are meaningful, comparing Personal Overlay notes with Codex metadata, recommending remediation from ambiguous local state, and asking before writes or current-machine changes.
 
@@ -27,6 +27,7 @@ Use this boundary:
 ## Acceptance Criteria
 
 - The Doctor helper is small enough to audit directly and remains obviously read-only.
+- The Doctor helper and its tests live under `os/skills/run-agentos-doctor/scripts/` so the skill is the visible workflow owner.
 - The helper runs `install_global_agent_instructions.py --check` only and reports command/output/exit status without applying remediation.
 - The Doctor helper does not run or parse mirror-skills; the Run AgentOS Doctor skill delegates mirror diagnosis to the mirror-skills audit-only workflow.
 - The Doctor helper does not parse getting-started Markdown or judge Personal Overlay starter completeness; the skill handles starter interpretation without quoting private file contents.
@@ -37,7 +38,7 @@ Use this boundary:
 
 ## Validation Plan
 
-- Run `python3 scripts/agentos_doctor.py --self-test`.
+- Run `python3 os/skills/run-agentos-doctor/scripts/agentos_doctor.py --self-test`.
 - Run Python compilation for the Doctor helper and test module.
 - Run AgentOS validator and validator self-test.
 - Run skill validation for `os/skills/run-agentos-doctor`.

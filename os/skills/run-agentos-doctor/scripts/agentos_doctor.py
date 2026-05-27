@@ -209,7 +209,7 @@ def resolve_agentos_home(requested: Path | None, cwd: Path) -> tuple[Path, Check
         "Could not discover an AgentOS checkout from the current directory.",
         details=[f"Starting directory: {current}"],
         recommendations=[
-            "Run: python3 scripts/agentos_doctor.py --agentos-home <path-to-AgentOS>"
+            "Run: python3 os/skills/run-agentos-doctor/scripts/agentos_doctor.py --agentos-home <path-to-AgentOS>"
         ],
     )
 

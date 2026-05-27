@@ -7,7 +7,7 @@ description: Run AgentOS setup health checks using a thin deterministic fact-col
 
 ## Goal
 
-Audit a local AgentOS installation without making changes. Treat `scripts/agentos_doctor.py` as a read-only fact collector, not as the whole diagnosis: scripts gather deterministic facts, and this Markdown skill interprets those facts.
+Audit a local AgentOS installation without making changes. Treat the skill-local helper at `os/skills/run-agentos-doctor/scripts/agentos_doctor.py` as a read-only fact collector, not as the whole diagnosis: scripts gather deterministic facts, and this Markdown skill interprets those facts.
 
 ## Contract
 
@@ -29,7 +29,7 @@ Mutability:
 
 Tools and connectors:
 
-- Local filesystem, `scripts/agentos_doctor.py`, `scripts/install_global_agent_instructions.py`, `os/skills/mirror-skills/scripts/mirror_skills.py`, `os/playbook/GETTING_STARTED.md`, and relevant Personal Overlay automation notes when present.
+- Local filesystem, skill-local `os/skills/run-agentos-doctor/scripts/agentos_doctor.py`, `scripts/install_global_agent_instructions.py`, `os/skills/mirror-skills/scripts/mirror_skills.py`, `os/playbook/GETTING_STARTED.md`, and relevant Personal Overlay automation notes when present.
 
 Safety:
 
@@ -50,7 +50,7 @@ Safety:
    Use:
 
    ```bash
-   python3 scripts/agentos_doctor.py
+   python3 os/skills/run-agentos-doctor/scripts/agentos_doctor.py
    ```
 
    Add `--agentos-home`, `--primary-agentos-home`, `--all-default-adapters`, and repeated `--adapter <path>` when needed. Repeat the same adapter flags used by installer dry-runs/checks. The helper must remain read-only: adapter check only and automation location/count facts only. It does not audit skill mirrors, parse `os/playbook/GETTING_STARTED.md` for starter paths, or judge starter-file completeness.
@@ -90,7 +90,7 @@ Safety:
 
 ## Filing Rules
 
-- Default output stays in chat; the deterministic helper stays at `scripts/agentos_doctor.py`; private setup notes and automation state stay in the Personal Overlay; current-machine mirror state is not recorded in the Core manifest.
+- Default output stays in chat; the deterministic helper and its tests stay under `os/skills/run-agentos-doctor/scripts/`; private setup notes and automation state stay in the Personal Overlay; current-machine mirror state is not recorded in the Core manifest.
 
 ## Verification
 

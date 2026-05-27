@@ -41,8 +41,8 @@ Install AgentOS for me.
 7. Run the drift check:
    python3 scripts/install_global_agent_instructions.py --agentos-home <resolved-agentos-home> --check
    If extra --adapter <path> flags were used above, repeat those exact flags here.
-8. Run the Run AgentOS Doctor skill, using its deterministic helper script for setup facts:
-   python3 scripts/agentos_doctor.py --agentos-home <resolved-agentos-home>
+8. Run the Run AgentOS Doctor skill. As part of that skill workflow, use its deterministic helper script for setup facts:
+   python3 os/skills/run-agentos-doctor/scripts/agentos_doctor.py --agentos-home <resolved-agentos-home>
    If extra --all-default-adapters or --adapter <path> flags were used above, repeat those exact flags here. Treat script warnings as facts or next-step recommendations, then use agent judgment for ambiguous setup notes such as automation drafts or disabled notes. Do not make changes without approval.
 9. Summarize what changed, where backups were written, whether the adapter check passed, and what Run AgentOS Doctor recommends.
 10. Ask me whether I want AgentOS skills to be discoverable from my harnesses. If I do, use the mirror-skills workflow to check Core skills and Personal Overlay skills, show me the audit result, and ask before syncing any files outside this checkout.
@@ -66,11 +66,11 @@ Review the dry-run output. It should tell you which global instruction files wou
 ```bash
 python3 scripts/install_global_agent_instructions.py --agentos-home <agentos-home> --no-dry-run
 python3 scripts/install_global_agent_instructions.py --agentos-home <agentos-home> --check
-python3 scripts/agentos_doctor.py --agentos-home <agentos-home>
+python3 os/skills/run-agentos-doctor/scripts/agentos_doctor.py --agentos-home <agentos-home>
 ```
 
 If you use `--all-default-adapters` or any custom `--adapter <path>` flags, repeat those same flags on the dry-run, write, check, and remove commands.
-Repeat those same flags when using Run AgentOS Doctor or `scripts/agentos_doctor.py`, because the helper script passes them through to its read-only adapter drift check.
+Repeat those same flags when using Run AgentOS Doctor, because its helper script passes them through to the read-only adapter drift check.
 
 </details>
 
@@ -78,10 +78,10 @@ For installer adapter details, see the [portability playbook](os/playbook/PORTAB
 
 ## Run AgentOS Doctor
 
-Use the [Run AgentOS Doctor skill](os/skills/run-agentos-doctor/SKILL.md) when you want a read-only setup-health audit with agent judgment for ambiguous local state. The skill uses this deterministic helper script for facts:
+Use the [Run AgentOS Doctor skill](os/skills/run-agentos-doctor/SKILL.md) when you want a read-only setup-health audit with agent judgment for ambiguous local state. The Doctor helper is skill-local and should be run as part of that workflow, not as a standalone diagnosis. The skill uses this deterministic helper script for facts:
 
 ```bash
-python3 scripts/agentos_doctor.py
+python3 os/skills/run-agentos-doctor/scripts/agentos_doctor.py
 ```
 
 The helper script discovers the AgentOS checkout from the current directory, or you can pass `--agentos-home <agentos-home>`. It always prints the resolved home, runs the installer drift check in read-only `--check` mode, and reports automation registry/file locations and counts only. It does not remediate, install, sync, delete, audit skill mirrors, parse getting-started Markdown for starter paths, classify automation lifecycle state, or print private file contents.
@@ -93,7 +93,7 @@ When running the doctor from an isolated feature worktree, pass `--primary-agent
 Use the tools this way:
 
 - `os/skills/run-agentos-doctor/SKILL.md`: read-only setup-health workflow with agent judgment for ambiguous local state.
-- `scripts/agentos_doctor.py`: deterministic setup facts and exact read-only check commands.
+- `os/skills/run-agentos-doctor/scripts/agentos_doctor.py`: skill-local deterministic setup facts and exact read-only check commands.
 - `scripts/install_global_agent_instructions.py`: dry-run, install, check, or remove global instruction adapters after review.
 - `os/skills/mirror-skills/scripts/mirror_skills.py`: audit skill mirrors by default; sync only after approving current-machine writes.
 

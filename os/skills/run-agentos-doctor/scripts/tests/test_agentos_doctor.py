@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Self-tests for scripts/agentos_doctor.py."""
+"""Self-tests for os/skills/run-agentos-doctor/scripts/agentos_doctor.py."""
 
 from __future__ import annotations
 
