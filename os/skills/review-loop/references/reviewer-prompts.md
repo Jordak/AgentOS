@@ -13,6 +13,7 @@ Before sending a reviewer prompt, confirm it includes:
 - read-only rule, including no PR comments by reviewers;
 - instruction to generalize each finding into an issue family and look for related occurrences;
 - instruction to report design-escape-hatch concerns when repeated findings suggest scope reduction, design clarification, or a different implementation shape;
+- instruction to compare implementation shape against the durable design source on first fresh review when one is provided;
 - finding IDs for same-reviewer re-review;
 - fix commits, accepted fixes, declined rationales, consolidated comment URL, and validation results when applicable;
 - full-diff reread instruction;
@@ -42,6 +43,7 @@ Rules:
 - Give each finding a provisional ID using your reviewer alias, such as `<alias>-F1`; the orchestrator may normalize IDs later.
 - For each finding, step back and identify the broader issue family or invariant it represents. Look for sibling occurrences in the diff or nearby code before reporting.
 - For accepted-risk findings, include the specific instance, generalized family, related occurrences or search strategy, and suggested family-level fix.
+- Compare the implementation shape against the baseline intent and durable design source when provided. If the PR added major architecture, parsing, synchronization, lifecycle, validation, or public-policy semantics that the design source did not agree to, report that as a design-readiness finding rather than treating only the symptoms as bugs.
 - If repeated findings seem to come from an over-expanded or under-designed feature shape, or if the best fix may be scope reduction, design clarification, or a different implementation shape, report a `Design escape hatch` section. In that section compare the current diff against the baseline intent and name the smaller or clearer design you would consider.
 - Do not pad the review with low-value style preferences.
 - If you find no issues, start your response with exactly `No new findings.` on its own first line. Then add the reviewed scope and validation you performed.

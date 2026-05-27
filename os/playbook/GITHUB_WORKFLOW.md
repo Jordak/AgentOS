@@ -30,6 +30,21 @@ Use snapshot language to avoid staleness in issues. Prefer phrases like "As of t
 
 This convention helps future agents understand not only what to build, but why the old shape was insufficient.
 
+## PR Readiness Fields
+
+For feature-sized implementation PRs, include these fields in the PR body:
+
+```md
+Readiness evidence: <GitHub issue, PRD, ADR, local design doc, or gate-skip reason>
+Readiness verdict: Ready to Implement
+```
+
+Prefer a GitHub issue as the readiness evidence for issue-driven work. The issue can contain the design directly or link to a larger PRD, ADR, or local design doc. Create a separate design doc only when the design is too large, architectural, private, or not naturally issue-shaped.
+
+Use `Readiness verdict: Gate Skipped` only when the implementation-readiness gate is exempt or intentionally bypassed, and put the reason in `Readiness evidence:`. A `ready-for-agent` label or a confident implementation prompt is not a substitute for these fields.
+
+Before opening, updating, or merging a feature PR, check that the body still points to current readiness evidence and does not contain stale paths, obsolete commands, or an old readiness verdict. Treat these fields as non-canonical documentation that still matters because future agents read PR bodies.
+
 ## GitHub CLI Auth In Sandboxed Harnesses
 
 Some agent harnesses run shell commands in a sandbox that cannot read the system keyring correctly. In that context, `gh auth status` may report "the token is invalid" even when the user's GitHub CLI credential is valid in the normal shell.
@@ -123,5 +138,5 @@ Before closing an implementation issue:
 Respect workflow labels as authority:
 
 - `ready-for-agent` means an agent may implement the issue when the instructions are clear.
-- For feature-sized implementation work, `ready-for-agent` is not a substitute for implementation readiness; the work must also pass or intentionally skip `os/playbook/IMPLEMENT_FEATURES.md`.
+- For feature-sized implementation work, `ready-for-agent` is not a substitute for implementation readiness; the work must also pass or intentionally skip `os/playbook/IMPLEMENT_FEATURES.md`, and the PR body should expose readiness evidence and the readiness verdict.
 - `ready-for-human`, `needs-human`, `needs-a-human`, or equivalent labels mean a human must do the work or make the closure decision. Do not close these issues as an agent, even if local work appears complete. Instead, leave an evidence comment and ask the user or the human owner to review and close.

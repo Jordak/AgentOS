@@ -44,6 +44,7 @@ Safety:
 - Do not treat a missing readiness marker as silently ready. Infer, explain, and confirm with the user before implementation proceeds.
 - Do not override `Design readiness: needs consensus` without user confirmation and an authorized design-source update.
 - Do not leave meaningful deferred questions only in chat, model memory, or an unpersisted report.
+- Do not allow chat-only consensus to become the first implementation commit. Promote the agreed design into a durable source before coding, or record an explicit `Gate Skipped` bypass.
 - Do not formally depend on non-Core or current-machine skills.
 
 ## Workflow Phases
@@ -52,7 +53,7 @@ Safety:
    Identify the implementation request, issue, PRD, design doc, PR, branch, or local plan. Apply the playbook's trigger scope and exemptions. If exempt, return `Gate Skipped` with the reason. If the user explicitly bypasses the gate after missing or incomplete readiness is reported, return `Gate Skipped` with the bypass reason and missing-readiness summary.
 
 2. Locate the durable design source.
-   Prefer the linked GitHub issue, PRD, ADR, local design doc, or planning note named by the request or repository. For PR review work, inspect the linked issue, PR body, and any referenced design source. If only chat context exists, the verdict is `Needs Design Consensus` until that context is promoted into a durable artifact or the user explicitly chooses a `Gate Skipped` bypass.
+   Prefer the linked GitHub issue, PRD, ADR, local design doc, or planning note named by the request or repository. For PR review work, inspect the linked issue, PR body, and any referenced design source. If only chat context exists, the verdict is `Needs Design Consensus` until that context is promoted into a durable artifact or the user explicitly chooses a `Gate Skipped` bypass. When the user has already asked you to make the work ready, create or update the durable design source first, then evaluate that source before implementation.
 
 3. Check readiness.
    Evaluate the source against the playbook's design-source standard and readiness-marker rules. Content wins over the marker.
@@ -64,7 +65,7 @@ Safety:
    Classify open questions as blocking or deferred using the playbook's rules. When an optional design-interview workflow is available and useful for the blocking question, use it; for simple questions or when no such workflow is available, ask targeted questions directly. Ask before GitHub issue creation or updates unless tracker writes were explicitly authorized. If GitHub writes are not authorized, create the local artifact named by the playbook unless the project has a better convention or the user redirects. If required durable follow-up artifacts are not created, the verdict remains `Needs Design Consensus`. Update or propose updating the current design source with a `Deferred Follow-ups` section linking to created artifacts.
 
 6. Report the verdict.
-   Include the source reviewed, satisfied and missing readiness fields, implementation boundary, non-goals, created follow-up artifacts, proposed source-design updates, and whether external writes happened, were proposed, or were skipped.
+   Include the source reviewed, satisfied and missing readiness fields, implementation boundary, non-goals, created follow-up artifacts, proposed source-design updates, and whether external writes happened, were proposed, or were skipped. If the work will become a PR, include the exact `Readiness evidence:` and `Readiness verdict:` lines the PR body should carry. Prefer a GitHub issue as readiness evidence for issue-driven work; use a design doc only when the design is too large, architectural, private, or not naturally issue-shaped.
 
 ## Filing Rules
 
@@ -81,6 +82,7 @@ Safety:
 - Meaningful deferred questions are captured durably, not only in chat.
 - External writes are approved before they happen.
 - The implementation boundary is clear enough that another agent can avoid design creep.
+- For PR-bound work, the readiness report supplies PR-body readiness fields.
 
 ## Verification
 
@@ -93,4 +95,5 @@ Before finishing:
 5. Confirm unmarked readiness was not silently accepted.
 6. Confirm deferred follow-up artifacts were created where required.
 7. Confirm external tracker writes were approved before they happened.
-8. If this skill or its manifest entry changed, run `scripts/run-validator`.
+8. Confirm PR-bound work has visible PR-body readiness fields or a recorded `Gate Skipped` reason.
+9. If this skill or its manifest entry changed, run `scripts/run-validator`.

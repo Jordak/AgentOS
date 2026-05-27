@@ -46,6 +46,40 @@ jobs:
             exit 1
           fi
 
+  pr-readiness:
+    name: Check PR design readiness fields
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Require visible design readiness
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          body_file="${RUNNER_TEMP}/pr-body.md"
+          printf '%s' "${PR_BODY}" > "${body_file}"
+
+          readiness_evidence="$(sed -n 's/^Readiness evidence:[[:space:]]*//p' "${body_file}" | head -n 1)"
+          readiness_verdict="$(sed -n 's/^Readiness verdict:[[:space:]]*//p' "${body_file}" | head -n 1)"
+
+          if [ -z "${readiness_evidence}" ]; then
+            echo "::error title=Missing readiness evidence::PRs must expose readiness evidence in the PR body. Add 'Readiness evidence: <GitHub issue, PRD, ADR, local design doc, or gate-skip reason>'."
+            exit 1
+          fi
+
+          case "${readiness_verdict}" in
+            "Ready to Implement"|"Gate Skipped")
+              ;;
+            "")
+              echo "::error title=Missing readiness verdict::Add 'Readiness verdict: Ready to Implement' or 'Readiness verdict: Gate Skipped' to the PR body."
+              exit 1
+              ;;
+            *)
+              echo "::error title=Unsupported readiness verdict::Use exactly 'Ready to Implement' or 'Gate Skipped'."
+              exit 1
+              ;;
+          esac
+
   validate:
     name: Validate public boundary
     runs-on: ubuntu-latest

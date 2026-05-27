@@ -58,7 +58,7 @@ Use the narrowest route that can answer the task.
 - Quality check code, schemas, and sanitized fixtures: `os/verification/`.
 - Private run reports and benchmark results: `personal/os/verification/`.
 - Cross-cutting operating policy, artifact policy, portability, publication, or programming preferences: `os/playbook/`.
-- Feature-sized implementation requests: check `os/playbook/IMPLEMENT_FEATURES.md` and use `os/skills/check-implementation-readiness/SKILL.md` before coding unless the work is clearly gate-exempt.
+- Feature-sized implementation requests: check `os/playbook/IMPLEMENT_FEATURES.md` and use `os/skills/check-implementation-readiness/SKILL.md` before coding unless the work is clearly gate-exempt. If only chat consensus exists, create or update a durable design source before implementation code.
 - GitHub issue drafting, pull request drafting/creation, branch handoffs, merge/landing notes, issue closure comments, or GitHub CLI authentication during those operations: `os/playbook/GITHUB_WORKFLOW.md`, even when the request is a follow-up to another skill's report or recommendation.
 - Live schedules, recurring jobs, or automation prompts: `personal/os/automations/`, using Core templates under `os/automations/`.
 - Live automation histories, queues, delivery records, and generated outputs: `personal/os/automations/` or the relevant Personal Overlay agent/memory directory.
@@ -114,4 +114,4 @@ Before finishing AgentOS work:
 5. Did generated recommendations for durable AgentOS state go through the appropriate review path?
 6. Did durable new state land in one canonical home?
 7. Did publication work preserve the fresh-history gate in `os/playbook/PUBLICATION.md`?
-8. For feature-sized implementation, did the work pass or intentionally skip the implementation-readiness gate in `os/playbook/IMPLEMENT_FEATURES.md`?
+8. For feature-sized implementation, did the work pass or intentionally skip the implementation-readiness gate in `os/playbook/IMPLEMENT_FEATURES.md`, and is that verdict visible in the PR body when there is a PR?

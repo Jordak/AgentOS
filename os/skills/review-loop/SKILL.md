@@ -35,6 +35,7 @@ Tools and connectors:
 - Local `git`, project test commands, and repository-specific validation.
 - GitHub connector or `gh` for PR metadata, consolidated comments, labels, draft state, and branch pushes.
 - The active harness's clean-context reviewer/delegation capability for review panels.
+- `os/skills/check-implementation-readiness/SKILL.md` and `os/playbook/IMPLEMENT_FEATURES.md` for PR design-source preflight.
 - `make-temp-file` for temporary report paths when available.
 - `os/playbook/ARTIFACTS.md` for substantial report format decisions.
 - `os/playbook/GITHUB_WORKFLOW.md` for GitHub issue, PR, and ready-for-human safety rules.
@@ -45,6 +46,7 @@ Safety:
 - If the user only asked for a normal review, ask before upgrading to `review-loop`; the question must state that the loop may post consolidated "Agent Review" comments, push fix commits to the PR branch, and apply the established ready-for-human marker.
 - Treat a request to run `review-loop` on a specific PR as permission for those listed PR-scoped writes when the current request or invocation surface made that write scope explicit. Do not ask before each ordinary loop write.
 - Keep review subagents read-only by default. They report to the orchestrator; the orchestrator is the single PR-comment writer.
+- Before spawning reviewers for feature-sized work, run or honor the implementation-readiness gate. If no durable design source exists, or if the source is not ready for the PR scope, pause before review unless the user explicitly chooses `Gate Skipped`.
 - Do not merge the PR, close issues, create labels, delete branches, change permissions, push outside the target PR branch, or publish outside the PR review surface unless separately requested and approved.
 - Do not copy private connector data, secrets, or unrelated repository context into reviewer prompts or final reports.
 - Close every review subagent after its panel cycle is complete so stale reviewer contexts do not leak into later fresh panels.
@@ -112,6 +114,7 @@ Accepted findings can be resolved by simplifying, narrowing, splitting, or delet
    - Identify the repository, PR or commit target, base branch, head branch, and current branch.
    - Read the repository's local instructions and review policy.
    - Fetch or inspect current PR metadata when network access and permissions allow.
+   - For feature-sized targets, apply the implementation-readiness preflight from `os/playbook/IMPLEMENT_FEATURES.md`: locate the durable design source from the issue, PR body, ADR, or local design doc; confirm it is `Ready to Implement` for the PR scope or record an explicit `Gate Skipped` bypass before reviewers start.
    - If the target is not a PR, choose local reporting mode instead of PR comments.
    - Establish the baseline intent summary described in the Design Escape Hatch section. Keep it in the loop ledger so later findings can be compared against the original brief and allowed alternatives.
 
@@ -133,6 +136,7 @@ Accepted findings can be resolved by simplifying, narrowing, splitting, or delet
    - Reopen `references/reviewer-prompts.md` and fill the initial fresh reviewer template for each reviewer.
    - Give each subagent only the target, base/head or commit range, reviewer alias, optional lens, the baseline intent summary, and the initial reviewer prompt from `references/reviewer-prompts.md`.
    - Require a full review of the current diff or PR, not a narrow check of suspected issues.
+   - Ask the first fresh panel to compare the implementation shape against the durable design source and flag any first-commit design drift before the loop starts treating symptoms as isolated bugs.
    - Ask reviewers to call out design-escape-hatch concerns when the best fix may be scope reduction, design clarification, or a different implementation shape rather than another patch.
    - Wait for all reviewers in the panel to report before adjudicating the panel.
 
@@ -189,6 +193,7 @@ Split into additional skills only after a subworkflow is reused independently. G
 - Fresh panel size matches PR size and risk.
 - Orchestrator and reviewer effort levels are assigned intentionally, with highest effort reserved for review quality rather than bookkeeping.
 - The loop preserves and uses a baseline intent summary from the original brief, including explicit alternatives and non-goals when available.
+- Feature-sized review targets have a `Ready to Implement` design source or an explicit `Gate Skipped` bypass recorded before reviewers are spawned.
 - Reviewers are context-independent at the start of each fresh panel cycle.
 - Reviewer prompts are assembled from the current templates, not memory.
 - The orchestrator owns one ledger and posts at most one consolidated "Agent Review" comment per panel pass.
@@ -217,15 +222,16 @@ Before finishing:
 
 1. Confirm the target, base, head, final reviewed commit SHA or local diff state, and panel-size rationale.
 2. Confirm the baseline intent summary was captured from the original brief, including allowed alternatives and non-goals when available.
-3. Confirm every design-escape-hatch trigger was either surfaced to the user, explicitly declined with rationale, or found not applicable.
-4. Confirm every reviewer in each active panel had a clean final report and was closed.
-5. Confirm the final fresh panel had no accepted findings on its initial pass.
-6. Confirm every accepted finding or issue family has a fix, a scope/design change, or an explicit unresolved-risk note.
-7. Confirm every declined finding has a rationale.
-8. Confirm accepted issue families were swept for sibling occurrences before re-review.
-9. Confirm reviewer prompts used the current initial or same-reviewer templates, including reporting mode, read-only rule, no-reviewer-PR-comment rule, issue-family sweep instruction, design-escape-hatch instruction, full-reread instruction, provisional-ID rule, and clean response sentinel.
-10. Confirm soft budget checkpoints were surfaced when checkpoint triggers occurred.
-11. Confirm validation commands and results are captured.
-12. Confirm fix commits use the active agent-name prefix.
-13. Confirm the temporary HTML report exists, follows `references/report-guidance.md`, hyperlinks commit hashes to GitHub commits when possible, and is linked in the orchestrator's chat as a clickable absolute-path `.html` Markdown link.
-14. Confirm no merges, issue closures, label creation, permission changes, non-target-branch pushes, or other out-of-loop external writes happened without current user authorization.
+3. Confirm feature-sized review targets had a durable `Ready to Implement` design source or an explicit `Gate Skipped` bypass before reviewers were spawned.
+4. Confirm every design-escape-hatch trigger was either surfaced to the user, explicitly declined with rationale, or found not applicable.
+5. Confirm every reviewer in each active panel had a clean final report and was closed.
+6. Confirm the final fresh panel had no accepted findings on its initial pass.
+7. Confirm every accepted finding or issue family has a fix, a scope/design change, or an explicit unresolved-risk note.
+8. Confirm every declined finding has a rationale.
+9. Confirm accepted issue families were swept for sibling occurrences before re-review.
+10. Confirm reviewer prompts used the current initial or same-reviewer templates, including reporting mode, read-only rule, no-reviewer-PR-comment rule, issue-family sweep instruction, design-escape-hatch instruction, full-reread instruction, provisional-ID rule, and clean response sentinel.
+11. Confirm soft budget checkpoints were surfaced when checkpoint triggers occurred.
+12. Confirm validation commands and results are captured.
+13. Confirm fix commits use the active agent-name prefix.
+14. Confirm the temporary HTML report exists, follows `references/report-guidance.md`, hyperlinks commit hashes to GitHub commits when possible, and is linked in the orchestrator's chat as a clickable absolute-path `.html` Markdown link.
+15. Confirm no merges, issue closures, label creation, permission changes, non-target-branch pushes, or other out-of-loop external writes happened without current user authorization.
