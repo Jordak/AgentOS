@@ -217,6 +217,20 @@ SECRET_LIKE_PATTERNS = [
 GENERIC_LOCAL_TOOL_PATH_RE = re.compile(
     r"^(?:~|\$HOME|\$\{HOME\})[\\/](?:\.agents[\\/]skills|\.codex[\\/]automations)(?:[\\/].*)?$"
 )
+BENCHMARK_REQUIRED_HELP_FLAGS = (
+    "--help",
+    "--self-test",
+    "--save-report",
+    "--no-save-report",
+    "--check-remote-main",
+)
+BENCHMARK_HARNESS_HELP_FLAGS = (
+    "--harness",
+    "--dry-run",
+    "--no-dry-run",
+    "--model",
+    "--effort",
+)
 
 
 @dataclass
@@ -1586,8 +1600,11 @@ class AgentOSValidator:
                     self.add_error(check, manifest_path, f"{benchmark_id}: duplicate script path: {script}")
                 else:
                     seen_scripts.add(script)
-                if not self.resolve_path(script).is_file():
+                script_path = self.resolve_path(script)
+                if not script_path.is_file():
                     self.add_error(check, manifest_path, f"{benchmark_id}: script does not exist: {script}")
+                else:
+                    self.check_benchmark_cli_contract(check, manifest_path, benchmark_id, script_path)
             if reports_dir and not self.resolve_path(reports_dir).is_dir():
                 self.add_error(
                     check,
@@ -1603,6 +1620,69 @@ class AgentOSValidator:
             self.add_error(check, manifest_path, f"benchmark script missing from manifest: {script}")
 
         self.checked.append(check)
+
+    def check_benchmark_cli_contract(
+        self,
+        check: str,
+        manifest_path: Path,
+        benchmark_id: str,
+        script_path: Path,
+    ) -> None:
+        help_result = self.run_benchmark_contract_command(script_path, ["--help"], timeout_seconds=30)
+        if help_result is None:
+            self.add_error(check, manifest_path, f"{benchmark_id}: benchmark script --help could not run")
+            return
+        if help_result.returncode != 0:
+            detail = self.command_failure_detail(help_result)
+            self.add_error(check, manifest_path, f"{benchmark_id}: benchmark script --help failed{detail}")
+            return
+
+        help_text = "\n".join([help_result.stdout, help_result.stderr])
+        missing_flags = [flag for flag in BENCHMARK_REQUIRED_HELP_FLAGS if flag not in help_text]
+        if "--harness" in help_text:
+            missing_flags.extend(flag for flag in BENCHMARK_HARNESS_HELP_FLAGS if flag not in help_text)
+        if missing_flags:
+            flags = ", ".join(sorted(set(missing_flags)))
+            self.add_error(check, manifest_path, f"{benchmark_id}: benchmark script help missing flag(s): {flags}")
+            return
+
+        self_test_result = self.run_benchmark_contract_command(script_path, ["--self-test"], timeout_seconds=120)
+        if self_test_result is None:
+            self.add_error(check, manifest_path, f"{benchmark_id}: benchmark script --self-test could not run")
+            return
+        if self_test_result.returncode != 0:
+            detail = self.command_failure_detail(self_test_result)
+            self.add_error(check, manifest_path, f"{benchmark_id}: benchmark script --self-test failed{detail}")
+
+    def run_benchmark_contract_command(
+        self,
+        script_path: Path,
+        args: list[str],
+        timeout_seconds: int,
+    ) -> subprocess.CompletedProcess[str] | None:
+        env = {
+            key: value
+            for key, value in os.environ.items()
+            if not key.startswith("GIT_")
+        }
+        try:
+            return subprocess.run(
+                [sys.executable, str(script_path), *args],
+                cwd=self.root,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=timeout_seconds,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+
+    def command_failure_detail(self, result: subprocess.CompletedProcess[str]) -> str:
+        output = "\n".join(part for part in [result.stderr.strip(), result.stdout.strip()] if part)
+        if not output:
+            return f" with exit code {result.returncode}"
+        return f" with exit code {result.returncode}: {output[-500:]}"
 
     def validate_manifest_path_field(
         self,

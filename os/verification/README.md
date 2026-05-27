@@ -20,6 +20,23 @@ Core benchmark posture lives in `os/verification/BENCHMARK_STATUS.md`. That file
 
 Raw benchmark reports and run histories belong outside Core, usually under the Personal Overlay report directories configured in `os/verification/BENCHMARKS.json`. Use `os/skills/refresh-benchmark-status/SKILL.md` to refresh the Core snapshot from eligible local evidence without copying private or raw run details into Core.
 
+## Benchmark Script CLI Contract
+
+Every benchmark script listed in `os/verification/BENCHMARKS.json` must expose a small common CLI surface so `run-benchmarks` can inspect and run scripts from the manifest without benchmark-specific command knowledge.
+
+Required behavior:
+
+- `--help` exits successfully, performs no writes, makes no network calls, spends no model calls, and advertises the orchestration flags the script supports.
+- `--self-test` runs deterministic local script or grader checks, writes no benchmark reports, spends no model calls, and exits nonzero when local benchmark invariants fail.
+- `--save-report` writes both `report.md` and `run.json` to one timestamped directory under the manifest `reports_dir`; `--no-save-report` must be available for boolean-option symmetry.
+- `--check-remote-main` records remote `origin/main` freshness metadata for status-eligible evidence. If remote freshness cannot be proven, the saved evidence remains ineligible for Core benchmark status updates.
+- Harness-capable scripts expose `--harness`, `--dry-run`, `--no-dry-run`, `--model`, and `--effort`. Dry-run mode is the safe default for external or model-call harness work; `--no-dry-run` is the explicit real-run mode.
+- Unsupported harness names fail as usage or configuration errors. Supported harnesses with missing local dependencies should be represented as unavailable harness evidence, not as behavioral benchmark failures.
+
+Saved `run.json` reports intended for `refresh-benchmark-status` must include current-schema Git metadata, a manifest-resolvable summary object, behavior totals, unavailable harness counts when applicable, and mode metadata sufficient to reject dry-run, transcript, saved-response, stale, dirty-worktree, non-main, or non-remote-fresh evidence.
+
+The default validator enforces the mechanical CLI surface and deterministic self-tests. It intentionally does not run real harnesses, inspect saved report directories, simulate missing dependencies, or parse raw benchmark reports.
+
 ## Commit And Tree Scans
 
 For shell-backed publication safety scans, run:
