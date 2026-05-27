@@ -295,6 +295,20 @@ def run(
         print(f"Claude config dir: {claude_config_dir}", file=out)
     if gemini_cli_home is not None:
         print(f"Gemini CLI home: {gemini_cli_home}", file=out)
+        if not adapter_paths_equal(gemini_cli_home, home):
+            print(
+                "Warning: GEMINI_CLI_HOME changes the Gemini CLI adapter target; "
+                "current official Antigravity docs still name "
+                f"{home / '.gemini' / 'GEMINI.md'} as the default global rules/context file.",
+                file=out,
+            )
+            if not args.no_remediation:
+                print(
+                    "If you also use Google Antigravity, repeat "
+                    "--adapter <home>/.gemini/GEMINI.md on install, check, and remove runs "
+                    "to manage that default Antigravity file explicitly.",
+                    file=out,
+                )
     print("", file=out)
 
     results: list[Result] = []
@@ -1580,6 +1594,7 @@ def run_self_tests() -> int:
         test_explicit_default_codex_siblings_follow_inactive_profile_targets,
         test_claude_config_dir_targets_profile_root,
         test_gemini_cli_home_targets_profile_root,
+        test_gemini_cli_home_warns_about_antigravity_default_home,
         test_all_default_adapters_and_explicit_adapter,
         test_explicit_default_adapter_overrides_skipped_default,
         test_import_adapters_escape_spaces,
@@ -2167,6 +2182,57 @@ def test_gemini_cli_home_targets_profile_root() -> None:
             gemini_cli_home=gemini_cli_home.resolve(),
         )
         assert_true(code == 0, output)
+
+
+def test_gemini_cli_home_warns_about_antigravity_default_home() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-global-installer-") as tmp:
+        root = Path(tmp)
+        home = root / "home"
+        home.mkdir()
+        gemini_cli_home = root / "gemini-cli-home"
+        (gemini_cli_home / ".gemini").mkdir(parents=True)
+        agentos = make_fake_agentos(root)
+
+        code, output = run_args_with_adapter_homes(
+            ["--agentos-home", str(agentos)],
+            home,
+            gemini_cli_home=gemini_cli_home.resolve(),
+        )
+        assert_true(code == 0, output)
+        assert_true(
+            "GEMINI_CLI_HOME changes the Gemini CLI adapter target" in output,
+            "GEMINI_CLI_HOME warning did not explain the target split",
+        )
+        assert_true(
+            str(home / ".gemini" / "GEMINI.md") in output,
+            "GEMINI_CLI_HOME warning did not name the default Antigravity file",
+        )
+        assert_true(
+            "--adapter <home>/.gemini/GEMINI.md" in output,
+            "GEMINI_CLI_HOME warning did not include the explicit adapter guidance",
+        )
+
+        code, output = run_args_with_adapter_homes(
+            ["--agentos-home", str(agentos), "--no-dry-run"],
+            home,
+            gemini_cli_home=gemini_cli_home.resolve(),
+        )
+        assert_true(code == 0, output)
+
+        code, output = run_args_with_adapter_homes(
+            ["--agentos-home", str(agentos), "--check", "--no-remediation"],
+            home,
+            gemini_cli_home=gemini_cli_home.resolve(),
+        )
+        assert_true(code == 0, output)
+        assert_true(
+            "GEMINI_CLI_HOME changes the Gemini CLI adapter target" in output,
+            "fact-only check should still surface the Antigravity caveat",
+        )
+        assert_true(
+            "--adapter <home>/.gemini/GEMINI.md" not in output,
+            "fact-only check should not print adapter write guidance",
+        )
 
 
 def test_claude_config_dir_targets_profile_root() -> None:
