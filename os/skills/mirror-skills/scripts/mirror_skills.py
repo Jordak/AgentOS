@@ -721,9 +721,9 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=None,
         help=(
-            "AgentOS root containing os/skills/MANIFEST.md. Defaults to discovery from cwd. "
-            "When including Personal Overlay skills from a feature worktree, pass the primary "
-            "AgentOS checkout root or use --core-only."
+            "AgentOS root containing the Core os/skills/MANIFEST.md. Defaults to discovery from cwd. "
+            "When auditing a feature worktree with Personal Overlay skills, pass the feature "
+            "worktree here and pass the primary checkout with --personal-agentos-root."
         ),
     )
     parser.add_argument(
@@ -736,7 +736,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--personal-agentos-root",
         type=Path,
         default=None,
-        help="AgentOS root whose personal/os/skills supplies Personal Overlay skills. Defaults to --agentos-root.",
+        help="AgentOS root whose personal/os/skills supplies Personal Overlay skills. Defaults to --agentos-root; pass the primary checkout when auditing a feature worktree.",
     )
     parser.add_argument(
         "--sync",

@@ -44,7 +44,7 @@ Safety:
    Read `AGENTS.md`, `os/INDEX.md`, `os/playbook/PERSONAL_OVERLAY.md`, and `os/playbook/GETTING_STARTED.md`. If current-machine setup boundaries are unclear, also read `os/RESOLVER.md`.
 
 2. Choose roots.
-   Use the current checkout as the Core audit root via `--agentos-home`. If running from an isolated Git worktree, find or ask for the primary checkout and pass `--primary-agentos-home <primary-agentos-home>` so private Personal Overlay automation locations refer to the canonical checkout. Use the same primary checkout when running the mirror-skills audit. Treat missing primary-root context as a limitation, not as permission to write into the worktree.
+   Use the current checkout as the Core audit root via `--agentos-home`. If running from an isolated Git worktree, find or ask for the primary checkout and pass `--primary-agentos-home <primary-agentos-home>` so private Personal Overlay automation locations refer to the canonical checkout. Use the same split-root boundary for mirror-skills: Core evidence stays tied to the audited checkout, and private Personal Overlay skill evidence comes from the primary checkout. Treat missing primary-root context as a limitation, not as permission to write into the worktree.
 
 3. Run the deterministic helper.
    Use:
@@ -59,7 +59,13 @@ Safety:
    Treat PASS/WARN/FAIL as facts about the helper's checks, not as final setup truth. If helper output is missing, unreadable, malformed, or ambiguous, keep the diagnosis at WARN/FAIL until a human or agent reviews the underlying facts.
 
 5. Audit skill mirrors when requested.
-   When the user wants skill mirror diagnosis, use the mirror-skills skill in its default audit-only mode. If running from a feature worktree, run mirror-skills from the primary checkout or pass its root arguments so canonical Core and Personal Overlay sources resolve to the intended checkout. Pass an explicit mirror root only when needed. Do not use `--sync` without explicit approval.
+   When the user wants skill mirror diagnosis, use the mirror-skills skill in its default audit-only mode. If running from a feature worktree, audit the worktree's Core skills while reading private skills from the primary checkout:
+
+   ```bash
+   python3 os/skills/mirror-skills/scripts/mirror_skills.py --agentos-root <feature-worktree-root> --personal-agentos-root <primary-agentos-root>
+   ```
+
+   Pass an explicit mirror root only when needed. Do not use `--sync` without explicit approval.
 
 6. Interpret starter setup.
    When the user wants Personal Overlay starter-file diagnosis, this skill reads `os/playbook/GETTING_STARTED.md` and reasons about the relevant starter guidance. Keep that judgment in the agent layer: summarize gaps without quoting private contents, and ask before creating or editing Personal Overlay files.

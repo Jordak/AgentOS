@@ -161,6 +161,7 @@ def run_doctor(
                     env,
                     adapter_args,
                     verbose,
+                    primary_agentos_home=primary_agentos_home,
                     omit_current_machine_write_guidance=split_roots,
                 ),
             ]
@@ -288,6 +289,7 @@ def check_adapters(
     env: Mapping[str, str],
     extra_args: list[str],
     verbose: bool,
+    primary_agentos_home: Path | None = None,
     omit_current_machine_write_guidance: bool = False,
 ) -> CheckResult:
     script, invalid = trusted_helper_script(
@@ -332,9 +334,20 @@ def check_adapters(
         recommendations.extend(
             [
                 "Feature-worktree split detected; Doctor omitted current-machine write guidance for the audit root.",
-                "Before any adapter write, rerun the adapter check from the primary checkout.",
+                "Before any adapter write, rerun the adapter check from the primary checkout:",
             ]
         )
+        if primary_agentos_home is not None and primary_agentos_home != setup_agentos_home:
+            primary_command = [
+                sys.executable,
+                str(primary_agentos_home / "scripts" / "install_global_agent_instructions.py"),
+                "--agentos-home",
+                str(primary_agentos_home),
+                "--check",
+                "--no-remediation",
+                *extra_args,
+            ]
+            recommendations.append("Run: " + shell_command(primary_command))
     return CheckResult(
         "adapter drift",
         "WARN",
