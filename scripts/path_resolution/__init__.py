@@ -1,0 +1,17 @@
+"""Public path-resolution interfaces for trusted AgentOS scripts."""
+
+__all__ = [
+    "ManagedPathProblem",
+    "managed_path_problem",
+    "managed_path_problem_list",
+    "managed_path_problem_text",
+    "managed_relative_path_problem",
+]
+
+
+def __getattr__(name: str):
+    if name not in __all__:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from . import managed
+
+    return getattr(managed, name)

@@ -13,6 +13,26 @@ import sys
 from dataclasses import dataclass, asdict
 from pathlib import Path
 
+sys.dont_write_bytecode = True
+
+
+def load_path_resolution_helpers():
+    """Temporary bridge for loose script imports.
+
+    Package integrity is owned by AgentOS validation. Issue #51 tracks replacing
+    this bridge with a first-class import convention for nested AgentOS scripts.
+    """
+    repo_scripts_dir = str(Path(__file__).parents[4] / "scripts")
+    if repo_scripts_dir not in sys.path:
+        sys.path.insert(0, repo_scripts_dir)
+
+    from path_resolution.managed import managed_path_problem_list, managed_relative_path_problem
+
+    return managed_path_problem_list, managed_relative_path_problem
+
+
+managed_path_problem_list, managed_relative_path_problem = load_path_resolution_helpers()
+
 
 SKILL_HEADING_RE = re.compile(r"^### `([^`]+)`\s*$", re.MULTILINE)
 FIELD_RE_TEMPLATE = r"^- {field}:\s*(.*)$"
@@ -86,7 +106,7 @@ def agentos_checkout_problem(path: Path) -> str | None:
     return None
 
 
-def lexical_absolute(path: Path) -> Path:
+def _local_lexical_absolute(path: Path) -> Path:
     """Make a path absolute without resolving symbolic links."""
     expanded = path.expanduser()
     if not expanded.is_absolute():
@@ -94,12 +114,12 @@ def lexical_absolute(path: Path) -> Path:
     return Path(os.path.abspath(expanded))
 
 
-def final_path_kind_problem(
+def _local_final_path_kind_problem(
     path: Path,
     expected_kind: str | None,
     allow_missing: bool,
 ) -> str | None:
-    absolute = lexical_absolute(path)
+    absolute = _local_lexical_absolute(path)
     try:
         path_stat = absolute.lstat()
     except FileNotFoundError:
@@ -118,58 +138,6 @@ def final_path_kind_problem(
     return None
 
 
-def path_component_problems(
-    path: Path,
-    expected_kind: str | None,
-    allow_missing: bool,
-    boundary: Path | None = None,
-) -> list[str]:
-    absolute = lexical_absolute(path)
-    if not absolute.is_absolute():
-        return [f"{path} (path is not absolute after normalization)"]
-
-    if boundary is None:
-        current = Path(absolute.anchor)
-        parts = absolute.parts[1:]
-    else:
-        boundary_absolute = lexical_absolute(boundary)
-        boundary_problem = final_path_kind_problem(boundary_absolute, expected_kind="directory", allow_missing=False)
-        if boundary_problem:
-            return [f"{boundary_absolute} ({boundary_problem})"]
-        try:
-            relative = absolute.relative_to(boundary_absolute)
-        except ValueError:
-            return [f"{absolute} (path is outside the managed root: {boundary_absolute})"]
-        current = boundary_absolute
-        parts = relative.parts
-
-    if not parts:
-        final_problem = final_path_kind_problem(current, expected_kind=expected_kind, allow_missing=allow_missing)
-        return [f"{current} ({final_problem})"] if final_problem else []
-
-    for index, part in enumerate(parts):
-        current = current / part
-        is_final = index == len(parts) - 1
-        try:
-            path_stat = current.lstat()
-        except FileNotFoundError:
-            if allow_missing:
-                return []
-            return [f"{current} (path component is missing)"]
-        except OSError as error:
-            return [f"{current} ({error.__class__.__name__}: {error})"]
-
-        if stat.S_ISLNK(path_stat.st_mode):
-            return [f"{current} (symbolic link is not allowed)"]
-        if not is_final and not stat.S_ISDIR(path_stat.st_mode):
-            return [f"{current} (path component is not a directory)"]
-        if is_final and expected_kind == "directory" and not stat.S_ISDIR(path_stat.st_mode):
-            return [f"{current} (not a directory)"]
-        if is_final and expected_kind == "file" and not stat.S_ISREG(path_stat.st_mode):
-            return [f"{current} (not a regular file)"]
-    return []
-
-
 def extract_field(section: str, field_name: str) -> str | None:
     pattern = re.compile(FIELD_RE_TEMPLATE.format(field=re.escape(field_name)), re.MULTILINE)
     match = pattern.search(section)
@@ -180,15 +148,30 @@ def extract_field(section: str, field_name: str) -> str | None:
     return code_span.group(1) if code_span else value
 
 
-def managed_relative_path_problem(raw_path: str) -> str | None:
-    path = Path(raw_path)
-    if path.is_absolute():
-        return "must be root-relative, not absolute"
-    if raw_path.startswith("~"):
-        return "must be root-relative, not home-relative"
-    if ".." in path.parts:
-        return "must not contain parent-directory segments"
-    return None
+def final_path_kind_problem(
+    path: Path,
+    expected_kind: str | None,
+    allow_missing: bool,
+) -> str | None:
+    return _local_final_path_kind_problem(path, expected_kind=expected_kind, allow_missing=allow_missing)
+
+
+def path_component_problems(
+    path: Path,
+    expected_kind: str | None,
+    allow_missing: bool,
+    boundary: Path | None = None,
+) -> list[str]:
+    if boundary is None:
+        absolute = _local_lexical_absolute(path)
+        problem = _local_final_path_kind_problem(absolute, expected_kind=expected_kind, allow_missing=allow_missing)
+        return [f"{absolute} ({problem})"] if problem else []
+    return managed_path_problem_list(
+        boundary,
+        path,
+        expected_kind=expected_kind,
+        allow_missing=allow_missing,
+    )
 
 
 def parse_manifest(agentos_root: Path) -> list[SkillEntry]:
@@ -782,15 +765,15 @@ def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
 
-    agentos_root = lexical_absolute(args.agentos_root) if args.agentos_root else find_agentos_root(lexical_absolute(Path.cwd()))
-    mirror_root = lexical_absolute(args.mirror_root)
+    agentos_root = _local_lexical_absolute(args.agentos_root) if args.agentos_root else find_agentos_root(_local_lexical_absolute(Path.cwd()))
+    mirror_root = _local_lexical_absolute(args.mirror_root)
     root_problem = final_path_kind_problem(agentos_root, expected_kind="directory", allow_missing=False)
     if root_problem:
         raise SystemExit(f"Unsafe AgentOS root: {agentos_root} ({root_problem})")
     mirror_root_problem = final_path_kind_problem(mirror_root, expected_kind="directory", allow_missing=True)
     if mirror_root_problem:
         raise SystemExit(f"Unsafe mirror root: {mirror_root} ({mirror_root_problem})")
-    personal_agentos_root = lexical_absolute(args.personal_agentos_root) if args.personal_agentos_root else agentos_root
+    personal_agentos_root = _local_lexical_absolute(args.personal_agentos_root) if args.personal_agentos_root else agentos_root
 
     core_entries = parse_manifest(agentos_root)
     requested_names = set(args.skill) if args.skill else None

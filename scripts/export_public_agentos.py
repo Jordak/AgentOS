@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 import importlib.util
 import io
 import os
@@ -14,6 +15,11 @@ import sys
 import tarfile
 import tempfile
 from pathlib import Path
+
+sys.dont_write_bytecode = True
+
+PATH_RESOLUTION_PACKAGE = "path_resolution"
+MANAGED_PATH_MODULE = f"{PATH_RESOLUTION_PACKAGE}.managed"
 
 
 def parse_args() -> argparse.Namespace:
@@ -87,7 +93,7 @@ def is_relative_to(path: Path, base: Path) -> bool:
     return True
 
 
-def lexical_absolute(path: Path) -> Path:
+def _bootstrap_lexical_absolute(path: Path) -> Path:
     """Make a path absolute without resolving symbolic links."""
     expanded = path.expanduser()
     if not expanded.is_absolute():
@@ -95,8 +101,8 @@ def lexical_absolute(path: Path) -> Path:
     return Path(os.path.abspath(expanded))
 
 
-def final_path_problem(path: Path, expected_kind: str | None = None, allow_missing: bool = True) -> str | None:
-    absolute = lexical_absolute(path)
+def _bootstrap_final_path_problem(path: Path, expected_kind: str | None = None, allow_missing: bool = True) -> str | None:
+    absolute = _bootstrap_lexical_absolute(path)
     try:
         path_stat = absolute.lstat()
     except FileNotFoundError:
@@ -115,18 +121,18 @@ def final_path_problem(path: Path, expected_kind: str | None = None, allow_missi
     return None
 
 
-def no_follow_path_problem(
+def _bootstrap_no_follow_path_problem(
     path: Path,
     expected_kind: str | None,
     allow_missing: bool,
     boundary: Path,
 ) -> str | None:
-    boundary_absolute = lexical_absolute(boundary)
-    boundary_problem = final_path_problem(boundary_absolute, expected_kind="directory", allow_missing=False)
+    boundary_absolute = _bootstrap_lexical_absolute(boundary)
+    boundary_problem = _bootstrap_final_path_problem(boundary_absolute, expected_kind="directory", allow_missing=False)
     if boundary_problem:
         return f"{boundary_absolute} ({boundary_problem})"
 
-    absolute = lexical_absolute(path)
+    absolute = _bootstrap_lexical_absolute(path)
     try:
         relative = absolute.relative_to(boundary_absolute)
     except ValueError:
@@ -134,7 +140,7 @@ def no_follow_path_problem(
 
     current = boundary_absolute
     if not relative.parts:
-        final_problem = final_path_problem(current, expected_kind=expected_kind, allow_missing=allow_missing)
+        final_problem = _bootstrap_final_path_problem(current, expected_kind=expected_kind, allow_missing=allow_missing)
         return f"{current} ({final_problem})" if final_problem else None
 
     for index, part in enumerate(relative.parts):
@@ -161,7 +167,54 @@ def no_follow_path_problem(
 
 
 def current_script_root() -> Path:
-    return lexical_absolute(Path(__file__).parent.parent)
+    return _bootstrap_lexical_absolute(Path(__file__).parent.parent)
+
+
+def _bootstrap_path_resolution_package_problem(root: Path) -> str | None:
+    package_dir = root / "scripts" / PATH_RESOLUTION_PACKAGE
+    package_problem = _bootstrap_no_follow_path_problem(
+        package_dir,
+        expected_kind="directory",
+        allow_missing=False,
+        boundary=root,
+    )
+    if package_problem:
+        return package_problem
+
+    try:
+        module_paths = sorted(package_dir.glob("*.py"))
+    except OSError as error:
+        return f"{package_dir} ({error.__class__.__name__}: {error})"
+    if not module_paths:
+        return f"{package_dir} (package contains no Python modules)"
+
+    for module_path in module_paths:
+        module_problem = _bootstrap_no_follow_path_problem(
+            module_path,
+            expected_kind="file",
+            allow_missing=False,
+            boundary=root,
+        )
+        if module_problem:
+            return module_problem
+    return None
+
+
+# Bootstrap stays local so this script can inspect the path-resolution package before executing it.
+def load_managed_paths():
+    root = current_script_root()
+    package_problem = _bootstrap_path_resolution_package_problem(root)
+    if package_problem:
+        raise RuntimeError(f"unsafe path-resolution package: {package_problem}")
+
+    scripts_dir = str(root / "scripts")
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    return importlib.import_module(MANAGED_PATH_MODULE)
+
+
+_MANAGED_PATHS = load_managed_paths()
+managed_path_problem_text = _MANAGED_PATHS.managed_path_problem_text
 
 
 _PUBLICATION_RULES_LOADED = False
@@ -182,11 +235,11 @@ def load_publication_rules() -> None:
 
     root = current_script_root()
     rules_path = root / "scripts/agentos_publication_rules.py"
-    rules_problem = no_follow_path_problem(
+    rules_problem = managed_path_problem_text(
+        root,
         rules_path,
         expected_kind="file",
         allow_missing=False,
-        boundary=root,
     )
     if rules_problem:
         raise RuntimeError(f"unsafe publication rules script: {rules_problem}")
@@ -365,11 +418,11 @@ def publishable_sources(root: Path, *, git_source_set: bool = True) -> list[Path
 def current_validator_script() -> Path:
     root = current_script_root()
     validator = root / "os/verification/scripts/validate_agentos.py"
-    validator_problem = no_follow_path_problem(
+    validator_problem = managed_path_problem_text(
+        root,
         validator,
         expected_kind="file",
         allow_missing=False,
-        boundary=root,
     )
     if validator_problem:
         raise RuntimeError(f"unsafe validator script: {validator_problem}")
@@ -412,8 +465,8 @@ def run_validation(root: Path, output: Path) -> int:
 
 def main() -> int:
     args = parse_args()
-    root = lexical_absolute(args.root)
-    root_problem = final_path_problem(root, expected_kind="directory", allow_missing=False)
+    root = _bootstrap_lexical_absolute(args.root)
+    root_problem = _bootstrap_final_path_problem(root, expected_kind="directory", allow_missing=False)
     if root_problem:
         print(f"error: unsafe AgentOS root: {root} ({root_problem})", file=sys.stderr)
         return 2
@@ -446,8 +499,8 @@ def main() -> int:
             sources = publishable_sources(source_root, git_source_set=git_source_set)
 
         if args.output:
-            output = lexical_absolute(args.output)
-            output_problem = final_path_problem(output, expected_kind="directory", allow_missing=True)
+            output = _bootstrap_lexical_absolute(args.output)
+            output_problem = _bootstrap_final_path_problem(output, expected_kind="directory", allow_missing=True)
             if output_problem:
                 print(f"error: unsafe output directory: {output} ({output_problem})", file=sys.stderr)
                 return 2

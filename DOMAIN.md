@@ -44,6 +44,18 @@ _Avoid_: publish while migrating
 A deterministic verification step that checks the working tree and Publishable File Set against AgentOS Core rules, public-safe support-file rules, Personal Overlay skeleton rules, `.gitignore` coverage, and known private markers.
 _Avoid_: LLM privacy vibes, private-looking file detector
 
+**Managed Path**:
+A filesystem path that a trusted AgentOS script treats as part of an AgentOS-managed tree for reading, writing, copying, syncing, or validation. Managed Paths must stay under their declared root and must not silently traverse symbolic-link components.
+_Avoid_: arbitrary local path, resolved target
+
+**Path Resolution Module**:
+A trusted-script module that answers a policy-shaped path question, such as whether a Managed Path is safe under a declared root, while hiding lexical path normalization, containment checks, `lstat()` facts, and component walking behind its interface.
+_Avoid_: path utility bag, public primitive helpers
+
+**Private Path Primitive**:
+An implementation detail used inside Path Resolution Modules for reusable filesystem mechanics such as lexical absolute paths, relative containment, and no-follow component walking.
+_Avoid_: public path helper
+
 **Publication Precheck**:
 A deterministic release gate against the mixed local working tree that catches migration mistakes before creating the fresh public initial commit.
 _Avoid_: candidate-only validation
@@ -156,6 +168,8 @@ _Avoid_: AgentOS Core
 - **Fresh-History Publication** prevents old private Git commits from becoming public.
 - The **Publication Gate** prevents repository deletion, replacement, public creation, or visibility changes before the migrated **Publishable File Set** is validated.
 - A **Privacy Validator** gates the **Publishable File Set** with deterministic checks; LLM review can supplement it but does not replace it.
+- A trusted script may check a **Managed Path** through a **Path Resolution Module**.
+- A **Path Resolution Module** may share **Private Path Primitives** with other path-resolution modules, but callers outside that module family should depend on the policy-shaped path-resolution interface.
 - A **Publication Precheck** is the primary local release gate.
 - **Publication Candidate Validation** is optional final dry-run evidence.
 - A **Private GitHub Archive** preserves old repository planning state before selective public-safe promotion.

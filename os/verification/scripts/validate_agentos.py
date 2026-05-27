@@ -10,6 +10,7 @@ skill instead of this portable validator.
 from __future__ import annotations
 
 import argparse
+import importlib
 import importlib.util
 import json
 import os
@@ -23,7 +24,10 @@ from pathlib import Path
 
 sys.dont_write_bytecode = True
 
-def lexical_absolute(path: Path) -> Path:
+PATH_RESOLUTION_PACKAGE = "path_resolution"
+MANAGED_PATH_MODULE = f"{PATH_RESOLUTION_PACKAGE}.managed"
+
+def _bootstrap_lexical_absolute(path: Path) -> Path:
     """Make a path absolute without resolving symbolic links."""
     expanded = path.expanduser()
     if not expanded.is_absolute():
@@ -31,12 +35,12 @@ def lexical_absolute(path: Path) -> Path:
     return Path(os.path.abspath(expanded))
 
 
-def final_path_problem(
+def _bootstrap_final_path_problem(
     path: Path,
     expected_kind: str | None = None,
     allow_missing: bool = True,
 ) -> str | None:
-    absolute = lexical_absolute(path)
+    absolute = _bootstrap_lexical_absolute(path)
     try:
         path_stat = absolute.lstat()
     except FileNotFoundError:
@@ -55,16 +59,16 @@ def final_path_problem(
     return None
 
 
-def bootstrap_path_problem(
+def _bootstrap_path_problem(
     path: Path,
     expected_kind: str,
     boundary: Path,
 ) -> str | None:
-    boundary_absolute = lexical_absolute(boundary)
-    boundary_problem = final_path_problem(boundary_absolute, expected_kind="directory", allow_missing=False)
+    boundary_absolute = _bootstrap_lexical_absolute(boundary)
+    boundary_problem = _bootstrap_final_path_problem(boundary_absolute, expected_kind="directory", allow_missing=False)
     if boundary_problem:
         return f"{boundary_absolute} ({boundary_problem})"
-    absolute = lexical_absolute(path)
+    absolute = _bootstrap_lexical_absolute(path)
     try:
         relative = absolute.relative_to(boundary_absolute)
     except ValueError:
@@ -91,6 +95,43 @@ def bootstrap_path_problem(
     return None
 
 
+def _bootstrap_path_resolution_package_problem(root: Path) -> str | None:
+    package_dir = root / "scripts" / PATH_RESOLUTION_PACKAGE
+    package_problem = _bootstrap_path_problem(package_dir, expected_kind="directory", boundary=root)
+    if package_problem:
+        return package_problem
+
+    try:
+        module_paths = sorted(package_dir.glob("*.py"))
+    except OSError as error:
+        return f"{package_dir} ({error.__class__.__name__}: {error})"
+    if not module_paths:
+        return f"{package_dir} (package contains no Python modules)"
+
+    for module_path in module_paths:
+        module_problem = _bootstrap_path_problem(module_path, expected_kind="file", boundary=root)
+        if module_problem:
+            return module_problem
+    return None
+
+
+# Bootstrap stays local so this script can inspect the path-resolution package before executing it.
+def load_managed_paths():
+    root = _bootstrap_lexical_absolute(Path(__file__).parents[3])
+    package_problem = _bootstrap_path_resolution_package_problem(root)
+    if package_problem:
+        raise RuntimeError(f"unsafe path-resolution package: {package_problem}")
+
+    scripts_dir = str(root / "scripts")
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    return importlib.import_module(MANAGED_PATH_MODULE)
+
+
+_MANAGED_PATHS = load_managed_paths()
+managed_path_problem_text = _MANAGED_PATHS.managed_path_problem_text
+
+
 def load_publication_rules() -> None:
     global GENERATED_OUTPUT_PARTS
     global PERSONAL_OVERLAY_SKELETON_FILES
@@ -102,9 +143,14 @@ def load_publication_rules() -> None:
     global personal_overlay_skeleton_file_reason
     global publication_path_reason
 
-    root = lexical_absolute(Path(__file__).parents[3])
+    root = _bootstrap_lexical_absolute(Path(__file__).parents[3])
     rules_path = root / "scripts/agentos_publication_rules.py"
-    rules_problem = bootstrap_path_problem(rules_path, expected_kind="file", boundary=root)
+    rules_problem = managed_path_problem_text(
+        root,
+        rules_path,
+        expected_kind="file",
+        allow_missing=False,
+    )
     if rules_problem:
         raise RuntimeError(f"unsafe publication rules script: {rules_problem}")
 
@@ -244,7 +290,7 @@ class Finding:
 
 class AgentOSValidator:
     def __init__(self, root: Path) -> None:
-        self.root = lexical_absolute(root)
+        self.root = _bootstrap_lexical_absolute(root)
         self.errors: list[Finding] = []
         self.warnings: list[Finding] = []
         self.checked: list[str] = []
@@ -297,7 +343,7 @@ class AgentOSValidator:
         return self.report()
 
     def run_public_export_validation_checks(self, export_root: Path) -> None:
-        self.root = lexical_absolute(export_root)
+        self.root = _bootstrap_lexical_absolute(export_root)
         root_problem = self.root_path_problem()
         if root_problem:
             self.add_error("public export allowlist", self.root, f"public export root is unsafe: {root_problem}")
@@ -323,7 +369,7 @@ class AgentOSValidator:
         return any(error.check == check for error in self.errors)
 
     def root_path_problem(self) -> str | None:
-        return final_path_problem(self.root, expected_kind="directory", allow_missing=False)
+        return _bootstrap_final_path_problem(self.root, expected_kind="directory", allow_missing=False)
 
     def display_path(self, path: Path | str) -> str:
         if isinstance(path, Path):
@@ -396,33 +442,16 @@ class AgentOSValidator:
         expected_kind: str | None = None,
         allow_missing: bool = True,
     ) -> str | None:
-        try:
-            relative = path.relative_to(self.root)
-        except ValueError:
+        problem = _MANAGED_PATHS.managed_path_problem(
+            self.root,
+            path,
+            expected_kind=expected_kind,
+            allow_missing=allow_missing,
+            root_label="AgentOS root",
+        )
+        if problem and problem.reason.startswith("path is outside the AgentOS root:"):
             return "path is outside the AgentOS root"
-
-        current = self.root
-        for index, part in enumerate(relative.parts):
-            current = current / part
-            is_final = index == len(relative.parts) - 1
-            try:
-                path_stat = current.lstat()
-            except FileNotFoundError:
-                if allow_missing:
-                    return None
-                return "path component is missing"
-            except OSError as error:
-                return f"{error.__class__.__name__}: {error}"
-
-            if stat.S_ISLNK(path_stat.st_mode):
-                return "symbolic link is not allowed"
-            if not is_final and not current.is_dir():
-                return "path component is not a directory"
-            if is_final and expected_kind == "directory" and not current.is_dir():
-                return "not a directory"
-            if is_final and expected_kind == "file" and not current.is_file():
-                return "not a regular file"
-        return None
+        return problem.reason if problem else None
 
     def personal_overlay_root_problem(self, personal: Path) -> str | None:
         try:
@@ -2555,7 +2584,7 @@ def main(argv: list[str] | None = None) -> int:
 
     validator = AgentOSValidator(args.root)
     if args.public_export:
-        export_root = lexical_absolute(args.public_export)
+        export_root = _bootstrap_lexical_absolute(args.public_export)
         if not (export_root / "os").exists():
             print(f"AgentOS validation failed: export root does not contain os/: {export_root}", file=sys.stderr)
             return 2
