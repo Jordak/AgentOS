@@ -148,11 +148,15 @@ def run_doctor(
     primary_agentos_home = absolute_path(requested_primary_agentos_home, cwd) if requested_primary_agentos_home else agentos_home
     home_structure = check_required_core_files(agentos_home)
     split_roots = agentos_home != primary_agentos_home
+    primary_home_structure = check_primary_agentos_home(primary_agentos_home) if split_roots else None
+    primary_home_trusted = primary_home_structure is None or primary_home_structure.status == "PASS"
 
     results = [
         discovery,
         home_structure,
     ]
+    if primary_home_structure is not None:
+        results.append(primary_home_structure)
     if home_structure.status == "PASS":
         results.extend(
             [
@@ -161,7 +165,7 @@ def run_doctor(
                     env,
                     adapter_args,
                     verbose,
-                    primary_agentos_home=primary_agentos_home,
+                    primary_agentos_home=primary_agentos_home if primary_home_trusted else None,
                     omit_current_machine_write_guidance=split_roots,
                 ),
             ]
@@ -174,7 +178,13 @@ def run_doctor(
         )
     results.extend(
         [
-            check_automation_locations(agentos_home, primary_agentos_home, process_home, env),
+            check_automation_locations(
+                agentos_home,
+                primary_agentos_home,
+                process_home,
+                env,
+                primary_home_trusted=primary_home_trusted,
+            ),
         ]
     )
     return DoctorReport(
@@ -271,6 +281,45 @@ def check_required_core_files(agentos_home: Path) -> CheckResult:
     )
 
 
+def check_primary_agentos_home(primary_agentos_home: Path) -> CheckResult:
+    root_problem = agentos_root_problem(primary_agentos_home)
+    if root_problem:
+        return CheckResult(
+            "primary home structure",
+            "WARN",
+            "Primary AgentOS home is not trusted; Personal Overlay evidence is unknown.",
+            details=[
+                f"Primary AgentOS home: {primary_agentos_home}",
+                f"Observed state: {root_problem}",
+            ],
+            recommendations=[
+                "Fix --primary-agentos-home before interpreting Personal Overlay evidence."
+            ],
+        )
+
+    required = check_required_core_files(primary_agentos_home)
+    details = [
+        f"Primary AgentOS home: {primary_agentos_home}",
+        *required.details,
+    ]
+    if required.status != "PASS":
+        return CheckResult(
+            "primary home structure",
+            "WARN",
+            "Primary AgentOS home is not trusted; Personal Overlay evidence is unknown.",
+            details=details,
+            recommendations=[
+                "Fix --primary-agentos-home before interpreting Personal Overlay evidence."
+            ],
+        )
+    return CheckResult(
+        "primary home structure",
+        "PASS",
+        "Primary AgentOS home is trusted for Personal Overlay evidence.",
+        details=details,
+    )
+
+
 def skipped_subprocess_check(name: str, home_structure: CheckResult) -> CheckResult:
     status = "FAIL" if home_structure.status == "FAIL" else "WARN"
     return CheckResult(
@@ -362,6 +411,7 @@ def check_automation_locations(
     primary_agentos_home: Path,
     process_home: Path,
     env: Mapping[str, str],
+    primary_home_trusted: bool = True,
 ) -> CheckResult:
     core_registry = agentos_home / "os" / "automations" / "AUTOMATIONS.md"
     personal_root = primary_agentos_home / "personal" / "os" / "automations"
@@ -369,14 +419,22 @@ def check_automation_locations(
     codex_home = absolute_path(Path(env.get("CODEX_HOME", process_home / ".codex")), process_home)
     codex_automation_root = codex_home / "automations"
 
-    personal_count, personal_error = count_files(personal_root)
+    if primary_home_trusted:
+        personal_count, personal_error = count_files(personal_root)
+        personal_registry_state = path_state(personal_registry)
+        personal_root_state = path_state(personal_root)
+    else:
+        personal_count = None
+        personal_error = "primary AgentOS home invalid/untrusted"
+        personal_registry_state = "unknown"
+        personal_root_state = "unknown"
     codex_count, codex_error = count_files(codex_automation_root)
     codex_toml_count, codex_toml_error = count_files(codex_automation_root, suffix=".toml")
 
     details = [
         f"Core automation registry: {path_state(core_registry)} ({core_registry})",
-        f"Personal automation registry: {path_state(personal_registry)} ({personal_registry})",
-        f"Personal automation directory: {path_state(personal_root)} ({personal_root})",
+        f"Personal automation registry: {personal_registry_state} ({personal_registry})",
+        f"Personal automation directory: {personal_root_state} ({personal_root})",
         f"Personal automation files: {count_or_unknown(personal_count, personal_error)}",
         f"Codex automation directory: {path_state(codex_automation_root)} ({codex_automation_root})",
         f"Codex automation files: {count_or_unknown(codex_count, codex_error)}",
@@ -392,8 +450,8 @@ def check_automation_locations(
     found_locations = any(
         [
             core_registry.exists(),
-            personal_registry.exists(),
-            bool(personal_count),
+            primary_home_trusted and personal_registry.exists(),
+            primary_home_trusted and bool(personal_count),
             bool(codex_count),
             bool(codex_toml_count),
         ]
@@ -422,6 +480,20 @@ def check_automation_locations(
 
 def looks_like_agentos(path: Path) -> bool:
     return all((path / rel).is_file() for rel in REQUIRED_AGENTOS_FILES)
+
+
+def agentos_root_problem(agentos_home: Path) -> str | None:
+    try:
+        mode = agentos_home.lstat().st_mode
+    except FileNotFoundError:
+        return "path is missing"
+    except OSError as exc:
+        return f"{exc.__class__.__name__}: {exc}"
+    if stat.S_ISLNK(mode):
+        return "symbolic link is not allowed"
+    if not stat.S_ISDIR(mode):
+        return "not a directory"
+    return None
 
 
 def absolute_path(path: Path, cwd: Path) -> Path:

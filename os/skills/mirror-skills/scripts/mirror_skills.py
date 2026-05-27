@@ -71,6 +71,21 @@ def find_agentos_root(start: Path) -> Path:
     raise SystemExit("Could not find AgentOS root containing os/skills/MANIFEST.md")
 
 
+def agentos_checkout_problem(path: Path) -> str | None:
+    root_problem = final_path_kind_problem(path, expected_kind="directory", allow_missing=False)
+    if root_problem:
+        return root_problem
+    manifest_problems = path_component_problems(
+        path / "os/skills/MANIFEST.md",
+        expected_kind="file",
+        allow_missing=False,
+        boundary=path,
+    )
+    if manifest_problems:
+        return "missing or unsafe os/skills/MANIFEST.md: " + "; ".join(manifest_problems)
+    return None
+
+
 def lexical_absolute(path: Path) -> Path:
     """Make a path absolute without resolving symbolic links."""
     expanded = path.expanduser()
@@ -781,11 +796,7 @@ def main() -> int:
     personal_entries: list[SkillEntry] = []
     preflight_results: list[MirrorResult] = []
     if not args.core_only:
-        personal_root_problem = final_path_kind_problem(
-            personal_agentos_root,
-            expected_kind="directory",
-            allow_missing=False,
-        )
+        personal_root_problem = agentos_checkout_problem(personal_agentos_root)
         if personal_root_problem:
             raise SystemExit(
                 f"Unsafe Personal Overlay AgentOS root: {personal_agentos_root} ({personal_root_problem})"

@@ -10,7 +10,7 @@ Contract reference: `os/skills/SKILL_CONTRACT.md`.
 
 ## Summary
 
-- Canonical Core skills: 14.
+- Canonical Core skills: 15.
 
 ## Maintenance Fields
 

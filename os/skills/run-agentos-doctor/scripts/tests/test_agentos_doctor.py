@@ -39,6 +39,7 @@ def run_self_tests() -> int:
         test_count_files_warns_on_symlink_root,
         test_automation_locations_report_counts_not_contents,
         test_automation_locations_split_roots,
+        test_invalid_primary_home_makes_personal_evidence_unknown,
         test_strict_warn_exit_code,
         test_adapter_home_notation_is_preserved,
     ]
@@ -386,6 +387,28 @@ def test_automation_locations_split_roots() -> None:
         joined = "\n".join(result.details)
         _case.assertTrue(f"Core automation registry: present file ({audit_root / 'os' / 'automations' / 'AUTOMATIONS.md'})" in joined, "Core registry should use audit root")
         _case.assertTrue(f"Personal automation registry: present file ({primary_root / 'personal' / 'os' / 'automations' / 'AUTOMATIONS.md'})" in joined, "Personal registry should use primary root")
+
+
+def test_invalid_primary_home_makes_personal_evidence_unknown() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        audit_root = Path(tmp) / "audit-AgentOS"
+        primary_root = Path(tmp) / "missing-primary-AgentOS"
+        make_fake_agentos(audit_root)
+        report = run_doctor(
+            requested_agentos_home=audit_root,
+            requested_primary_agentos_home=primary_root,
+            cwd=audit_root,
+            process_home=Path(tmp) / "home",
+            env=minimal_env(Path(tmp) / "home"),
+            adapter_args=[],
+            verbose=True,
+        )
+        rendered = render_report_for_test(report, verbose=True)
+        _case.assertTrue(result_named(report, "primary home structure").status == "WARN", "invalid primary root should warn")
+        _case.assertTrue("Primary AgentOS home is not trusted" in rendered, "invalid primary root should be explicit")
+        _case.assertTrue("Personal automation registry: unknown" in rendered, "invalid primary root should make personal registry unknown")
+        _case.assertTrue("Personal automation files: unknown" in rendered, "invalid primary root should make personal counts unknown")
+        _case.assertTrue(f"--agentos-home {primary_root}" not in rendered, "invalid primary root should not produce primary check commands")
 
 
 def test_strict_warn_exit_code() -> None:
