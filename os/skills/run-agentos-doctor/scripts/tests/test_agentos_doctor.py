@@ -273,7 +273,7 @@ def test_split_root_adapter_output_omits_write_commands() -> None:
         _case.assertTrue("Remediation:" not in rendered, "split-root doctor should omit remediation labels")
         _case.assertTrue("write guidance omitted" not in rendered, "doctor should rely on helper fact-only output")
         _case.assertTrue("Feature-worktree split detected" in rendered, "split-root limitation should be explicit")
-        _case.assertTrue(str(primary_root / "scripts" / "install_global_agent_instructions.py") in rendered, "split-root guidance should name the primary adapter checker")
+        _case.assertTrue(str(audit_root / "scripts" / "install_global_agent_instructions.py") in rendered, "split-root guidance should use the audited helper version")
         _case.assertTrue(f"--agentos-home {primary_root}" in rendered, "split-root guidance should give an exact primary-root check command")
 
 

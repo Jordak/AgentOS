@@ -334,13 +334,13 @@ def check_adapters(
         recommendations.extend(
             [
                 "Feature-worktree split detected; Doctor omitted current-machine write guidance for the audit root.",
-                "Before any adapter write, rerun the adapter check from the primary checkout:",
+                "Before any adapter write, rerun the adapter check against the primary checkout:",
             ]
         )
         if primary_agentos_home is not None and primary_agentos_home != setup_agentos_home:
             primary_command = [
                 sys.executable,
-                str(primary_agentos_home / "scripts" / "install_global_agent_instructions.py"),
+                str(script),
                 "--agentos-home",
                 str(primary_agentos_home),
                 "--check",
