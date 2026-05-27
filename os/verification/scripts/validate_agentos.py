@@ -134,6 +134,7 @@ except RuntimeError as error:
 
 CODE_SPAN_RE = re.compile(r"`([^`]+)`")
 SKILL_HEADING_RE = re.compile(r"^### `([^`]+)`\s*$", re.MULTILINE)
+SKILL_FRONTMATTER_KEY_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*$")
 PRIVATE_LOCAL_PATH_RE = r"[^\n`]+"
 PRIVATE_TOKEN_RE = r"[^\s`'\"<>)\]}]+"
 POSIX_ROOT = "/"
@@ -253,6 +254,7 @@ class AgentOSValidator:
         self.check_markdown_path_portability()
         self.check_source_map_path_health()
         self.check_skills_manifest_consistency()
+        self.check_skill_frontmatter()
         self.check_agent_contract_completeness()
         self.check_automation_registry_completeness()
         self.check_resolver_reachability()
@@ -1060,6 +1062,136 @@ class AgentOSValidator:
         for path in skills_dir.glob("*/SKILL.md"):
             skills[path.parent.name] = path
         return skills
+
+    def check_skill_frontmatter(self) -> None:
+        check = "skill frontmatter"
+        for skill_name, path in sorted(self.discover_canonical_skills().items()):
+            text = self.read_text(path, check)
+            if not text:
+                continue
+            frontmatter = self.parse_skill_frontmatter(path, text, check)
+            if frontmatter is None:
+                continue
+
+            name = frontmatter.get("name")
+            if name is None:
+                self.add_error(check, path, "frontmatter.name is required")
+            elif name != skill_name:
+                self.add_error(
+                    check,
+                    path,
+                    f"frontmatter.name must match canonical skill identifier {skill_name!r}; got {name!r}",
+                )
+
+            description = frontmatter.get("description")
+            if description is None:
+                self.add_error(check, path, "frontmatter.description is required")
+            elif not description.strip():
+                self.add_error(check, path, "frontmatter.description must be a non-empty string")
+
+        self.checked.append(check)
+
+    def parse_skill_frontmatter(self, path: Path, text: str, check: str) -> dict[str, str] | None:
+        """Parse the documented AgentOS skill-frontmatter subset.
+
+        This intentionally is not a YAML parser. Core skill frontmatter supports
+        only a leading `---` block containing one-line scalar `key: value` pairs.
+        Unsupported YAML features fail closed so the validator stays portable and
+        does not grow into an ad hoc partial YAML implementation.
+        """
+        lines = text.splitlines()
+        if not lines or lines[0].strip() != "---":
+            self.add_error(check, path, "frontmatter block is required at the start of the file")
+            return None
+
+        end_index: int | None = None
+        for index, line in enumerate(lines[1:], start=1):
+            if line.strip() == "---":
+                end_index = index
+                break
+        if end_index is None:
+            self.add_error(check, path, "frontmatter closing delimiter is required")
+            return None
+
+        fields: dict[str, str] = {}
+        for offset, raw_line in enumerate(lines[1:end_index], start=2):
+            line = raw_line.strip()
+            if not line or ":" not in line:
+                self.add_error(
+                    check,
+                    f"{self.display_path(path)}:{offset}",
+                    "frontmatter uses unsupported syntax; expected one-line 'field: value'",
+                )
+                continue
+
+            raw_key, _, raw_value = line.partition(":")
+            key = raw_key.strip()
+            value = raw_value.strip()
+            field = f"frontmatter.{key or '<missing>'}"
+            if not SKILL_FRONTMATTER_KEY_RE.fullmatch(key):
+                self.add_error(
+                    check,
+                    f"{self.display_path(path)}:{offset}",
+                    f"{field} has unsupported field name syntax",
+                )
+                continue
+            if key in fields:
+                self.add_error(check, f"{self.display_path(path)}:{offset}", f"frontmatter.{key} is duplicated")
+                continue
+            if not value:
+                fields[key] = ""
+                continue
+            if value in {"|", ">", "|-", ">-", "|+", ">+"} or value.startswith(("- ", "[", "{")):
+                self.add_error(
+                    check,
+                    f"{self.display_path(path)}:{offset}",
+                    f"frontmatter.{key} must be a one-line scalar string",
+                )
+                fields[key] = value
+                continue
+
+            parsed_value = self.parse_skill_frontmatter_scalar(path, offset, key, value, check)
+            if parsed_value is not None:
+                fields[key] = parsed_value
+            else:
+                fields[key] = value
+
+        return fields
+
+    def parse_skill_frontmatter_scalar(
+        self,
+        path: Path,
+        line_no: int,
+        key: str,
+        value: str,
+        check: str,
+    ) -> str | None:
+        if value[0] in {"'", '"'}:
+            quote = value[0]
+            if len(value) < 2 or value[-1] != quote:
+                self.add_error(
+                    check,
+                    f"{self.display_path(path)}:{line_no}",
+                    f"frontmatter.{key} quoted string is not closed",
+                )
+                return None
+            return value[1:-1]
+
+        if value[-1] in {"'", '"'}:
+            self.add_error(
+                check,
+                f"{self.display_path(path)}:{line_no}",
+                f"frontmatter.{key} quoted string is not opened",
+            )
+            return None
+        if ": " in value:
+            self.add_error(
+                check,
+                f"{self.display_path(path)}:{line_no}",
+                f"frontmatter.{key} contains an unquoted colon; quote the scalar string",
+            )
+            return None
+        return value
 
     def extract_field(self, section: str, field_name: str) -> str | None:
         pattern = re.compile(rf"^- {re.escape(field_name)}:\s*(.*)$", re.MULTILINE)
@@ -1971,6 +2103,66 @@ def run_self_test() -> int:
             and "Canonical source must be root-relative" in error.message
             for error in canonical_escape_validator.errors
         )
+        skill_frontmatter_root = root / "_skill_frontmatter_fixture"
+        missing_frontmatter = skill_frontmatter_root / "os/skills/missing-frontmatter/SKILL.md"
+        missing_frontmatter.parent.mkdir(parents=True)
+        missing_frontmatter.write_text("# Missing Frontmatter\n", encoding="utf-8")
+        wrong_name = skill_frontmatter_root / "os/skills/wrong-name/SKILL.md"
+        wrong_name.parent.mkdir(parents=True)
+        wrong_name.write_text(
+            "---\nname: other-name\ndescription: Present description.\n---\n# Wrong Name\n",
+            encoding="utf-8",
+        )
+        bad_colon = skill_frontmatter_root / "os/skills/bad-colon/SKILL.md"
+        bad_colon.parent.mkdir(parents=True)
+        bad_colon.write_text(
+            "---\nname: bad-colon\ndescription: Needs quote: because colon-space is outside the subset.\n---\n# Bad Colon\n",
+            encoding="utf-8",
+        )
+        list_value = skill_frontmatter_root / "os/skills/list-value/SKILL.md"
+        list_value.parent.mkdir(parents=True)
+        list_value.write_text(
+            "---\nname: list-value\ndescription: [unsupported]\n---\n# List Value\n",
+            encoding="utf-8",
+        )
+        empty_description = skill_frontmatter_root / "os/skills/empty-description/SKILL.md"
+        empty_description.parent.mkdir(parents=True)
+        empty_description.write_text(
+            "---\nname: empty-description\ndescription:\n---\n# Empty Description\n",
+            encoding="utf-8",
+        )
+        skill_frontmatter_validator = AgentOSValidator(skill_frontmatter_root)
+        skill_frontmatter_validator.check_skill_frontmatter()
+        skill_frontmatter_missing_rejected = any(
+            error.check == "skill frontmatter"
+            and error.path == "os/skills/missing-frontmatter/SKILL.md"
+            and "frontmatter block is required" in error.message
+            for error in skill_frontmatter_validator.errors
+        )
+        skill_frontmatter_name_rejected = any(
+            error.check == "skill frontmatter"
+            and error.path == "os/skills/wrong-name/SKILL.md"
+            and "frontmatter.name must match canonical skill identifier" in error.message
+            for error in skill_frontmatter_validator.errors
+        )
+        skill_frontmatter_colon_rejected = any(
+            error.check == "skill frontmatter"
+            and error.path == "os/skills/bad-colon/SKILL.md:3"
+            and "frontmatter.description contains an unquoted colon" in error.message
+            for error in skill_frontmatter_validator.errors
+        )
+        skill_frontmatter_list_rejected = any(
+            error.check == "skill frontmatter"
+            and error.path == "os/skills/list-value/SKILL.md:3"
+            and "frontmatter.description must be a one-line scalar string" in error.message
+            for error in skill_frontmatter_validator.errors
+        )
+        skill_frontmatter_empty_rejected = any(
+            error.check == "skill frontmatter"
+            and error.path == "os/skills/empty-description/SKILL.md"
+            and "frontmatter.description must be a non-empty string" in error.message
+            for error in skill_frontmatter_validator.errors
+        )
         marker_symlink_root = root / "_marker_symlink_fixture"
         marker_symlink_file = marker_symlink_root / "personal/os/verification/privacy-markers.txt"
         marker_symlink_file.parent.mkdir(parents=True)
@@ -2188,6 +2380,11 @@ def run_self_test() -> int:
             and built_in_marker_redacted
             and missing_skeleton_rejected
             and canonical_escape_rejected
+            and skill_frontmatter_missing_rejected
+            and skill_frontmatter_name_rejected
+            and skill_frontmatter_colon_rejected
+            and skill_frontmatter_list_rejected
+            and skill_frontmatter_empty_rejected
             and marker_symlink_rejected
             and marker_symlink_not_loaded
             and personal_symlink_rejected
@@ -2218,6 +2415,8 @@ def run_self_test() -> int:
             for error in broad_gitkeep_validator.errors:
                 print(f"EXPECTED {error.format()}")
             for error in canonical_escape_validator.errors:
+                print(f"EXPECTED {error.format()}")
+            for error in skill_frontmatter_validator.errors:
                 print(f"EXPECTED {error.format()}")
             for error in marker_config_validator.errors:
                 print(f"EXPECTED {error.format()}")
