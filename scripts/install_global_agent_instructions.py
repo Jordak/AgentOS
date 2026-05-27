@@ -412,6 +412,7 @@ def run(
             agentos_home,
             dry_run=dry_run,
             timestamp=timestamp,
+            include_remediation=not args.no_remediation,
         )
 
     for result in results:
@@ -454,6 +455,7 @@ def evaluate_targets(
     agentos_home: Path | None,
     dry_run: bool,
     timestamp: str,
+    include_remediation: bool = True,
 ) -> list[Result]:
     results: list[Result] = []
     for target in targets:
@@ -467,7 +469,17 @@ def evaluate_targets(
                 )
             )
             continue
-        results.append(evaluate_target(target, mode, home, agentos_home, dry_run, timestamp))
+        results.append(
+            evaluate_target(
+                target,
+                mode,
+                home,
+                agentos_home,
+                dry_run,
+                timestamp,
+                include_remediation=include_remediation,
+            )
+        )
     return results
 
 
@@ -629,12 +641,13 @@ def evaluate_target(
     agentos_home: Path | None,
     dry_run: bool,
     timestamp: str,
+    include_remediation: bool = True,
 ) -> Result:
     try:
         if mode == "check":
             if agentos_home is None:
                 return Result(False, "error", target.path, "--agentos-home is required for --check")
-            return check_target(target, home, agentos_home)
+            return check_target(target, home, agentos_home, include_remediation=include_remediation)
         if mode == "remove":
             return remove_target(target, dry_run=dry_run, timestamp=timestamp)
         if agentos_home is None:
@@ -1044,13 +1057,18 @@ def path_exists_for_planning(path: Path) -> tuple[bool, str | None]:
     return True, None
 
 
-def expected_block(target: Target, home: Path, agentos_home: Path) -> str:
+def expected_block(target: Target, home: Path, agentos_home: Path, include_remediation: bool = True) -> str:
     if target.kind == "global":
         return global_block(agentos_home)
     if target.import_style == "inline_global":
-        return inline_global_adapter_block(home, agentos_home)
+        return inline_global_adapter_block(home, agentos_home, include_remediation=include_remediation)
     if target.import_style == "inline_global_gemini":
-        return inline_global_adapter_block(home, agentos_home, reject_gemini_imports=True)
+        return inline_global_adapter_block(
+            home,
+            agentos_home,
+            reject_gemini_imports=True,
+            include_remediation=include_remediation,
+        )
     return adapter_block(global_instructions_path(home), target.import_style)
 
 
@@ -1106,10 +1124,19 @@ def effective_global_instructions(home: Path, agentos_home: Path) -> str:
     return upsert_block(existing, block, GLOBAL_START, GLOBAL_END)
 
 
-def inline_global_adapter_block(home: Path, agentos_home: Path, reject_gemini_imports: bool = False) -> str:
+def inline_global_adapter_block(
+    home: Path,
+    agentos_home: Path,
+    reject_gemini_imports: bool = False,
+    include_remediation: bool = True,
+) -> str:
     canonical = effective_global_instructions(home, agentos_home).rstrip()
     for marker in (ADAPTER_START, ADAPTER_END):
         if marker in canonical:
+            if not include_remediation:
+                raise ManagedBlockError(
+                    "canonical global instructions contain an adapter managed block marker"
+                )
             raise ManagedBlockError(
                 "canonical global instructions contain an adapter managed block marker; "
                 "remove or rephrase that marker before mirroring into inline adapters"
@@ -1118,6 +1145,11 @@ def inline_global_adapter_block(home: Path, agentos_home: Path, reject_gemini_im
         gemini_import = find_gemini_import_like_reference(canonical)
         if gemini_import is not None:
             line_number, reference = gemini_import
+            if not include_remediation:
+                raise ManagedBlockError(
+                    "canonical global instructions contain Gemini-style import syntax outside code "
+                    f"at line {line_number}"
+                )
             raise ManagedBlockError(
                 "canonical global instructions contain Gemini-style import syntax outside code "
                 f"at line {line_number}: {reference}; Gemini would resolve mirrored imports from "
@@ -1210,12 +1242,17 @@ def markdown_import_path(path: Path) -> str:
     return re.sub(r"([ \t])", r"\\\1", prompt_path(path))
 
 
-def check_target(target: Target, home: Path, agentos_home: Path) -> Result:
+def check_target(
+    target: Target,
+    home: Path,
+    agentos_home: Path,
+    include_remediation: bool = True,
+) -> Result:
     path_error = validate_target_path(target.path, allow_missing=True)
     if path_error:
         return Result(False, "error", target.path, path_error)
     if not target.path.exists():
-        expected_block(target, home, agentos_home)
+        expected_block(target, home, agentos_home, include_remediation=include_remediation)
         return Result(False, "missing", target.path, "file is missing")
     text = read_text_preserve_newlines(target.path)
     start, end = markers_for(target.kind)
@@ -1223,7 +1260,7 @@ def check_target(target: Target, home: Path, agentos_home: Path) -> Result:
     if found is None:
         return Result(False, "drift", target.path, "managed block is missing")
     actual = text[found[0] : found[1]]
-    expected = expected_block(target, home, agentos_home)
+    expected = expected_block(target, home, agentos_home, include_remediation=include_remediation)
     if normalize_newlines(actual).strip() != normalize_newlines(expected).strip():
         return Result(False, "drift", target.path, "managed block is stale")
     return Result(True, "ok", target.path, "managed block is current")
@@ -1666,6 +1703,33 @@ def test_check_no_remediation_suppresses_write_guidance() -> None:
         assert_true("Remediation:" not in output, "fact-only check should not print remediation labels")
         assert_true("--no-dry-run" not in output, "fact-only check should not print install write commands")
         assert_true("--remove" not in output, "fact-only check should not print removal commands")
+
+        leak_home = root / "leak-home"
+        leak_home.mkdir()
+        (leak_home / ".gemini").mkdir()
+        leak_global = global_instructions_path(leak_home)
+        leak_global.parent.mkdir()
+        sentinel = "PRIVATE_SENTINEL_527"
+        leak_global.write_text(
+            f"Existing global guidance.\nSee @./{sentinel}.md for more.\n",
+            encoding="utf-8",
+        )
+        code, output = run_args(["--agentos-home", str(agentos), "--check", "--no-remediation"], leak_home)
+        assert_true(code == 1, "fact-only check should fail on unsafe Gemini import syntax")
+        assert_true("Gemini-style import syntax" in output, "fact-only check should name the blocked syntax family")
+        assert_true(sentinel not in output, "fact-only check should not echo matched canonical content")
+        assert_true("remove or inline" not in output, "fact-only check should not print remediation guidance")
+
+        marker_home = root / "marker-home"
+        marker_home.mkdir()
+        (marker_home / ".codex").mkdir()
+        marker_global = global_instructions_path(marker_home)
+        marker_global.parent.mkdir()
+        marker_global.write_text(f"Literal marker example: {ADAPTER_START}\n", encoding="utf-8")
+        code, output = run_args(["--agentos-home", str(agentos), "--check", "--no-remediation"], marker_home)
+        assert_true(code == 1, "fact-only check should fail on nested adapter marker syntax")
+        assert_true("adapter managed block marker" in output, "fact-only check should name the marker family")
+        assert_true("remove or rephrase" not in output, "fact-only check should not print marker remediation guidance")
 
 
 def test_remove_preserves_unmanaged_content() -> None:
