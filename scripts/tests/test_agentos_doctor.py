@@ -33,12 +33,6 @@ def run_self_tests() -> int:
         test_same_root_adapter_output_omits_write_commands,
         test_split_root_adapter_output_omits_write_commands,
         test_adapter_helper_failure_warns,
-        test_mirror_audit_never_syncs,
-        test_mirror_audit_passes_primary_personal_root,
-        test_mirror_malformed_json_warns,
-        test_mirror_valid_json_schema_errors_warn,
-        test_mirror_unknown_source_kind_warns_without_echo,
-        test_mirror_output_does_not_print_private_metadata,
         test_helper_output_is_bounded,
         test_count_files_ignores_placeholder_noise,
         test_count_files_warns_on_walk_errors,
@@ -65,7 +59,6 @@ def test_invalid_home_is_graceful() -> None:
         report = run_doctor(
             requested_agentos_home=root,
             requested_primary_agentos_home=None,
-            mirror_root=Path(tmp) / "mirrors",
             cwd=root,
             process_home=Path(tmp) / "home",
             env=minimal_env(Path(tmp) / "home"),
@@ -115,7 +108,6 @@ def test_untrusted_home_skips_subprocess_helpers() -> None:
         report = run_doctor(
             requested_agentos_home=root,
             requested_primary_agentos_home=root,
-            mirror_root=Path(tmp) / "mirrors",
             cwd=root,
             process_home=Path(tmp) / "home",
             env=minimal_env(Path(tmp) / "home"),
@@ -144,7 +136,6 @@ def test_helper_parent_symlink_does_not_execute() -> None:
         report = run_doctor(
             requested_agentos_home=root,
             requested_primary_agentos_home=root,
-            mirror_root=Path(tmp) / "mirrors",
             cwd=root,
             process_home=Path(tmp) / "home",
             env=minimal_env(Path(tmp) / "home"),
@@ -167,7 +158,6 @@ def test_personal_overlay_does_not_print_private_contents() -> None:
         report = run_doctor(
             requested_agentos_home=root,
             requested_primary_agentos_home=root,
-            mirror_root=Path(tmp) / "mirrors",
             cwd=root,
             process_home=Path(tmp) / "home",
             env=minimal_env(Path(tmp) / "home"),
@@ -209,7 +199,6 @@ def test_adapter_check_uses_audit_root_when_primary_differs() -> None:
         report = run_doctor(
             requested_agentos_home=audit_root,
             requested_primary_agentos_home=primary_root,
-            mirror_root=Path(tmp) / "mirrors",
             cwd=audit_root,
             process_home=Path(tmp) / "home",
             env=minimal_env(Path(tmp) / "home"),
@@ -239,7 +228,6 @@ def test_same_root_adapter_output_omits_write_commands() -> None:
         report = run_doctor(
             requested_agentos_home=root,
             requested_primary_agentos_home=root,
-            mirror_root=Path(tmp) / "mirrors",
             cwd=root,
             process_home=Path(tmp) / "home",
             env=minimal_env(Path(tmp) / "home"),
@@ -273,7 +261,6 @@ def test_split_root_adapter_output_omits_write_commands() -> None:
         report = run_doctor(
             requested_agentos_home=audit_root,
             requested_primary_agentos_home=primary_root,
-            mirror_root=Path(tmp) / "mirrors",
             cwd=audit_root,
             process_home=Path(tmp) / "home",
             env=minimal_env(Path(tmp) / "home"),
@@ -301,145 +288,6 @@ def test_adapter_helper_failure_warns() -> None:
         joined = "\n".join(result.details + result.recommendations)
         _case.assertTrue(result.status == "WARN", "helper nonzero output should warn for interpretation")
         _case.assertTrue("adapter drift or helper warning" in joined, "stderr should be reported")
-
-
-def test_mirror_audit_never_syncs() -> None:
-    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
-        root = Path(tmp) / "AgentOS"
-        make_fake_agentos(root)
-        result = check_skill_mirrors(root, root, Path(tmp) / "mirrors", minimal_env(Path(tmp) / "home"), verbose=True)
-        joined = "\n".join(result.details + result.recommendations)
-        _case.assertTrue(result.status == "PASS", "default fake mirror audit should pass")
-        _case.assertTrue("--json" in joined, "mirror audit should request JSON")
-        _case.assertTrue("--sync" not in joined, "doctor must not sync mirrors")
-
-
-def test_mirror_audit_passes_primary_personal_root() -> None:
-    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
-        audit_root = Path(tmp) / "audit-AgentOS"
-        primary_root = Path(tmp) / "primary-AgentOS"
-        make_fake_agentos(audit_root)
-        make_fake_agentos(primary_root)
-        mirror = audit_root / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py"
-        mirror.write_text(
-            "import json, sys\n"
-            "has_primary = '--personal-agentos-root' in sys.argv and sys.argv[sys.argv.index('--personal-agentos-root') + 1].endswith('primary-AgentOS')\n"
-            "results = [{\n"
-            "  'name': 'example-skill',\n"
-            "  'source_kind': 'core',\n"
-            "  'status': 'in-sync',\n"
-            "  'canonical_source': 'os/skills/example-skill/SKILL.md',\n"
-            "  'mirror_path': 'mirror/example-skill',\n"
-            "  'missing_files': [],\n"
-            "  'changed_files': [],\n"
-            "  'extra_files': [],\n"
-            "  'notes': []\n"
-            "}]\n"
-            "if has_primary:\n"
-            "  results.append({\n"
-            "    'name': 'private-skill',\n"
-            "    'source_kind': 'personal-overlay',\n"
-            "    'status': 'in-sync',\n"
-            "    'canonical_source': 'personal/os/skills/private-skill/SKILL.md',\n"
-            "    'mirror_path': 'mirror/private-skill',\n"
-            "    'missing_files': [],\n"
-            "    'changed_files': [],\n"
-            "    'extra_files': [],\n"
-            "    'notes': []\n"
-            "  })\n"
-            "print(json.dumps(results))\n",
-            encoding="utf-8",
-        )
-        result = check_skill_mirrors(
-            audit_root,
-            primary_root,
-            Path(tmp) / "mirrors",
-            minimal_env(Path(tmp) / "home"),
-            verbose=True,
-            suppress_sync_commands=True,
-        )
-        joined = "\n".join(result.details + result.recommendations)
-        _case.assertTrue("Mirror source kinds: core=1, personal-overlay=1" in joined, "primary Personal Overlay root should be audited")
-        _case.assertTrue("--sync" not in joined, "split-root mirror audit should omit sync commands")
-
-
-def test_mirror_malformed_json_warns() -> None:
-    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
-        root = Path(tmp) / "AgentOS"
-        make_fake_agentos(root)
-        mirror = root / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py"
-        mirror.write_text("print('not json')\n", encoding="utf-8")
-        result = check_skill_mirrors(root, root, Path(tmp) / "mirrors", minimal_env(Path(tmp) / "home"), verbose=False)
-        _case.assertTrue(result.status == "WARN", "malformed mirror JSON should warn")
-        _case.assertTrue(any("malformed" in detail for detail in result.details), "malformed JSON should be reported")
-
-
-def test_mirror_valid_json_schema_errors_warn() -> None:
-    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
-        root = Path(tmp) / "AgentOS"
-        make_fake_agentos(root)
-        mirror = root / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py"
-        mirror.write_text("import json\nprint(json.dumps([{'name': 'partial'}]))\n", encoding="utf-8")
-        result = check_skill_mirrors(root, root, Path(tmp) / "mirrors", minimal_env(Path(tmp) / "home"), verbose=False)
-        joined = "\n".join(result.details)
-        _case.assertTrue(result.status == "WARN", "schema-invalid mirror JSON should warn")
-        _case.assertTrue("missing fields" in joined, "schema error should be reported")
-
-
-def test_mirror_unknown_source_kind_warns_without_echo() -> None:
-    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
-        root = Path(tmp) / "AgentOS"
-        make_fake_agentos(root)
-        mirror = root / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py"
-        mirror.write_text(
-            "import json\n"
-            "print(json.dumps([{\n"
-            "  'name': 'example-skill',\n"
-            "  'source_kind': 'private-client-secret',\n"
-            "  'status': 'in-sync',\n"
-            "  'canonical_source': 'os/skills/example-skill/SKILL.md',\n"
-            "  'mirror_path': 'mirror/example-skill',\n"
-            "  'missing_files': [],\n"
-            "  'changed_files': [],\n"
-            "  'extra_files': [],\n"
-            "  'notes': []\n"
-            "}]))\n",
-            encoding="utf-8",
-        )
-        result = check_skill_mirrors(root, root, Path(tmp) / "mirrors", minimal_env(Path(tmp) / "home"), verbose=True)
-        joined = "\n".join(result.details + result.recommendations)
-        _case.assertTrue(result.status == "WARN", "unknown source_kind should warn")
-        _case.assertTrue("source_kind was not recognized" in joined, "source_kind schema error should be reported")
-        _case.assertTrue("private-client-secret" not in joined, "unknown source_kind value leaked")
-
-
-def test_mirror_output_does_not_print_private_metadata() -> None:
-    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
-        root = Path(tmp) / "AgentOS"
-        make_fake_agentos(root)
-        mirror = root / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py"
-        mirror.write_text(
-            "import json\n"
-            "print(json.dumps([{\n"
-            "  'name': 'private-client-skill',\n"
-            "  'source_kind': 'personal-overlay',\n"
-            "  'status': 'stale',\n"
-            "  'canonical_source': 'personal/os/skills/private-client-skill/SKILL.md',\n"
-            "  'mirror_path': 'mirror/private-client-skill',\n"
-            "  'missing_files': ['secret-plan.md'],\n"
-            "  'changed_files': ['client-notes.md'],\n"
-            "  'extra_files': [],\n"
-            "  'notes': ['private note']\n"
-            "}]))\n",
-            encoding="utf-8",
-        )
-        result = check_skill_mirrors(root, root, Path(tmp) / "mirrors", minimal_env(Path(tmp) / "home"), verbose=True)
-        joined = "\n".join(result.details + result.recommendations)
-        _case.assertTrue(result.status == "WARN", "stale mirror result should warn")
-        _case.assertTrue("private-client-skill" not in joined, "mirror skill name leaked")
-        _case.assertTrue("secret-plan.md" not in joined, "mirror file name leaked")
-        _case.assertTrue("Mirror statuses: stale=1" in joined, "safe aggregate status missing")
-        _case.assertTrue("--sync" not in joined, "doctor must not suggest mirror sync commands")
 
 
 def test_helper_output_is_bounded() -> None:
@@ -509,7 +357,6 @@ def test_automation_locations_report_counts_not_contents() -> None:
         report = run_doctor(
             requested_agentos_home=root,
             requested_primary_agentos_home=root,
-            mirror_root=Path(tmp) / "mirrors",
             cwd=root,
             process_home=home,
             env=minimal_env(home),
@@ -556,7 +403,6 @@ def test_adapter_home_notation_is_preserved() -> None:
 def make_fake_agentos(root: Path) -> None:
     (root / "os" / "playbook").mkdir(parents=True, exist_ok=True)
     (root / "scripts").mkdir(parents=True, exist_ok=True)
-    (root / "os" / "skills" / "mirror-skills" / "scripts").mkdir(parents=True, exist_ok=True)
     (root / "os" / "automations").mkdir(parents=True, exist_ok=True)
     (root / "personal" / "os" / "automations").mkdir(parents=True, exist_ok=True)
     (root / "AGENTS.md").write_text("# Agents\n", encoding="utf-8")
@@ -575,22 +421,6 @@ def make_fake_agentos(root: Path) -> None:
         "print('[OK] ok global - managed block current')\n",
         encoding="utf-8",
     )
-    (root / "os" / "skills" / "mirror-skills" / "scripts" / "mirror_skills.py").write_text(
-        "import json\n"
-        "print(json.dumps([{\n"
-        "  'name': 'example-skill',\n"
-        "  'source_kind': 'core',\n"
-        "  'status': 'in-sync',\n"
-        "  'canonical_source': 'os/skills/example-skill/SKILL.md',\n"
-        "  'mirror_path': 'mirror/example-skill',\n"
-        "  'missing_files': [],\n"
-        "  'changed_files': [],\n"
-        "  'extra_files': [],\n"
-        "  'notes': []\n"
-        "}]))\n",
-        encoding="utf-8",
-    )
-
 
 def minimal_env(home: Path) -> dict[str, str]:
     home.mkdir(parents=True, exist_ok=True)

@@ -121,7 +121,7 @@ Each skill entry records:
 - Output artifact: concise setup health report with deterministic script facts, agent interpretation for ambiguous local state, and approval-gated next steps.
 - Filing rule: default output stays in chat; deterministic helper stays at `scripts/agentos_doctor.py`; private setup notes and automation state stay in the Personal Overlay; current-machine mirror state is not recorded in the Core manifest.
 - Safety posture: read-only by default; distinguish script facts from agent judgment; do not expose private file contents; do not treat helper automation counts or ambiguous automation prose as active recurring evidence; ask before writes or current-machine changes.
-- Verification coverage: run the doctor script or explain why it could not run; confirm feature worktree runs use `--primary-agentos-home` or warn about limited interpretation; classify automation evidence conservatively in the skill, not from helper counts alone; run `python3 os/verification/scripts/validate_agentos.py` after skill or manifest changes.
+- Verification coverage: run the doctor script or explain why it could not run; confirm feature worktree runs use `--primary-agentos-home` or warn about limited interpretation; use mirror-skills audit mode for mirror diagnosis when requested; classify automation evidence conservatively in the skill, not from helper counts alone; run `python3 os/verification/scripts/validate_agentos.py` after skill or manifest changes.
 - Upgrade notes: Core skill wrapper for AgentOS setup health checks; keeps vague judgment in agent instructions while deterministic checks remain in the script.
 
 ### `double-steelman`

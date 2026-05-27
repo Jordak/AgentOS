@@ -4,13 +4,11 @@
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import re
 import stat
 import subprocess
 import sys
-from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, Mapping
@@ -26,28 +24,6 @@ OUTPUT_LINE_LIMIT = 20
 VERBOSE_OUTPUT_LINE_LIMIT = 80
 OUTPUT_LINE_CHAR_LIMIT = 240
 VERBOSE_OUTPUT_LINE_CHAR_LIMIT = 1000
-MIRROR_REQUIRED_FIELDS = {
-    "name",
-    "source_kind",
-    "status",
-    "canonical_source",
-    "mirror_path",
-    "missing_files",
-    "changed_files",
-    "extra_files",
-    "notes",
-}
-MIRROR_LIST_FIELDS = {"missing_files", "changed_files", "extra_files", "notes"}
-MIRROR_ALLOWED_STATUSES = {
-    "in-sync",
-    "missing",
-    "stale",
-    "extra-files",
-    "source-missing",
-    "source-unreadable",
-    "mirror-unreadable",
-}
-MIRROR_ALLOWED_SOURCE_KINDS = {"core", "personal-overlay"}
 IGNORED_COUNT_FILE_NAMES = {".DS_Store", ".gitkeep"}
 IGNORED_COUNT_DIR_NAMES = {"__pycache__"}
 
@@ -65,7 +41,6 @@ class CheckResult:
 class DoctorReport:
     agentos_home: Path
     primary_agentos_home: Path
-    mirror_root: Path
     results: list[CheckResult]
 
 
@@ -82,12 +57,6 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=None,
         help="Primary AgentOS checkout that owns the canonical Personal Overlay. Defaults to --agentos-home.",
-    )
-    parser.add_argument(
-        "--mirror-root",
-        type=Path,
-        default=Path.home() / ".agents" / "skills",
-        help="Current-machine skill mirror root to audit. Default: the user's .agents/skills directory.",
     )
     parser.add_argument(
         "--all-default-adapters",
@@ -125,7 +94,6 @@ def main(argv: list[str] | None = None) -> int:
         if (
             args.agentos_home is not None
             or args.primary_agentos_home is not None
-            or args.mirror_root != Path.home() / ".agents" / "skills"
             or args.all_default_adapters
             or args.adapter
             or args.verbose
@@ -139,7 +107,6 @@ def main(argv: list[str] | None = None) -> int:
     report = run_doctor(
         requested_agentos_home=args.agentos_home,
         requested_primary_agentos_home=args.primary_agentos_home,
-        mirror_root=args.mirror_root,
         cwd=cwd,
         process_home=Path.home(),
         env=os.environ,
@@ -171,7 +138,6 @@ def normalize_adapter_arg(adapter: str, cwd: Path) -> str:
 def run_doctor(
     requested_agentos_home: Path | None,
     requested_primary_agentos_home: Path | None,
-    mirror_root: Path,
     cwd: Path,
     process_home: Path,
     env: Mapping[str, str],
@@ -180,7 +146,6 @@ def run_doctor(
 ) -> DoctorReport:
     agentos_home, discovery = resolve_agentos_home(requested_agentos_home, cwd)
     primary_agentos_home = absolute_path(requested_primary_agentos_home, cwd) if requested_primary_agentos_home else agentos_home
-    mirror_root = absolute_path(mirror_root, cwd)
     home_structure = check_required_core_files(agentos_home)
     split_roots = agentos_home != primary_agentos_home
 
@@ -198,21 +163,12 @@ def run_doctor(
                     verbose,
                     omit_current_machine_write_guidance=split_roots,
                 ),
-                check_skill_mirrors(
-                    agentos_home,
-                    primary_agentos_home,
-                    mirror_root,
-                    env,
-                    verbose,
-                    suppress_sync_commands=split_roots,
-                ),
             ]
         )
     else:
         results.extend(
             [
                 skipped_subprocess_check("adapter drift", home_structure),
-                skipped_subprocess_check("skill mirrors", home_structure),
             ]
         )
     results.extend(
@@ -223,7 +179,6 @@ def run_doctor(
     return DoctorReport(
         agentos_home=agentos_home,
         primary_agentos_home=primary_agentos_home,
-        mirror_root=mirror_root,
         results=results,
     )
 
@@ -384,84 +339,6 @@ def check_adapters(
         "adapter drift",
         "WARN",
         "Adapter check helper reported output that needs review.",
-        details=details,
-        recommendations=recommendations,
-    )
-
-
-def check_skill_mirrors(
-    agentos_home: Path,
-    primary_agentos_home: Path,
-    mirror_root: Path,
-    env: Mapping[str, str],
-    verbose: bool,
-    suppress_sync_commands: bool = False,
-) -> CheckResult:
-    script, invalid = trusted_helper_script(
-        agentos_home,
-        "os/skills/mirror-skills/scripts/mirror_skills.py",
-        "skill mirrors",
-        "Mirror-skills audit helper",
-    )
-    if invalid:
-        return invalid
-
-    command = [
-        sys.executable,
-        str(script),
-        "--agentos-root",
-        str(agentos_home),
-        "--personal-agentos-root",
-        str(primary_agentos_home),
-        "--mirror-root",
-        str(mirror_root),
-        "--json",
-    ]
-    completed = run_subprocess(command, cwd=agentos_home, env=env)
-    details = mirror_subprocess_details(command, completed)
-    parsed, schema_errors = parse_mirror_results(completed.stdout)
-    mirror_needs_review = False
-    if schema_errors:
-        details.extend("Mirror audit JSON: " + error for error in schema_errors)
-    else:
-        statuses = Counter(str(item.get("status", "<missing>")) for item in parsed if isinstance(item, dict))
-        source_kinds = Counter(str(item.get("source_kind", "<missing>")) for item in parsed if isinstance(item, dict))
-        mirror_needs_review = any(status != "in-sync" for status in statuses)
-        details.append(f"Mirror results: {len(parsed)}")
-        if statuses:
-            details.append("Mirror statuses: " + format_counts(statuses))
-        if source_kinds:
-            details.append("Mirror source kinds: " + format_counts(source_kinds))
-
-    if completed.returncode in {124, 127}:
-        return CheckResult(
-            "skill mirrors",
-            "FAIL",
-            "Mirror-skills audit helper could not run.",
-            details=details,
-        )
-    if completed.returncode == 0 and parsed is not None and not schema_errors and not mirror_needs_review and not completed.stderr.strip():
-        return CheckResult(
-            "skill mirrors",
-            "PASS",
-            "Mirror-skills audit helper exited successfully.",
-            details=details,
-        )
-    recommendations = [
-        "Review or rerun the audit command above; raw JSON is not printed by Doctor.",
-        "Ask through Run AgentOS Doctor before syncing skill mirrors.",
-    ]
-    if suppress_sync_commands:
-        recommendations.extend(
-            [
-                "Feature-worktree split detected; Doctor omitted mirror sync guidance for the audit root.",
-                "Before any mirror sync, rerun the audit from the primary checkout or after this branch lands.",
-            ]
-        )
-    return CheckResult(
-        "skill mirrors",
-        "WARN",
-        "Mirror-skills audit output needs review.",
         details=details,
         recommendations=recommendations,
     )
@@ -647,43 +524,6 @@ def read_probe(path: Path) -> str | None:
 
 
 
-def parse_mirror_results(stdout: str) -> tuple[list[dict[str, object]] | None, list[str]]:
-    if not stdout.strip():
-        return None, ["missing."]
-    try:
-        parsed = json.loads(stdout)
-    except json.JSONDecodeError:
-        return None, ["malformed."]
-    if not isinstance(parsed, list):
-        return None, ["expected a JSON list."]
-    if not parsed:
-        return None, ["JSON list was empty."]
-
-    errors: list[str] = []
-    results: list[dict[str, object]] = []
-    for index, item in enumerate(parsed):
-        if not isinstance(item, dict):
-            errors.append(f"item {index} was not an object.")
-            continue
-        missing = sorted(MIRROR_REQUIRED_FIELDS - set(item))
-        if missing:
-            errors.append(f"item {index} missing fields: {', '.join(missing)}.")
-        for field in MIRROR_REQUIRED_FIELDS - MIRROR_LIST_FIELDS:
-            if field in item and not isinstance(item[field], str):
-                errors.append(f"item {index} field {field} was not a string.")
-        for field in MIRROR_LIST_FIELDS:
-            if field in item and not isinstance(item[field], list):
-                errors.append(f"item {index} field {field} was not a list.")
-        status = item.get("status")
-        if isinstance(status, str) and status not in MIRROR_ALLOWED_STATUSES:
-            errors.append(f"item {index} status was not recognized.")
-        source_kind = item.get("source_kind")
-        if isinstance(source_kind, str) and source_kind not in MIRROR_ALLOWED_SOURCE_KINDS:
-            errors.append(f"item {index} source_kind was not recognized.")
-        results.append(item)
-    return (results if results else None), errors
-
-
 def count_files(root: Path, suffix: str | None = None) -> tuple[int | None, str | None]:
     try:
         if root.is_symlink():
@@ -786,22 +626,6 @@ def subprocess_details(
     return details
 
 
-def mirror_subprocess_details(command: list[str], completed: subprocess.CompletedProcess[str]) -> list[str]:
-    details = [
-        "Command: " + shell_command(command),
-        f"Exit code: {completed.returncode}",
-        output_summary("stdout", completed.stdout, "not printed; parsed as mirror audit JSON"),
-        output_summary("stderr", completed.stderr, "not printed to avoid leaking mirror metadata"),
-    ]
-    return details
-
-
-def output_summary(label: str, text: str, note: str) -> str:
-    if not text:
-        return f"{label}: <empty>"
-    return f"{label}: <{len(text.splitlines())} line(s), {len(text)} char(s); {note}>"
-
-
 def format_output(label: str, text: str, line_limit: int, line_char_limit: int) -> list[str]:
     lines = text.splitlines()
     if not lines:
@@ -836,10 +660,6 @@ def sh_quote(value: str) -> str:
     return "'" + value.replace("'", "'\"'\"'") + "'"
 
 
-def format_counts(counts: Counter[str]) -> str:
-    return ", ".join(f"{key}={counts[key]}" for key in sorted(counts))
-
-
 def output_to_text(value: str | bytes | None) -> str:
     if value is None:
         return ""
@@ -852,7 +672,6 @@ def print_report(report: DoctorReport, verbose: bool) -> None:
     print("AgentOS doctor (read-only facts)")
     print(f"AgentOS home: {report.agentos_home}")
     print(f"Primary AgentOS home: {report.primary_agentos_home}")
-    print(f"Skill mirror root: {report.mirror_root}")
     print("No files were modified.")
     print()
     for result in report.results:
@@ -871,7 +690,6 @@ def render_report_for_test(report: DoctorReport, verbose: bool = False) -> str:
         "AgentOS doctor (read-only facts)",
         f"AgentOS home: {report.agentos_home}",
         f"Primary AgentOS home: {report.primary_agentos_home}",
-        f"Skill mirror root: {report.mirror_root}",
         "No files were modified.",
         "",
     ]

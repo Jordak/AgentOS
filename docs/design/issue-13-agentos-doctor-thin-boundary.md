@@ -28,7 +28,7 @@ Use this boundary:
 
 - The Doctor helper is small enough to audit directly and remains obviously read-only.
 - The helper runs `install_global_agent_instructions.py --check` only and reports command/output/exit status without applying remediation.
-- The helper runs `mirror_skills.py --json` only and never passes `--sync`.
+- The Doctor helper does not run or parse mirror-skills; the Run AgentOS Doctor skill delegates mirror diagnosis to the mirror-skills audit-only workflow.
 - The Doctor helper does not parse getting-started Markdown or judge Personal Overlay starter completeness; the skill handles starter interpretation without quoting private file contents.
 - Feature-worktree checks keep Core evidence tied to the audited checkout and Personal Overlay evidence tied to the primary checkout.
 - Automation checks report registry/file/directory presence, counts, and locations only.
@@ -38,7 +38,7 @@ Use this boundary:
 ## Validation Plan
 
 - Run `python3 scripts/agentos_doctor.py --self-test`.
-- Run Python compilation for the Doctor and mirror-skills helpers.
+- Run Python compilation for the Doctor helper and test module.
 - Run AgentOS validator and validator self-test.
 - Run skill validation for `os/skills/run-agentos-doctor`.
 - Smoke-run Doctor against the PR worktree and canonical primary checkout, verifying it exits read-only and does not print private file contents.

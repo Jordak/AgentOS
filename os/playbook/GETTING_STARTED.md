@@ -79,16 +79,16 @@ Use the Run AgentOS Doctor skill when the user wants a read-only setup health ch
 python3 scripts/agentos_doctor.py
 ```
 
-The helper script discovers `$root` from the current directory, or accepts `--agentos-home <root>`. It reports the resolved AgentOS home, checks adapter drift through `scripts/install_global_agent_instructions.py --check`, audits skill mirrors through mirror-skills without syncing, and reports automation registry/file locations and counts only. It prints bounded facts and helper output only; it must not parse this Markdown for starter paths, print Personal Overlay file contents, or classify automation lifecycle state.
+The helper script discovers `$root` from the current directory, or accepts `--agentos-home <root>`. It reports the resolved AgentOS home, checks adapter drift through `scripts/install_global_agent_instructions.py --check`, and reports automation registry/file locations and counts only. It prints bounded facts and helper output only; it must not audit skill mirrors, parse this Markdown for starter paths, print Personal Overlay file contents, or classify automation lifecycle state.
 
 If the installer or adapter check used `--all-default-adapters` or any custom `--adapter <path>` flags, repeat those exact flags when using Run AgentOS Doctor or the helper script so the read-only adapter drift result covers the same harness files.
 
-If the command is running from an isolated feature worktree, pass `--primary-agentos-home <primary-agentos-home>` so Personal Overlay skill mirrors and automation location counts refer to the canonical checkout. The helper still runs read-only checks only and suppresses feature-worktree write commands when the audit root and primary checkout differ; starter-file interpretation, adapter writes, mirror syncs, Personal Overlay edits, and automation changes require the Run AgentOS Doctor skill and explicit approval.
+If the command is running from an isolated feature worktree, pass `--primary-agentos-home <primary-agentos-home>` so Personal Overlay automation location counts refer to the canonical checkout. The helper still runs read-only checks only and suppresses feature-worktree write commands when the audit root and primary checkout differ; starter-file interpretation, skill mirror diagnosis, adapter writes, mirror syncs, Personal Overlay edits, and automation changes require the Run AgentOS Doctor skill and explicit approval.
 
 Run AgentOS Doctor is not the installer and not mirror sync:
 
 - Use `os/skills/run-agentos-doctor/SKILL.md` for setup-health workflow and judgment over ambiguous notes.
-- Use `scripts/agentos_doctor.py` for deterministic setup facts and exact check/audit commands.
+- Use `scripts/agentos_doctor.py` for deterministic setup facts and exact read-only check commands.
 - Use `scripts/install_global_agent_instructions.py` when the user has approved creating, updating, checking, or removing global instruction adapters.
 - Use `os/skills/mirror-skills/scripts/mirror_skills.py` when the user wants to audit or, after approval, sync harness-discoverable skill mirrors.
 
