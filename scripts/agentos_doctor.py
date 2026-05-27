@@ -22,9 +22,6 @@ REQUIRED_AGENTOS_FILES = (
     "os/INDEX.md",
     "os/playbook/PERSONAL_OVERLAY.md",
 )
-STARTER_HEADING_RE = re.compile(r"^## Starter Files\s*$", re.MULTILINE)
-NEXT_HEADING_RE = re.compile(r"^##\s+", re.MULTILINE)
-PERSONAL_PATH_RE = re.compile(r"`(personal/os/[^`]+)`")
 DEFAULT_TIMEOUT_SECONDS = 30
 OUTPUT_LINE_LIMIT = 20
 VERBOSE_OUTPUT_LINE_LIMIT = 80
@@ -222,7 +219,6 @@ def run_doctor(
         )
     results.extend(
         [
-            check_personal_overlay_starters(agentos_home, primary_agentos_home),
             check_automation_locations(agentos_home, primary_agentos_home, process_home, env),
         ]
     )
@@ -473,92 +469,6 @@ def check_skill_mirrors(
     )
 
 
-def check_personal_overlay_starters(agentos_home: Path, primary_agentos_home: Path) -> CheckResult:
-    source = agentos_home / "os" / "playbook" / "GETTING_STARTED.md"
-    try:
-        text = source.read_text(encoding="utf-8")
-    except OSError as exc:
-        return CheckResult(
-            "Personal Overlay starters",
-            "WARN",
-            "Could not read the documented starter path list.",
-            details=[f"Starter source: {source} ({exc.__class__.__name__})"],
-        )
-    except UnicodeDecodeError:
-        return CheckResult(
-            "Personal Overlay starters",
-            "WARN",
-            "Could not decode the documented starter path list.",
-            details=[f"Starter source: {source}"],
-        )
-
-    starter_paths = extract_starter_paths(text)
-    if not starter_paths:
-        return CheckResult(
-            "Personal Overlay starters",
-            "WARN",
-            "No documented Personal Overlay starter paths were found.",
-            details=[f"Starter source: {source}"],
-        )
-
-    present: list[str] = []
-    missing: list[str] = []
-    unreadable: list[str] = []
-    non_regular: list[str] = []
-    for rel in starter_paths:
-        path = primary_agentos_home / rel
-        try:
-            state = lstat_path_state(path)
-            if state == "regular file":
-                present.append(rel)
-            elif state == "absent":
-                missing.append(rel)
-            elif state == "unreadable":
-                unreadable.append(rel)
-            else:
-                non_regular.append(f"{rel} ({state})")
-        except OSError as exc:
-            unreadable.append(f"{rel} ({exc.__class__.__name__})")
-
-    details = [
-        f"Starter source: {source}",
-        f"Primary Personal Overlay root: {primary_agentos_home / 'personal' / 'os'}",
-        f"Starter paths regular files: {len(present)}/{len(starter_paths)}",
-    ]
-    if present:
-        details.append("Present starter paths: " + ", ".join(present))
-    if missing:
-        details.append("Missing starter paths: " + ", ".join(missing))
-    if unreadable:
-        details.append("Unreadable starter paths: " + ", ".join(unreadable))
-    if non_regular:
-        details.append("Non-regular starter paths: " + ", ".join(non_regular))
-
-    if unreadable or non_regular:
-        return CheckResult(
-            "Personal Overlay starters",
-            "WARN",
-            "Some documented starter paths are unreadable or not regular files.",
-            details=details,
-        )
-    if missing:
-        return CheckResult(
-            "Personal Overlay starters",
-            "WARN",
-            "Some documented starter Personal Overlay paths are absent.",
-            details=details,
-            recommendations=[
-                "Review documented starter paths: os/playbook/GETTING_STARTED.md"
-            ],
-        )
-    return CheckResult(
-        "Personal Overlay starters",
-        "PASS",
-        "Documented starter Personal Overlay paths exist.",
-        details=details,
-    )
-
-
 def check_automation_locations(
     agentos_home: Path,
     primary_agentos_home: Path,
@@ -631,21 +541,6 @@ def absolute_path(path: Path, cwd: Path) -> Path:
     if not os.path.isabs(raw):
         raw = os.path.join(os.fspath(cwd), raw)
     return Path(os.path.abspath(raw))
-
-
-def extract_starter_paths(text: str) -> list[str]:
-    match = STARTER_HEADING_RE.search(text)
-    if not match:
-        return []
-    start = match.end()
-    next_heading = NEXT_HEADING_RE.search(text, start)
-    section = text[start : next_heading.start() if next_heading else len(text)]
-    paths = []
-    for path in PERSONAL_PATH_RE.findall(section):
-        clean = path.rstrip(".,)")
-        if clean not in paths:
-            paths.append(clean)
-    return paths
 
 
 def trusted_helper_script(
@@ -1036,8 +931,6 @@ def run_self_tests() -> int:
         test_mirror_unknown_source_kind_warns_without_echo,
         test_mirror_output_does_not_print_private_metadata,
         test_helper_output_is_bounded,
-        test_starter_heading_missing_fails_closed,
-        test_starter_non_regular_paths_warn,
         test_count_files_ignores_placeholder_noise,
         test_count_files_warns_on_walk_errors,
         test_count_files_warns_on_symlink_root,
@@ -1174,7 +1067,8 @@ def test_personal_overlay_does_not_print_private_contents() -> None:
         )
         rendered = render_report_for_test(report, verbose=True)
         assert_true(PRIVATE_CONTENT_SENTINEL not in rendered, "private file contents leaked")
-        assert_true("personal/os/identity/USER.md" in rendered, "private path presence should be reported")
+        assert_true("Personal Overlay starters" not in rendered, "doctor should not report starter completeness")
+        assert_true("personal/os/identity/USER.md" not in rendered, "doctor should not parse starter paths from Markdown")
 
 
 def test_adapter_check_is_read_only_check_only() -> None:
@@ -1445,23 +1339,6 @@ def test_helper_output_is_bounded() -> None:
     rendered = "\n".join(lines)
     assert_true(len(lines) == OUTPUT_LINE_LIMIT + 1, "line count should be capped with an omission note")
     assert_true("char(s) omitted" in rendered, "long line should be capped")
-
-
-def test_starter_heading_missing_fails_closed() -> None:
-    text = "# Getting Started\n\nExample: `personal/os/identity/USER.md`\n"
-    assert_true(extract_starter_paths(text) == [], "missing Starter Files heading should not scan whole document")
-
-
-def test_starter_non_regular_paths_warn() -> None:
-    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
-        root = Path(tmp) / "AgentOS"
-        make_fake_agentos(root)
-        starter = root / "personal" / "os" / "identity" / "USER.md"
-        starter.mkdir(parents=True)
-        result = check_personal_overlay_starters(root, root)
-        joined = "\n".join(result.details)
-        assert_true(result.status == "WARN", "directory at starter file path should warn")
-        assert_true("Non-regular starter paths" in joined, "non-regular starter state should be reported")
 
 
 def test_count_files_ignores_placeholder_noise() -> None:

@@ -44,7 +44,7 @@ Safety:
    Read `AGENTS.md`, `os/INDEX.md`, `os/playbook/PERSONAL_OVERLAY.md`, and `os/playbook/GETTING_STARTED.md`. If current-machine setup boundaries are unclear, also read `os/RESOLVER.md`.
 
 2. Choose roots.
-   Use the current checkout as the Core audit root via `--agentos-home`. If running from an isolated Git worktree, find or ask for the primary checkout and pass `--primary-agentos-home <primary-agentos-home>` so private Personal Overlay skill mirrors, starter paths, and automation locations refer to the canonical checkout. Treat missing primary-root context as a limitation, not as permission to write into the worktree.
+   Use the current checkout as the Core audit root via `--agentos-home`. If running from an isolated Git worktree, find or ask for the primary checkout and pass `--primary-agentos-home <primary-agentos-home>` so private Personal Overlay skill mirrors and automation locations refer to the canonical checkout. Treat missing primary-root context as a limitation, not as permission to write into the worktree.
 
 3. Run the deterministic helper.
    Use:
@@ -53,12 +53,15 @@ Safety:
    python3 scripts/agentos_doctor.py
    ```
 
-   Add `--agentos-home`, `--primary-agentos-home`, `--mirror-root`, `--all-default-adapters`, and repeated `--adapter <path>` when needed. Repeat the same adapter flags used by installer dry-runs/checks. The helper must remain read-only: adapter check only, mirror audit only, Personal Overlay path presence only, automation location/count facts only.
+   Add `--agentos-home`, `--primary-agentos-home`, `--mirror-root`, `--all-default-adapters`, and repeated `--adapter <path>` when needed. Repeat the same adapter flags used by installer dry-runs/checks. The helper must remain read-only: adapter check only, mirror audit only, automation location/count facts only. It does not parse `os/playbook/GETTING_STARTED.md` for starter paths or judge starter-file completeness.
 
 4. Interpret script facts.
    Treat PASS/WARN/FAIL as facts about the helper's checks, not as final setup truth. If helper output is missing, unreadable, malformed, or ambiguous, keep the diagnosis at WARN/FAIL until a human or agent reviews the underlying facts.
 
-5. Interpret automation state.
+5. Interpret starter setup.
+   When the user wants Personal Overlay starter-file diagnosis, this skill reads `os/playbook/GETTING_STARTED.md` and reasons about the relevant starter guidance. Keep that judgment in the agent layer: summarize gaps without quoting private contents, and ask before creating or editing Personal Overlay files.
+
+6. Interpret automation state.
    The helper reports automation registry/file/directory presence and counts only. When the user wants automation diagnosis, inspect relevant local notes only as needed:
 
    - Codex automation metadata under the current harness automation directory, when present.
@@ -66,7 +69,7 @@ Safety:
 
    Do not quote private contents. Summarize only the minimum needed: active, scheduled/enabled, possible/ambiguous, disabled/retired/draft, missing, or unreadable. Vague prose, drafts, retired notes, disabled notes, negative statements, malformed metadata, or uncertainty should remain WARN and prompt confirmation.
 
-6. Recommend next steps.
+7. Recommend next steps.
    Separate deterministic commands from judgment calls. Ask before adapter writes, mirror syncs, Personal Overlay file creation, automation edits, or current-machine setup changes. Prefer the lower-level tools only after approval:
 
    - `scripts/install_global_agent_instructions.py` for global instruction adapters.
