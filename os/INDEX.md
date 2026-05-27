@@ -20,7 +20,7 @@ AgentOS is not one giant prompt. Its control plane is a stack of small Markdown 
 - The Personal Overlay rule separates publishable Core files under `$root/os/` from private user-specific files under `$root/personal/os/`.
 - The publication rule explains how to create a fresh-history public repository without exposing private Git history.
 - The protected-main workflow keeps Core/public changes on isolated feature-branch worktrees and lands them through validated pull requests.
-- The implementation-readiness rule keeps feature-sized work from starting before a durable design source is complete for the requested scope.
+- The implementation-readiness rule keeps feature-sized work from starting before a durable design source is complete for the requested scope; chat-only consensus must be promoted into a durable source before implementation code begins.
 
 ## How To Use This Folder
 
@@ -45,7 +45,7 @@ When updating AgentOS, prefer adding facts to the narrowest file:
 - Guided first-pass setup -> `os/playbook/GETTING_STARTED.md`
 - Public repository publication workflow -> `os/playbook/PUBLICATION.md`
 - GitHub branch, worktree, pull request, and merge workflow -> `os/playbook/GITHUB_WORKFLOW.md`
-- Feature implementation readiness -> `os/playbook/IMPLEMENT_FEATURES.md`
+- Feature implementation readiness and no-first-commit design gate -> `os/playbook/IMPLEMENT_FEATURES.md`
 - Lookup, routing, authority, safety, and filing tie-breakers -> `os/RESOLVER.md`
 
 ## Backlog

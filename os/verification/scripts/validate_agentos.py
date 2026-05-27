@@ -256,6 +256,7 @@ class AgentOSValidator:
         self.check_agent_contract_completeness()
         self.check_automation_registry_completeness()
         self.check_resolver_reachability()
+        self.check_pr_readiness_tripwire()
         self.check_retrieval_eval_fixtures()
         self.check_benchmark_manifest()
 
@@ -1261,6 +1262,36 @@ class AgentOSValidator:
 
         self.checked.append(check)
 
+    def check_pr_readiness_tripwire(self) -> None:
+        check = "PR readiness tripwire"
+        template_path = self.root / ".github/pull_request_template.md"
+        workflow_path = self.root / ".github/workflows/agentos-validation.yml"
+        template = self.read_text(template_path, check)
+        workflow = self.read_text(workflow_path, check)
+
+        if template:
+            for needle in [
+                "Readiness evidence:",
+                "Readiness verdict:",
+                "GitHub issue",
+                "Ready to Implement",
+                "Gate Skipped",
+                "os/playbook/IMPLEMENT_FEATURES.md",
+            ]:
+                self.require_contains(template, needle, check, template_path)
+
+        if workflow:
+            for needle in [
+                "Check PR design readiness fields",
+                "Readiness evidence:",
+                "Readiness verdict:",
+                "Ready to Implement",
+                "Gate Skipped",
+            ]:
+                self.require_contains(workflow, needle, check, workflow_path)
+
+        self.checked.append(check)
+
     def check_retrieval_eval_fixtures(self) -> None:
         check = "retrieval eval fixtures"
         fixture_path = self.root / "os/verification/retrieval/fixtures.json"
@@ -1711,6 +1742,7 @@ def run_self_test() -> int:
         validator.check_markdown_path_portability()
         validator.check_source_map_path_health()
         validator.check_benchmark_manifest()
+        validator.check_pr_readiness_tripwire()
         validator.check_no_git_directory()
         validator.check_public_export_allowlist()
         validator.check_personal_overlay_ignore_file_rules()
@@ -1726,6 +1758,8 @@ def run_self_test() -> int:
             "uses a parent-relative AgentOS path",
             "listed local path does not exist",
             "benchmark script missing from manifest",
+            "Check PR design readiness fields",
+            "Readiness evidence:",
             "public export must not contain git history",
             "private marker matched",
             "missing required Personal Overlay ignore rule",
@@ -2030,6 +2064,12 @@ def run_self_test() -> int:
             and "AgentOS-managed paths outside personal/ must not contain symbolic links" in error.message
             for error in validator.errors
         )
+        missing_pr_template_rejected = any(
+            error.check == "PR readiness tripwire"
+            and error.path == ".github/pull_request_template.md"
+            and "required file is missing" in error.message
+            for error in validator.errors
+        )
 
         symlink_root = root / "_publication_symlink_fixture"
         (symlink_root / "os/context").mkdir(parents=True)
@@ -2156,6 +2196,7 @@ def run_self_test() -> int:
             and symlinked_root_rejected
             and public_export_root_rejected
             and non_os_symlink_rejected
+            and missing_pr_template_rejected
             and symlink_rejected_cleanly
             and managed_symlink_rejected
             and live_core_file_rejected

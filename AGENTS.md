@@ -28,6 +28,7 @@ Before answering questions about Codex, ChatGPT, OpenAI APIs, Cursor, Claude Cod
 - Build in small, usable increments.
 - Treat `main` as protected. Do not commit or push Core/public AgentOS changes directly to `main`.
 - Make Core/public changes on a feature branch in an isolated worktree, open a pull request, wait for required validators, and squash merge through GitHub.
+- Before implementing feature-sized AgentOS Core work, run `os/skills/check-implementation-readiness/SKILL.md` against `os/playbook/IMPLEMENT_FEATURES.md`. If no durable design source exists, create or update one before coding; do not let chat-only consensus become the first implementation commit.
 - Use the harness-provided worktree when one exists. Otherwise create an external Git worktree under `$CODEX_HOME/worktrees/`; do not create worktrees inside this repository.
 - When running from a feature worktree, do not assume ignored `personal/os/` files exist there. For Personal Overlay reads or approved writes, use the canonical primary AgentOS checkout's `personal/os/` unless the user explicitly assigns a different private overlay workspace.
 - For AgentOS public repository persistence, use `scripts/agent-push` instead of raw `git push` when that helper is available. If the helper is missing or unsuitable, pause and ask before pushing.

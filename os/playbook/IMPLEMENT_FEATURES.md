@@ -6,6 +6,14 @@ Use this playbook before implementing feature-sized AgentOS or mapped-project wo
 
 For the callable workflow, use `os/skills/check-implementation-readiness/SKILL.md`. This playbook is the canonical policy; the skill runs the gate.
 
+## No First Commit Before Consensus
+
+Feature-sized implementation must not get its first implementation commit before the readiness gate returns `Ready to Implement` or the user explicitly chooses `Gate Skipped` after hearing what readiness evidence is missing.
+
+If the only design source is chat, the first durable action is to create or update a GitHub issue, PRD, ADR, local design doc, or other durable planning note. Do not turn chat consensus directly into implementation code. Once the durable source contains the agreed problem, chosen design, scope boundaries, acceptance criteria, validation plan, and readiness marker, implementation may proceed within that boundary.
+
+`ready-for-agent`, a confident user prompt, or an existing branch name is not enough by itself. The readiness evidence must be visible in a durable source, or the bypass must be recorded as `Gate Skipped`.
+
 ## When This Applies
 
 Run the readiness gate when a request asks an agent to implement, build, add, redesign, substantially refactor, or start work on an issue, PRD, spec, or plan where the outcome changes behavior, workflow, data model, public documentation policy, validation policy, or reusable AgentOS structure.
@@ -116,6 +124,21 @@ If the user proceeds despite missing or incomplete readiness, record the `Gate S
 
 If the loop later detects design creep, treat the bypass as evidence that the PR may need redesign rather than more local fixes.
 
+On the first reviewer panel, ask reviewers to compare the implementation shape against the durable design source. If the first implementation already introduced architecture, parsing, synchronization, lifecycle, validation, or public-policy semantics that the design source did not agree to, pause for design consensus instead of continuing to patch review findings.
+
+## Pull Request Readiness Fields
+
+Feature PRs should make readiness visible in the PR body:
+
+```md
+Readiness evidence: <GitHub issue, PRD, ADR, local design doc, or gate-skip reason>
+Readiness verdict: Ready to Implement
+```
+
+For issue-driven work, prefer a GitHub issue as the readiness evidence. The issue can contain the design directly or link to a larger PRD, ADR, or local design doc. Create a separate design doc only when the design is too large, architectural, private, or not naturally issue-shaped.
+
+Use `Readiness verdict: Gate Skipped` only for exempt work or an intentional bypass, and put the bypass reason in `Readiness evidence:`. These fields are a visibility tripwire, not a semantic proof that the design is good. Humans and agents still need to read the source and apply this playbook.
+
 ## Completion Check
 
 Before implementing feature-sized work, confirm:
@@ -126,3 +149,4 @@ Before implementing feature-sized work, confirm:
 4. Meaningful deferred questions are out of scope and captured in durable follow-up artifacts.
 5. The current design source links to those follow-up artifacts when they exist.
 6. External tracker writes were approved before they happened.
+7. Any PR body for the implementation cites readiness evidence and a readiness verdict, preferring a GitHub issue for issue-driven work, or explains the gate skip.

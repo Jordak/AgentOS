@@ -118,6 +118,9 @@ def github_metadata_reason(rel: Path) -> str | None:
     if not rel.parts or rel.parts[0] != ".github":
         return None
 
+    if rel.as_posix() == ".github/pull_request_template.md":
+        return None
+
     if (
         len(rel.parts) == 3
         and rel.parts[1] == "workflows"
