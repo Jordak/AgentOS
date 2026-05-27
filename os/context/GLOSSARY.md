@@ -4,6 +4,10 @@ Status: draft.
 
 - AgentOS: a portable Markdown control plane with static HTML as the preferred format for substantial human-facing artifacts.
 - AgentOS Core: the public-safe reusable AgentOS layer under `$root/os/`.
+- Core Root: `$root/os/`, the tracked directory root for AgentOS Core.
+- Publishable File Set: Git-visible AgentOS files eligible for a fresh public initial commit after publication precheck, including AgentOS Core, public-safe support files, and the tracked Personal Overlay skeleton.
+- Publishable support file: a public-safe root-level or sibling repository file outside the Core Root that supports discovery, adapters, documentation, governance, CI, validation, installation, or publication.
+- AgentOS-managed file set: repository paths AgentOS tools and policies treat as managed for checks such as symlink, publication, export, and validation rules; broader than Core, narrower than the raw local filesystem.
 - Personal Overlay: the local private AgentOS layer under `$root/personal/os/`, used for real identity, projects, tools, memories, live agents, automations, and generated outputs.
 - `$root`: the location where AgentOS is installed.
 - Harness: the agentic tool running the work, such as Codex, Claude Code, Google Antigravity, OpenClaw, Hermes, or another agent interface.

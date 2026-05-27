@@ -5,23 +5,31 @@ This domain model defines the language for separating AgentOS into reusable publ
 ## Language
 
 **AgentOS Core**:
-The publishable, reusable AgentOS framework: structure, playbooks, templates, validators, skills, and agent/job patterns that do not depend on user-specific facts.
-_Avoid_: public repo, sanitized snapshot, starter template
+The publishable, reusable AgentOS framework under the Core Root: layer structure, playbooks, templates, validators, skills, and agent/job patterns that do not depend on user-specific facts.
+_Avoid_: public repo, whole repository, sanitized snapshot, starter template
 
 **Core Root**:
 The tracked directory root for AgentOS Core, written as `$root/os/`.
-_Avoid_: public folder, main OS folder
+_Avoid_: public folder, main OS folder, whole repository
 
 **Publication Candidate**:
 A sanitized filesystem tree used as an optional final dry run before creating the public AgentOS repository from fresh Git history.
 _Avoid_: backup, current private repo, sanitized branch
 
 **Publishable File Set**:
-The Git-visible AgentOS files that can become the fresh public initial commit after the Publication Precheck passes.
+The Git-visible AgentOS files that can become the fresh public initial commit after the Publication Precheck passes, including AgentOS Core, public-safe root support files, public-safe repository support directories, and the tracked Personal Overlay skeleton.
 _Avoid_: raw working directory, ignored overlay files
 
+**Publishable Support File**:
+A Git-visible public-safe file or directory outside the Core Root that supports repository discovery, adapters, documentation, governance, CI, validation, installation, or publication.
+_Avoid_: Core file, Personal Overlay file, root noise
+
+**AgentOS-Managed File Set**:
+The repository paths AgentOS tools and policies treat as managed for structural checks such as symlink, publication, export, and validation rules; broader than AgentOS Core, narrower than every local filesystem entry.
+_Avoid_: raw filesystem tree, ignored local artifacts, only Core
+
 **Export Script**:
-A deterministic script that builds an optional Publication Candidate from allowlisted Core files and tracked Personal Overlay skeleton files.
+A deterministic script that builds an optional Publication Candidate from the allowlisted Publishable File Set.
 _Avoid_: manual public copy
 
 **Fresh-History Publication**:
@@ -33,7 +41,7 @@ The sequencing rule that repo deletion, replacement, public creation, or visibil
 _Avoid_: publish while migrating
 
 **Privacy Validator**:
-A deterministic verification step that checks the working tree and Publishable File Set against allowlisted Core files, Personal Overlay skeleton rules, `.gitignore` coverage, and known private markers.
+A deterministic verification step that checks the working tree and Publishable File Set against AgentOS Core rules, public-safe support-file rules, Personal Overlay skeleton rules, `.gitignore` coverage, and known private markers.
 _Avoid_: LLM privacy vibes, private-looking file detector
 
 **Publication Precheck**:
@@ -140,7 +148,9 @@ _Avoid_: AgentOS Core
 
 - An **AgentOS Core** may be used without a **Personal Overlay**, but with generic placeholders and examples only.
 - The **Core Root** is `$root/os/`.
-- A **Publishable File Set** is the source for the public GitHub repository.
+- A **Publishable File Set** is the source for the public GitHub repository and is broader than **AgentOS Core**.
+- A **Publishable Support File** may live outside the **Core Root** without broadening **AgentOS Core** to mean the whole repository.
+- An **AgentOS-Managed File Set** may include **Publishable Support Files** and any Personal Overlay paths explicitly managed by a bounded script operation.
 - A **Publication Candidate** may be generated from the **Publishable File Set** for final inspection.
 - An **Export Script** builds the optional **Publication Candidate**; manual assembly is not the dry-run mechanism.
 - **Fresh-History Publication** prevents old private Git commits from becoming public.
@@ -172,7 +182,7 @@ _Avoid_: AgentOS Core
 - Live `connections` files belong in the **Personal Overlay** by default; AgentOS Core may keep connection schemas, safety categories, and approval patterns.
 - Live `automations` files belong in the **Personal Overlay** by default; AgentOS Core may keep automation schemas, safety policy, and examples.
 - Live `verification` reports belong in the **Personal Overlay** by default; AgentOS Core may keep reusable validators, schemas, sanitized fixtures, and sanitized example reports.
-- Root adapter files belong in **AgentOS Core** only when they are generic launchers; local adapter install state belongs in the **Personal Overlay**.
+- Root adapter files are **Publishable Support Files** when they are generic launchers into **AgentOS Core** and the optional **Personal Overlay**; local adapter install state belongs in the **Personal Overlay**.
 - A **Migration Atom** keeps AgentOS publishability from depending on stale duplicate private files.
 - **Move-First Migration** preserves private live state while Core replacements are made publishable.
 - The **Overlay Root** is `$root/personal/os/` for v1.
@@ -181,10 +191,11 @@ _Avoid_: AgentOS Core
 ## Example Dialogue
 
 > **Dev:** "Are we publishing the user's current AgentOS after deleting private files?"
-> **Domain expert:** "No. We are publishing **AgentOS Core** and keeping user-specific state in a **Personal Overlay**."
+> **Domain expert:** "No. The public repository is built from the **Publishable File Set**, centered on **AgentOS Core**, while user-specific state stays in a **Personal Overlay**."
 
 ## Flagged Ambiguities
 
-- "Public repo" was too vague; resolved: the publishable target is **AgentOS Core**, not a one-time sanitized snapshot.
+- "Public repo" was too vague; resolved: the public initial commit is built from the **Publishable File Set**, not from a one-time sanitized snapshot of a private workspace.
 - "Context" conflicted with `os/context/`; resolved: domain vocabulary lives in `DOMAIN.md`.
 - "Core layer" versus "personal layer" implied layer ownership; resolved: AgentOS uses **Layer Parity** plus **Content Residency**.
+- "Core" versus "publishable repository root" was ambiguous; resolved: **AgentOS Core** means the **Core Root** at `$root/os/`, while root-level and sibling compatibility files are **Publishable Support Files** in the broader **Publishable File Set** or **AgentOS-Managed File Set**.

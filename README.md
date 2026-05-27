@@ -2,7 +2,7 @@
 
 AgentOS is a portable Markdown control plane for agentic tools. It gives agents a stable way to find operating instructions, routing rules, reusable skills, memory templates, safety policies, verification checks, and publication workflows without requiring any one agent harness or private account.
 
-This public repository contains AgentOS Core: the reusable, public-safe scaffolding described in [os/INDEX.md](os/INDEX.md). A real local installation is meant to grow a Personal Overlay for private user-specific state.
+This public repository is built from the publishable AgentOS file set and centers on AgentOS Core: the reusable, public-safe scaffolding described in [os/INDEX.md](os/INDEX.md). It also includes public-safe support files such as root adapters, docs, scripts, GitHub metadata, and the tracked Personal Overlay skeleton. A real local installation is meant to grow a Personal Overlay for private user-specific state.
 
 This project started as an implementation of [aidbagentos.ai](https://aidbagentos.ai/).
 
