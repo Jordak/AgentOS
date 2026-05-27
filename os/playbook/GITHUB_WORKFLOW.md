@@ -63,8 +63,8 @@ Concrete example: in Codex Desktop, an unelevated `gh auth status` can report an
 
 When implementation work is meant to land in a repository, the durable artifact is integrated code, not a local commit or unmerged branch.
 
-- Treat `main` as protected. Do not commit or push AgentOS Core/public changes directly to `main`.
-- Make Core/public changes on a feature branch in an isolated worktree, open a pull request, wait for required validators, and squash merge the PR through GitHub.
+- Treat `main` as protected. Do not commit or push AgentOS Core or publishable support-file changes directly to `main`.
+- Make AgentOS Core or publishable support-file changes on a feature branch in an isolated worktree, open a pull request, wait for required validators, and squash merge the PR through GitHub.
 - Use the harness-provided worktree when one exists. Otherwise create an external Git worktree under `$CODEX_HOME/worktrees/`, not inside the AgentOS repository.
 - If the work is on a pushed feature branch and is meant to land, open a pull request. Do not treat a pushed branch as the final artifact unless the user explicitly asked only for a branch.
 - When updating a feature branch with newer integration-branch changes, prefer rebasing the feature branch onto `main` and force-pushing with lease when the branch is yours to rewrite.
@@ -86,13 +86,13 @@ Resolve conflicts during the rebase if prompted. If the rebase becomes unclear, 
 
 ## Personal Overlay and Worktrees
 
-Git worktrees isolate tracked Core/public edits. They do not isolate or synchronize ignored Personal Overlay state.
+Git worktrees isolate tracked AgentOS Core and publishable support-file edits. They do not isolate or synchronize ignored Personal Overlay state.
 
 When work is routed to `personal/os/`, use `os/playbook/PERSONAL_OVERLAY.md` as the authority. A feature worktree's `personal/os/` directory may contain only the tracked public-safe skeleton. It should not be treated as the live Personal Overlay unless the user explicitly assigned that worktree as a private overlay workspace.
 
 For Personal Overlay reads from a feature worktree, inspect the canonical primary AgentOS checkout's `personal/os/`. For Personal Overlay writes, use the primary checkout only when the task is personal-state work and the agent has clear path ownership.
 
-Personal-only ignored-file edits may happen in the primary checkout even when it is on `main`, because they are not Git commits. If the task also requires a Core/public change, split the work: edit ignored Personal Overlay files in the primary checkout, and make tracked Core changes on a feature branch in an isolated worktree with a pull request.
+Personal-only ignored-file edits may happen in the primary checkout even when it is on `main`, because they are not Git commits. If the task also requires an AgentOS Core or publishable support-file change, split the work: edit ignored Personal Overlay files in the primary checkout, and make tracked public-safe changes on a feature branch in an isolated worktree with a pull request.
 
 Do not broad-copy `personal/os/` into feature worktrees, and do not use `git add -f personal/...` unless the user explicitly approves a narrow, public-safe skeleton or template change.
 

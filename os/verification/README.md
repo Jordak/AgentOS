@@ -2,7 +2,7 @@
 
 Status: maintainer guidance.
 
-Use this when changing AgentOS Core, reviewing a pull request, or preparing a public-safe release. User-facing setup should usually ask an agent to run these checks rather than asking the user to run them directly.
+Use this when changing AgentOS Core, changing publishable support files, reviewing a pull request, or preparing a public-safe release. User-facing setup should usually ask an agent to run these checks rather than asking the user to run them directly.
 
 ## Default Validator
 

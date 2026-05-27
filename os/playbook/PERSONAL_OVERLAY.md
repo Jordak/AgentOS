@@ -251,13 +251,13 @@ Examples:
 
 ## Root Adapters
 
-Root adapter files such as `AGENTS.md` and `CLAUDE.md` may live in AgentOS Core when they are generic launchers into the Core and optional Personal Overlay.
+Root adapter files such as `$root/AGENTS.md` and `$root/CLAUDE.md` are publishable repository support files, not files under the Core Root. They may live at repository root when they are generic launchers into AgentOS Core and the optional Personal Overlay.
 
-Core adapters must not contain private identity, private absolute paths, private repository URLs, installed mirror paths, account identifiers, or local machine setup state.
+Publishable root adapters must not contain private identity, private absolute paths, private repository URLs, installed mirror paths, account identifiers, or local machine setup state.
 
 Local adapter install state belongs in the Personal Overlay.
 
-Core adapter pattern:
+Root adapter pattern:
 
 ```md
 Read `$root/os/INDEX.md`.

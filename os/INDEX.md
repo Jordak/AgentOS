@@ -19,7 +19,7 @@ AgentOS is not one giant prompt. Its control plane is a stack of small Markdown 
 - Automations describe safe scheduled or event-driven work.
 - The Personal Overlay rule separates publishable Core files under `$root/os/` from private user-specific files under `$root/personal/os/`.
 - The publication rule explains how to create a fresh-history public repository without exposing private Git history.
-- The protected-main workflow keeps Core/public changes on isolated feature-branch worktrees and lands them through validated pull requests.
+- The protected-main workflow keeps AgentOS Core and publishable support-file changes on isolated feature-branch worktrees and lands them through validated pull requests.
 - The implementation-readiness rule keeps feature-sized work from starting before a durable design source is complete for the requested scope; chat-only consensus must be promoted into a durable source before implementation code begins.
 
 ## How To Use This Folder

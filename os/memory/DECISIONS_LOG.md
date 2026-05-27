@@ -4,6 +4,10 @@ Status: Core architecture decisions.
 
 This Core log records publishable AgentOS architecture decisions. Live personal decisions belong in `personal/os/memory/DECISIONS_LOG.md`.
 
+## 2026-05-27
+
+- AgentOS Core means the Core Root at `$root/os/`; root-level files and sibling directories such as `README.md`, `AGENTS.md`, `CLAUDE.md`, `DOMAIN.md`, `docs/`, `scripts/`, and `.github/` are publishable repository-managed support files covered by Publishable File Set or AgentOS-managed file set terminology rather than by broadening Core to mean the whole repository. See `docs/adr/0007-core-root-and-publishable-file-set-boundary.md`.
+
 ## 2026-05-23
 
 - AgentOS-managed files and directories should not use symlinks; managed repository paths outside `personal/` and public exports reject symlinks, ordinary local artifact directories are not treated as managed AgentOS files, and scripts must fail closed instead of following symlinks during managed reads or writes, including when the relevant managed path is in Personal Overlay. See `docs/adr/0005-no-symlinks-in-agentos-managed-files.md`.
@@ -19,6 +23,6 @@ This Core log records publishable AgentOS architecture decisions. Live personal 
 - Reusable skill procedures may remain in AgentOS Core, while private live inputs for those skills belong in Personal Overlay skill config files such as `$root/personal/os/skills/<skill-name>/CONFIG.md`; thin adapters to private agents or personal-artifact workflows belong in the Personal Overlay by default.
 - Personal Overlay config is Markdown-first, with structured sidecars such as JSON or YAML only when scripts or validators need deterministic parsing.
 - Live `context`, `identity`, `memory`, `connections`, `automations`, and verification report files belong in the Personal Overlay by default; AgentOS Core keeps templates, generic policy, schemas, reusable checks, and sanitized examples.
-- Root adapter files such as `AGENTS.md` and `CLAUDE.md` may live in AgentOS Core only as generic launchers into Core and optional Personal Overlay.
+- Root adapter files such as `AGENTS.md` and `CLAUDE.md` may live as publishable support files at repository root only as generic launchers into Core and optional Personal Overlay.
 - Private live files should move mostly as-is into the Personal Overlay first, while Core replacements are sanitized or rewritten separately.
 - Public AgentOS publication must use a sanitized public export and fresh Git history rather than making a formerly private GitHub repository public.
