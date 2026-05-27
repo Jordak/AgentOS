@@ -107,9 +107,9 @@ python3 os/skills/mirror-skills/scripts/mirror_skills.py --mirror-root <mirror-r
 
 - The audit derives canonical skills from the manifest, Personal Overlay skill paths, and canonical source paths, not from machine-local mirror records.
 - The audit includes both Core manifest skills and Personal Overlay skills, unless `--core-only` is used.
-- Skill filters only select from canonical skills discovered in the selected scope and fail clearly when a requested skill is unknown or directly collides between Core and the Personal Overlay.
-- Scoped skill filters should not fail because of unrelated Personal Overlay collisions outside the requested skill names.
-- Personal Overlay skill names must not collide with Core skill names; use `personal/os/skills/<core-skill>/CONFIG.md` for private inputs to a Core skill.
+- Skill filters only select from requested canonical skill names and fail clearly when a requested skill is unknown or directly collides between Core and the Personal Overlay.
+- Scoped skill filters should not fail because of unrelated Personal Overlay collisions or invalid private roots outside the requested skill names.
+- Unscoped audits fail on any Personal Overlay skill name that collides with Core. Use `personal/os/skills/<core-skill>/CONFIG.md` for private inputs to a Core skill.
 - Sync mode copies all required canonical skill files for directory-backed skills, including `os/agents/`, `scripts/`, `assets/`, and `references/` when present.
 - The report clearly separates missing/stale mirrors from extra mirror files.
 - No external account or network state is touched.

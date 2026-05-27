@@ -795,20 +795,22 @@ def main() -> int:
     core_entries = parse_manifest(agentos_root)
     requested_names = set(args.skill) if args.skill else None
     core_names = {entry.name for entry in core_entries}
-    needs_personal_overlay = requested_names is None or not requested_names <= core_names
+    scoped_to_core = requested_names is not None and requested_names <= core_names
     personal_entries: list[SkillEntry] = []
     preflight_results: list[MirrorResult] = []
-    if not args.core_only and needs_personal_overlay:
+    if not args.core_only:
         personal_root_problem = agentos_checkout_problem(personal_agentos_root)
         if personal_root_problem:
-            raise SystemExit(
-                f"Unsafe Personal Overlay AgentOS root: {personal_agentos_root} ({personal_root_problem})"
+            if not scoped_to_core:
+                raise SystemExit(
+                    f"Unsafe Personal Overlay AgentOS root: {personal_agentos_root} ({personal_root_problem})"
+                )
+        else:
+            personal_entries, personal_problems = discover_personal_overlay_entries(
+                personal_agentos_root,
+                requested_names=requested_names,
             )
-        personal_entries, personal_problems = discover_personal_overlay_entries(
-            personal_agentos_root,
-            requested_names=requested_names,
-        )
-        preflight_results.extend(personal_preflight_results(personal_problems, mirror_root))
+            preflight_results.extend(personal_preflight_results(personal_problems, mirror_root))
     blocked_names = {result.name for result in preflight_results}
     if "personal-overlay" in blocked_names and args.skill:
         requested_set = set(args.skill)
