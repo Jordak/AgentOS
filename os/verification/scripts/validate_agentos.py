@@ -23,7 +23,21 @@ from pathlib import Path
 
 sys.dont_write_bytecode = True
 
-def lexical_absolute(path: Path) -> Path:
+PATH_RESOLUTION_PACKAGE = "path_resolution"
+PUBLIC_EXPORT_REQUIRED_SUPPORT_FILES = tuple(
+    Path(rel)
+    for rel in [
+        "os/verification/scripts/validate_agentos.py",
+        "scripts/agentos_publication_rules.py",
+        "scripts/path_resolution/__init__.py",
+        "scripts/path_resolution/_primitives.py",
+        "scripts/path_resolution/bootstrap.py",
+        "scripts/path_resolution/managed.py",
+    ]
+)
+
+
+def _loader_lexical_absolute(path: Path) -> Path:
     """Make a path absolute without resolving symbolic links."""
     expanded = path.expanduser()
     if not expanded.is_absolute():
@@ -31,46 +45,26 @@ def lexical_absolute(path: Path) -> Path:
     return Path(os.path.abspath(expanded))
 
 
-def final_path_problem(
-    path: Path,
-    expected_kind: str | None = None,
-    allow_missing: bool = True,
-) -> str | None:
-    absolute = lexical_absolute(path)
+def _loader_file_problem(root: Path, path: Path) -> str | None:
+    root_absolute = _loader_lexical_absolute(root)
     try:
-        path_stat = absolute.lstat()
+        root_stat = root_absolute.lstat()
     except FileNotFoundError:
-        if allow_missing:
-            return None
-        return "path is missing"
+        return f"{root_absolute} (path is missing)"
     except OSError as error:
-        return f"{error.__class__.__name__}: {error}"
+        return f"{root_absolute} ({error.__class__.__name__}: {error})"
+    if stat.S_ISLNK(root_stat.st_mode):
+        return f"{root_absolute} (symbolic link is not allowed)"
+    if not stat.S_ISDIR(root_stat.st_mode):
+        return f"{root_absolute} (not a directory)"
 
-    if stat.S_ISLNK(path_stat.st_mode):
-        return "symbolic link is not allowed"
-    if expected_kind == "directory" and not stat.S_ISDIR(path_stat.st_mode):
-        return "not a directory"
-    if expected_kind == "file" and not stat.S_ISREG(path_stat.st_mode):
-        return "not a regular file"
-    return None
-
-
-def bootstrap_path_problem(
-    path: Path,
-    expected_kind: str,
-    boundary: Path,
-) -> str | None:
-    boundary_absolute = lexical_absolute(boundary)
-    boundary_problem = final_path_problem(boundary_absolute, expected_kind="directory", allow_missing=False)
-    if boundary_problem:
-        return f"{boundary_absolute} ({boundary_problem})"
-    absolute = lexical_absolute(path)
+    absolute = _loader_lexical_absolute(path)
     try:
-        relative = absolute.relative_to(boundary_absolute)
+        relative = absolute.relative_to(root_absolute)
     except ValueError:
-        return f"{absolute} (path is outside the managed root: {boundary_absolute})"
+        return f"{absolute} (path is outside the managed root: {root_absolute})"
 
-    current = boundary_absolute
+    current = root_absolute
     for index, part in enumerate(relative.parts):
         current = current / part
         is_final = index == len(relative.parts) - 1
@@ -82,13 +76,44 @@ def bootstrap_path_problem(
             return f"{current} ({error.__class__.__name__}: {error})"
         if stat.S_ISLNK(path_stat.st_mode):
             return f"{current} (symbolic link is not allowed)"
-        if not is_final and not stat.S_ISDIR(path_stat.st_mode):
+        if is_final:
+            if not stat.S_ISREG(path_stat.st_mode):
+                return f"{current} (not a regular file)"
+        elif not stat.S_ISDIR(path_stat.st_mode):
             return f"{current} (path component is not a directory)"
-        if is_final and expected_kind == "file" and not stat.S_ISREG(path_stat.st_mode):
-            return f"{current} (not a regular file)"
-        if is_final and expected_kind == "directory" and not stat.S_ISDIR(path_stat.st_mode):
-            return f"{current} (not a directory)"
     return None
+
+
+def load_path_resolution_bootstrap(root: Path):
+    package_dir = root / "scripts" / PATH_RESOLUTION_PACKAGE
+    bootstrap_path = package_dir / "bootstrap.py"
+    bootstrap_problem = _loader_file_problem(root, bootstrap_path)
+    if bootstrap_problem:
+        raise RuntimeError(f"unsafe path-resolution bootstrap module: {bootstrap_problem}")
+
+    spec = importlib.util.spec_from_file_location("_agentos_checked_path_resolution_bootstrap", bootstrap_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"could not load path-resolution bootstrap module: {bootstrap_path}")
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except Exception as error:
+        raise RuntimeError(f"could not load path-resolution bootstrap module: {bootstrap_path}: {error}") from error
+    return module
+
+
+_ROOT_FOR_BOOTSTRAP = _loader_lexical_absolute(Path(__file__).parents[3])
+
+
+try:
+    _PATH_RESOLUTION_BOOTSTRAP = load_path_resolution_bootstrap(_ROOT_FOR_BOOTSTRAP)
+    _MANAGED_PATHS = _PATH_RESOLUTION_BOOTSTRAP.load_checked_managed_paths(_ROOT_FOR_BOOTSTRAP)
+except RuntimeError as error:
+    print(f"AgentOS validation failed: {error}", file=sys.stderr)
+    raise SystemExit(2)
+_bootstrap_lexical_absolute = _PATH_RESOLUTION_BOOTSTRAP.lexical_absolute
+_bootstrap_final_path_problem = _PATH_RESOLUTION_BOOTSTRAP.path_kind_problem
+managed_path_problem_text = _MANAGED_PATHS.managed_path_problem_text
 
 
 def load_publication_rules() -> None:
@@ -102,9 +127,14 @@ def load_publication_rules() -> None:
     global personal_overlay_skeleton_file_reason
     global publication_path_reason
 
-    root = lexical_absolute(Path(__file__).parents[3])
+    root = _bootstrap_lexical_absolute(Path(__file__).parents[3])
     rules_path = root / "scripts/agentos_publication_rules.py"
-    rules_problem = bootstrap_path_problem(rules_path, expected_kind="file", boundary=root)
+    rules_problem = managed_path_problem_text(
+        root,
+        rules_path,
+        expected_kind="file",
+        allow_missing=False,
+    )
     if rules_problem:
         raise RuntimeError(f"unsafe publication rules script: {rules_problem}")
 
@@ -244,7 +274,7 @@ class Finding:
 
 class AgentOSValidator:
     def __init__(self, root: Path) -> None:
-        self.root = lexical_absolute(root)
+        self.root = _bootstrap_lexical_absolute(root)
         self.errors: list[Finding] = []
         self.warnings: list[Finding] = []
         self.checked: list[str] = []
@@ -297,7 +327,7 @@ class AgentOSValidator:
         return self.report()
 
     def run_public_export_validation_checks(self, export_root: Path) -> None:
-        self.root = lexical_absolute(export_root)
+        self.root = _bootstrap_lexical_absolute(export_root)
         root_problem = self.root_path_problem()
         if root_problem:
             self.add_error("public export allowlist", self.root, f"public export root is unsafe: {root_problem}")
@@ -305,6 +335,7 @@ class AgentOSValidator:
             self.checked.append("public export validation")
             return
         self.check_no_git_directory()
+        self.check_public_export_required_support_files()
         self.check_public_export_allowlist()
         self.check_personal_overlay_ignore_file_rules()
         self.check_personal_overlay_tracking(allow_private_files=False)
@@ -323,7 +354,7 @@ class AgentOSValidator:
         return any(error.check == check for error in self.errors)
 
     def root_path_problem(self) -> str | None:
-        return final_path_problem(self.root, expected_kind="directory", allow_missing=False)
+        return _bootstrap_final_path_problem(self.root, expected_kind="directory", allow_missing=False)
 
     def display_path(self, path: Path | str) -> str:
         if isinstance(path, Path):
@@ -396,33 +427,16 @@ class AgentOSValidator:
         expected_kind: str | None = None,
         allow_missing: bool = True,
     ) -> str | None:
-        try:
-            relative = path.relative_to(self.root)
-        except ValueError:
+        problem = _MANAGED_PATHS.managed_path_problem(
+            self.root,
+            path,
+            expected_kind=expected_kind,
+            allow_missing=allow_missing,
+            root_label="AgentOS root",
+        )
+        if problem and problem.reason.startswith("path is outside the AgentOS root:"):
             return "path is outside the AgentOS root"
-
-        current = self.root
-        for index, part in enumerate(relative.parts):
-            current = current / part
-            is_final = index == len(relative.parts) - 1
-            try:
-                path_stat = current.lstat()
-            except FileNotFoundError:
-                if allow_missing:
-                    return None
-                return "path component is missing"
-            except OSError as error:
-                return f"{error.__class__.__name__}: {error}"
-
-            if stat.S_ISLNK(path_stat.st_mode):
-                return "symbolic link is not allowed"
-            if not is_final and not current.is_dir():
-                return "path component is not a directory"
-            if is_final and expected_kind == "directory" and not current.is_dir():
-                return "not a directory"
-            if is_final and expected_kind == "file" and not current.is_file():
-                return "not a regular file"
-        return None
+        return problem.reason if problem else None
 
     def personal_overlay_root_problem(self, personal: Path) -> str | None:
         try:
@@ -593,6 +607,19 @@ class AgentOSValidator:
         check = "no git history"
         if (self.root / ".git").exists():
             self.add_error(check, self.root / ".git", "public export must not contain git history")
+        self.checked.append(check)
+
+    def check_public_export_required_support_files(self) -> None:
+        check = "public export required support"
+        for rel in PUBLIC_EXPORT_REQUIRED_SUPPORT_FILES:
+            path = self.root / rel
+            problem = self.no_follow_path_problem(
+                path,
+                expected_kind="file",
+                allow_missing=False,
+            )
+            if problem:
+                self.add_error(check, path, f"required support file is missing or unsafe: {problem}")
         self.checked.append(check)
 
     def check_public_export_allowlist(self) -> None:
@@ -2331,6 +2358,16 @@ def run_self_test() -> int:
             and "symbolic link is not allowed" in error.message
             for error in public_export_root_validator.errors
         )
+        missing_support_export_root = root / "_missing_support_public_export_fixture"
+        missing_support_export_root.mkdir()
+        missing_support_validator = AgentOSValidator(root)
+        missing_support_validator.run_public_export_validation_checks(missing_support_export_root)
+        missing_support_rejected = any(
+            error.check == "public export required support"
+            and error.path == "scripts/path_resolution/managed.py"
+            and "required support file is missing or unsafe" in error.message
+            for error in missing_support_validator.errors
+        )
         non_os_symlink_rejected = any(
             error.path == "docs/linked.raw"
             and "AgentOS-managed paths outside personal/ must not contain symbolic links" in error.message
@@ -2472,6 +2509,7 @@ def run_self_test() -> int:
             and managed_os_symlink_stops_reads
             and symlinked_root_rejected
             and public_export_root_rejected
+            and missing_support_rejected
             and non_os_symlink_rejected
             and missing_pr_template_rejected
             and symlink_rejected_cleanly
@@ -2509,6 +2547,8 @@ def run_self_test() -> int:
             for error in symlinked_root_validator.errors:
                 print(f"EXPECTED {error.format()}")
             for error in public_export_root_validator.errors:
+                print(f"EXPECTED {error.format()}")
+            for error in missing_support_validator.errors:
                 print(f"EXPECTED {error.format()}")
             return 0
 
@@ -2555,7 +2595,7 @@ def main(argv: list[str] | None = None) -> int:
 
     validator = AgentOSValidator(args.root)
     if args.public_export:
-        export_root = lexical_absolute(args.public_export)
+        export_root = _bootstrap_lexical_absolute(args.public_export)
         if not (export_root / "os").exists():
             print(f"AgentOS validation failed: export root does not contain os/: {export_root}", file=sys.stderr)
             return 2

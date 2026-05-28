@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 import os
 import re
@@ -12,6 +13,73 @@ import stat
 import sys
 from dataclasses import dataclass, asdict
 from pathlib import Path
+from typing import Callable
+
+sys.dont_write_bytecode = True
+
+PATH_RESOLUTION_PACKAGE = "path_resolution"
+MANAGED_PATH_MODULE = f"{PATH_RESOLUTION_PACKAGE}.managed"
+SUPPORTED_EXPECTED_KINDS = {None, "file", "directory"}
+
+
+@dataclass(frozen=True)
+class ManagedPathSafety:
+    managed_path_problem_text: Callable[..., str | None]
+
+    def path_component_problems(
+        self,
+        path: Path,
+        expected_kind: str | None,
+        allow_missing: bool,
+        boundary: Path,
+    ) -> list[str]:
+        problem = self.managed_path_problem_text(
+            boundary,
+            path,
+            expected_kind=expected_kind,
+            allow_missing=allow_missing,
+        )
+        return [problem] if problem else []
+
+
+def load_managed_path_safety(agentos_root: Path) -> ManagedPathSafety:
+    """Temporary bridge for loose script imports.
+
+    Package integrity is owned by AgentOS validation. Issue #51 tracks replacing
+    this bridge with a first-class import convention for nested AgentOS scripts.
+    """
+    repo_scripts_dir = _local_lexical_absolute(agentos_root / "scripts")
+
+    def is_repo_scripts_entry(entry: str) -> bool:
+        try:
+            return _local_lexical_absolute(Path(entry)) == repo_scripts_dir
+        except OSError:
+            return False
+
+    sys.path[:] = [entry for entry in sys.path if not is_repo_scripts_entry(entry)]
+    sys.path.insert(0, str(repo_scripts_dir))
+    for module_name in [
+        MANAGED_PATH_MODULE,
+        f"{PATH_RESOLUTION_PACKAGE}._primitives",
+        PATH_RESOLUTION_PACKAGE,
+    ]:
+        sys.modules.pop(module_name, None)
+
+    try:
+        managed_module = importlib.import_module(MANAGED_PATH_MODULE)
+    except Exception as error:
+        raise RuntimeError(f"could not import {MANAGED_PATH_MODULE} from {repo_scripts_dir}: {error}") from error
+    module_file = getattr(managed_module, "__file__", None)
+    expected_module_file = repo_scripts_dir / PATH_RESOLUTION_PACKAGE / "managed.py"
+    if module_file is None or _local_lexical_absolute(Path(module_file)) != expected_module_file:
+        raise RuntimeError(f"path-resolution import did not load expected module: {expected_module_file}")
+
+    try:
+        managed_path_problem_text = managed_module.managed_path_problem_text
+    except AttributeError as error:
+        raise RuntimeError(f"path-resolution module missing expected helper: {error}") from error
+
+    return ManagedPathSafety(managed_path_problem_text=managed_path_problem_text)
 
 
 SKILL_HEADING_RE = re.compile(r"^### `([^`]+)`\s*$", re.MULTILINE)
@@ -66,16 +134,16 @@ def find_agentos_root(start: Path) -> Path:
         manifest_path = path / "os/skills/MANIFEST.md"
         if final_path_kind_problem(path, expected_kind="directory", allow_missing=False):
             continue
-        if not path_component_problems(manifest_path, expected_kind="file", allow_missing=False, boundary=path):
+        if not _local_path_component_problems(manifest_path, expected_kind="file", allow_missing=False, boundary=path):
             return path
     raise SystemExit("Could not find AgentOS root containing os/skills/MANIFEST.md")
 
 
-def agentos_checkout_problem(path: Path) -> str | None:
+def agentos_checkout_problem(path: Path, path_safety: ManagedPathSafety) -> str | None:
     root_problem = final_path_kind_problem(path, expected_kind="directory", allow_missing=False)
     if root_problem:
         return root_problem
-    manifest_problems = path_component_problems(
+    manifest_problems = path_safety.path_component_problems(
         path / "os/skills/MANIFEST.md",
         expected_kind="file",
         allow_missing=False,
@@ -86,7 +154,7 @@ def agentos_checkout_problem(path: Path) -> str | None:
     return None
 
 
-def lexical_absolute(path: Path) -> Path:
+def _local_lexical_absolute(path: Path) -> Path:
     """Make a path absolute without resolving symbolic links."""
     expanded = path.expanduser()
     if not expanded.is_absolute():
@@ -94,12 +162,15 @@ def lexical_absolute(path: Path) -> Path:
     return Path(os.path.abspath(expanded))
 
 
-def final_path_kind_problem(
+def _local_final_path_kind_problem(
     path: Path,
     expected_kind: str | None,
     allow_missing: bool,
 ) -> str | None:
-    absolute = lexical_absolute(path)
+    expected_kind_problem = _local_expected_kind_problem(expected_kind)
+    if expected_kind_problem:
+        return expected_kind_problem
+    absolute = _local_lexical_absolute(path)
     try:
         path_stat = absolute.lstat()
     except FileNotFoundError:
@@ -118,13 +189,38 @@ def final_path_kind_problem(
     return None
 
 
-def path_component_problems(
+def extract_field(section: str, field_name: str) -> str | None:
+    pattern = re.compile(FIELD_RE_TEMPLATE.format(field=re.escape(field_name)), re.MULTILINE)
+    match = pattern.search(section)
+    if not match:
+        return None
+    value = match.group(1).strip().rstrip(".")
+    code_span = re.search(r"`([^`]+)`", value)
+    return code_span.group(1) if code_span else value
+
+
+def final_path_kind_problem(
+    path: Path,
+    expected_kind: str | None,
+    allow_missing: bool,
+) -> str | None:
+    return _local_final_path_kind_problem(path, expected_kind=expected_kind, allow_missing=allow_missing)
+
+
+def _local_path_component_problems(
     path: Path,
     expected_kind: str | None,
     allow_missing: bool,
     boundary: Path | None = None,
+    boundary_allow_missing: bool = False,
 ) -> list[str]:
-    absolute = lexical_absolute(path)
+    expected_kind_problem = _local_expected_kind_problem(expected_kind)
+    if expected_kind_problem:
+        return [f"{path} ({expected_kind_problem})"]
+    if ".." in path.expanduser().parts:
+        return [f"{path} (parent-directory segments are not allowed)"]
+
+    absolute = _local_lexical_absolute(path)
     if not absolute.is_absolute():
         return [f"{path} (path is not absolute after normalization)"]
 
@@ -132,10 +228,16 @@ def path_component_problems(
         current = Path(absolute.anchor)
         parts = absolute.parts[1:]
     else:
-        boundary_absolute = lexical_absolute(boundary)
-        boundary_problem = final_path_kind_problem(boundary_absolute, expected_kind="directory", allow_missing=False)
+        boundary_absolute = _local_lexical_absolute(boundary)
+        boundary_problem = final_path_kind_problem(
+            boundary_absolute,
+            expected_kind="directory",
+            allow_missing=boundary_allow_missing,
+        )
         if boundary_problem:
             return [f"{boundary_absolute} ({boundary_problem})"]
+        if boundary_allow_missing and not boundary_absolute.exists():
+            return []
         try:
             relative = absolute.relative_to(boundary_absolute)
         except ValueError:
@@ -170,17 +272,17 @@ def path_component_problems(
     return []
 
 
-def extract_field(section: str, field_name: str) -> str | None:
-    pattern = re.compile(FIELD_RE_TEMPLATE.format(field=re.escape(field_name)), re.MULTILINE)
-    match = pattern.search(section)
-    if not match:
-        return None
-    value = match.group(1).strip().rstrip(".")
-    code_span = re.search(r"`([^`]+)`", value)
-    return code_span.group(1) if code_span else value
+def _local_expected_kind_problem(expected_kind: object) -> str | None:
+    try:
+        supported = expected_kind in SUPPORTED_EXPECTED_KINDS
+    except TypeError:
+        supported = False
+    if not supported:
+        return "expected_kind must be None, 'file', or 'directory'"
+    return None
 
 
-def managed_relative_path_problem(raw_path: str) -> str | None:
+def canonical_source_path_problem(raw_path: str) -> str | None:
     path = Path(raw_path)
     if path.is_absolute():
         return "must be root-relative, not absolute"
@@ -191,9 +293,9 @@ def managed_relative_path_problem(raw_path: str) -> str | None:
     return None
 
 
-def parse_manifest(agentos_root: Path) -> list[SkillEntry]:
+def parse_manifest(agentos_root: Path, path_safety: ManagedPathSafety) -> list[SkillEntry]:
     manifest_path = agentos_root / "os/skills/MANIFEST.md"
-    manifest_problems = path_component_problems(
+    manifest_problems = path_safety.path_component_problems(
         manifest_path,
         expected_kind="file",
         allow_missing=False,
@@ -213,7 +315,7 @@ def parse_manifest(agentos_root: Path) -> list[SkillEntry]:
         canonical_source = extract_field(section, "Canonical source")
         if not canonical_source:
             continue
-        canonical_problem = managed_relative_path_problem(canonical_source)
+        canonical_problem = canonical_source_path_problem(canonical_source)
         if canonical_problem:
             raise SystemExit(f"{name}: unsafe Canonical source {canonical_source!r}: {canonical_problem}")
 
@@ -236,10 +338,11 @@ def parse_manifest(agentos_root: Path) -> list[SkillEntry]:
 
 def discover_personal_overlay_entries(
     personal_agentos_root: Path,
+    path_safety: ManagedPathSafety,
     requested_names: set[str] | None = None,
 ) -> tuple[list[SkillEntry], list[PreflightProblem]]:
     personal_skills_root = personal_agentos_root / "personal/os/skills"
-    problems = path_component_problems(
+    problems = path_safety.path_component_problems(
         personal_skills_root,
         expected_kind="directory",
         allow_missing=True,
@@ -386,11 +489,17 @@ def should_ignore(path: Path) -> bool:
     return any(part in IGNORED_NAMES or part.endswith(".pyc") for part in path.parts)
 
 
-def file_map(root: Path, boundary: Path | None = None) -> tuple[dict[str, Path], list[str]]:
+def file_map(
+    root: Path,
+    boundary: Path | None = None,
+    path_safety: ManagedPathSafety | None = None,
+) -> tuple[dict[str, Path], list[str]]:
     files: dict[str, Path] = {}
     problems: list[str] = []
     if boundary is not None:
-        component_problems = path_component_problems(
+        if path_safety is None:
+            raise ValueError("path_safety is required when file_map checks a managed boundary")
+        component_problems = path_safety.path_component_problems(
             root,
             expected_kind=None,
             allow_missing=True,
@@ -452,53 +561,45 @@ def unreadable_files(files: dict[str, Path]) -> list[str]:
     return problems
 
 
-def existing_path_kind_problem(path: Path, expected_kind: str) -> str | None:
-    try:
-        path_stat = path.lstat()
-    except FileNotFoundError:
-        return None
-    except OSError as error:
-        return f"{error.__class__.__name__}: {error}"
-    if stat.S_ISLNK(path_stat.st_mode):
-        return "symbolic link is not allowed"
-    if expected_kind == "directory" and not stat.S_ISDIR(path_stat.st_mode):
-        return "not a directory"
-    if expected_kind == "file" and not stat.S_ISREG(path_stat.st_mode):
-        return "not a regular file"
-    return None
-
-
 def mirror_path_kind_problems(mirror_dir: Path, canonical_files: dict[str, Path]) -> list[str]:
     mirror_root = mirror_dir.parent
-    if mirror_root.exists() and not mirror_root.is_dir():
-        return [f". ({mirror_root}: not a directory)"]
-    mirror_dir_problem = existing_path_kind_problem(mirror_dir, "directory")
-    if mirror_dir_problem:
-        return [f". ({mirror_dir}: {mirror_dir_problem})"]
+    # The selected mirror root is the local output boundary. Ancestors such as
+    # macOS /tmp -> /private/tmp are root-selection concerns; symlinks at or
+    # beneath the mirror root are rejected before sync/prune writes.
+    mirror_root_problem = final_path_kind_problem(
+        mirror_root,
+        expected_kind="directory",
+        allow_missing=True,
+    )
+    if mirror_root_problem:
+        return [f". ({mirror_root}: {mirror_root_problem})"]
+    mirror_dir_problems = _local_path_component_problems(
+        mirror_dir,
+        expected_kind="directory",
+        allow_missing=True,
+        boundary=mirror_root,
+        boundary_allow_missing=True,
+    )
+    if mirror_dir_problems:
+        return [f". ({problem})" for problem in mirror_dir_problems]
     if not mirror_dir.exists():
         return []
 
     problems: list[str] = []
     for rel in sorted(canonical_files):
-        current = mirror_dir
-        parts = Path(rel).parts
-        for part in parts[:-1]:
-            current = current / part
-            problem = existing_path_kind_problem(current, "directory")
-            if problem:
-                problems.append(f"{rel} ({current.relative_to(mirror_dir).as_posix()}: {problem})")
-                break
-            if not current.exists():
-                break
-        else:
-            destination = mirror_dir / rel
-            problem = existing_path_kind_problem(destination, "file")
-            if problem:
-                problems.append(f"{rel} ({rel}: {problem})")
+        destination = mirror_dir / rel
+        destination_problems = _local_path_component_problems(
+            destination,
+            expected_kind="file",
+            allow_missing=True,
+            boundary=mirror_dir,
+            boundary_allow_missing=True,
+        )
+        problems.extend(f"{rel} ({problem})" for problem in destination_problems)
     return problems
 
 
-def compare_entry(entry: SkillEntry) -> MirrorResult:
+def compare_entry(entry: SkillEntry, path_safety: ManagedPathSafety) -> MirrorResult:
     notes: list[str] = []
     try:
         source_stat = entry.source_path.lstat()
@@ -539,7 +640,11 @@ def compare_entry(entry: SkillEntry) -> MirrorResult:
             notes=[f"canonical source is a symbolic link: {entry.source_path}"],
         )
 
-    canonical_files, source_problems = file_map(entry.source_root, boundary=entry.managed_root)
+    canonical_files, source_problems = file_map(
+        entry.source_root,
+        boundary=entry.managed_root,
+        path_safety=path_safety,
+    )
     mirror_files: dict[str, Path] = {}
     source_unreadable = [*source_problems, *unreadable_files(canonical_files)]
     if source_unreadable:
@@ -616,7 +721,7 @@ def compare_entry(entry: SkillEntry) -> MirrorResult:
     )
 
 
-def sync_entry(entry: SkillEntry, prune_extra: bool) -> None:
+def sync_entry(entry: SkillEntry, path_safety: ManagedPathSafety, prune_extra: bool) -> None:
     try:
         source_stat = entry.source_path.lstat()
     except OSError:
@@ -624,7 +729,11 @@ def sync_entry(entry: SkillEntry, prune_extra: bool) -> None:
     if stat.S_ISLNK(source_stat.st_mode):
         return
 
-    canonical_files, source_problems = file_map(entry.source_root, boundary=entry.managed_root)
+    canonical_files, source_problems = file_map(
+        entry.source_root,
+        boundary=entry.managed_root,
+        path_safety=path_safety,
+    )
     if source_problems:
         return
     if mirror_path_kind_problems(entry.mirror_dir, canonical_files):
@@ -782,24 +891,32 @@ def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
 
-    agentos_root = lexical_absolute(args.agentos_root) if args.agentos_root else find_agentos_root(lexical_absolute(Path.cwd()))
-    mirror_root = lexical_absolute(args.mirror_root)
+    agentos_root = _local_lexical_absolute(args.agentos_root) if args.agentos_root else find_agentos_root(_local_lexical_absolute(Path.cwd()))
+    mirror_root = _local_lexical_absolute(args.mirror_root)
     root_problem = final_path_kind_problem(agentos_root, expected_kind="directory", allow_missing=False)
     if root_problem:
         raise SystemExit(f"Unsafe AgentOS root: {agentos_root} ({root_problem})")
-    mirror_root_problem = final_path_kind_problem(mirror_root, expected_kind="directory", allow_missing=True)
+    try:
+        path_safety = load_managed_path_safety(agentos_root)
+    except RuntimeError as error:
+        raise SystemExit(f"Unsafe path-resolution package: {error}")
+    mirror_root_problem = final_path_kind_problem(
+        mirror_root,
+        expected_kind="directory",
+        allow_missing=True,
+    )
     if mirror_root_problem:
         raise SystemExit(f"Unsafe mirror root: {mirror_root} ({mirror_root_problem})")
-    personal_agentos_root = lexical_absolute(args.personal_agentos_root) if args.personal_agentos_root else agentos_root
+    personal_agentos_root = _local_lexical_absolute(args.personal_agentos_root) if args.personal_agentos_root else agentos_root
 
-    core_entries = parse_manifest(agentos_root)
+    core_entries = parse_manifest(agentos_root, path_safety)
     requested_names = set(args.skill) if args.skill else None
     core_names = {entry.name for entry in core_entries}
     scoped_to_core = requested_names is not None and requested_names <= core_names
     personal_entries: list[SkillEntry] = []
     preflight_results: list[MirrorResult] = []
     if not args.core_only:
-        personal_root_problem = agentos_checkout_problem(personal_agentos_root)
+        personal_root_problem = agentos_checkout_problem(personal_agentos_root, path_safety)
         if personal_root_problem:
             if not scoped_to_core:
                 raise SystemExit(
@@ -808,6 +925,7 @@ def main() -> int:
         else:
             personal_entries, personal_problems = discover_personal_overlay_entries(
                 personal_agentos_root,
+                path_safety,
                 requested_names=requested_names,
             )
             preflight_results.extend(personal_preflight_results(personal_problems, mirror_root))
@@ -838,9 +956,9 @@ def main() -> int:
         for entry in entries:
             if block_all_sync or entry.name in blocked_names:
                 continue
-            sync_entry(entry, prune_extra=args.prune_extra)
+            sync_entry(entry, path_safety, prune_extra=args.prune_extra)
 
-    results = [*preflight_results, *[compare_entry(entry) for entry in entries]]
+    results = [*preflight_results, *[compare_entry(entry, path_safety) for entry in entries]]
 
     if args.json:
         print(json.dumps([asdict(result) for result in results], indent=2))
