@@ -111,17 +111,6 @@ def managed_path_problem_list(
     return [problem.with_path()] if problem else []
 
 
-def managed_relative_path_problem(raw_path: str) -> str | None:
-    path = Path(raw_path)
-    if path.is_absolute():
-        return "must be root-relative, not absolute"
-    if raw_path.startswith("~"):
-        return "must be root-relative, not home-relative"
-    if ".." in path.parts:
-        return "must not contain parent-directory segments"
-    return None
-
-
 def run_self_tests() -> int:
     with tempfile.TemporaryDirectory(prefix="path-resolution-") as tmp:
         root = Path(tmp)
@@ -143,11 +132,6 @@ def run_self_tests() -> int:
             allow_missing=True,
         )
         assert outside and "outside the managed root" in outside.reason, outside
-
-        assert managed_relative_path_problem("/" + "tmp/file") == "must be root-relative, not absolute"
-        assert managed_relative_path_problem("~" + "/file") == "must be root-relative, not home-relative"
-        assert managed_relative_path_problem("../file") == "must not contain parent-directory segments"
-        assert managed_relative_path_problem("os/INDEX.md") is None
 
         try:
             managed_path_problem(root, regular, expected_kind="dir", allow_missing=False)  # type: ignore[arg-type]

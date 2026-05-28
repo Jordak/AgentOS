@@ -17,7 +17,6 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 
 _shared_managed_path_problem_list = None
-_shared_managed_relative_path_problem = None
 PATH_RESOLUTION_PACKAGE = "path_resolution"
 MANAGED_PATH_MODULE = f"{PATH_RESOLUTION_PACKAGE}.managed"
 SUPPORTED_EXPECTED_KINDS = {None, "file", "directory"}
@@ -57,13 +56,11 @@ def load_path_resolution_helpers(agentos_root: Path) -> None:
 
     try:
         managed_path_problem_list = managed_module.managed_path_problem_list
-        managed_relative_path_problem = managed_module.managed_relative_path_problem
     except AttributeError as error:
         raise RuntimeError(f"path-resolution module missing expected helper: {error}") from error
 
-    global _shared_managed_path_problem_list, _shared_managed_relative_path_problem
+    global _shared_managed_path_problem_list
     _shared_managed_path_problem_list = managed_path_problem_list
-    _shared_managed_relative_path_problem = managed_relative_path_problem
 
 
 SKILL_HEADING_RE = re.compile(r"^### `([^`]+)`\s*$", re.MULTILINE)
@@ -287,10 +284,15 @@ def path_component_problems(
     )
 
 
-def managed_relative_path_problem(raw_path: str) -> str | None:
-    if _shared_managed_relative_path_problem is None:
-        raise RuntimeError("path-resolution helpers have not been loaded")
-    return _shared_managed_relative_path_problem(raw_path)
+def canonical_source_path_problem(raw_path: str) -> str | None:
+    path = Path(raw_path)
+    if path.is_absolute():
+        return "must be root-relative, not absolute"
+    if raw_path.startswith("~"):
+        return "must be root-relative, not home-relative"
+    if ".." in path.parts:
+        return "must not contain parent-directory segments"
+    return None
 
 
 def parse_manifest(agentos_root: Path) -> list[SkillEntry]:
@@ -315,7 +317,7 @@ def parse_manifest(agentos_root: Path) -> list[SkillEntry]:
         canonical_source = extract_field(section, "Canonical source")
         if not canonical_source:
             continue
-        canonical_problem = managed_relative_path_problem(canonical_source)
+        canonical_problem = canonical_source_path_problem(canonical_source)
         if canonical_problem:
             raise SystemExit(f"{name}: unsafe Canonical source {canonical_source!r}: {canonical_problem}")
 
