@@ -27,6 +27,7 @@ Output artifact:
 
 - A structured Markdown review packet in chat by default.
 - Optional temporary Markdown packet file when requested or when the packet is too large for comfortable chat delivery.
+- Optional caller-private reviewer continuity handoff when an orchestrating caller may need same-source verification and the harness exposes resumable reviewer handles. Do not include opaque handles in the human-facing packet.
 
 Mutability:
 
@@ -56,9 +57,9 @@ Use `fresh` mode for an independent pass over the current target. The panel gets
 
 Use `verification` mode after a caller has fixed, declined, or otherwise adjudicated prior findings. The panel gets the target, current head, prior packet or relevant finding IDs, fix commits, accepted fixes, declined rationales, validation results, and any consolidated comment URL. Verification reviewers check the prior findings and still reread the full current diff for missed or newly introduced issues.
 
-Verification continuity is caller-directed. When a caller provides source reviewer handles and asks for same-reviewer continuity, prefer resuming those reviewers for the current verification pass if the harness can do so safely. If live resumption is unavailable or unsafe, fall back to fresh verification reviewers using the prior packet, source reviewer aliases, and source finding IDs as the continuity trail. Record the continuity mode in the packet so callers such as `review-loop` can preserve it in their ledgers.
+Verification continuity is caller-directed. When a caller provides source reviewer handles and asks for same-reviewer continuity, prefer resuming those reviewers for the current verification pass if the harness can do so safely. If live resumption is unavailable or unsafe, fall back to fresh verification reviewers using the prior packet, source reviewer aliases, and source finding IDs as the continuity trail. Record the continuity mode and handle availability in the packet so callers such as `review-loop` can preserve it in their ledgers.
 
-Source reviewer handles are harness-specific opaque tokens for orchestration and caller ledgers only. Do not include them in reviewer prompts, PR comments, public reports, or human-facing packets unless the user explicitly asks for debugging detail. Closing a reviewer ends the active pass and prevents stale live work; it does not promise future resumability. Each verification pass must attempt safe resumption from the caller-provided handles and fall back to packet/finding-source continuity when handles are absent, stale, or rejected by the harness.
+Source reviewer handles are harness-specific opaque tokens for orchestration and caller ledgers only. Capture any harness-provided handles in the caller-private continuity handoff when same-source verification may be needed. Do not include handle values in reviewer prompts, PR comments, public reports, or human-facing packets unless the user explicitly asks for debugging detail. If the harness does not provide a private handoff channel, record handle availability as unavailable and use packet/finding-source fallback for later verification. Closing a reviewer ends the active pass and prevents stale live work; it does not promise future resumability. Each verification pass must attempt safe resumption from the caller-provided handles and fall back to packet/finding-source continuity when handles are absent, stale, or rejected by the harness.
 
 Do not require the caller to manage live subagents, reviewer opening, or reviewer closure. The caller may provide prior packets and decisions, but this skill owns prompt assembly, reviewer lifecycle, collection, and packet normalization for the current pass.
 
@@ -135,6 +136,7 @@ The matrix is not a design doc and does not authorize mutation. It helps reviewe
 
 5. Collect and close:
    - Wait for every reviewer in the pass to report.
+   - Capture any harness-provided opaque reviewer handles in a caller-private continuity handoff when same-source verification may be needed; otherwise record that handles are unavailable.
    - Close every spawned or resumed reviewer for this pass.
    - Preserve raw reviewer findings in the packet or summarize them with a reviewer crosswalk when the raw output is too large.
 
@@ -149,7 +151,7 @@ The matrix is not a design doc and does not authorize mutation. It helps reviewe
 
 7. Return the packet:
    - Use the packet schema in `references/reviewer-prompts.md`.
-   - Include residual risks, limitations, and whether a temporary packet file was written.
+   - Include residual risks, limitations, reviewer continuity mode, handle availability, and whether a temporary packet file was written.
    - Do not post the packet externally unless another approved workflow owns that write.
 
 ## Filing Rules
@@ -171,7 +173,7 @@ The matrix is not a design doc and does not authorize mutation. It helps reviewe
 - Design-compliance and issue-compliance concerns are compared against the baseline intent when available.
 - Structural-depth findings stay review-sized and escalate larger architecture work through the design escape hatch.
 - Verification mode checks prior findings and performs a full current-diff reread.
-- Verification mode records whether same-source reviewers were resumed or packet/finding-source fallback was used.
+- Verification mode records whether same-source reviewers were resumed or packet/finding-source fallback was used, and whether opaque handles were privately handed off or unavailable.
 - Spawned or resumed reviewers are closed after the pass.
 
 ## Verification
@@ -187,5 +189,6 @@ Before finishing a review pass:
 7. Confirm every likely accepted family has evidence, a sibling-search suggestion, and a validation signal.
 8. Confirm every likely declined finding has a short rationale.
 9. Confirm verification continuity mode was recorded when applicable.
-10. Confirm every spawned or resumed reviewer was closed.
-11. Confirm no target files, PRs, issues, labels, branches, or external state were changed.
+10. Confirm opaque reviewer handle availability was privately handed off or marked unavailable when same-source verification may be needed, and confirm handle values were not exposed in prompts or human-facing packets.
+11. Confirm every spawned or resumed reviewer was closed.
+12. Confirm no target files, PRs, issues, labels, branches, or external state were changed.

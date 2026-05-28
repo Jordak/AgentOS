@@ -72,6 +72,7 @@ Verification should preserve source-reviewer continuity without making the user 
 
 - When the harness can safely resume the same source reviewers, request that `review-pass` use same-source reviewer continuity and provide the source reviewer aliases, source reviewer handles, and relevant finding IDs.
 - When same-source resumption is unavailable, unsafe, or lost after compaction, request packet/finding-source fallback: provide the prior packet, source reviewer aliases, source finding IDs, fix commits, declined rationales, and validation results to fresh verification reviewers.
+- Get opaque source reviewer handles from the caller-private continuity handoff returned by `review-pass` when the harness provides one. If the handoff is unavailable, record that limitation and use packet/finding-source fallback.
 - Keep opaque source reviewer handles in the loop ledger or orchestration request only; do not put them in reviewer prompts, PR comments, public reports, or human-facing packets unless the user explicitly asks for debugging detail.
 - Record the continuity mode and source aliases in the ledger and final report so later agents can distinguish same-reviewer verification from packet/finding-source fallback without exposing handles.
 - Treat continuity as a verification-quality preference, not as permission for reviewers to keep state open, mutate files, or post PR comments. `review-pass` still owns prompt assembly, reviewer lifecycle, collection, closure, and packet normalization for the current pass.
@@ -141,7 +142,7 @@ Use the matrix to update affected contract surfaces in one pass. Check the ownin
    - Establish the baseline intent summary described in the Design Escape Hatch section. Keep it in the loop ledger so later packets can be compared against the original brief and allowed alternatives.
 
 2. Set the loop ledger:
-   - Track each pass cycle, pass mode, reviewer continuity mode, review packet path or chat status, reviewer aliases when supplied by `review-pass`, raw findings or crosswalk summaries, normalized family IDs, accepted/declined decisions, fix commits, validation results, consolidated comment URL or chat status, and pass closure status.
+   - Track each pass cycle, pass mode, reviewer continuity mode, opaque handle availability, review packet path or chat status, reviewer aliases when supplied by `review-pass`, raw findings or crosswalk summaries, normalized family IDs, accepted/declined decisions, fix commits, validation results, consolidated comment URL or chat status, and pass closure status.
    - Normalize families into stable IDs such as `C1-F3` and preserve source reviewer IDs from `review-pass`.
    - If compaction or interruption loses details, rebuild the ledger from consolidated "Agent Review" comments, commit history, local validation output, and saved or pasted review packets.
    - Prefer one consolidated "Agent Review" comment per panel pass for PR targets. For non-PR targets, keep packet output in chat and the final report.
@@ -176,7 +177,7 @@ Use the matrix to update affected contract surfaces in one pass. Check the ownin
    - Prefer same-source reviewer continuity when the harness can safely resume source reviewers; otherwise use packet/finding-source fallback.
    - Provide only the needed reviewer continuity preference, source reviewer aliases or handles, prior packet or family IDs, fix commits, accepted fixes, declined rationales, validation results, and consolidated comment URL.
    - Ask `review-pass` to verify prior findings, reassess declined findings against the rationale, and reread the full current diff for missed or newly introduced issues.
-   - Record whether the verification pass used same-source reviewer continuity or packet/finding-source fallback.
+   - Record whether the verification pass used same-source reviewer continuity or packet/finding-source fallback, and whether opaque handles were available through the private handoff.
    - If the verification packet contains likely accepted or unresolved findings, adjudicate them, fix accepted families, and request another verification pass.
    - If a verification packet challenges a declined rationale, reassess once from repository evidence; ask the user if the dispute changes product behavior, scope, or remains genuinely ambiguous.
    - Continue until verification packets report no likely accepted findings and no unresolved design-judgment blockers for the active family set.
@@ -216,7 +217,7 @@ Call narrower playbooks for their owned surfaces: GitHub workflow policy for PR 
 - The parent agent reaches out to the user whenever user judgment would help decide scope, design direction, or whether to keep investing in the loop.
 - Accepted findings have concrete fix commits or local changes, plus validation evidence.
 - Declined findings have short rationales and are not silently dropped.
-- Verification passes prefer same-source reviewer continuity when safely available, record any packet/finding-source fallback, check prior fixes, and reread the full current diff.
+- Verification passes prefer same-source reviewer continuity when safely available, record opaque handle availability and any packet/finding-source fallback, check prior fixes, and reread the full current diff.
 - The final state is supported by a fresh `review-pass` packet with no likely accepted findings on its initial pass.
 - The final HTML report follows `references/report-guidance.md` and can be reconstructed from consolidated PR comments, review packets, and commits.
 - PR-scoped comments and commits are factual and clearly labeled as agent-generated review work.
@@ -245,7 +246,7 @@ Before finishing:
 10. Confirm accepted semantic contract changes used a Contract Surface Matrix, or record why the matrix was skipped.
 11. Confirm review-pass requests used the current fresh or verification templates, including reporting mode, read-only rule, no-reviewer-PR-comment rule, dirty-validation rule, issue-family sweep instruction, design-escape-hatch instruction, full-reread instruction, provisional-ID rule, and clean response sentinel.
 12. If a structural-depth lens was assigned, confirm `review-pass` supplied the structural-depth lens instructions and no full architecture-report workflow was run inside `review-loop`.
-13. Confirm verification continuity mode was recorded for verification passes.
+13. Confirm verification continuity mode and opaque handle availability were recorded for verification passes without exposing handle values.
 14. Confirm soft budget checkpoints were surfaced when checkpoint triggers occurred.
 15. Confirm validation commands and results are captured.
 16. Confirm fix commits use the active agent-name prefix.

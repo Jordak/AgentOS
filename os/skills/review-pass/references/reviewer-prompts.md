@@ -12,6 +12,7 @@ Before sending a reviewer prompt, confirm it includes:
 - reviewer alias and optional lens;
 - custom lens notes when provided;
 - reviewer continuity preference plus source reviewer aliases and source finding IDs in verification mode when applicable; source reviewer handles stay in the orchestration request when needed for resumption;
+- reviewer continuity handle availability in verification mode when applicable, without exposing opaque handle values;
 - structural-depth lens instructions when that lens is assigned;
 - reporting mode: chat to review-pass orchestrator only;
 - instruction to read repository instructions before inspecting the target;
@@ -106,6 +107,7 @@ Reviewer alias: <P2-R1, P2-R2, etc.>
 Optional lens: <general | correctness | tests-regressions | edge-cases-data-integrity | architecture-depth | code-judo | design-compliance | issue-compliance | ux-api-docs | security-privacy | release-risk | structural-depth | none>
 Custom lens notes: <target-specific concerns or none>
 Reviewer continuity: <same-source reviewer resumed | packet/finding-source fallback | none; include source reviewer aliases and finding IDs when applicable>
+Continuity handle availability: <private handoff available | unavailable | not applicable; never include opaque handle values>
 Prior packet or findings for you to verify: <finding IDs and summaries relevant to this reviewer or lens>
 Fix commits: <commit SHAs and one-line summaries>
 Accepted findings fixed: <brief list>
@@ -151,6 +153,7 @@ Panel: <reviewer aliases and count>
 Lens Plan: <reviewer alias -> lens>
 Coverage: <scope inspected, metadata read, limitations>
 Reviewer Continuity: <same-source reviewers resumed | packet/finding-source fallback | none; include source aliases or limitation, never opaque reviewer handles>
+Continuity Handle Availability: <private handoff available | unavailable | not applicable; never include opaque handle values>
 
 Issue Families:
 1. [<family-id>] [Severity] <family title>
@@ -212,6 +215,7 @@ Do not reconstruct these prompts from memory. Each reviewer prompt must include:
 - the design-escape-hatch instruction: call out when scope reduction, design clarification, or a different implementation shape may be better than another patch;
 - prior finding IDs, fixes, declined rationales, comments, and validation when it is a verification pass;
 - reviewer continuity preference plus source reviewer aliases and source finding IDs when applicable; source reviewer handles stay in the orchestration request when needed for resumption;
+- continuity handle availability when applicable, without exposing opaque handle values;
 - the full-diff reread instruction;
 - the provisional-ID instruction for new findings;
 - the clean response sentinel: start with exactly `No new findings.` on its own first line.
