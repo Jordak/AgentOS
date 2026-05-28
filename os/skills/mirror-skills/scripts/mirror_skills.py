@@ -163,6 +163,7 @@ def _local_path_component_problems(
     expected_kind: str | None,
     allow_missing: bool,
     boundary: Path | None = None,
+    boundary_allow_missing: bool = False,
 ) -> list[str]:
     absolute = _local_lexical_absolute(path)
     if not absolute.is_absolute():
@@ -173,9 +174,15 @@ def _local_path_component_problems(
         parts = absolute.parts[1:]
     else:
         boundary_absolute = _local_lexical_absolute(boundary)
-        boundary_problem = final_path_kind_problem(boundary_absolute, expected_kind="directory", allow_missing=False)
+        boundary_problem = final_path_kind_problem(
+            boundary_absolute,
+            expected_kind="directory",
+            allow_missing=boundary_allow_missing,
+        )
         if boundary_problem:
             return [f"{boundary_absolute} ({boundary_problem})"]
+        if boundary_allow_missing and not boundary_absolute.exists():
+            return []
         try:
             relative = absolute.relative_to(boundary_absolute)
         except ValueError:
@@ -500,17 +507,22 @@ def unreadable_files(files: dict[str, Path]) -> list[str]:
 
 def mirror_path_kind_problems(mirror_dir: Path, canonical_files: dict[str, Path]) -> list[str]:
     mirror_root = mirror_dir.parent
-    mirror_root_problems = _local_path_component_problems(
+    # The selected mirror root is the local output boundary. Ancestors such as
+    # macOS /tmp -> /private/tmp are root-selection concerns; symlinks at or
+    # beneath the mirror root are rejected before sync/prune writes.
+    mirror_root_problem = final_path_kind_problem(
         mirror_root,
         expected_kind="directory",
         allow_missing=True,
     )
-    if mirror_root_problems:
-        return [f". ({problem})" for problem in mirror_root_problems]
+    if mirror_root_problem:
+        return [f". ({mirror_root}: {mirror_root_problem})"]
     mirror_dir_problems = _local_path_component_problems(
         mirror_dir,
         expected_kind="directory",
         allow_missing=True,
+        boundary=mirror_root,
+        boundary_allow_missing=True,
     )
     if mirror_dir_problems:
         return [f". ({problem})" for problem in mirror_dir_problems]
@@ -525,6 +537,7 @@ def mirror_path_kind_problems(mirror_dir: Path, canonical_files: dict[str, Path]
             expected_kind="file",
             allow_missing=True,
             boundary=mirror_dir,
+            boundary_allow_missing=True,
         )
         problems.extend(f"{rel} ({problem})" for problem in destination_problems)
     return problems
@@ -820,13 +833,13 @@ def main() -> int:
     if root_problem:
         raise SystemExit(f"Unsafe AgentOS root: {agentos_root} ({root_problem})")
     load_path_resolution_helpers(agentos_root)
-    mirror_root_problems = _local_path_component_problems(
+    mirror_root_problem = final_path_kind_problem(
         mirror_root,
         expected_kind="directory",
         allow_missing=True,
     )
-    if mirror_root_problems:
-        raise SystemExit(f"Unsafe mirror root: {'; '.join(mirror_root_problems)}")
+    if mirror_root_problem:
+        raise SystemExit(f"Unsafe mirror root: {mirror_root} ({mirror_root_problem})")
     personal_agentos_root = _local_lexical_absolute(args.personal_agentos_root) if args.personal_agentos_root else agentos_root
 
     core_entries = parse_manifest(agentos_root)
