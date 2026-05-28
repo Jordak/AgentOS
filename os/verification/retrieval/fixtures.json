@@ -103,6 +103,81 @@
       ]
     },
     {
+      "id": "review-pass",
+      "category": "code review",
+      "prompt": "Run one manual review iteration on this PR and give me a structured review packet without fixing or posting anything.",
+      "expected": {
+        "skill": "review-pass"
+      },
+      "evidence": [
+        {
+          "path": "os/skills/review-pass/SKILL.md",
+          "contains": [
+            "one read-only review panel pass",
+            "structured Markdown review packet"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "review-pass-contract-surface",
+      "category": "code review",
+      "prompt": "Run a single read-only review pass on a skill change and check whether workflow semantics propagated through prompts, recovery, manifest, reports, and validation.",
+      "expected": {
+        "skill": "review-pass"
+      },
+      "evidence": [
+        {
+          "path": "os/skills/review-pass/SKILL.md",
+          "contains": [
+            "Contract Surface Matrix Lens",
+            "read-only inspection lens"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "review-pass-verification-continuity",
+      "category": "code review",
+      "prompt": "Run a read-only verification review pass using same-source reviewer continuity, but keep reviewer handles private and report only handle availability.",
+      "expected": {
+        "skill": "review-pass"
+      },
+      "evidence": [
+        {
+          "path": "os/skills/review-pass/SKILL.md",
+          "contains": [
+            "caller-private reviewer continuity handoff",
+            "opaque tokens for orchestration and caller ledgers only"
+          ]
+        },
+        {
+          "path": "os/skills/review-pass/references/reviewer-prompts.md",
+          "contains": [
+            "Continuity handle availability",
+            "never include opaque handle values"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "review-loop-contract-surface",
+      "category": "code review loop",
+      "prompt": "Run a review/fix loop and, when accepting a finding that changes workflow semantics, make sure the change propagates through prompts, recovery, reports, manifest, and validation.",
+      "expected": {
+        "skill": "review-loop"
+      },
+      "evidence": [
+        {
+          "path": "os/skills/review-loop/SKILL.md",
+          "contains": [
+            "Contract Surface Matrix",
+            "semantic contract changes"
+          ]
+        }
+      ]
+    },
+    {
       "id": "github-issue-breakdown",
       "category": "github issue breakdown",
       "prompt": "Break a plan into implementation issues and preserve GitHub safety rules.",

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review Pass"
+  short_description: "Read-only review panel pass"
+  default_prompt: "Use $review-pass to run one read-only fresh or verification review panel pass on this target and return a structured Markdown review packet."

@@ -9,7 +9,7 @@ description: Run an extremely strict maintainability review for abstraction qual
 
 Vendored from `cursor/plugins` at commit `26878d6606afd611197c900bf2dc451ee2e80a74`, path `cursor-team-kit/skills/thermo-nuclear-code-quality-review/SKILL.md`.
 
-Use this as a standalone strict maintainability review skill, and as source material for `review-loop`'s structural-depth lens when a PR needs a sharper architecture and code-quality pass.
+Use this as a standalone strict maintainability review skill, and as source material for `review-pass`'s structural-depth lens when a PR needs a sharper architecture and code-quality pass.
 
 Upstream license and update notes are in [UPSTREAM.md](UPSTREAM.md).
 

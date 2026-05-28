@@ -10,7 +10,7 @@ Contract reference: `os/skills/SKILL_CONTRACT.md`.
 
 ## Summary
 
-- Canonical Core skills: 17.
+- Canonical Core skills: 18.
 
 ## Maintenance Fields
 
@@ -124,17 +124,29 @@ Each skill entry records:
 - Verification coverage: confirm domain docs and relevant ADRs were checked, generated reports exist under the temp directory when produced, proposed modules use the skill's architecture vocabulary, ADR conflicts are surfaced when real, and skill validation plus `scripts/run-validator` pass after skill changes.
 - Upgrade notes: vendored from `mattpocock/skills` path `skills/engineering/improve-codebase-architecture/` at ref `0288510dd61ff6ef7c2003834082ab8f2387e80e`; preserve companion references and `UPSTREAM.md`, reapply AgentOS domain-doc alias patches after upstream updates, and use `mirror-skills` after accepted updates.
 
+### `review-pass`
+
+- Canonical source: `os/skills/review-pass/SKILL.md`
+- Contract status: full.
+- Mutability: read-only for target repositories, GitHub, issue trackers, PR state, and external accounts; local-write only for optional temporary Markdown packet artifacts.
+- Tools and connectors: local filesystem, `git`, `rg`, optional GitHub connector or `gh` reads for PR metadata, review subagents when available, `make-temp-file` for optional packet paths, and the vendored review-quality skills as source material for lens guidance.
+- Output artifact: structured Markdown review packet with target, baseline intent, panel, lens plan, coverage, issue families, recommended dispositions, design-escape-hatch concerns, reviewer crosswalk, residual risks, reviewer continuity mode and handle availability when applicable, optional caller-private continuity handoff, and optional temporary packet path.
+- Filing rule: no durable AgentOS state by default; chat output by default; optional temporary packet files live under the system temporary directory; project fixes, PR comments, pushes, ready markers, and durable loop ledgers belong to callers such as `review-loop`.
+- Safety posture: read-only reviewer-panel workflow; do not edit files, commit, push, merge, comment on PRs, label, close issues, mark ready, change permissions, run validation commands that may dirty the checkout, expose opaque reviewer handles, or perform external writes; keep spawned or resumed reviewers read-only and close them after each pass.
+- Verification coverage: confirm target/base/head, mode, baseline-intent source or limitation, reviewer count, lens plan, reviewer continuity mode and opaque handle availability when applicable, current prompt templates, dirty-validation rule, Contract Surface Matrix review for skill/workflow contract changes, structural-depth instructions when assigned, issue-family normalization, recommended dispositions, sibling-search suggestions, validation signals, reviewer closure, and absence of target, PR, issue, handle exposure, or external writes.
+- Upgrade notes: Core reusable read-only panel-pass workflow introduced by GitHub Issue #54; `review-loop` depends on it for fresh and verification reviewer-panel mechanics.
+
 ### `review-loop`
 
 - Canonical source: `os/skills/review-loop/SKILL.md`
 - Contract status: full.
 - Mutability: mixed: reads local code, GitHub PR metadata, and review context; may edit project files, create fix commits, push to a target PR branch, post consolidated Agent Review PR comments, apply the repository's established ready-for-human marker, and write a temporary HTML report when explicitly authorized for a review loop.
-- Tools and connectors: local `git`, project validation commands, GitHub connector or `gh`, review subagents when available, optional structural-depth reviewer lens sourced from `thermo-nuclear-code-quality-review` and `improve-codebase-architecture`, `make-temp-file`, `os/skills/check-implementation-readiness/SKILL.md`, `os/playbook/IMPLEMENT_FEATURES.md`, `os/playbook/ARTIFACTS.md`, and `os/playbook/GITHUB_WORKFLOW.md`.
+- Tools and connectors: `os/skills/review-pass/SKILL.md` for fresh and verification reviewer-panel passes, local `git`, project validation commands, GitHub connector or `gh`, `make-temp-file`, `os/skills/check-implementation-readiness/SKILL.md`, `os/playbook/IMPLEMENT_FEATURES.md`, `os/playbook/ARTIFACTS.md`, and `os/playbook/GITHUB_WORKFLOW.md`.
 - Output artifact: temporary static HTML review-loop report, optional project fix commits, optional consolidated PR comments, and optional ready-for-human PR marker.
 - Filing rule: no durable AgentOS state by default; temporary reports live under the system temporary directory; project fixes, commits, branches, and reports live in the target project; PR comments and ready markers stay in GitHub.
-- Safety posture: use only after explicit review-loop authorization; keep reviewer subagents read-only; run or honor the implementation-readiness gate for feature-sized PRs before spawning reviewers; do not merge, close issues, create labels, delete branches, change permissions, push outside the target PR branch, or publish outside the PR review surface without separate approval.
-- Verification coverage: confirm target/base/head and panel sizing, durable design readiness or recorded gate skip for feature-sized targets, baseline intent, reviewer prompt templates, structural-depth lens instructions when assigned, accepted/declined findings, sibling sweeps, validation commands, clean final reviewer panel, temporary HTML report, and absence of unapproved external writes.
-- Upgrade notes: Core reusable orchestration workflow for fresh-context PR review/fix loops; structural-depth lens is a prompt lens, not a nested architecture-report workflow.
+- Safety posture: use only after explicit review-loop authorization; delegate reviewer-panel mechanics to read-only `review-pass`; keep opaque reviewer handles out of reviewer prompts, PR comments, public reports, and human-facing packets; run or honor the implementation-readiness gate for feature-sized PRs before reviewers start; do not merge, close issues, create labels, delete branches, change permissions, push outside the target PR branch, or publish outside the PR review surface without separate approval.
+- Verification coverage: confirm target/base/head and review-pass sizing, durable design readiness or recorded gate skip for feature-sized targets, baseline intent, review-pass template usage, Contract Surface Matrix use or explicit skip for semantic contract changes, verification reviewer continuity mode and opaque handle availability, structural-depth lens instructions when assigned, accepted/declined findings, sibling sweeps, validation commands, consolidated Agent Review comment shape when posted, clean final fresh review-pass packet, temporary HTML report, and absence of unapproved external writes or handle exposure.
+- Upgrade notes: Core reusable orchestration workflow for fresh-context PR review/fix loops; reviewer-panel mechanics now live in `review-pass`.
 
 ### `run-agentos-doctor`
 

@@ -12,7 +12,7 @@ Vendored from `mattpocock/skills` at commit `0288510dd61ff6ef7c2003834082ab8f238
 Local AgentOS changes:
 
 - Prefer `DOMAIN.md` and `DOMAIN-MAP.md`; treat `CONTEXT.md` and `CONTEXT-MAP.md` as legacy aliases.
-- Keep this as a standalone architecture-review workflow. `review-loop` may use the vocabulary as a reviewer lens, but should not run this skill's full HTML-report workflow inside every review loop.
+- Keep this as a standalone architecture-review workflow. `review-pass` may use the vocabulary as reviewer-lens source material, and `review-loop` should consume that lens through `review-pass` rather than running this skill's full HTML-report workflow inside every review loop.
 
 Upstream license and update notes are in [UPSTREAM.md](UPSTREAM.md).
 
