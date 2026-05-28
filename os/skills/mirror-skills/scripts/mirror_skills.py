@@ -20,6 +20,7 @@ _shared_managed_path_problem_list = None
 _shared_managed_relative_path_problem = None
 PATH_RESOLUTION_PACKAGE = "path_resolution"
 MANAGED_PATH_MODULE = f"{PATH_RESOLUTION_PACKAGE}.managed"
+SUPPORTED_EXPECTED_KINDS = {None, "file", "directory"}
 
 
 def load_path_resolution_helpers(agentos_root: Path) -> None:
@@ -45,15 +46,24 @@ def load_path_resolution_helpers(agentos_root: Path) -> None:
     ]:
         sys.modules.pop(module_name, None)
 
-    managed_module = importlib.import_module(MANAGED_PATH_MODULE)
+    try:
+        managed_module = importlib.import_module(MANAGED_PATH_MODULE)
+    except Exception as error:
+        raise RuntimeError(f"could not import {MANAGED_PATH_MODULE} from {repo_scripts_dir}: {error}") from error
     module_file = getattr(managed_module, "__file__", None)
     expected_module_file = repo_scripts_dir / PATH_RESOLUTION_PACKAGE / "managed.py"
     if module_file is None or _local_lexical_absolute(Path(module_file)) != expected_module_file:
         raise RuntimeError(f"path-resolution import did not load expected module: {expected_module_file}")
 
+    try:
+        managed_path_problem_list = managed_module.managed_path_problem_list
+        managed_relative_path_problem = managed_module.managed_relative_path_problem
+    except AttributeError as error:
+        raise RuntimeError(f"path-resolution module missing expected helper: {error}") from error
+
     global _shared_managed_path_problem_list, _shared_managed_relative_path_problem
-    _shared_managed_path_problem_list = managed_module.managed_path_problem_list
-    _shared_managed_relative_path_problem = managed_module.managed_relative_path_problem
+    _shared_managed_path_problem_list = managed_path_problem_list
+    _shared_managed_relative_path_problem = managed_relative_path_problem
 
 
 SKILL_HEADING_RE = re.compile(r"^### `([^`]+)`\s*$", re.MULTILINE)
@@ -141,6 +151,9 @@ def _local_final_path_kind_problem(
     expected_kind: str | None,
     allow_missing: bool,
 ) -> str | None:
+    expected_kind_problem = _local_expected_kind_problem(expected_kind)
+    if expected_kind_problem:
+        return expected_kind_problem
     absolute = _local_lexical_absolute(path)
     try:
         path_stat = absolute.lstat()
@@ -185,6 +198,9 @@ def _local_path_component_problems(
     boundary: Path | None = None,
     boundary_allow_missing: bool = False,
 ) -> list[str]:
+    expected_kind_problem = _local_expected_kind_problem(expected_kind)
+    if expected_kind_problem:
+        return [f"{path} ({expected_kind_problem})"]
     if ".." in path.expanduser().parts:
         return [f"{path} (parent-directory segments are not allowed)"]
 
@@ -238,6 +254,16 @@ def _local_path_component_problems(
         if is_final and expected_kind == "file" and not stat.S_ISREG(path_stat.st_mode):
             return [f"{current} (not a regular file)"]
     return []
+
+
+def _local_expected_kind_problem(expected_kind: object) -> str | None:
+    try:
+        supported = expected_kind in SUPPORTED_EXPECTED_KINDS
+    except TypeError:
+        supported = False
+    if not supported:
+        return "expected_kind must be None, 'file', or 'directory'"
+    return None
 
 
 def path_component_problems(
@@ -855,7 +881,10 @@ def main() -> int:
     root_problem = final_path_kind_problem(agentos_root, expected_kind="directory", allow_missing=False)
     if root_problem:
         raise SystemExit(f"Unsafe AgentOS root: {agentos_root} ({root_problem})")
-    load_path_resolution_helpers(agentos_root)
+    try:
+        load_path_resolution_helpers(agentos_root)
+    except RuntimeError as error:
+        raise SystemExit(f"Unsafe path-resolution package: {error}")
     mirror_root_problem = final_path_kind_problem(
         mirror_root,
         expected_kind="directory",

@@ -24,6 +24,17 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 
 PATH_RESOLUTION_PACKAGE = "path_resolution"
+SUPPORTED_EXPECTED_KINDS = {None, "file", "directory"}
+PUBLIC_EXPORT_REQUIRED_SUPPORT_FILES = tuple(
+    Path(rel)
+    for rel in [
+        "os/verification/scripts/validate_agentos.py",
+        "scripts/agentos_publication_rules.py",
+        "scripts/path_resolution/__init__.py",
+        "scripts/path_resolution/_primitives.py",
+        "scripts/path_resolution/managed.py",
+    ]
+)
 
 
 def _bootstrap_lexical_absolute(path: Path) -> Path:
@@ -39,6 +50,9 @@ def _bootstrap_final_path_problem(
     expected_kind: str | None = None,
     allow_missing: bool = True,
 ) -> str | None:
+    expected_kind_problem = _bootstrap_expected_kind_problem(expected_kind)
+    if expected_kind_problem:
+        return expected_kind_problem
     absolute = _bootstrap_lexical_absolute(path)
     try:
         path_stat = absolute.lstat()
@@ -63,6 +77,9 @@ def _bootstrap_path_problem(
     expected_kind: str,
     boundary: Path,
 ) -> str | None:
+    expected_kind_problem = _bootstrap_expected_kind_problem(expected_kind)
+    if expected_kind_problem:
+        return f"{path} ({expected_kind_problem})"
     boundary_absolute = _bootstrap_lexical_absolute(boundary)
     boundary_problem = _bootstrap_final_path_problem(boundary_absolute, expected_kind="directory", allow_missing=False)
     if boundary_problem:
@@ -93,6 +110,16 @@ def _bootstrap_path_problem(
             return f"{current} (not a regular file)"
         if is_final and expected_kind == "directory" and not stat.S_ISDIR(path_stat.st_mode):
             return f"{current} (not a directory)"
+    return None
+
+
+def _bootstrap_expected_kind_problem(expected_kind: object) -> str | None:
+    try:
+        supported = expected_kind in SUPPORTED_EXPECTED_KINDS
+    except TypeError:
+        supported = False
+    if not supported:
+        return "expected_kind must be None, 'file', or 'directory'"
     return None
 
 
@@ -157,7 +184,11 @@ def load_managed_paths():
     return managed_module
 
 
-_MANAGED_PATHS = load_managed_paths()
+try:
+    _MANAGED_PATHS = load_managed_paths()
+except RuntimeError as error:
+    print(f"AgentOS validation failed: {error}", file=sys.stderr)
+    raise SystemExit(2)
 managed_path_problem_text = _MANAGED_PATHS.managed_path_problem_text
 
 
@@ -380,6 +411,7 @@ class AgentOSValidator:
             self.checked.append("public export validation")
             return
         self.check_no_git_directory()
+        self.check_public_export_required_support_files()
         self.check_public_export_allowlist()
         self.check_personal_overlay_ignore_file_rules()
         self.check_personal_overlay_tracking(allow_private_files=False)
@@ -651,6 +683,19 @@ class AgentOSValidator:
         check = "no git history"
         if (self.root / ".git").exists():
             self.add_error(check, self.root / ".git", "public export must not contain git history")
+        self.checked.append(check)
+
+    def check_public_export_required_support_files(self) -> None:
+        check = "public export required support"
+        for rel in PUBLIC_EXPORT_REQUIRED_SUPPORT_FILES:
+            path = self.root / rel
+            problem = self.no_follow_path_problem(
+                path,
+                expected_kind="file",
+                allow_missing=False,
+            )
+            if problem:
+                self.add_error(check, path, f"required support file is missing or unsafe: {problem}")
         self.checked.append(check)
 
     def check_public_export_allowlist(self) -> None:
@@ -2389,6 +2434,16 @@ def run_self_test() -> int:
             and "symbolic link is not allowed" in error.message
             for error in public_export_root_validator.errors
         )
+        missing_support_export_root = root / "_missing_support_public_export_fixture"
+        missing_support_export_root.mkdir()
+        missing_support_validator = AgentOSValidator(root)
+        missing_support_validator.run_public_export_validation_checks(missing_support_export_root)
+        missing_support_rejected = any(
+            error.check == "public export required support"
+            and error.path == "scripts/path_resolution/managed.py"
+            and "required support file is missing or unsafe" in error.message
+            for error in missing_support_validator.errors
+        )
         non_os_symlink_rejected = any(
             error.path == "docs/linked.raw"
             and "AgentOS-managed paths outside personal/ must not contain symbolic links" in error.message
@@ -2530,6 +2585,7 @@ def run_self_test() -> int:
             and managed_os_symlink_stops_reads
             and symlinked_root_rejected
             and public_export_root_rejected
+            and missing_support_rejected
             and non_os_symlink_rejected
             and missing_pr_template_rejected
             and symlink_rejected_cleanly
@@ -2567,6 +2623,8 @@ def run_self_test() -> int:
             for error in symlinked_root_validator.errors:
                 print(f"EXPECTED {error.format()}")
             for error in public_export_root_validator.errors:
+                print(f"EXPECTED {error.format()}")
+            for error in missing_support_validator.errors:
                 print(f"EXPECTED {error.format()}")
             return 0
 

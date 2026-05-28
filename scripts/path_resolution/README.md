@@ -2,7 +2,7 @@
 
 This package contains reusable path-resolution modules for trusted AgentOS scripts.
 
-The declared root passed to a public module is the trust boundary. Managed-path checks reject symlink traversal beneath that root; they do not try to authenticate the root itself or reject symlinks in its ancestors.
+The declared root passed to a public module is the trust boundary. Managed-path checks reject the declared root itself if it is a symlink and reject symlink traversal beneath that root; they do not try to authenticate ancestor directories or reject symlinks in those ancestors.
 
 Public callers should import a path-resolution module that matches the policy they need, such as:
 

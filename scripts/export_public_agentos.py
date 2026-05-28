@@ -18,6 +18,7 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 
 PATH_RESOLUTION_PACKAGE = "path_resolution"
+SUPPORTED_EXPECTED_KINDS = {None, "file", "directory"}
 
 
 def parse_args() -> argparse.Namespace:
@@ -100,6 +101,9 @@ def _bootstrap_lexical_absolute(path: Path) -> Path:
 
 
 def _bootstrap_final_path_problem(path: Path, expected_kind: str | None = None, allow_missing: bool = True) -> str | None:
+    expected_kind_problem = _bootstrap_expected_kind_problem(expected_kind)
+    if expected_kind_problem:
+        return expected_kind_problem
     absolute = _bootstrap_lexical_absolute(path)
     try:
         path_stat = absolute.lstat()
@@ -125,6 +129,9 @@ def _bootstrap_no_follow_path_problem(
     allow_missing: bool,
     boundary: Path,
 ) -> str | None:
+    expected_kind_problem = _bootstrap_expected_kind_problem(expected_kind)
+    if expected_kind_problem:
+        return f"{path} ({expected_kind_problem})"
     boundary_absolute = _bootstrap_lexical_absolute(boundary)
     boundary_problem = _bootstrap_final_path_problem(boundary_absolute, expected_kind="directory", allow_missing=False)
     if boundary_problem:
@@ -164,6 +171,16 @@ def _bootstrap_no_follow_path_problem(
             return f"{current} (not a directory)"
         if is_final and expected_kind == "file" and not stat.S_ISREG(path_stat.st_mode):
             return f"{current} (not a regular file)"
+    return None
+
+
+def _bootstrap_expected_kind_problem(expected_kind: object) -> str | None:
+    try:
+        supported = expected_kind in SUPPORTED_EXPECTED_KINDS
+    except TypeError:
+        supported = False
+    if not supported:
+        return "expected_kind must be None, 'file', or 'directory'"
     return None
 
 
@@ -242,7 +259,11 @@ def load_managed_paths():
     return managed_module
 
 
-_MANAGED_PATHS = load_managed_paths()
+try:
+    _MANAGED_PATHS = load_managed_paths()
+except RuntimeError as error:
+    print(f"AgentOS export failed: {error}", file=sys.stderr)
+    raise SystemExit(2)
 managed_path_problem_text = _MANAGED_PATHS.managed_path_problem_text
 
 

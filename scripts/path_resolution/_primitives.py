@@ -10,6 +10,11 @@ import os
 import stat
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal, Optional
+
+
+ExpectedKind = Optional[Literal["file", "directory"]]
+SUPPORTED_EXPECTED_KINDS = {None, "file", "directory"}
 
 
 @dataclass(frozen=True)
@@ -38,10 +43,11 @@ def is_relative_to(path: Path, base: Path) -> bool:
 
 def path_kind_problem(
     path: Path,
-    expected_kind: str | None = None,
+    expected_kind: ExpectedKind = None,
     allow_missing: bool = True,
     cwd: Path | None = None,
 ) -> PathProblem | None:
+    _validate_expected_kind(expected_kind)
     absolute = lexical_absolute(path, cwd=cwd)
     try:
         path_stat = absolute.lstat()
@@ -64,11 +70,12 @@ def path_kind_problem(
 def no_follow_path_problem(
     root: Path,
     path: Path,
-    expected_kind: str | None,
+    expected_kind: ExpectedKind,
     allow_missing: bool,
     cwd: Path | None = None,
     root_label: str = "managed root",
 ) -> PathProblem | None:
+    _validate_expected_kind(expected_kind)
     root_absolute = lexical_absolute(root, cwd=cwd)
     root_problem = path_kind_problem(
         root_absolute,
@@ -121,3 +128,12 @@ def no_follow_path_problem(
         if is_final and expected_kind == "file" and not stat.S_ISREG(path_stat.st_mode):
             return PathProblem(current, "not a regular file")
     return None
+
+
+def _validate_expected_kind(expected_kind: object) -> None:
+    try:
+        supported = expected_kind in SUPPORTED_EXPECTED_KINDS
+    except TypeError:
+        supported = False
+    if not supported:
+        raise ValueError("expected_kind must be None, 'file', or 'directory'")

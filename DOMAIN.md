@@ -45,7 +45,7 @@ A deterministic verification step that checks the working tree and Publishable F
 _Avoid_: LLM privacy vibes, private-looking file detector
 
 **Managed Path**:
-A filesystem path that a trusted AgentOS script treats as part of an AgentOS-managed tree for reading, writing, copying, syncing, or validation. Managed Paths must stay under their declared root and must not silently traverse symbolic-link components beneath that root. The declared root is the caller-chosen trust boundary, so ancestor symlinks of that root are a root-selection concern rather than a Managed Path concern.
+A filesystem path that a trusted AgentOS script treats as part of an AgentOS-managed tree for reading, writing, copying, syncing, or validation. Managed Paths must stay under their declared root and must not silently traverse symbolic-link components beneath that root. The declared root is the caller-chosen trust boundary and must itself be a non-symlink directory; ancestor symlinks of that root are a root-selection concern rather than a Managed Path concern.
 _Avoid_: arbitrary local path, resolved target
 
 **Path Resolution Module**:

@@ -1,10 +1,10 @@
 """Managed-path safety checks for AgentOS trusted scripts.
 
-This public module owns one narrow policy: a managed path must stay under its
-declared root, must not traverse symbolic-link components beneath that root,
-and must have the expected final kind when the caller asks for one. Callers
-still own AgentOS domain policy, status labels, and decisions such as FAIL
-versus WARN.
+This public module owns one narrow policy: a managed path must stay under a
+non-symlink declared root, must not traverse symbolic-link components beneath
+that root, and must have the expected final kind when the caller asks for one.
+Callers still own AgentOS domain policy, status labels, and decisions such as
+FAIL versus WARN.
 """
 
 from __future__ import annotations
@@ -15,6 +15,10 @@ import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal, Optional
+
+
+ExpectedKind = Optional[Literal["file", "directory"]]
 
 
 def _load_direct_primitives():
@@ -52,7 +56,7 @@ def _managed_problem(problem: _primitives.PathProblem | None) -> ManagedPathProb
 def managed_path_problem(
     root: Path,
     path: Path,
-    expected_kind: str | None,
+    expected_kind: ExpectedKind,
     allow_missing: bool,
     cwd: Path | None = None,
     root_label: str = "managed root",
@@ -72,7 +76,7 @@ def managed_path_problem(
 def managed_path_problem_text(
     root: Path,
     path: Path,
-    expected_kind: str | None,
+    expected_kind: ExpectedKind,
     allow_missing: bool,
     cwd: Path | None = None,
     root_label: str = "managed root",
@@ -91,7 +95,7 @@ def managed_path_problem_text(
 def managed_path_problem_list(
     root: Path,
     path: Path,
-    expected_kind: str | None,
+    expected_kind: ExpectedKind,
     allow_missing: bool,
     cwd: Path | None = None,
     root_label: str = "managed root",
@@ -144,6 +148,13 @@ def run_self_tests() -> int:
         assert managed_relative_path_problem("~" + "/file") == "must be root-relative, not home-relative"
         assert managed_relative_path_problem("../file") == "must not contain parent-directory segments"
         assert managed_relative_path_problem("os/INDEX.md") is None
+
+        try:
+            managed_path_problem(root, regular, expected_kind="dir", allow_missing=False)  # type: ignore[arg-type]
+        except ValueError as error:
+            assert "expected_kind" in str(error), error
+        else:
+            raise AssertionError("invalid expected_kind must fail closed")
 
         parent_segment = managed_path_problem(
             root,
