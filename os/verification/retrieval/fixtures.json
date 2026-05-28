@@ -137,6 +137,30 @@
       ]
     },
     {
+      "id": "review-pass-verification-continuity",
+      "category": "code review",
+      "prompt": "Run a read-only verification review pass using same-source reviewer continuity, but keep reviewer handles private and report only handle availability.",
+      "expected": {
+        "skill": "review-pass"
+      },
+      "evidence": [
+        {
+          "path": "os/skills/review-pass/SKILL.md",
+          "contains": [
+            "caller-private reviewer continuity handoff",
+            "opaque tokens for orchestration and caller ledgers only"
+          ]
+        },
+        {
+          "path": "os/skills/review-pass/references/reviewer-prompts.md",
+          "contains": [
+            "Continuity handle availability",
+            "never include opaque handle values"
+          ]
+        }
+      ]
+    },
+    {
       "id": "review-loop-contract-surface",
       "category": "code review loop",
       "prompt": "Run a review/fix loop and, when accepting a finding that changes workflow semantics, make sure the change propagates through prompts, recovery, reports, manifest, and validation.",
