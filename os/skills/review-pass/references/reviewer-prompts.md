@@ -18,6 +18,7 @@ Before sending a reviewer prompt, confirm it includes:
 - read-only rule, including no PR comments by reviewers;
 - dirty-validation rule: use existing validation output only, do not run validation commands that may dirty the target checkout, and recommend validation signals for the caller instead;
 - instruction to generalize each finding into an issue family and look for related occurrences;
+- instruction to check semantic propagation across affected contract surfaces for skill, workflow, or reusable contract changes;
 - instruction to report design-escape-hatch concerns when repeated findings suggest scope reduction, design clarification, or a different implementation shape;
 - instruction to compare implementation shape against the durable design source on fresh review when one is provided;
 - finding IDs, fix commits, accepted fixes, declined rationales, consolidated comment URL, and validation results in verification mode when applicable;
@@ -83,6 +84,7 @@ Rules:
 - Give each finding a provisional ID using your reviewer alias, such as `<alias>-F1`; the review-pass orchestrator may normalize IDs later.
 - For each finding, step back and identify the broader issue family or invariant it represents. Look for sibling occurrences in the diff or nearby code before reporting.
 - For accepted-risk findings, include the specific instance, generalized family, related occurrences or search strategy, and suggested family-level fix.
+- For skill, workflow, prompt, safety, lifecycle, schema, validation-policy, privacy, filing, or cross-skill ownership changes, check whether the changed semantic propagated across affected contract surfaces: owning skill, caller or called skills, prompt templates, recovery prompts, packet or report schemas, manifest, retrieval or validator coverage when relevant, privacy/filing rules, and mirrors. Report missing propagation as an issue family, not as isolated wording.
 - Compare the implementation shape against the baseline intent and durable design source when provided. If the target added major architecture, parsing, synchronization, lifecycle, validation, or public-policy semantics that the design source did not agree to, report that as a design-readiness finding rather than treating only the symptoms as bugs.
 - If repeated findings seem to come from an over-expanded or under-designed feature shape, or if the best fix may be scope reduction, design clarification, or a different implementation shape, report a `Design escape hatch` section. In that section compare the current target against the baseline intent and name the smaller or clearer design you would consider.
 - Do not pad the review with low-value style preferences.
@@ -126,6 +128,7 @@ Tasks:
 - Re-read the full current target against the base, not only the changed lines from the fix commit.
 - Look for issues missed last time and regressions introduced by the fix.
 - For each remaining or new issue, step back and identify the broader issue family. Look for sibling occurrences before reporting so the caller can fix the family, not one instance.
+- For skill, workflow, prompt, safety, lifecycle, schema, validation-policy, privacy, filing, or cross-skill ownership changes, check whether the changed semantic propagated across affected contract surfaces: owning skill, caller or called skills, prompt templates, recovery prompts, packet or report schemas, manifest, retrieval or validator coverage when relevant, privacy/filing rules, and mirrors. Report missing propagation as an issue family, not as isolated wording.
 - If the same issue family is recurring, or if the fix added schema, grammar, lifecycle, synchronization, parser, or publication semantics beyond the baseline intent, report a `Design escape hatch` section with the smaller or clearer design you would consider.
 - If issues remain or new issues exist, report them in chat with provisional IDs using your reviewer alias.
 - If no accepted issues remain and you find no new issues, start your response with exactly `No new findings.` on its own first line. Then add the reviewed scope and validation you performed.
@@ -147,7 +150,7 @@ Baseline Intent: <summary and source, or limitation>
 Panel: <reviewer aliases and count>
 Lens Plan: <reviewer alias -> lens>
 Coverage: <scope inspected, metadata read, limitations>
-Reviewer Continuity: <same-source reviewers resumed | packet/finding-source fallback | none; include source aliases or limitation>
+Reviewer Continuity: <same-source reviewers resumed | packet/finding-source fallback | none; include source aliases or limitation, never opaque reviewer handles>
 
 Issue Families:
 1. [<family-id>] [Severity] <family title>
@@ -205,6 +208,7 @@ Do not reconstruct these prompts from memory. Each reviewer prompt must include:
 - the read-only rule, including no PR comments by reviewers;
 - the dirty-validation rule: use existing validation output only, do not run validation commands that may dirty the target checkout, and recommend validation signals for the caller instead;
 - the issue-family instruction: generalize each finding and look for related occurrences before reporting;
+- the semantic-propagation rule for skill, workflow, or reusable contract changes;
 - the design-escape-hatch instruction: call out when scope reduction, design clarification, or a different implementation shape may be better than another patch;
 - prior finding IDs, fixes, declined rationales, comments, and validation when it is a verification pass;
 - reviewer continuity preference plus source reviewer aliases and source finding IDs when applicable; source reviewer handles stay in the orchestration request when needed for resumption;
@@ -212,5 +216,5 @@ Do not reconstruct these prompts from memory. Each reviewer prompt must include:
 - the provisional-ID instruction for new findings;
 - the clean response sentinel: start with exactly `No new findings.` on its own first line.
 
-Keep review-pass read-only. Close every spawned reviewer after collecting its report, then return a packet using the Review Packet Schema.
+Keep review-pass read-only. Close every spawned or resumed reviewer after collecting its report, then return a packet using the Review Packet Schema.
 ```

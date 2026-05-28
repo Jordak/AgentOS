@@ -72,7 +72,8 @@ Verification should preserve source-reviewer continuity without making the user 
 
 - When the harness can safely resume the same source reviewers, request that `review-pass` use same-source reviewer continuity and provide the source reviewer aliases, source reviewer handles, and relevant finding IDs.
 - When same-source resumption is unavailable, unsafe, or lost after compaction, request packet/finding-source fallback: provide the prior packet, source reviewer aliases, source finding IDs, fix commits, declined rationales, and validation results to fresh verification reviewers.
-- Record the continuity mode in the ledger and final report so later agents can distinguish same-reviewer verification from packet/finding-source fallback.
+- Keep opaque source reviewer handles in the loop ledger or orchestration request only; do not put them in reviewer prompts, PR comments, public reports, or human-facing packets unless the user explicitly asks for debugging detail.
+- Record the continuity mode and source aliases in the ledger and final report so later agents can distinguish same-reviewer verification from packet/finding-source fallback without exposing handles.
 - Treat continuity as a verification-quality preference, not as permission for reviewers to keep state open, mutate files, or post PR comments. `review-pass` still owns prompt assembly, reviewer lifecycle, collection, closure, and packet normalization for the current pass.
 
 ## Efficiency Controls
@@ -119,6 +120,16 @@ At the escape hatch, do not silently keep patching. Report:
 
 Accepted findings can be resolved by simplifying, narrowing, splitting, or deleting the problematic design, not only by adding code. If the user chooses to continue the current design, record that decision in the ledger and continue with the normal fix and verification workflow.
 
+## Contract Surface Matrix
+
+Use this when an accepted finding changes workflow semantics, cross-skill ownership, safety rules, state or lifecycle behavior, prompt behavior, artifact schemas, validation policy, privacy boundaries, or filing rules. Skip it for typo fixes, local prose cleanup, narrow examples, and implementation details that do not change a reusable contract.
+
+Before editing, make a tiny matrix in the loop ledger or working notes:
+
+`Semantic | Owner | Inputs | Outputs | Prompt/Recovery | Ledger/Report | Privacy/Filing | Validation`
+
+Use the matrix to update affected contract surfaces in one pass. Check the owning skill, caller or called skills, prompt templates, recovery prompts, packet or report schemas, manifest entry, retrieval or validator coverage when relevant, privacy/filing rules, mirrors, and any final report guidance. Keep the matrix lightweight; it is a propagation guard, not a design doc.
+
 ## Workflow Phases
 
 1. Establish the target:
@@ -144,6 +155,7 @@ Accepted findings can be resolved by simplifying, narrowing, splitting, or delet
    - Read each packet family as a claim, not an instruction.
    - Deduplicate with existing ledger families while preserving which pass and reviewers found them.
    - For every accepted family, record the generalized rule, representative examples, sibling-search strategy, expected fix shape, and validation signal that would prove the family is closed.
+   - If an accepted family changes a reusable workflow contract, create a Contract Surface Matrix before editing so all affected surfaces are patched together.
    - Compare accepted issue families against the baseline intent summary. If a family mostly exists because the implementation chose a heavier design than the brief required, trigger the Design Escape Hatch before implementing another fix.
    - Accept findings that identify real correctness, safety, regression, maintainability, test, or UX risks.
    - Decline findings that are incorrect, out of scope, stylistic without project support, duplicates, or lower-value than the churn they would create. Record a short rationale.
@@ -153,6 +165,7 @@ Accepted findings can be resolved by simplifying, narrowing, splitting, or delet
 5. Fix accepted findings:
    - Implement fixes in the parent workspace, preserving unrelated user changes.
    - Sweep for sibling occurrences in the same issue family before committing, using repository search, tests, fixtures, or small scripts when useful.
+   - Use any Contract Surface Matrix created during adjudication to patch every affected surface before verification, not just the representative line.
    - Before adding new schema, grammar, parser, lifecycle, synchronization, or publication semantics to satisfy a finding, check whether the Design Escape Hatch should fire.
    - Run the smallest trustworthy validation for the touched surface, broadening when shared behavior or user-facing workflows are affected.
    - Commit accepted fixes with an agent-prefixed subject, such as `#<agent-name> fix review finding about retries`. Use the active agent or harness name, for example `codex`, `claude`, or `gemini`; do not hard-code one agent name into the skill.
@@ -199,6 +212,7 @@ Call narrower playbooks for their owned surfaces: GitHub workflow policy for PR 
 - The orchestrator owns one durable ledger and posts at most one consolidated "Agent Review" comment per panel pass.
 - Findings are generalized into issue families where possible, and accepted families are swept before verification.
 - Repeated findings in the same issue family trigger a design-escape-hatch check rather than automatic patch accumulation.
+- Accepted semantic contract changes use a Contract Surface Matrix, or explicitly skip it because the fix is local and non-contractual.
 - The parent agent reaches out to the user whenever user judgment would help decide scope, design direction, or whether to keep investing in the loop.
 - Accepted findings have concrete fix commits or local changes, plus validation evidence.
 - Declined findings have short rationales and are not silently dropped.
@@ -228,12 +242,13 @@ Before finishing:
 7. Confirm every accepted finding or issue family has a fix, a scope/design change, or an explicit unresolved-risk note.
 8. Confirm every declined finding has a rationale.
 9. Confirm accepted issue families were swept for sibling occurrences before verification.
-10. Confirm review-pass requests used the current fresh or verification templates, including reporting mode, read-only rule, no-reviewer-PR-comment rule, dirty-validation rule, issue-family sweep instruction, design-escape-hatch instruction, full-reread instruction, provisional-ID rule, and clean response sentinel.
-11. If a structural-depth lens was assigned, confirm `review-pass` supplied the structural-depth lens instructions and no full architecture-report workflow was run inside `review-loop`.
-12. Confirm verification continuity mode was recorded for verification passes.
-13. Confirm soft budget checkpoints were surfaced when checkpoint triggers occurred.
-14. Confirm validation commands and results are captured.
-15. Confirm fix commits use the active agent-name prefix.
-16. Confirm the temporary HTML report exists, follows `references/report-guidance.md`, hyperlinks commit hashes to GitHub commits when possible, and is linked in the orchestrator's chat as a clickable absolute-path `.html` Markdown link.
-17. Confirm consolidated "Agent Review" comments followed `references/agent-review-comment.md` when posted.
-18. Confirm no merges, issue closures, label creation, permission changes, non-target-branch pushes, or other out-of-loop external writes happened without current user authorization.
+10. Confirm accepted semantic contract changes used a Contract Surface Matrix, or record why the matrix was skipped.
+11. Confirm review-pass requests used the current fresh or verification templates, including reporting mode, read-only rule, no-reviewer-PR-comment rule, dirty-validation rule, issue-family sweep instruction, design-escape-hatch instruction, full-reread instruction, provisional-ID rule, and clean response sentinel.
+12. If a structural-depth lens was assigned, confirm `review-pass` supplied the structural-depth lens instructions and no full architecture-report workflow was run inside `review-loop`.
+13. Confirm verification continuity mode was recorded for verification passes.
+14. Confirm soft budget checkpoints were surfaced when checkpoint triggers occurred.
+15. Confirm validation commands and results are captured.
+16. Confirm fix commits use the active agent-name prefix.
+17. Confirm the temporary HTML report exists, follows `references/report-guidance.md`, hyperlinks commit hashes to GitHub commits when possible, and is linked in the orchestrator's chat as a clickable absolute-path `.html` Markdown link.
+18. Confirm consolidated "Agent Review" comments followed `references/agent-review-comment.md` when posted.
+19. Confirm no merges, issue closures, label creation, permission changes, non-target-branch pushes, or other out-of-loop external writes happened without current user authorization.

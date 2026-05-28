@@ -120,6 +120,23 @@
       ]
     },
     {
+      "id": "review-loop-contract-surface",
+      "category": "code review loop",
+      "prompt": "Run a review/fix loop and, when accepting a finding that changes workflow semantics, make sure the change propagates through prompts, recovery, reports, manifest, and validation.",
+      "expected": {
+        "skill": "review-loop"
+      },
+      "evidence": [
+        {
+          "path": "os/skills/review-loop/SKILL.md",
+          "contains": [
+            "Contract Surface Matrix",
+            "semantic contract changes"
+          ]
+        }
+      ]
+    },
+    {
       "id": "github-issue-breakdown",
       "category": "github issue breakdown",
       "prompt": "Break a plan into implementation issues and preserve GitHub safety rules.",

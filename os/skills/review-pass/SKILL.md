@@ -20,7 +20,7 @@ Inputs:
 - Optional durable design source, issue, PR body, ADR, local design doc, or user-provided baseline intent.
 - Optional mode: `fresh` by default, or `verification` when checking prior findings after fixes or adjudication.
 - Optional prior review packet, finding IDs, accepted fixes, declined rationales, fix commits, validation results, and consolidated comment URL for verification mode.
-- Optional verification continuity preference, source reviewer aliases, source reviewer handles, and source finding IDs when a caller wants same-reviewer verification and the harness can safely resume prior reviewers.
+- Optional verification continuity preference, source reviewer aliases, opaque source reviewer handles, and source finding IDs when a caller wants same-reviewer verification and the harness can safely resume prior reviewers.
 - Optional reviewer count, lens plan, custom lens notes, and reporting constraints.
 
 Output artifact:
@@ -45,7 +45,7 @@ Safety:
 
 - Do not edit files, commit, push, merge, comment on PRs, label issues, close issues, mark PRs ready, change permissions, or perform external writes.
 - Do not run validation commands that may dirty the target checkout. Recommend validation signals for the caller when proof requires a mutating test, build, coverage, or fixture command.
-- Keep spawned reviewers read-only and instruct them not to post comments or mutate state.
+- Keep spawned or resumed reviewers read-only and instruct them not to post comments or mutate state.
 - Close every spawned or resumed reviewer after its current pass completes so stale context does not leak into unrelated later passes.
 - If the user asks for fixes, commits, PR comments, pushes, ready markers, or loop convergence, route that work to the caller or to `review-loop`.
 - Do not copy private connector data, secrets, or unrelated repository context into reviewer prompts or packets.
@@ -57,6 +57,8 @@ Use `fresh` mode for an independent pass over the current target. The panel gets
 Use `verification` mode after a caller has fixed, declined, or otherwise adjudicated prior findings. The panel gets the target, current head, prior packet or relevant finding IDs, fix commits, accepted fixes, declined rationales, validation results, and any consolidated comment URL. Verification reviewers check the prior findings and still reread the full current diff for missed or newly introduced issues.
 
 Verification continuity is caller-directed. When a caller provides source reviewer handles and asks for same-reviewer continuity, prefer resuming those reviewers for the current verification pass if the harness can do so safely. If live resumption is unavailable or unsafe, fall back to fresh verification reviewers using the prior packet, source reviewer aliases, and source finding IDs as the continuity trail. Record the continuity mode in the packet so callers such as `review-loop` can preserve it in their ledgers.
+
+Source reviewer handles are harness-specific opaque tokens for orchestration and caller ledgers only. Do not include them in reviewer prompts, PR comments, public reports, or human-facing packets unless the user explicitly asks for debugging detail. Closing a reviewer ends the active pass and prevents stale live work; it does not promise future resumability. Each verification pass must attempt safe resumption from the caller-provided handles and fall back to packet/finding-source continuity when handles are absent, stale, or rejected by the harness.
 
 Do not require the caller to manage live subagents, reviewer opening, or reviewer closure. The caller may provide prior packets and decisions, but this skill owns prompt assembly, reviewer lifecycle, collection, and packet normalization for the current pass.
 
@@ -118,7 +120,7 @@ Use at most one `structural-depth` reviewer in a normal panel. If structural fin
 4. Assemble and run prompts:
    - Reopen `references/reviewer-prompts.md`.
    - Fill the fresh or verification template explicitly for every reviewer.
-   - Include target, repository, base/head or current head, baseline intent, reviewer alias, lens, custom lens notes, verification continuity when applicable, reporting mode, read-only rule, full-reread rule, issue-family rule, design-escape-hatch instruction, provisional-ID rule, and clean response sentinel.
+   - Include target, repository, base/head or current head, baseline intent, reviewer alias, lens, custom lens notes, verification continuity when applicable, reporting mode, read-only rule, full-reread rule, issue-family rule, semantic-propagation rule for skill or workflow changes, design-escape-hatch instruction, provisional-ID rule, and clean response sentinel.
    - Spawn clean-context reviewers in parallel when the harness supports it. If subagents are unavailable, run the pass as a clearly labeled single-agent fallback and state the limitation in the packet.
 
 5. Collect and close:
@@ -154,6 +156,7 @@ Use at most one `structural-depth` reviewer in a normal panel. If structural fin
 - Every reviewer reviews the full target, even when assigned a lens.
 - The packet groups findings by issue family, not only by reviewer chronology.
 - Recommendations are clearly non-final and preserve caller authority.
+- For skill, workflow, or reusable contract changes, reviewers check whether changed semantics propagated across affected contract surfaces rather than only the representative paragraph.
 - Design-compliance and issue-compliance concerns are compared against the baseline intent when available.
 - Structural-depth findings stay review-sized and escalate larger architecture work through the design escape hatch.
 - Verification mode checks prior findings and performs a full current-diff reread.
@@ -167,7 +170,7 @@ Before finishing a review pass:
 1. Confirm the prompt reference was read for the current pass.
 2. Confirm target, repository, base, head or current head, mode, reviewer count, and lens plan.
 3. Confirm baseline intent source and any missing-baseline limitation.
-4. Confirm reviewer prompts included the read-only rule, no-comment rule, dirty-validation rule, issue-family instruction, design-escape-hatch instruction, full-reread instruction, provisional-ID rule, and clean response sentinel.
+4. Confirm reviewer prompts included the read-only rule, no-comment rule, dirty-validation rule, issue-family instruction, semantic-propagation rule when applicable, design-escape-hatch instruction, full-reread instruction, provisional-ID rule, and clean response sentinel.
 5. If `structural-depth` was assigned, confirm the reviewer received the structural-depth lens instructions and no full architecture-report workflow was run.
 6. Confirm raw findings were deduped into issue families and mapped back to reviewer sources.
 7. Confirm every likely accepted family has evidence, a sibling-search suggestion, and a validation signal.
