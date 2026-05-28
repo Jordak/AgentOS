@@ -120,6 +120,23 @@
       ]
     },
     {
+      "id": "review-pass-contract-surface",
+      "category": "code review",
+      "prompt": "Run a single read-only review pass on a skill change and check whether workflow semantics propagated through prompts, recovery, manifest, reports, and validation.",
+      "expected": {
+        "skill": "review-pass"
+      },
+      "evidence": [
+        {
+          "path": "os/skills/review-pass/SKILL.md",
+          "contains": [
+            "Contract Surface Matrix Lens",
+            "read-only inspection lens"
+          ]
+        }
+      ]
+    },
+    {
       "id": "review-loop-contract-surface",
       "category": "code review loop",
       "prompt": "Run a review/fix loop and, when accepting a finding that changes workflow semantics, make sure the change propagates through prompts, recovery, reports, manifest, and validation.",

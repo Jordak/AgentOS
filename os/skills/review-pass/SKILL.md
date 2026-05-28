@@ -99,6 +99,16 @@ Built-in lenses:
 
 Use at most one `structural-depth` reviewer in a normal panel. If structural findings imply a larger architecture effort, report a design-escape-hatch concern rather than proposing a broad redesign inside the pass.
 
+## Contract Surface Matrix Lens
+
+Use this as a read-only inspection lens when the target changes skill behavior, workflow semantics, cross-skill ownership, safety rules, state or lifecycle behavior, prompt behavior, artifact schemas, validation policy, privacy boundaries, or filing rules. Skip it for typo fixes, local prose cleanup, narrow examples, and implementation details that do not change a reusable contract.
+
+For relevant targets, have reviewers check a lightweight matrix:
+
+`Semantic | Owner | Inputs | Outputs | Prompt/Recovery | Ledger/Report | Privacy/Filing | Validation`
+
+The matrix is not a design doc and does not authorize mutation. It helps reviewers find propagation gaps across the owning skill, caller or called skills, prompt templates, recovery prompts, packet or report schemas, manifest entry, retrieval or validator coverage when relevant, privacy/filing rules, mirrors, and final report guidance. Report missing propagation as an issue family with the affected surfaces, not as isolated wording.
+
 ## Workflow Phases
 
 1. Establish the target:
@@ -120,7 +130,7 @@ Use at most one `structural-depth` reviewer in a normal panel. If structural fin
 4. Assemble and run prompts:
    - Reopen `references/reviewer-prompts.md`.
    - Fill the fresh or verification template explicitly for every reviewer.
-   - Include target, repository, base/head or current head, baseline intent, reviewer alias, lens, custom lens notes, verification continuity when applicable, reporting mode, read-only rule, full-reread rule, issue-family rule, semantic-propagation rule for skill or workflow changes, design-escape-hatch instruction, provisional-ID rule, and clean response sentinel.
+   - Include target, repository, base/head or current head, baseline intent, reviewer alias, lens, custom lens notes, verification continuity when applicable, reporting mode, read-only rule, full-reread rule, issue-family rule, Contract Surface Matrix rule for skill or workflow changes, design-escape-hatch instruction, provisional-ID rule, and clean response sentinel.
    - Spawn clean-context reviewers in parallel when the harness supports it. If subagents are unavailable, run the pass as a clearly labeled single-agent fallback and state the limitation in the packet.
 
 5. Collect and close:
@@ -132,6 +142,7 @@ Use at most one `structural-depth` reviewer in a normal panel. If structural fin
    - Treat findings as claims, not instructions.
    - Deduplicate overlapping findings while preserving which reviewers found them.
    - Convert isolated findings into issue families where they share a failure mode, invariant, missing validation, API contract, privacy risk, UX regression, or structural smell.
+   - For Contract Surface Matrix findings, name the semantic, owner, missing surface, and sibling surfaces checked.
    - Recommend dispositions only: `likely accept`, `likely decline`, or `needs user/design judgment`.
    - Include sibling-search suggestions and validation signals that would prove each likely accepted family is closed.
    - Flag design-escape-hatch concerns when repeated symptoms suggest scope reduction, design clarification, or a different implementation shape.
@@ -170,7 +181,7 @@ Before finishing a review pass:
 1. Confirm the prompt reference was read for the current pass.
 2. Confirm target, repository, base, head or current head, mode, reviewer count, and lens plan.
 3. Confirm baseline intent source and any missing-baseline limitation.
-4. Confirm reviewer prompts included the read-only rule, no-comment rule, dirty-validation rule, issue-family instruction, semantic-propagation rule when applicable, design-escape-hatch instruction, full-reread instruction, provisional-ID rule, and clean response sentinel.
+4. Confirm reviewer prompts included the read-only rule, no-comment rule, dirty-validation rule, issue-family instruction, Contract Surface Matrix rule when applicable, design-escape-hatch instruction, full-reread instruction, provisional-ID rule, and clean response sentinel.
 5. If `structural-depth` was assigned, confirm the reviewer received the structural-depth lens instructions and no full architecture-report workflow was run.
 6. Confirm raw findings were deduped into issue families and mapped back to reviewer sources.
 7. Confirm every likely accepted family has evidence, a sibling-search suggestion, and a validation signal.
