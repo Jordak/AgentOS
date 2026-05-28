@@ -16,7 +16,7 @@ or:
 from path_resolution.managed import managed_path_problem_text
 ```
 
-The `_primitives.py` module is private implementation shared by path-resolution modules. Callers outside this package must not import or compose `_primitives.py` directly. If a caller needs behavior that is only available as a primitive, add or deepen a public path-resolution module instead.
+The `_primitives.py` module is private implementation shared by path-resolution modules. The `bootstrap.py` module is also private; it exists only for trusted scripts that must validate and import this package before normal package imports are available. Callers outside this package must not import or compose these private modules directly. If a caller needs behavior that is only available as a primitive, add or deepen a public path-resolution module instead.
 
 This keeps the public modules deep: callers ask a policy-shaped question, while lexical path normalization, containment checks, `lstat()` facts, and no-follow component walking stay behind the package seam.
 

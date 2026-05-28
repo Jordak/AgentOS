@@ -6,7 +6,7 @@ The first public module is `scripts/path_resolution/managed.py`. It owns one pol
 
 The declared root is the trust boundary, not something this small module authenticates. A symlink in an ancestor of the declared AgentOS root is allowed because the caller has already chosen that root; the declared root itself must be a non-symlink directory because it is the managed boundary object. The safety invariant is that managed path operations do not silently follow symlinks from that root into some other tree. If AgentOS later needs to defend against a mutable or spoofed checkout root, that should be handled by a separate root-authentication or root-pinning design rather than by widening the managed-path interface.
 
-The package may contain a private implementation layer, currently `scripts/path_resolution/_primitives.py`, for lexical absolute paths, relative containment, `lstat()` facts, and no-follow component walking. That private layer exists for implementation locality across path-resolution modules. It is not a caller interface.
+The package may contain private implementation support, currently `scripts/path_resolution/_primitives.py` for lexical absolute paths, relative containment, `lstat()` facts, and no-follow component walking, plus `scripts/path_resolution/bootstrap.py` for trusted scripts that must validate and import the package before normal package imports are available. Those private modules exist for implementation locality across path-resolution modules and checked import paths. They are not caller interfaces.
 
 Callers outside `scripts/path_resolution/` should import from the package or a public path-resolution module:
 
@@ -28,7 +28,7 @@ This also preserves local policy ownership. The Privacy Validator owns managed-t
 
 The rejected alternative was a general public helper module for primitives such as `lexical_absolute`, `is_relative_to`, and final-kind checks. That would reduce visible duplication, but it would make each caller compose the safety policy itself. Under the deletion test, such a module would be shallow: deleting it would mostly move small helper code around while leaving the important sequencing and safety decisions spread across callers.
 
-Package integrity is owned by AgentOS validation and publication tooling, not by every caller. Scripts such as the mirror skill should import the public path-resolution module as a normal dependency and keep their local path checks focused on their own inputs and outputs. Until AgentOS has a first-class import convention for nested scripts, mirror-skills uses a small local import bridge; issue #51 tracks replacing that bridge with the repo-wide convention.
+Package integrity is owned by AgentOS validation and publication tooling, not by every caller. Scripts such as the mirror skill should import the public path-resolution module as a normal dependency and keep their local path checks focused on their own inputs and outputs. Validator/export code may use the private bootstrap support because those scripts own package-integrity checks. Until AgentOS has a first-class import convention for nested scripts, mirror-skills uses a small local import bridge; issue #51 tracks replacing that bridge with the repo-wide convention.
 
 Readiness evidence: `docs/adr/0008-managed-path-resolution-interface.md`
 

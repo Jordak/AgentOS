@@ -18,8 +18,6 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 
 PATH_RESOLUTION_PACKAGE = "path_resolution"
-PATH_RESOLUTION_REQUIRED_MODULES = ("__init__.py", "_primitives.py", "managed.py")
-SUPPORTED_EXPECTED_KINDS = {None, "file", "directory"}
 
 
 def parse_args() -> argparse.Namespace:
@@ -93,7 +91,7 @@ def is_relative_to(path: Path, base: Path) -> bool:
     return True
 
 
-def _bootstrap_lexical_absolute(path: Path) -> Path:
+def _loader_lexical_absolute(path: Path) -> Path:
     """Make a path absolute without resolving symbolic links."""
     expanded = path.expanduser()
     if not expanded.is_absolute():
@@ -101,187 +99,78 @@ def _bootstrap_lexical_absolute(path: Path) -> Path:
     return Path(os.path.abspath(expanded))
 
 
-def _bootstrap_final_path_problem(path: Path, expected_kind: str | None = None, allow_missing: bool = True) -> str | None:
-    expected_kind_problem = _bootstrap_expected_kind_problem(expected_kind)
-    if expected_kind_problem:
-        return expected_kind_problem
-    absolute = _bootstrap_lexical_absolute(path)
+def _loader_file_problem(root: Path, path: Path) -> str | None:
+    root_absolute = _loader_lexical_absolute(root)
     try:
-        path_stat = absolute.lstat()
+        root_stat = root_absolute.lstat()
     except FileNotFoundError:
-        if allow_missing:
-            return None
-        return "path is missing"
+        return f"{root_absolute} (path is missing)"
     except OSError as error:
-        return f"{error.__class__.__name__}: {error}"
+        return f"{root_absolute} ({error.__class__.__name__}: {error})"
+    if stat.S_ISLNK(root_stat.st_mode):
+        return f"{root_absolute} (symbolic link is not allowed)"
+    if not stat.S_ISDIR(root_stat.st_mode):
+        return f"{root_absolute} (not a directory)"
 
-    if stat.S_ISLNK(path_stat.st_mode):
-        return "symbolic link is not allowed"
-    if expected_kind == "directory" and not stat.S_ISDIR(path_stat.st_mode):
-        return "not a directory"
-    if expected_kind == "file" and not stat.S_ISREG(path_stat.st_mode):
-        return "not a regular file"
-    return None
-
-
-def _bootstrap_no_follow_path_problem(
-    path: Path,
-    expected_kind: str | None,
-    allow_missing: bool,
-    boundary: Path,
-) -> str | None:
-    expected_kind_problem = _bootstrap_expected_kind_problem(expected_kind)
-    if expected_kind_problem:
-        return f"{path} ({expected_kind_problem})"
-    boundary_absolute = _bootstrap_lexical_absolute(boundary)
-    boundary_problem = _bootstrap_final_path_problem(boundary_absolute, expected_kind="directory", allow_missing=False)
-    if boundary_problem:
-        return f"{boundary_absolute} ({boundary_problem})"
-
-    if ".." in path.expanduser().parts:
-        return f"{path} (parent-directory segments are not allowed)"
-
-    absolute = _bootstrap_lexical_absolute(path)
+    absolute = _loader_lexical_absolute(path)
     try:
-        relative = absolute.relative_to(boundary_absolute)
+        relative = absolute.relative_to(root_absolute)
     except ValueError:
-        return f"{absolute} (path is outside the managed root: {boundary_absolute})"
+        return f"{absolute} (path is outside the managed root: {root_absolute})"
 
-    current = boundary_absolute
-    if not relative.parts:
-        final_problem = _bootstrap_final_path_problem(current, expected_kind=expected_kind, allow_missing=allow_missing)
-        return f"{current} ({final_problem})" if final_problem else None
-
+    current = root_absolute
     for index, part in enumerate(relative.parts):
         current = current / part
         is_final = index == len(relative.parts) - 1
         try:
             path_stat = current.lstat()
         except FileNotFoundError:
-            if allow_missing:
-                return None
             return f"{current} (path component is missing)"
         except OSError as error:
             return f"{current} ({error.__class__.__name__}: {error})"
-
         if stat.S_ISLNK(path_stat.st_mode):
             return f"{current} (symbolic link is not allowed)"
-        if not is_final and not stat.S_ISDIR(path_stat.st_mode):
+        if is_final:
+            if not stat.S_ISREG(path_stat.st_mode):
+                return f"{current} (not a regular file)"
+        elif not stat.S_ISDIR(path_stat.st_mode):
             return f"{current} (path component is not a directory)"
-        if is_final and expected_kind == "directory" and not stat.S_ISDIR(path_stat.st_mode):
-            return f"{current} (not a directory)"
-        if is_final and expected_kind == "file" and not stat.S_ISREG(path_stat.st_mode):
-            return f"{current} (not a regular file)"
-    return None
-
-
-def _bootstrap_expected_kind_problem(expected_kind: object) -> str | None:
-    try:
-        supported = expected_kind in SUPPORTED_EXPECTED_KINDS
-    except TypeError:
-        supported = False
-    if not supported:
-        return "expected_kind must be None, 'file', or 'directory'"
     return None
 
 
 def current_script_root() -> Path:
-    return _bootstrap_lexical_absolute(Path(__file__).parent.parent)
+    return _loader_lexical_absolute(Path(__file__).parent.parent)
 
 
-def _bootstrap_path_resolution_package_problem(root: Path) -> str | None:
+def load_path_resolution_bootstrap(root: Path):
     package_dir = root / "scripts" / PATH_RESOLUTION_PACKAGE
-    package_problem = _bootstrap_no_follow_path_problem(
-        package_dir,
-        expected_kind="directory",
-        allow_missing=False,
-        boundary=root,
-    )
-    if package_problem:
-        return package_problem
+    bootstrap_path = package_dir / "bootstrap.py"
+    bootstrap_problem = _loader_file_problem(root, bootstrap_path)
+    if bootstrap_problem:
+        raise RuntimeError(f"unsafe path-resolution bootstrap module: {bootstrap_problem}")
 
-    for module_name in PATH_RESOLUTION_REQUIRED_MODULES:
-        module_problem = _bootstrap_no_follow_path_problem(
-            package_dir / module_name,
-            expected_kind="file",
-            allow_missing=False,
-            boundary=root,
-        )
-        if module_problem:
-            return module_problem
-
+    spec = importlib.util.spec_from_file_location("_agentos_checked_path_resolution_bootstrap", bootstrap_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"could not load path-resolution bootstrap module: {bootstrap_path}")
+    module = importlib.util.module_from_spec(spec)
     try:
-        module_paths = sorted(package_dir.glob("*.py"))
-    except OSError as error:
-        return f"{package_dir} ({error.__class__.__name__}: {error})"
-    if not module_paths:
-        return f"{package_dir} (package contains no Python modules)"
-
-    for module_path in module_paths:
-        module_problem = _bootstrap_no_follow_path_problem(
-            module_path,
-            expected_kind="file",
-            allow_missing=False,
-            boundary=root,
-        )
-        if module_problem:
-            return module_problem
-    return None
-
-
-# Bootstrap stays local so this script can inspect the path-resolution package before executing it.
-def load_managed_paths():
-    root = current_script_root()
-    package_problem = _bootstrap_path_resolution_package_problem(root)
-    if package_problem:
-        raise RuntimeError(f"unsafe path-resolution package: {package_problem}")
-
-    package_dir = root / "scripts" / PATH_RESOLUTION_PACKAGE
-    package_init = package_dir / "__init__.py"
-    managed_path = package_dir / "managed.py"
-    checked_package_name = "_agentos_checked_path_resolution"
-    for module_name in [
-        f"{checked_package_name}.managed",
-        f"{checked_package_name}._primitives",
-        checked_package_name,
-    ]:
-        sys.modules.pop(module_name, None)
-
-    package_spec = importlib.util.spec_from_file_location(
-        checked_package_name,
-        package_init,
-        submodule_search_locations=[str(package_dir)],
-    )
-    if package_spec is None or package_spec.loader is None:
-        raise RuntimeError(f"could not load path-resolution package: {package_init}")
-    package_module = importlib.util.module_from_spec(package_spec)
-    sys.modules[checked_package_name] = package_module
-    try:
-        package_spec.loader.exec_module(package_module)
+        spec.loader.exec_module(module)
     except Exception as error:
-        raise RuntimeError(f"could not load path-resolution package: {package_init}: {error}") from error
+        raise RuntimeError(f"could not load path-resolution bootstrap module: {bootstrap_path}: {error}") from error
+    return module
 
-    managed_spec = importlib.util.spec_from_file_location(
-        f"{checked_package_name}.managed",
-        managed_path,
-    )
-    if managed_spec is None or managed_spec.loader is None:
-        raise RuntimeError(f"could not load managed paths module: {managed_path}")
-    managed_module = importlib.util.module_from_spec(managed_spec)
-    sys.modules[managed_spec.name] = managed_module
-    try:
-        managed_spec.loader.exec_module(managed_module)
-        getattr(managed_module, "managed_path_problem_text")
-    except Exception as error:
-        raise RuntimeError(f"could not load managed paths module: {managed_path}: {error}") from error
-    return managed_module
+
+_ROOT_FOR_BOOTSTRAP = current_script_root()
 
 
 try:
-    _MANAGED_PATHS = load_managed_paths()
+    _PATH_RESOLUTION_BOOTSTRAP = load_path_resolution_bootstrap(_ROOT_FOR_BOOTSTRAP)
+    _MANAGED_PATHS = _PATH_RESOLUTION_BOOTSTRAP.load_checked_managed_paths(_ROOT_FOR_BOOTSTRAP)
 except RuntimeError as error:
     print(f"AgentOS export failed: {error}", file=sys.stderr)
     raise SystemExit(2)
+_bootstrap_lexical_absolute = _PATH_RESOLUTION_BOOTSTRAP.lexical_absolute
+_bootstrap_final_path_problem = _PATH_RESOLUTION_BOOTSTRAP.path_kind_problem
 managed_path_problem_text = _MANAGED_PATHS.managed_path_problem_text
 
 
