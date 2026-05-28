@@ -1,9 +1,10 @@
 """Managed-path safety checks for AgentOS trusted scripts.
 
 This public module owns one narrow policy: a managed path must stay under its
-declared root, must not traverse symbolic-link components, and must have the
-expected final kind when the caller asks for one. Callers still own AgentOS
-domain policy, status labels, and decisions such as FAIL versus WARN.
+declared root, must not traverse symbolic-link components beneath that root,
+and must have the expected final kind when the caller asks for one. Callers
+still own AgentOS domain policy, status labels, and decisions such as FAIL
+versus WARN.
 """
 
 from __future__ import annotations

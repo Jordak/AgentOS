@@ -15,23 +15,25 @@ from pathlib import Path
 
 sys.dont_write_bytecode = True
 
+_shared_managed_path_problem_list = None
+_shared_managed_relative_path_problem = None
 
-def load_path_resolution_helpers():
+
+def load_path_resolution_helpers(agentos_root: Path) -> None:
     """Temporary bridge for loose script imports.
 
     Package integrity is owned by AgentOS validation. Issue #51 tracks replacing
     this bridge with a first-class import convention for nested AgentOS scripts.
     """
-    repo_scripts_dir = str(Path(__file__).parents[4] / "scripts")
+    repo_scripts_dir = str(agentos_root / "scripts")
     if repo_scripts_dir not in sys.path:
         sys.path.insert(0, repo_scripts_dir)
 
     from path_resolution.managed import managed_path_problem_list, managed_relative_path_problem
 
-    return managed_path_problem_list, managed_relative_path_problem
-
-
-managed_path_problem_list, managed_relative_path_problem = load_path_resolution_helpers()
+    global _shared_managed_path_problem_list, _shared_managed_relative_path_problem
+    _shared_managed_path_problem_list = managed_path_problem_list
+    _shared_managed_relative_path_problem = managed_relative_path_problem
 
 
 SKILL_HEADING_RE = re.compile(r"^### `([^`]+)`\s*$", re.MULTILINE)
@@ -156,22 +158,83 @@ def final_path_kind_problem(
     return _local_final_path_kind_problem(path, expected_kind=expected_kind, allow_missing=allow_missing)
 
 
+def _local_path_component_problems(
+    path: Path,
+    expected_kind: str | None,
+    allow_missing: bool,
+    boundary: Path | None = None,
+) -> list[str]:
+    absolute = _local_lexical_absolute(path)
+    if not absolute.is_absolute():
+        return [f"{path} (path is not absolute after normalization)"]
+
+    if boundary is None:
+        current = Path(absolute.anchor)
+        parts = absolute.parts[1:]
+    else:
+        boundary_absolute = _local_lexical_absolute(boundary)
+        boundary_problem = final_path_kind_problem(boundary_absolute, expected_kind="directory", allow_missing=False)
+        if boundary_problem:
+            return [f"{boundary_absolute} ({boundary_problem})"]
+        try:
+            relative = absolute.relative_to(boundary_absolute)
+        except ValueError:
+            return [f"{absolute} (path is outside the managed root: {boundary_absolute})"]
+        current = boundary_absolute
+        parts = relative.parts
+
+    if not parts:
+        final_problem = final_path_kind_problem(current, expected_kind=expected_kind, allow_missing=allow_missing)
+        return [f"{current} ({final_problem})"] if final_problem else []
+
+    for index, part in enumerate(parts):
+        current = current / part
+        is_final = index == len(parts) - 1
+        try:
+            path_stat = current.lstat()
+        except FileNotFoundError:
+            if allow_missing:
+                return []
+            return [f"{current} (path component is missing)"]
+        except OSError as error:
+            return [f"{current} ({error.__class__.__name__}: {error})"]
+
+        if stat.S_ISLNK(path_stat.st_mode):
+            return [f"{current} (symbolic link is not allowed)"]
+        if not is_final and not stat.S_ISDIR(path_stat.st_mode):
+            return [f"{current} (path component is not a directory)"]
+        if is_final and expected_kind == "directory" and not stat.S_ISDIR(path_stat.st_mode):
+            return [f"{current} (not a directory)"]
+        if is_final and expected_kind == "file" and not stat.S_ISREG(path_stat.st_mode):
+            return [f"{current} (not a regular file)"]
+    return []
+
+
 def path_component_problems(
     path: Path,
     expected_kind: str | None,
     allow_missing: bool,
     boundary: Path | None = None,
 ) -> list[str]:
-    if boundary is None:
-        absolute = _local_lexical_absolute(path)
-        problem = _local_final_path_kind_problem(absolute, expected_kind=expected_kind, allow_missing=allow_missing)
-        return [f"{absolute} ({problem})"] if problem else []
-    return managed_path_problem_list(
+    if boundary is None or _shared_managed_path_problem_list is None:
+        return _local_path_component_problems(
+            path,
+            expected_kind=expected_kind,
+            allow_missing=allow_missing,
+            boundary=boundary,
+        )
+    return _shared_managed_path_problem_list(
         boundary,
         path,
         expected_kind=expected_kind,
         allow_missing=allow_missing,
     )
+
+
+def managed_relative_path_problem(raw_path: str) -> str | None:
+    if _shared_managed_relative_path_problem is None:
+        raise RuntimeError("path-resolution helpers have not been loaded")
+    return _shared_managed_relative_path_problem(raw_path)
 
 
 def parse_manifest(agentos_root: Path) -> list[SkillEntry]:
@@ -435,49 +498,35 @@ def unreadable_files(files: dict[str, Path]) -> list[str]:
     return problems
 
 
-def existing_path_kind_problem(path: Path, expected_kind: str) -> str | None:
-    try:
-        path_stat = path.lstat()
-    except FileNotFoundError:
-        return None
-    except OSError as error:
-        return f"{error.__class__.__name__}: {error}"
-    if stat.S_ISLNK(path_stat.st_mode):
-        return "symbolic link is not allowed"
-    if expected_kind == "directory" and not stat.S_ISDIR(path_stat.st_mode):
-        return "not a directory"
-    if expected_kind == "file" and not stat.S_ISREG(path_stat.st_mode):
-        return "not a regular file"
-    return None
-
-
 def mirror_path_kind_problems(mirror_dir: Path, canonical_files: dict[str, Path]) -> list[str]:
     mirror_root = mirror_dir.parent
-    if mirror_root.exists() and not mirror_root.is_dir():
-        return [f". ({mirror_root}: not a directory)"]
-    mirror_dir_problem = existing_path_kind_problem(mirror_dir, "directory")
-    if mirror_dir_problem:
-        return [f". ({mirror_dir}: {mirror_dir_problem})"]
+    mirror_root_problems = _local_path_component_problems(
+        mirror_root,
+        expected_kind="directory",
+        allow_missing=True,
+    )
+    if mirror_root_problems:
+        return [f". ({problem})" for problem in mirror_root_problems]
+    mirror_dir_problems = _local_path_component_problems(
+        mirror_dir,
+        expected_kind="directory",
+        allow_missing=True,
+    )
+    if mirror_dir_problems:
+        return [f". ({problem})" for problem in mirror_dir_problems]
     if not mirror_dir.exists():
         return []
 
     problems: list[str] = []
     for rel in sorted(canonical_files):
-        current = mirror_dir
-        parts = Path(rel).parts
-        for part in parts[:-1]:
-            current = current / part
-            problem = existing_path_kind_problem(current, "directory")
-            if problem:
-                problems.append(f"{rel} ({current.relative_to(mirror_dir).as_posix()}: {problem})")
-                break
-            if not current.exists():
-                break
-        else:
-            destination = mirror_dir / rel
-            problem = existing_path_kind_problem(destination, "file")
-            if problem:
-                problems.append(f"{rel} ({rel}: {problem})")
+        destination = mirror_dir / rel
+        destination_problems = _local_path_component_problems(
+            destination,
+            expected_kind="file",
+            allow_missing=True,
+            boundary=mirror_dir,
+        )
+        problems.extend(f"{rel} ({problem})" for problem in destination_problems)
     return problems
 
 
@@ -770,9 +819,14 @@ def main() -> int:
     root_problem = final_path_kind_problem(agentos_root, expected_kind="directory", allow_missing=False)
     if root_problem:
         raise SystemExit(f"Unsafe AgentOS root: {agentos_root} ({root_problem})")
-    mirror_root_problem = final_path_kind_problem(mirror_root, expected_kind="directory", allow_missing=True)
-    if mirror_root_problem:
-        raise SystemExit(f"Unsafe mirror root: {mirror_root} ({mirror_root_problem})")
+    load_path_resolution_helpers(agentos_root)
+    mirror_root_problems = _local_path_component_problems(
+        mirror_root,
+        expected_kind="directory",
+        allow_missing=True,
+    )
+    if mirror_root_problems:
+        raise SystemExit(f"Unsafe mirror root: {'; '.join(mirror_root_problems)}")
     personal_agentos_root = _local_lexical_absolute(args.personal_agentos_root) if args.personal_agentos_root else agentos_root
 
     core_entries = parse_manifest(agentos_root)

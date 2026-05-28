@@ -2,6 +2,8 @@
 
 This package contains reusable path-resolution modules for trusted AgentOS scripts.
 
+The declared root passed to a public module is the trust boundary. Managed-path checks reject symlink traversal beneath that root; they do not try to authenticate the root itself or reject symlinks in its ancestors.
+
 Public callers should import a path-resolution module that matches the policy they need, such as:
 
 ```python

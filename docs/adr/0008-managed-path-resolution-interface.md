@@ -2,7 +2,9 @@
 
 AgentOS trusted scripts should share path-safety behavior through public path-resolution modules, not through caller-composed path primitives.
 
-The first public module is `scripts/path_resolution/managed.py`. It owns one policy-shaped interface: a managed path must stay under its declared root, must not traverse symbolic-link components, and must have the expected final kind when the caller asks for one.
+The first public module is `scripts/path_resolution/managed.py`. It owns one policy-shaped interface: a managed path must stay under its declared root, must not traverse symbolic-link components beneath that declared root, and must have the expected final kind when the caller asks for one.
+
+The declared root is the trust boundary, not something this small module authenticates. A symlink in an ancestor of the declared AgentOS root is allowed because the caller has already chosen that root; the safety invariant is that managed path operations do not silently follow symlinks from that root into some other tree. If AgentOS later needs to defend against a mutable or spoofed checkout root, that should be handled by a separate root-authentication or root-pinning design rather than by widening the managed-path interface.
 
 The package may contain a private implementation layer, currently `scripts/path_resolution/_primitives.py`, for lexical absolute paths, relative containment, `lstat()` facts, and no-follow component walking. That private layer exists for implementation locality across path-resolution modules. It is not a caller interface.
 
