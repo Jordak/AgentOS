@@ -13,16 +13,36 @@ import stat
 import sys
 from dataclasses import dataclass, asdict
 from pathlib import Path
+from typing import Callable
 
 sys.dont_write_bytecode = True
 
-_shared_managed_path_problem_text = None
 PATH_RESOLUTION_PACKAGE = "path_resolution"
 MANAGED_PATH_MODULE = f"{PATH_RESOLUTION_PACKAGE}.managed"
 SUPPORTED_EXPECTED_KINDS = {None, "file", "directory"}
 
 
-def load_path_resolution_helpers(agentos_root: Path) -> None:
+@dataclass(frozen=True)
+class ManagedPathSafety:
+    managed_path_problem_text: Callable[..., str | None]
+
+    def path_component_problems(
+        self,
+        path: Path,
+        expected_kind: str | None,
+        allow_missing: bool,
+        boundary: Path,
+    ) -> list[str]:
+        problem = self.managed_path_problem_text(
+            boundary,
+            path,
+            expected_kind=expected_kind,
+            allow_missing=allow_missing,
+        )
+        return [problem] if problem else []
+
+
+def load_managed_path_safety(agentos_root: Path) -> ManagedPathSafety:
     """Temporary bridge for loose script imports.
 
     Package integrity is owned by AgentOS validation. Issue #51 tracks replacing
@@ -59,8 +79,7 @@ def load_path_resolution_helpers(agentos_root: Path) -> None:
     except AttributeError as error:
         raise RuntimeError(f"path-resolution module missing expected helper: {error}") from error
 
-    global _shared_managed_path_problem_text
-    _shared_managed_path_problem_text = managed_path_problem_text
+    return ManagedPathSafety(managed_path_problem_text=managed_path_problem_text)
 
 
 SKILL_HEADING_RE = re.compile(r"^### `([^`]+)`\s*$", re.MULTILINE)
@@ -115,16 +134,16 @@ def find_agentos_root(start: Path) -> Path:
         manifest_path = path / "os/skills/MANIFEST.md"
         if final_path_kind_problem(path, expected_kind="directory", allow_missing=False):
             continue
-        if not path_component_problems(manifest_path, expected_kind="file", allow_missing=False, boundary=path):
+        if not _local_path_component_problems(manifest_path, expected_kind="file", allow_missing=False, boundary=path):
             return path
     raise SystemExit("Could not find AgentOS root containing os/skills/MANIFEST.md")
 
 
-def agentos_checkout_problem(path: Path) -> str | None:
+def agentos_checkout_problem(path: Path, path_safety: ManagedPathSafety) -> str | None:
     root_problem = final_path_kind_problem(path, expected_kind="directory", allow_missing=False)
     if root_problem:
         return root_problem
-    manifest_problems = path_component_problems(
+    manifest_problems = path_safety.path_component_problems(
         path / "os/skills/MANIFEST.md",
         expected_kind="file",
         allow_missing=False,
@@ -263,28 +282,6 @@ def _local_expected_kind_problem(expected_kind: object) -> str | None:
     return None
 
 
-def path_component_problems(
-    path: Path,
-    expected_kind: str | None,
-    allow_missing: bool,
-    boundary: Path | None = None,
-) -> list[str]:
-    if boundary is None or _shared_managed_path_problem_text is None:
-        return _local_path_component_problems(
-            path,
-            expected_kind=expected_kind,
-            allow_missing=allow_missing,
-            boundary=boundary,
-        )
-    problem = _shared_managed_path_problem_text(
-        boundary,
-        path,
-        expected_kind=expected_kind,
-        allow_missing=allow_missing,
-    )
-    return [problem] if problem else []
-
-
 def canonical_source_path_problem(raw_path: str) -> str | None:
     path = Path(raw_path)
     if path.is_absolute():
@@ -296,9 +293,9 @@ def canonical_source_path_problem(raw_path: str) -> str | None:
     return None
 
 
-def parse_manifest(agentos_root: Path) -> list[SkillEntry]:
+def parse_manifest(agentos_root: Path, path_safety: ManagedPathSafety) -> list[SkillEntry]:
     manifest_path = agentos_root / "os/skills/MANIFEST.md"
-    manifest_problems = path_component_problems(
+    manifest_problems = path_safety.path_component_problems(
         manifest_path,
         expected_kind="file",
         allow_missing=False,
@@ -341,10 +338,11 @@ def parse_manifest(agentos_root: Path) -> list[SkillEntry]:
 
 def discover_personal_overlay_entries(
     personal_agentos_root: Path,
+    path_safety: ManagedPathSafety,
     requested_names: set[str] | None = None,
 ) -> tuple[list[SkillEntry], list[PreflightProblem]]:
     personal_skills_root = personal_agentos_root / "personal/os/skills"
-    problems = path_component_problems(
+    problems = path_safety.path_component_problems(
         personal_skills_root,
         expected_kind="directory",
         allow_missing=True,
@@ -491,11 +489,17 @@ def should_ignore(path: Path) -> bool:
     return any(part in IGNORED_NAMES or part.endswith(".pyc") for part in path.parts)
 
 
-def file_map(root: Path, boundary: Path | None = None) -> tuple[dict[str, Path], list[str]]:
+def file_map(
+    root: Path,
+    boundary: Path | None = None,
+    path_safety: ManagedPathSafety | None = None,
+) -> tuple[dict[str, Path], list[str]]:
     files: dict[str, Path] = {}
     problems: list[str] = []
     if boundary is not None:
-        component_problems = path_component_problems(
+        if path_safety is None:
+            raise ValueError("path_safety is required when file_map checks a managed boundary")
+        component_problems = path_safety.path_component_problems(
             root,
             expected_kind=None,
             allow_missing=True,
@@ -595,7 +599,7 @@ def mirror_path_kind_problems(mirror_dir: Path, canonical_files: dict[str, Path]
     return problems
 
 
-def compare_entry(entry: SkillEntry) -> MirrorResult:
+def compare_entry(entry: SkillEntry, path_safety: ManagedPathSafety) -> MirrorResult:
     notes: list[str] = []
     try:
         source_stat = entry.source_path.lstat()
@@ -636,7 +640,11 @@ def compare_entry(entry: SkillEntry) -> MirrorResult:
             notes=[f"canonical source is a symbolic link: {entry.source_path}"],
         )
 
-    canonical_files, source_problems = file_map(entry.source_root, boundary=entry.managed_root)
+    canonical_files, source_problems = file_map(
+        entry.source_root,
+        boundary=entry.managed_root,
+        path_safety=path_safety,
+    )
     mirror_files: dict[str, Path] = {}
     source_unreadable = [*source_problems, *unreadable_files(canonical_files)]
     if source_unreadable:
@@ -713,7 +721,7 @@ def compare_entry(entry: SkillEntry) -> MirrorResult:
     )
 
 
-def sync_entry(entry: SkillEntry, prune_extra: bool) -> None:
+def sync_entry(entry: SkillEntry, path_safety: ManagedPathSafety, prune_extra: bool) -> None:
     try:
         source_stat = entry.source_path.lstat()
     except OSError:
@@ -721,7 +729,11 @@ def sync_entry(entry: SkillEntry, prune_extra: bool) -> None:
     if stat.S_ISLNK(source_stat.st_mode):
         return
 
-    canonical_files, source_problems = file_map(entry.source_root, boundary=entry.managed_root)
+    canonical_files, source_problems = file_map(
+        entry.source_root,
+        boundary=entry.managed_root,
+        path_safety=path_safety,
+    )
     if source_problems:
         return
     if mirror_path_kind_problems(entry.mirror_dir, canonical_files):
@@ -885,7 +897,7 @@ def main() -> int:
     if root_problem:
         raise SystemExit(f"Unsafe AgentOS root: {agentos_root} ({root_problem})")
     try:
-        load_path_resolution_helpers(agentos_root)
+        path_safety = load_managed_path_safety(agentos_root)
     except RuntimeError as error:
         raise SystemExit(f"Unsafe path-resolution package: {error}")
     mirror_root_problem = final_path_kind_problem(
@@ -897,14 +909,14 @@ def main() -> int:
         raise SystemExit(f"Unsafe mirror root: {mirror_root} ({mirror_root_problem})")
     personal_agentos_root = _local_lexical_absolute(args.personal_agentos_root) if args.personal_agentos_root else agentos_root
 
-    core_entries = parse_manifest(agentos_root)
+    core_entries = parse_manifest(agentos_root, path_safety)
     requested_names = set(args.skill) if args.skill else None
     core_names = {entry.name for entry in core_entries}
     scoped_to_core = requested_names is not None and requested_names <= core_names
     personal_entries: list[SkillEntry] = []
     preflight_results: list[MirrorResult] = []
     if not args.core_only:
-        personal_root_problem = agentos_checkout_problem(personal_agentos_root)
+        personal_root_problem = agentos_checkout_problem(personal_agentos_root, path_safety)
         if personal_root_problem:
             if not scoped_to_core:
                 raise SystemExit(
@@ -913,6 +925,7 @@ def main() -> int:
         else:
             personal_entries, personal_problems = discover_personal_overlay_entries(
                 personal_agentos_root,
+                path_safety,
                 requested_names=requested_names,
             )
             preflight_results.extend(personal_preflight_results(personal_problems, mirror_root))
@@ -943,9 +956,9 @@ def main() -> int:
         for entry in entries:
             if block_all_sync or entry.name in blocked_names:
                 continue
-            sync_entry(entry, prune_extra=args.prune_extra)
+            sync_entry(entry, path_safety, prune_extra=args.prune_extra)
 
-    results = [*preflight_results, *[compare_entry(entry) for entry in entries]]
+    results = [*preflight_results, *[compare_entry(entry, path_safety) for entry in entries]]
 
     if args.json:
         print(json.dumps([asdict(result) for result in results], indent=2))
