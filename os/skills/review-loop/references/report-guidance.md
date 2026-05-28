@@ -23,7 +23,7 @@ Use this when creating the final temporary HTML report for a review-loop run. Th
    - Explain what changed at the family level, not only at the individual commit level.
 
 5. Review-loop convergence:
-   - Show review-pass cycles, reviewer aliases, accepted finding clusters, fix commits, and final clean status.
+   - Show review-pass cycles, reviewer aliases, reviewer continuity mode for verification passes, accepted finding clusters, fix commits, and final clean status.
    - Name the final fresh review-pass packet and terminal condition.
 
 6. Validation evidence:

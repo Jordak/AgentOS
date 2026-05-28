@@ -66,6 +66,15 @@ After any pause, interruption, resume, unusually long loop, or suspected compact
 - Do not ask the user to manage reviewer opening, reviewer closure, or pass-level prompt assembly; that is `review-pass` responsibility.
 - After compaction, rebuild the ledger first, then reload `review-pass`, then request the next pass.
 
+## Reviewer Continuity
+
+Verification should preserve source-reviewer continuity without making the user manage live reviewer state.
+
+- When the harness can safely resume the same source reviewers, request that `review-pass` use same-source reviewer continuity and provide the source reviewer aliases, source reviewer handles, and relevant finding IDs.
+- When same-source resumption is unavailable, unsafe, or lost after compaction, request packet/finding-source fallback: provide the prior packet, source reviewer aliases, source finding IDs, fix commits, declined rationales, and validation results to fresh verification reviewers.
+- Record the continuity mode in the ledger and final report so later agents can distinguish same-reviewer verification from packet/finding-source fallback.
+- Treat continuity as a verification-quality preference, not as permission for reviewers to keep state open, mutate files, or post PR comments. `review-pass` still owns prompt assembly, reviewer lifecycle, collection, closure, and packet normalization for the current pass.
+
 ## Efficiency Controls
 
 - Use a moderate, balanced, or medium effort level for the orchestrator by default when the harness exposes reasoning-effort controls. Reserve high or extra-high effort for `review-pass` reviewer quality, genuinely ambiguous adjudication, and hard design tradeoffs.
@@ -121,7 +130,7 @@ Accepted findings can be resolved by simplifying, narrowing, splitting, or delet
    - Establish the baseline intent summary described in the Design Escape Hatch section. Keep it in the loop ledger so later packets can be compared against the original brief and allowed alternatives.
 
 2. Set the loop ledger:
-   - Track each pass cycle, pass mode, review packet path or chat status, reviewer aliases when supplied by `review-pass`, raw findings or crosswalk summaries, normalized family IDs, accepted/declined decisions, fix commits, validation results, consolidated comment URL or chat status, and pass closure status.
+   - Track each pass cycle, pass mode, reviewer continuity mode, review packet path or chat status, reviewer aliases when supplied by `review-pass`, raw findings or crosswalk summaries, normalized family IDs, accepted/declined decisions, fix commits, validation results, consolidated comment URL or chat status, and pass closure status.
    - Normalize families into stable IDs such as `C1-F3` and preserve source reviewer IDs from `review-pass`.
    - If compaction or interruption loses details, rebuild the ledger from consolidated "Agent Review" comments, commit history, local validation output, and saved or pasted review packets.
    - Prefer one consolidated "Agent Review" comment per panel pass for PR targets. For non-PR targets, keep packet output in chat and the final report.
@@ -151,8 +160,10 @@ Accepted findings can be resolved by simplifying, narrowing, splitting, or delet
 
 6. Run a verification review pass:
    - Reopen `review-pass` and request `verification` mode.
-   - Provide only the needed prior packet or family IDs, fix commits, accepted fixes, declined rationales, validation results, and consolidated comment URL.
+   - Prefer same-source reviewer continuity when the harness can safely resume source reviewers; otherwise use packet/finding-source fallback.
+   - Provide only the needed reviewer continuity preference, source reviewer aliases or handles, prior packet or family IDs, fix commits, accepted fixes, declined rationales, validation results, and consolidated comment URL.
    - Ask `review-pass` to verify prior findings, reassess declined findings against the rationale, and reread the full current diff for missed or newly introduced issues.
+   - Record whether the verification pass used same-source reviewer continuity or packet/finding-source fallback.
    - If the verification packet contains likely accepted or unresolved findings, adjudicate them, fix accepted families, and request another verification pass.
    - If a verification packet challenges a declined rationale, reassess once from repository evidence; ask the user if the dispute changes product behavior, scope, or remains genuinely ambiguous.
    - Continue until verification packets report no likely accepted findings and no unresolved design-judgment blockers for the active family set.
@@ -191,7 +202,7 @@ Call narrower playbooks for their owned surfaces: GitHub workflow policy for PR 
 - The parent agent reaches out to the user whenever user judgment would help decide scope, design direction, or whether to keep investing in the loop.
 - Accepted findings have concrete fix commits or local changes, plus validation evidence.
 - Declined findings have short rationales and are not silently dropped.
-- Verification passes check prior fixes and reread the full current diff.
+- Verification passes prefer same-source reviewer continuity when safely available, record any packet/finding-source fallback, check prior fixes, and reread the full current diff.
 - The final state is supported by a fresh `review-pass` packet with no likely accepted findings on its initial pass.
 - The final HTML report follows `references/report-guidance.md` and can be reconstructed from consolidated PR comments, review packets, and commits.
 - PR-scoped comments and commits are factual and clearly labeled as agent-generated review work.
@@ -217,11 +228,12 @@ Before finishing:
 7. Confirm every accepted finding or issue family has a fix, a scope/design change, or an explicit unresolved-risk note.
 8. Confirm every declined finding has a rationale.
 9. Confirm accepted issue families were swept for sibling occurrences before verification.
-10. Confirm review-pass requests used the current fresh or verification templates, including reporting mode, read-only rule, no-reviewer-PR-comment rule, issue-family sweep instruction, design-escape-hatch instruction, full-reread instruction, provisional-ID rule, and clean response sentinel.
+10. Confirm review-pass requests used the current fresh or verification templates, including reporting mode, read-only rule, no-reviewer-PR-comment rule, dirty-validation rule, issue-family sweep instruction, design-escape-hatch instruction, full-reread instruction, provisional-ID rule, and clean response sentinel.
 11. If a structural-depth lens was assigned, confirm `review-pass` supplied the structural-depth lens instructions and no full architecture-report workflow was run inside `review-loop`.
-12. Confirm soft budget checkpoints were surfaced when checkpoint triggers occurred.
-13. Confirm validation commands and results are captured.
-14. Confirm fix commits use the active agent-name prefix.
-15. Confirm the temporary HTML report exists, follows `references/report-guidance.md`, hyperlinks commit hashes to GitHub commits when possible, and is linked in the orchestrator's chat as a clickable absolute-path `.html` Markdown link.
-16. Confirm consolidated "Agent Review" comments followed `references/agent-review-comment.md` when posted.
-17. Confirm no merges, issue closures, label creation, permission changes, non-target-branch pushes, or other out-of-loop external writes happened without current user authorization.
+12. Confirm verification continuity mode was recorded for verification passes.
+13. Confirm soft budget checkpoints were surfaced when checkpoint triggers occurred.
+14. Confirm validation commands and results are captured.
+15. Confirm fix commits use the active agent-name prefix.
+16. Confirm the temporary HTML report exists, follows `references/report-guidance.md`, hyperlinks commit hashes to GitHub commits when possible, and is linked in the orchestrator's chat as a clickable absolute-path `.html` Markdown link.
+17. Confirm consolidated "Agent Review" comments followed `references/agent-review-comment.md` when posted.
+18. Confirm no merges, issue closures, label creation, permission changes, non-target-branch pushes, or other out-of-loop external writes happened without current user authorization.

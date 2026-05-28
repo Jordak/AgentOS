@@ -11,10 +11,12 @@ Before sending a reviewer prompt, confirm it includes:
 - mode: `fresh` or `verification`;
 - reviewer alias and optional lens;
 - custom lens notes when provided;
+- reviewer continuity preference plus source reviewer aliases and source finding IDs in verification mode when applicable; source reviewer handles stay in the orchestration request when needed for resumption;
 - structural-depth lens instructions when that lens is assigned;
 - reporting mode: chat to review-pass orchestrator only;
 - instruction to read repository instructions before inspecting the target;
 - read-only rule, including no PR comments by reviewers;
+- dirty-validation rule: use existing validation output only, do not run validation commands that may dirty the target checkout, and recommend validation signals for the caller instead;
 - instruction to generalize each finding into an issue family and look for related occurrences;
 - instruction to report design-escape-hatch concerns when repeated findings suggest scope reduction, design clarification, or a different implementation shape;
 - instruction to compare implementation shape against the durable design source on fresh review when one is provided;
@@ -72,6 +74,7 @@ Reporting mode: chat to review-pass orchestrator only
 
 Rules:
 - Do not edit files, commit, push, merge, comment on the PR, label, close issues, mark ready, or change external state.
+- Use existing validation output only. Do not run validation commands that may dirty the target checkout; recommend validation signals for the caller instead.
 - Read the repository instructions and inspect the full target against the base.
 - Your optional lens is a prompt for extra attention, not a limit; still review the full target.
 - If your optional lens is `structural-depth`, apply the Structural-Depth Lens above.
@@ -100,6 +103,7 @@ Mode: verification
 Reviewer alias: <P2-R1, P2-R2, etc.>
 Optional lens: <general | correctness | tests-regressions | edge-cases-data-integrity | architecture-depth | code-judo | design-compliance | issue-compliance | ux-api-docs | security-privacy | release-risk | structural-depth | none>
 Custom lens notes: <target-specific concerns or none>
+Reviewer continuity: <same-source reviewer resumed | packet/finding-source fallback | none; include source reviewer aliases and finding IDs when applicable>
 Prior packet or findings for you to verify: <finding IDs and summaries relevant to this reviewer or lens>
 Fix commits: <commit SHAs and one-line summaries>
 Accepted findings fixed: <brief list>
@@ -110,11 +114,13 @@ Reporting mode: chat to review-pass orchestrator only
 
 Rules:
 - Do not edit files, commit, push, merge, comment on the PR, label, close issues, mark ready, or change external state.
+- Use existing validation output only. Do not run validation commands that may dirty the target checkout; recommend validation signals for the caller instead.
 - Read the repository instructions and inspect the full current target against the base.
 - Your optional lens is a prompt for extra attention, not a limit; still review the full target.
 - If your optional lens is `structural-depth`, apply the Structural-Depth Lens above.
 
 Tasks:
+- If same-source reviewer continuity is active, verify your own prior findings while still rereading the full current target. If packet/finding-source fallback is active, use the source reviewer aliases and finding IDs as the continuity trail without assuming access to the original reviewer context.
 - Verify whether the prior accepted findings were actually fixed.
 - Check whether declined findings remain worth escalating after reading the rationale.
 - Re-read the full current target against the base, not only the changed lines from the fix commit.
@@ -141,6 +147,7 @@ Baseline Intent: <summary and source, or limitation>
 Panel: <reviewer aliases and count>
 Lens Plan: <reviewer alias -> lens>
 Coverage: <scope inspected, metadata read, limitations>
+Reviewer Continuity: <same-source reviewers resumed | packet/finding-source fallback | none; include source aliases or limitation>
 
 Issue Families:
 1. [<family-id>] [Severity] <family title>
@@ -196,9 +203,11 @@ Do not reconstruct these prompts from memory. Each reviewer prompt must include:
 - reporting mode: chat to review-pass orchestrator only;
 - the repository-instruction rule;
 - the read-only rule, including no PR comments by reviewers;
+- the dirty-validation rule: use existing validation output only, do not run validation commands that may dirty the target checkout, and recommend validation signals for the caller instead;
 - the issue-family instruction: generalize each finding and look for related occurrences before reporting;
 - the design-escape-hatch instruction: call out when scope reduction, design clarification, or a different implementation shape may be better than another patch;
 - prior finding IDs, fixes, declined rationales, comments, and validation when it is a verification pass;
+- reviewer continuity preference plus source reviewer aliases and source finding IDs when applicable; source reviewer handles stay in the orchestration request when needed for resumption;
 - the full-diff reread instruction;
 - the provisional-ID instruction for new findings;
 - the clean response sentinel: start with exactly `No new findings.` on its own first line.
