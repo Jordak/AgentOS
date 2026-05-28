@@ -10,7 +10,7 @@ Contract reference: `os/skills/SKILL_CONTRACT.md`.
 
 ## Summary
 
-- Canonical Core skills: 15.
+- Canonical Core skills: 17.
 
 ## Maintenance Fields
 
@@ -100,17 +100,41 @@ Each skill entry records:
 - Verification coverage: validate the skill with `quick_validate.py` when available; run `scripts/run-validator`; run scoped `mirror-skills` audit/sync smoke checks; manually confirm no bundled reverse mirror script, no future Personal Overlay governance dependency, no specific-person reference, backup behavior, bulk approval behavior, external-origin exclusion behavior, and protected-main behavior.
 - Upgrade notes: complements `mirror-skills` by reviewing local harness skills before promoting approved ones into AgentOS; revisit after the deferred Personal Overlay skills governance design lands.
 
+### `thermo-nuclear-code-quality-review`
+
+- Canonical source: `os/skills/thermo-nuclear-code-quality-review/SKILL.md`
+- Contract status: full.
+- Mutability: read-only.
+- Tools and connectors: local repository files, `git diff`, project instructions, local search, tests when the caller asks for validation, and no external connectors by default.
+- Output artifact: strict code-quality review findings focused on structural regressions, missed simplification, spaghetti growth, file-size pressure, type and layer cleanliness, and maintainability risks.
+- Filing rule: review output stays in chat or the calling review artifact by default; durable follow-up belongs in the mapped project or the invoking workflow's report, not in AgentOS.
+- Safety posture: do not edit files, post comments, push, or change external state unless another explicitly invoked workflow owns those actions; this skill is reviewer guidance by default.
+- Verification coverage: confirm the target diff or code area was inspected, findings prioritize structural risks over nits, no external writes happened, and skill validation plus `scripts/run-validator` pass after skill changes.
+- Upgrade notes: vendored from `cursor/plugins` path `cursor-team-kit/skills/thermo-nuclear-code-quality-review/SKILL.md` at ref `26878d6606afd611197c900bf2dc451ee2e80a74`; review upstream diffs deliberately, preserve `UPSTREAM.md`, and use `mirror-skills` after accepted updates.
+
+### `improve-codebase-architecture`
+
+- Canonical source: `os/skills/improve-codebase-architecture/SKILL.md`
+- Contract status: full.
+- Mutability: mixed: read-only while exploring architecture and presenting candidates; local-write when creating temporary HTML reports; mapped-project local-write only after the user chooses a candidate and approves domain-doc or ADR updates during the grilling loop.
+- Tools and connectors: local repository files, project domain docs (`DOMAIN.md`/`DOMAIN-MAP.md`, with legacy `CONTEXT.md`/`CONTEXT-MAP.md` fallback), `docs/adr/`, local search, optional exploration subagents, temporary HTML output, and no external connectors by default.
+- Output artifact: temporary static HTML architecture-review report with deepening candidates, before/after visuals, recommendation strengths, and a top recommendation; optional project domain-doc or ADR updates after user approval.
+- Filing rule: reports live under the system temporary directory; project-specific domain docs and ADRs live in the mapped project; no durable AgentOS state is created by default.
+- Safety posture: do not write project domain docs or ADRs until the user has selected a candidate or approved the specific update; do not treat a review candidate as implementation approval; external writes require separate approval through the relevant workflow.
+- Verification coverage: confirm domain docs and relevant ADRs were checked, generated reports exist under the temp directory when produced, proposed modules use the skill's architecture vocabulary, ADR conflicts are surfaced when real, and skill validation plus `scripts/run-validator` pass after skill changes.
+- Upgrade notes: vendored from `mattpocock/skills` path `skills/engineering/improve-codebase-architecture/` at ref `0288510dd61ff6ef7c2003834082ab8f2387e80e`; preserve companion references and `UPSTREAM.md`, reapply AgentOS domain-doc alias patches after upstream updates, and use `mirror-skills` after accepted updates.
+
 ### `review-loop`
 
 - Canonical source: `os/skills/review-loop/SKILL.md`
 - Contract status: full.
 - Mutability: mixed: reads local code, GitHub PR metadata, and review context; may edit project files, create fix commits, push to a target PR branch, post consolidated Agent Review PR comments, apply the repository's established ready-for-human marker, and write a temporary HTML report when explicitly authorized for a review loop.
-- Tools and connectors: local `git`, project validation commands, GitHub connector or `gh`, review subagents when available, `make-temp-file`, `os/skills/check-implementation-readiness/SKILL.md`, `os/playbook/IMPLEMENT_FEATURES.md`, `os/playbook/ARTIFACTS.md`, and `os/playbook/GITHUB_WORKFLOW.md`.
+- Tools and connectors: local `git`, project validation commands, GitHub connector or `gh`, review subagents when available, optional structural-depth reviewer lens sourced from `thermo-nuclear-code-quality-review` and `improve-codebase-architecture`, `make-temp-file`, `os/skills/check-implementation-readiness/SKILL.md`, `os/playbook/IMPLEMENT_FEATURES.md`, `os/playbook/ARTIFACTS.md`, and `os/playbook/GITHUB_WORKFLOW.md`.
 - Output artifact: temporary static HTML review-loop report, optional project fix commits, optional consolidated PR comments, and optional ready-for-human PR marker.
 - Filing rule: no durable AgentOS state by default; temporary reports live under the system temporary directory; project fixes, commits, branches, and reports live in the target project; PR comments and ready markers stay in GitHub.
 - Safety posture: use only after explicit review-loop authorization; keep reviewer subagents read-only; run or honor the implementation-readiness gate for feature-sized PRs before spawning reviewers; do not merge, close issues, create labels, delete branches, change permissions, push outside the target PR branch, or publish outside the PR review surface without separate approval.
-- Verification coverage: confirm target/base/head and panel sizing, durable design readiness or recorded gate skip for feature-sized targets, baseline intent, reviewer prompt templates, accepted/declined findings, sibling sweeps, validation commands, clean final reviewer panel, temporary HTML report, and absence of unapproved external writes.
-- Upgrade notes: Core reusable orchestration workflow for fresh-context PR review/fix loops.
+- Verification coverage: confirm target/base/head and panel sizing, durable design readiness or recorded gate skip for feature-sized targets, baseline intent, reviewer prompt templates, structural-depth lens instructions when assigned, accepted/declined findings, sibling sweeps, validation commands, clean final reviewer panel, temporary HTML report, and absence of unapproved external writes.
+- Upgrade notes: Core reusable orchestration workflow for fresh-context PR review/fix loops; structural-depth lens is a prompt lens, not a nested architecture-report workflow.
 
 ### `run-agentos-doctor`
 
