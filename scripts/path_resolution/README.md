@@ -23,5 +23,5 @@ This keeps the public modules deep: callers ask a policy-shaped question, while 
 Run the managed-path self-test with:
 
 ```bash
-python3 scripts/path_resolution/managed.py --self-test
+PYTHONPATH=scripts python3 -m path_resolution.managed --self-test
 ```
