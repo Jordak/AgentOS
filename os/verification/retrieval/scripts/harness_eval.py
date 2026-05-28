@@ -45,6 +45,7 @@ HARNESS_UNAVAILABLE_PATTERNS = (
     "failed to initialize in-process app-server client",
     "failed to initialize state runtime",
     "attempt to write a readonly database",
+    "Not inside a trusted directory",
     "Error finding codex home",
     "CODEX_HOME points to",
 )
@@ -144,6 +145,7 @@ def codex_command(
         "exec",
         "--cd",
         str(root),
+        "--skip-git-repo-check",
         "--sandbox",
         "read-only",
         "--ephemeral",
@@ -989,6 +991,18 @@ def run_self_test(root: Path, questions_path: Path) -> int:
         print(json.dumps(synthetic_report["summary"], indent=2))
         return 1
 
+    codex_probe = codex_command(
+        Path("agentos-export"),
+        Path("schema.json"),
+        "prompt",
+        Path("last-message.json"),
+        effort="low",
+    )
+    if "--skip-git-repo-check" not in codex_probe:
+        print("SELF-TEST FAIL: Codex harness command does not allow sanitized non-git exports.")
+        print(json.dumps(codex_probe, indent=2))
+        return 1
+
     unavailable_result = HarnessResult(
         harness="codex",
         question_id=question["id"],
@@ -1003,6 +1017,25 @@ def run_self_test(root: Path, questions_path: Path) -> int:
     if unavailable_report["summary"]["harness_unavailable"] != 1 or unavailable_report["summary"]["behavioral_fail"] != 0:
         print("SELF-TEST FAIL: harness startup failure was not separated from behavioral failures.")
         print(json.dumps(unavailable_report["summary"], indent=2))
+        return 1
+
+    trusted_directory_result = HarnessResult(
+        harness="codex",
+        question_id=question["id"],
+        response=None,
+        raw_response="",
+        command=["codex", "exec"],
+        exit_code=1,
+        stderr="Not inside a trusted directory and --skip-git-repo-check was not specified.",
+        version="codex-test",
+    )
+    trusted_directory_report = report_for_results(root, {question["id"]: question}, [trusted_directory_result])
+    if (
+        trusted_directory_report["summary"]["harness_unavailable"] != 1
+        or trusted_directory_report["summary"]["behavioral_fail"] != 0
+    ):
+        print("SELF-TEST FAIL: Codex trusted-directory failure was not separated from behavioral failures.")
+        print(json.dumps(trusted_directory_report["summary"], indent=2))
         return 1
 
     print("SELF-TEST PASS: valid structured responses were accepted.")
