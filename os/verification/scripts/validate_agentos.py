@@ -10,7 +10,6 @@ skill instead of this portable validator.
 from __future__ import annotations
 
 import argparse
-import importlib
 import importlib.util
 import json
 import os
@@ -25,7 +24,7 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 
 PATH_RESOLUTION_PACKAGE = "path_resolution"
-MANAGED_PATH_MODULE = f"{PATH_RESOLUTION_PACKAGE}.managed"
+
 
 def _bootstrap_lexical_absolute(path: Path) -> Path:
     """Make a path absolute without resolving symbolic links."""
@@ -68,6 +67,8 @@ def _bootstrap_path_problem(
     boundary_problem = _bootstrap_final_path_problem(boundary_absolute, expected_kind="directory", allow_missing=False)
     if boundary_problem:
         return f"{boundary_absolute} ({boundary_problem})"
+    if ".." in path.expanduser().parts:
+        return f"{path} (parent-directory segments are not allowed)"
     absolute = _bootstrap_lexical_absolute(path)
     try:
         relative = absolute.relative_to(boundary_absolute)
@@ -122,10 +123,38 @@ def load_managed_paths():
     if package_problem:
         raise RuntimeError(f"unsafe path-resolution package: {package_problem}")
 
-    scripts_dir = str(root / "scripts")
-    if scripts_dir not in sys.path:
-        sys.path.insert(0, scripts_dir)
-    return importlib.import_module(MANAGED_PATH_MODULE)
+    package_dir = root / "scripts" / PATH_RESOLUTION_PACKAGE
+    package_init = package_dir / "__init__.py"
+    managed_path = package_dir / "managed.py"
+    checked_package_name = "_agentos_checked_path_resolution"
+    for module_name in [
+        f"{checked_package_name}.managed",
+        f"{checked_package_name}._primitives",
+        checked_package_name,
+    ]:
+        sys.modules.pop(module_name, None)
+
+    package_spec = importlib.util.spec_from_file_location(
+        checked_package_name,
+        package_init,
+        submodule_search_locations=[str(package_dir)],
+    )
+    if package_spec is None or package_spec.loader is None:
+        raise RuntimeError(f"could not load path-resolution package: {package_init}")
+    package_module = importlib.util.module_from_spec(package_spec)
+    sys.modules[checked_package_name] = package_module
+    package_spec.loader.exec_module(package_module)
+
+    managed_spec = importlib.util.spec_from_file_location(
+        f"{checked_package_name}.managed",
+        managed_path,
+    )
+    if managed_spec is None or managed_spec.loader is None:
+        raise RuntimeError(f"could not load managed paths module: {managed_path}")
+    managed_module = importlib.util.module_from_spec(managed_spec)
+    sys.modules[managed_spec.name] = managed_module
+    managed_spec.loader.exec_module(managed_module)
+    return managed_module
 
 
 _MANAGED_PATHS = load_managed_paths()

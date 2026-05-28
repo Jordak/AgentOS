@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 import os
 import re
@@ -17,6 +18,8 @@ sys.dont_write_bytecode = True
 
 _shared_managed_path_problem_list = None
 _shared_managed_relative_path_problem = None
+PATH_RESOLUTION_PACKAGE = "path_resolution"
+MANAGED_PATH_MODULE = f"{PATH_RESOLUTION_PACKAGE}.managed"
 
 
 def load_path_resolution_helpers(agentos_root: Path) -> None:
@@ -25,15 +28,32 @@ def load_path_resolution_helpers(agentos_root: Path) -> None:
     Package integrity is owned by AgentOS validation. Issue #51 tracks replacing
     this bridge with a first-class import convention for nested AgentOS scripts.
     """
-    repo_scripts_dir = str(agentos_root / "scripts")
-    if repo_scripts_dir not in sys.path:
-        sys.path.insert(0, repo_scripts_dir)
+    repo_scripts_dir = _local_lexical_absolute(agentos_root / "scripts")
 
-    from path_resolution.managed import managed_path_problem_list, managed_relative_path_problem
+    def is_repo_scripts_entry(entry: str) -> bool:
+        try:
+            return _local_lexical_absolute(Path(entry)) == repo_scripts_dir
+        except OSError:
+            return False
+
+    sys.path[:] = [entry for entry in sys.path if not is_repo_scripts_entry(entry)]
+    sys.path.insert(0, str(repo_scripts_dir))
+    for module_name in [
+        MANAGED_PATH_MODULE,
+        f"{PATH_RESOLUTION_PACKAGE}._primitives",
+        PATH_RESOLUTION_PACKAGE,
+    ]:
+        sys.modules.pop(module_name, None)
+
+    managed_module = importlib.import_module(MANAGED_PATH_MODULE)
+    module_file = getattr(managed_module, "__file__", None)
+    expected_module_file = repo_scripts_dir / PATH_RESOLUTION_PACKAGE / "managed.py"
+    if module_file is None or _local_lexical_absolute(Path(module_file)) != expected_module_file:
+        raise RuntimeError(f"path-resolution import did not load expected module: {expected_module_file}")
 
     global _shared_managed_path_problem_list, _shared_managed_relative_path_problem
-    _shared_managed_path_problem_list = managed_path_problem_list
-    _shared_managed_relative_path_problem = managed_relative_path_problem
+    _shared_managed_path_problem_list = managed_module.managed_path_problem_list
+    _shared_managed_relative_path_problem = managed_module.managed_relative_path_problem
 
 
 SKILL_HEADING_RE = re.compile(r"^### `([^`]+)`\s*$", re.MULTILINE)
@@ -165,6 +185,9 @@ def _local_path_component_problems(
     boundary: Path | None = None,
     boundary_allow_missing: bool = False,
 ) -> list[str]:
+    if ".." in path.expanduser().parts:
+        return [f"{path} (parent-directory segments are not allowed)"]
+
     absolute = _local_lexical_absolute(path)
     if not absolute.is_absolute():
         return [f"{path} (path is not absolute after normalization)"]

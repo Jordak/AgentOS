@@ -10,11 +10,28 @@ versus WARN.
 from __future__ import annotations
 
 import argparse
+import importlib.util
+import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from . import _primitives
+
+def _load_direct_primitives():
+    module_path = Path(__file__).with_name("_primitives.py")
+    spec = importlib.util.spec_from_file_location("_agentos_path_resolution_primitives", module_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"could not load path primitives: {module_path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+if __package__ in (None, ""):
+    _primitives = _load_direct_primitives()
+else:
+    from . import _primitives
 
 
 @dataclass(frozen=True)
@@ -128,6 +145,14 @@ def run_self_tests() -> int:
         assert managed_relative_path_problem("../file") == "must not contain parent-directory segments"
         assert managed_relative_path_problem("os/INDEX.md") is None
 
+        parent_segment = managed_path_problem(
+            root,
+            safe / ".." / "safe" / "file.txt",
+            expected_kind="file",
+            allow_missing=False,
+        )
+        assert parent_segment and parent_segment.reason == "parent-directory segments are not allowed", parent_segment
+
         target = root / "real"
         target.mkdir()
         link = root / "link"
@@ -145,6 +170,15 @@ def run_self_tests() -> int:
         )
         assert symlink_problem and symlink_problem.path == link, symlink_problem
         assert symlink_problem.reason == "symbolic link is not allowed", symlink_problem
+
+        hidden_symlink_problem = managed_path_problem(
+            root,
+            link / ".." / "safe" / "file.txt",
+            expected_kind="file",
+            allow_missing=False,
+        )
+        assert hidden_symlink_problem, hidden_symlink_problem
+        assert hidden_symlink_problem.reason == "parent-directory segments are not allowed", hidden_symlink_problem
 
     print("PASS path_resolution.managed self-tests")
     return 0

@@ -79,6 +79,11 @@ def no_follow_path_problem(
     if root_problem:
         return root_problem
 
+    raw_path = path.expanduser()
+    if ".." in raw_path.parts:
+        candidate = raw_path if raw_path.is_absolute() else root_absolute / raw_path
+        return PathProblem(candidate, "parent-directory segments are not allowed")
+
     candidate = path if path.is_absolute() else root_absolute / path
     absolute = lexical_absolute(candidate, cwd=cwd)
     try:
