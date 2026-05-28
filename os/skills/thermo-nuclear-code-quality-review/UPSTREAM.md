@@ -13,7 +13,7 @@ Files vendored:
 Local AgentOS patches:
 
 - Add this provenance file.
-- Reference use as source material for `review-loop`'s structural-depth lens.
+- Reference use as source material for `review-pass`'s structural-depth lens.
 - Remove upstream `disable-model-invocation` frontmatter because Codex skill validation only allows supported metadata keys.
 
 Update procedure:

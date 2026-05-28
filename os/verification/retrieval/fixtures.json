@@ -103,6 +103,23 @@
       ]
     },
     {
+      "id": "review-pass",
+      "category": "code review",
+      "prompt": "Run one manual review iteration on this PR and give me a structured review packet without fixing or posting anything.",
+      "expected": {
+        "skill": "review-pass"
+      },
+      "evidence": [
+        {
+          "path": "os/skills/review-pass/SKILL.md",
+          "contains": [
+            "one read-only review panel pass",
+            "structured Markdown review packet"
+          ]
+        }
+      ]
+    },
+    {
       "id": "github-issue-breakdown",
       "category": "github issue breakdown",
       "prompt": "Break a plan into implementation issues and preserve GitHub safety rules.",
