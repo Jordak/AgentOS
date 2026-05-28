@@ -9,6 +9,7 @@ Before sending a reviewer prompt, confirm it includes:
 - target, repository, base, and head or current head;
 - baseline intent summary from the original issue, PR description, spec, or user request;
 - reviewer alias and optional lens;
+- structural-depth lens instructions when that lens is assigned;
 - reporting mode: chat to orchestrator only;
 - read-only rule, including no PR comments by reviewers;
 - instruction to generalize each finding into an issue family and look for related occurrences;
@@ -19,6 +20,23 @@ Before sending a reviewer prompt, confirm it includes:
 - full-diff reread instruction;
 - provisional-ID instruction for new findings;
 - clean response sentinel: start the response with exactly `No new findings.` on its own first line;
+
+## Structural-Depth Lens
+
+Use this lens only when the reviewer prompt assigns `structural-depth` as the optional lens.
+
+This lens blends `thermo-nuclear-code-quality-review` and `improve-codebase-architecture` into a PR-review posture. It is a lens inside `review-loop`, not a request to run the full `improve-codebase-architecture` HTML-report workflow.
+
+Additional priorities:
+
+- Be ambitious about structural simplification. Look for a code-judo move that preserves behavior while deleting concepts, branches, wrappers, conditionals, or layers.
+- Treat spaghetti growth as a design risk: new ad-hoc conditionals, scattered special cases, one-off flags, cast-heavy contracts, wrong-layer logic, and bespoke helpers should be flagged when they make the code harder to reason about.
+- Watch file-size and decomposition pressure, especially a PR pushing a file from below 1000 lines to above 1000 lines.
+- Use the architecture vocabulary exactly where relevant: **module**, **interface**, **implementation**, **depth**, **deep**, **shallow**, **seam**, **adapter**, **leverage**, **locality**.
+- Apply the deletion test to suspicious modules: if deleting the module makes complexity vanish, it is probably pass-through; if complexity would reappear across callers, it may be earning its keep.
+- Prefer deeper modules with smaller interfaces, better locality, and tests that cross the same interface callers use.
+- Do not approve merely because behavior works if the PR clearly makes the codebase structurally messier.
+- If the best answer is a separate architecture pass rather than another local patch, report it as a `Design escape hatch` concern instead of proposing a broad redesign inside the review loop.
 
 ## Initial Fresh Reviewer Prompt
 
@@ -31,13 +49,14 @@ Base: <base ref or commit>
 Head: <head ref or commit>
 Baseline intent: <brief summary of required outcomes, explicit alternatives, non-goals, chosen implementation shape, and risky assumptions>
 Reviewer alias: <C1-R1, C1-R2, etc.>
-Optional lens: <general correctness | tests/regressions | edge cases/data integrity | UX/API/docs | none>
+Optional lens: <general correctness | tests/regressions | edge cases/data integrity | UX/API/docs | structural-depth | none>
 Reporting mode: chat to orchestrator only
 
 Rules:
 - Do not edit files, commit, push, merge, comment on the PR, label, or change PR state.
 - Read the repository instructions and inspect the full diff against the base.
 - Your optional lens is a prompt for extra attention, not a limit; still review the full diff.
+- If your optional lens is `structural-depth`, apply the Structural-Depth Lens above.
 - Prioritize correctness, regressions, missing tests, safety, maintainability risks, and user-facing behavior.
 - Report findings first, ordered by severity, with file/line evidence and suggested fixes.
 - Give each finding a provisional ID using your reviewer alias, such as `<alias>-F1`; the orchestrator may normalize IDs later.
@@ -70,6 +89,7 @@ Reporting mode: chat to orchestrator only
 
 Rules:
 - Do not edit files, commit, push, merge, comment on the PR, label, or change PR state.
+- If your optional lens is `structural-depth`, apply the Structural-Depth Lens above.
 
 Tasks:
 - Verify whether your originated accepted findings were actually fixed.
@@ -130,6 +150,7 @@ Do not reconstruct these prompts from memory. Each reviewer prompt must include:
 - target, repository, base, and current head;
 - baseline intent summary from the original issue, PR description, spec, or user request;
 - reviewer alias and optional lens;
+- structural-depth lens instructions when that lens is assigned;
 - reporting mode: chat to orchestrator only;
 - the read-only rule, including no PR comments by reviewers;
 - the issue-family instruction: generalize each finding and look for related occurrences before reporting;

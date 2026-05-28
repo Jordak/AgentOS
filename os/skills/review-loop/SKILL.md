@@ -35,6 +35,7 @@ Tools and connectors:
 - Local `git`, project test commands, and repository-specific validation.
 - GitHub connector or `gh` for PR metadata, consolidated comments, labels, draft state, and branch pushes.
 - The active harness's clean-context reviewer/delegation capability for review panels.
+- Optional structural-depth review lens informed by `os/skills/thermo-nuclear-code-quality-review/SKILL.md` and `os/skills/improve-codebase-architecture/LANGUAGE.md`.
 - `os/skills/check-implementation-readiness/SKILL.md` and `os/playbook/IMPLEMENT_FEATURES.md` for PR design-source preflight.
 - `make-temp-file` for temporary report paths when available.
 - `os/playbook/ARTIFACTS.md` for substantial report format decisions.
@@ -124,6 +125,7 @@ Accepted findings can be resolved by simplifying, narrowing, splitting, or delet
    - Use 4 reviewers for broad, cross-cutting, multi-subsystem, migration, public API, security, data-integrity, concurrency, or user-facing workflow changes.
    - Use 5 reviewers only for unusually large or high-risk PRs, or when the user asks for extra confidence.
    - Give every reviewer the full diff. Optionally assign lightweight lenses to improve diversity, but do not make any reviewer responsible only for a slice.
+   - Use at most one `structural-depth` lens in a normal panel, usually on broad, architecture-sensitive, maintainability-heavy, or churn-prone diffs. The lens blends thermo-nuclear code-quality standards with the improve-codebase-architecture vocabulary; it does not run the full architecture-report workflow inside `review-loop`.
 
 3. Set the loop ledger:
    - Track each panel cycle, reviewer alias, reviewer status, pass number, raw findings, normalized finding IDs, accepted/declined decisions, fix commits, validation results, consolidated comment URL or chat status, and closure status.
@@ -188,6 +190,8 @@ Keep this as one orchestration skill by default. Call narrower skills or playboo
 
 Split into additional skills only after a subworkflow is reused independently. Good split candidates are a generic reviewer-agent prompt skill, a PR review report generator, or a GitHub ready-for-human transition skill. Until then, references are lighter than nested skills.
 
+Use the vendored `thermo-nuclear-code-quality-review` and `improve-codebase-architecture` skills as reviewer-lens source material, not as nested workflows. If structural-depth findings suggest a larger architecture effort, trigger the Design Escape Hatch and ask whether to run `improve-codebase-architecture` separately.
+
 ## Quality Bar
 
 - Fresh panel size matches PR size and risk.
@@ -196,6 +200,7 @@ Split into additional skills only after a subworkflow is reused independently. G
 - Feature-sized review targets have a `Ready to Implement` design source or an explicit `Gate Skipped` bypass recorded before reviewers are spawned.
 - Reviewers are context-independent at the start of each fresh panel cycle.
 - Reviewer prompts are assembled from the current templates, not memory.
+- Structural-depth reviewers receive the current structural-depth prompt section when assigned, and the orchestrator treats broad architecture recommendations as design-escape-hatch candidates rather than automatic patch work.
 - The orchestrator owns one ledger and posts at most one consolidated "Agent Review" comment per panel pass.
 - Findings are generalized into issue families where possible, and accepted families are swept before re-review.
 - Repeated findings in the same issue family trigger a design-escape-hatch check rather than automatic patch accumulation.
@@ -230,8 +235,9 @@ Before finishing:
 8. Confirm every declined finding has a rationale.
 9. Confirm accepted issue families were swept for sibling occurrences before re-review.
 10. Confirm reviewer prompts used the current initial or same-reviewer templates, including reporting mode, read-only rule, no-reviewer-PR-comment rule, issue-family sweep instruction, design-escape-hatch instruction, full-reread instruction, provisional-ID rule, and clean response sentinel.
-11. Confirm soft budget checkpoints were surfaced when checkpoint triggers occurred.
-12. Confirm validation commands and results are captured.
-13. Confirm fix commits use the active agent-name prefix.
-14. Confirm the temporary HTML report exists, follows `references/report-guidance.md`, hyperlinks commit hashes to GitHub commits when possible, and is linked in the orchestrator's chat as a clickable absolute-path `.html` Markdown link.
-15. Confirm no merges, issue closures, label creation, permission changes, non-target-branch pushes, or other out-of-loop external writes happened without current user authorization.
+11. If a structural-depth lens was assigned, confirm the reviewer received the structural-depth lens instructions and no full architecture-report workflow was run inside `review-loop`.
+12. Confirm soft budget checkpoints were surfaced when checkpoint triggers occurred.
+13. Confirm validation commands and results are captured.
+14. Confirm fix commits use the active agent-name prefix.
+15. Confirm the temporary HTML report exists, follows `references/report-guidance.md`, hyperlinks commit hashes to GitHub commits when possible, and is linked in the orchestrator's chat as a clickable absolute-path `.html` Markdown link.
+16. Confirm no merges, issue closures, label creation, permission changes, non-target-branch pushes, or other out-of-loop external writes happened without current user authorization.
