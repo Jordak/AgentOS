@@ -24,6 +24,7 @@ from pathlib import Path
 sys.dont_write_bytecode = True
 
 PATH_RESOLUTION_PACKAGE = "path_resolution"
+PATH_RESOLUTION_REQUIRED_MODULES = ("__init__.py", "_primitives.py", "managed.py")
 SUPPORTED_EXPECTED_KINDS = {None, "file", "directory"}
 PUBLIC_EXPORT_REQUIRED_SUPPORT_FILES = tuple(
     Path(rel)
@@ -129,6 +130,11 @@ def _bootstrap_path_resolution_package_problem(root: Path) -> str | None:
     if package_problem:
         return package_problem
 
+    for module_name in PATH_RESOLUTION_REQUIRED_MODULES:
+        module_problem = _bootstrap_path_problem(package_dir / module_name, expected_kind="file", boundary=root)
+        if module_problem:
+            return module_problem
+
     try:
         module_paths = sorted(package_dir.glob("*.py"))
     except OSError as error:
@@ -170,7 +176,10 @@ def load_managed_paths():
         raise RuntimeError(f"could not load path-resolution package: {package_init}")
     package_module = importlib.util.module_from_spec(package_spec)
     sys.modules[checked_package_name] = package_module
-    package_spec.loader.exec_module(package_module)
+    try:
+        package_spec.loader.exec_module(package_module)
+    except Exception as error:
+        raise RuntimeError(f"could not load path-resolution package: {package_init}: {error}") from error
 
     managed_spec = importlib.util.spec_from_file_location(
         f"{checked_package_name}.managed",
@@ -180,7 +189,11 @@ def load_managed_paths():
         raise RuntimeError(f"could not load managed paths module: {managed_path}")
     managed_module = importlib.util.module_from_spec(managed_spec)
     sys.modules[managed_spec.name] = managed_module
-    managed_spec.loader.exec_module(managed_module)
+    try:
+        managed_spec.loader.exec_module(managed_module)
+        getattr(managed_module, "managed_path_problem_text")
+    except Exception as error:
+        raise RuntimeError(f"could not load managed paths module: {managed_path}: {error}") from error
     return managed_module
 
 

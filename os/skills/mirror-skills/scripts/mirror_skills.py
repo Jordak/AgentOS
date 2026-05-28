@@ -16,7 +16,7 @@ from pathlib import Path
 
 sys.dont_write_bytecode = True
 
-_shared_managed_path_problem_list = None
+_shared_managed_path_problem_text = None
 PATH_RESOLUTION_PACKAGE = "path_resolution"
 MANAGED_PATH_MODULE = f"{PATH_RESOLUTION_PACKAGE}.managed"
 SUPPORTED_EXPECTED_KINDS = {None, "file", "directory"}
@@ -55,12 +55,12 @@ def load_path_resolution_helpers(agentos_root: Path) -> None:
         raise RuntimeError(f"path-resolution import did not load expected module: {expected_module_file}")
 
     try:
-        managed_path_problem_list = managed_module.managed_path_problem_list
+        managed_path_problem_text = managed_module.managed_path_problem_text
     except AttributeError as error:
         raise RuntimeError(f"path-resolution module missing expected helper: {error}") from error
 
-    global _shared_managed_path_problem_list
-    _shared_managed_path_problem_list = managed_path_problem_list
+    global _shared_managed_path_problem_text
+    _shared_managed_path_problem_text = managed_path_problem_text
 
 
 SKILL_HEADING_RE = re.compile(r"^### `([^`]+)`\s*$", re.MULTILINE)
@@ -269,19 +269,20 @@ def path_component_problems(
     allow_missing: bool,
     boundary: Path | None = None,
 ) -> list[str]:
-    if boundary is None or _shared_managed_path_problem_list is None:
+    if boundary is None or _shared_managed_path_problem_text is None:
         return _local_path_component_problems(
             path,
             expected_kind=expected_kind,
             allow_missing=allow_missing,
             boundary=boundary,
         )
-    return _shared_managed_path_problem_list(
+    problem = _shared_managed_path_problem_text(
         boundary,
         path,
         expected_kind=expected_kind,
         allow_missing=allow_missing,
     )
+    return [problem] if problem else []
 
 
 def canonical_source_path_problem(raw_path: str) -> str | None:

@@ -3,7 +3,6 @@
 __all__ = [
     "ManagedPathProblem",
     "managed_path_problem",
-    "managed_path_problem_list",
     "managed_path_problem_text",
 ]
 

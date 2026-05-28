@@ -92,25 +92,6 @@ def managed_path_problem_text(
     return problem.with_path() if problem else None
 
 
-def managed_path_problem_list(
-    root: Path,
-    path: Path,
-    expected_kind: ExpectedKind,
-    allow_missing: bool,
-    cwd: Path | None = None,
-    root_label: str = "managed root",
-) -> list[str]:
-    problem = managed_path_problem(
-        root,
-        path,
-        expected_kind=expected_kind,
-        allow_missing=allow_missing,
-        cwd=cwd,
-        root_label=root_label,
-    )
-    return [problem.with_path()] if problem else []
-
-
 def run_self_tests() -> int:
     with tempfile.TemporaryDirectory(prefix="path-resolution-") as tmp:
         root = Path(tmp)
