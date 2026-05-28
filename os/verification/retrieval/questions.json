@@ -30,6 +30,16 @@
     ]
   },
   {
+    "id": "review-pass-verification-continuity",
+    "category": "code-review",
+    "question": "Where should an agent find the rules for running a verification review pass with same-source reviewer continuity and private reviewer-handle handoff?",
+    "expected_paths": [
+      "os/skills/review-pass/SKILL.md",
+      "os/skills/review-pass/references/reviewer-prompts.md",
+      "os/skills/review-loop/SKILL.md"
+    ]
+  },
+  {
     "id": "memory-current-state",
     "category": "memory",
     "question": "Where should current operating state and publishable architecture decisions be filed?",
