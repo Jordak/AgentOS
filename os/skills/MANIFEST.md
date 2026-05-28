@@ -133,7 +133,7 @@ Each skill entry records:
 - Output artifact: structured Markdown review packet with target, baseline intent, panel, lens plan, coverage, issue families, recommended dispositions, design-escape-hatch concerns, reviewer crosswalk, residual risks, and optional temporary packet path.
 - Filing rule: no durable AgentOS state by default; chat output by default; optional temporary packet files live under the system temporary directory; project fixes, PR comments, pushes, ready markers, and durable loop ledgers belong to callers such as `review-loop`.
 - Safety posture: read-only reviewer-panel workflow; do not edit files, commit, push, merge, comment on PRs, label, close issues, mark ready, change permissions, or perform external writes; keep spawned reviewers read-only and close them after each pass.
-- Verification coverage: confirm target/base/head, mode, baseline-intent source or limitation, reviewer count, lens plan, current prompt templates, structural-depth instructions when assigned, issue-family normalization, recommended dispositions, sibling-search suggestions, validation signals, reviewer closure, and absence of target or external writes.
+- Verification coverage: confirm target/base/head, mode, baseline-intent source or limitation, reviewer count, lens plan, current prompt templates, structural-depth instructions when assigned, issue-family normalization, recommended dispositions, sibling-search suggestions, validation signals, reviewer closure, and absence of target, PR, issue, or external writes.
 - Upgrade notes: Core reusable read-only panel-pass workflow introduced by GitHub Issue #54; `review-loop` depends on it for fresh and verification reviewer-panel mechanics.
 
 ### `review-loop`

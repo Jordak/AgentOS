@@ -18,7 +18,7 @@ Local AgentOS patches:
 
 - Prefer `DOMAIN.md` and `DOMAIN-MAP.md` as domain-doc names.
 - Treat `CONTEXT.md` and `CONTEXT-MAP.md` as legacy aliases.
-- Keep full architecture-review behavior separate from `review-loop`; `review-loop` may reuse this skill's vocabulary as a reviewer lens.
+- Keep full architecture-review behavior separate from `review-loop`; `review-pass` may reuse this skill's vocabulary as reviewer-lens source material, and `review-loop` consumes that lens through `review-pass`.
 
 Update procedure:
 

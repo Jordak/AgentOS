@@ -13,6 +13,7 @@ Before sending a reviewer prompt, confirm it includes:
 - custom lens notes when provided;
 - structural-depth lens instructions when that lens is assigned;
 - reporting mode: chat to review-pass orchestrator only;
+- instruction to read repository instructions before inspecting the target;
 - read-only rule, including no PR comments by reviewers;
 - instruction to generalize each finding into an issue family and look for related occurrences;
 - instruction to report design-escape-hatch concerns when repeated findings suggest scope reduction, design clarification, or a different implementation shape;
@@ -109,6 +110,7 @@ Reporting mode: chat to review-pass orchestrator only
 
 Rules:
 - Do not edit files, commit, push, merge, comment on the PR, label, close issues, mark ready, or change external state.
+- Read the repository instructions and inspect the full current target against the base.
 - Your optional lens is a prompt for extra attention, not a limit; still review the full target.
 - If your optional lens is `structural-depth`, apply the Structural-Depth Lens above.
 
@@ -192,6 +194,7 @@ Do not reconstruct these prompts from memory. Each reviewer prompt must include:
 - mode, reviewer alias, optional lens, and custom lens notes;
 - structural-depth lens instructions when that lens is assigned;
 - reporting mode: chat to review-pass orchestrator only;
+- the repository-instruction rule;
 - the read-only rule, including no PR comments by reviewers;
 - the issue-family instruction: generalize each finding and look for related occurrences before reporting;
 - the design-escape-hatch instruction: call out when scope reduction, design clarification, or a different implementation shape may be better than another patch;

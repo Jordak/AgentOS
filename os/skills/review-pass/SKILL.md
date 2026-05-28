@@ -34,7 +34,7 @@ Mutability:
 
 Tools and connectors:
 
-- Local filesystem, `git`, `rg`, and project validation commands only when useful for read-only inspection.
+- Local filesystem, `git`, `rg`, and existing validation output for read-only inspection.
 - GitHub connector or `gh` for PR metadata reads when authorized and available.
 - The active harness's clean-context reviewer or subagent capability when available.
 - `make-temp-file` for optional temporary packet paths.
@@ -43,6 +43,7 @@ Tools and connectors:
 Safety:
 
 - Do not edit files, commit, push, merge, comment on PRs, label issues, close issues, mark PRs ready, change permissions, or perform external writes.
+- Do not run validation commands that may dirty the target checkout. Recommend validation signals for the caller when proof requires a mutating test, build, coverage, or fixture command.
 - Keep spawned reviewers read-only and instruct them not to post comments or mutate state.
 - Close every spawned reviewer after its pass completes so stale context does not leak into later passes.
 - If the user asks for fixes, commits, PR comments, pushes, ready markers, or loop convergence, route that work to the caller or to `review-loop`.
