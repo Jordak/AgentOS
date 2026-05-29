@@ -136,6 +136,18 @@ Each skill entry records:
 - Verification coverage: confirm domain docs and relevant ADRs were checked, generated reports exist under the temp directory when produced, proposed modules use the skill's architecture vocabulary, ADR conflicts are surfaced when real, and skill validation plus `scripts/run-validator` pass after skill changes.
 - Upgrade notes: vendored from `mattpocock/skills` path `skills/engineering/improve-codebase-architecture/` at ref `0288510dd61ff6ef7c2003834082ab8f2387e80e`; preserve companion references and `UPSTREAM.md`, reapply AgentOS domain-doc alias patches after upstream updates, and use `mirror-skills` after accepted updates.
 
+### `check-vendored-skill-upstreams`
+
+- Canonical source: `os/skills/check-vendored-skill-upstreams/SKILL.md`
+- Contract status: full.
+- Mutability: read-only.
+- Tools and connectors: local filesystem, `os/skills/*/UPSTREAM.md`, skill-local Python helper, and public GitHub HTTP API for supported upstream sources.
+- Output artifact: text or JSON freshness report with one row per vendored skill, including status, vendored ref, latest path-touching upstream ref, notes, and compare URLs when useful.
+- Filing rule: output stays in chat or the invoking weekly review report by default; no run history or upstream status snapshot is written to Core.
+- Safety posture: never auto-update vendored files, open PRs or issues, post comments, change automations, or write external state; update availability is only a prompt for a reviewed vendoring PR.
+- Verification coverage: run the helper with `--self-test`, run text and JSON checks against the AgentOS root, run skill validation, run `scripts/run-validator`, and run scoped `mirror-skills` audit/sync when current-machine discoverability matters.
+- Upgrade notes: Core reusable freshness check for vendored skill `UPSTREAM.md` files; compare against the latest commit touching the upstream path rather than repository HEAD to avoid noisy unrelated updates.
+
 ### `review-pass`
 
 - Canonical source: `os/skills/review-pass/SKILL.md`

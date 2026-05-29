@@ -1,0 +1,4 @@
+interface:
+  display_name: "Check Vendored Skill Upstreams"
+  short_description: "Audit vendored AgentOS skills for upstream freshness."
+  default_prompt: "Use $check-vendored-skill-upstreams to check Core skills with UPSTREAM.md files for reviewed upstream updates."
