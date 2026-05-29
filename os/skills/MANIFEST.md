@@ -88,18 +88,6 @@ Each skill entry records:
 - Verification coverage: run dry run with a temporary `HOME`; run `--no-dry-run` with a temporary `HOME` and confirm symlink creation; verify scoped `--skill` behavior; run `python3 os/skills/expose-skills/scripts/expose_skills.py --self-test`; verify existing-copy, `--replace-existing-copy` dry-run and apply behavior, backup creation, partial-failure reporting, wrong-target, regular-file, unknown-skill, unrelated global skill, dry-run exit-code, apply exit-code, and symlink-permission failure behavior; run `scripts/run-validator`.
 - Upgrade notes: introduced for GitHub Issue #62 as the symlink-adapter successor to the retired copy-based exposure workflow; Personal Overlay exposure is doc-only in v1.
 
-### `reverse-mirror-skills`
-
-- Canonical source: `os/skills/reverse-mirror-skills/SKILL.md`
-- Contract status: full.
-- Mutability: mixed: read-only in audit/recommendation mode; local-write after approval when importing a skill into Core or the Personal Overlay, updating manifest metadata, backing up or archiving local skills, generating active-harness metadata, or recommending approved current-machine exposure through `expose-skills`.
-- Tools and connectors: local filesystem tools, `git`, `os/skills/MANIFEST.md`, `os/skills/SKILL_CONTRACT.md`, `os/playbook/PERSONAL_OVERLAY.md`, `os/skills/expose-skills/SKILL.md`, optional skill validation helpers, and GitHub only when permitted by the shared external-write policy.
-- Output artifact: prioritized recommendation table for local skills and optional canonical skill files, Core manifest entry, backup/archive directories, current-machine exposure recommendations, and user-approved follow-up issues.
-- Filing rule: reusable public-safe imports live under `os/skills/` and get manifest entries; private user-specific imports live under `personal/os/skills/` and do not get Core manifest entries; local skill backups stay under the local skill root archive; Personal Overlay backups stay under the Personal Overlay skills archive; audit output stays in chat unless the user asks for a local report.
-- Safety posture: treat local skills as potentially private or externally owned until reviewed; require approval before import, overwrite, archive, delete, permanent delete, or current-machine exposure changes; route GitHub issue creation through the shared external-write policy; default local deletion to archive/move; do not overwrite canonical skills automatically; do not record machine-local installed-skill state in the manifest; do not import externally sourced skills without explicit vendor/fork approval.
-- Verification coverage: validate the skill with `quick_validate.py` when available; run `scripts/run-validator`; run `expose-skills` dry run when current-machine Core exposure matters; manually confirm no bundled reverse mirror script, no future Personal Overlay governance dependency, no specific-person reference, backup behavior, bulk approval behavior, external-origin exclusion behavior, protected-main behavior, and GitHub issue-write policy compliance.
-- Upgrade notes: reviews local harness skills before promoting approved ones into AgentOS; revisit after the deferred Personal Overlay skills governance design lands.
-
 ### `thermo-nuclear-code-quality-review`
 
 - Canonical source: `os/skills/thermo-nuclear-code-quality-review/SKILL.md`
