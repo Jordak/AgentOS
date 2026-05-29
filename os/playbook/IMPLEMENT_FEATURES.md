@@ -97,7 +97,7 @@ Do not leave meaningful deferred questions only in chat, model memory, an unpers
 
 If deferred questions are meaningful but out of scope for the current implementation, create durable follow-up artifacts before marking the current scope ready. Use the narrowest appropriate destination:
 
-- GitHub issue when the design source is a tracker issue and tracker writes are authorized by the current request, explicit approval, or a matching Personal Overlay GitHub allowance;
+- GitHub issue when the design source is a tracker issue and tracker writes are authorized by the applicable external-write policy;
 - local project design doc, usually `docs/design/issue-<number>-implementation-readiness.md`, when GitHub writes are not authorized or the user chooses local docs;
 - mapped project docs when the implementation belongs to another project with an existing design-doc convention;
 - Personal Overlay when the deferred question is private or personal.
@@ -106,7 +106,7 @@ After creating follow-up artifacts, update or propose updating the current desig
 
 ## GitHub And External Writes
 
-Before updating or creating GitHub issues, comments, labels, or other tracker state, ask the user unless the current request explicitly authorized tracker writes or a matching Personal Overlay GitHub allowance permits the write type for the target repository. If the user declines a GitHub update, create local documentation or the destination the user chooses.
+Before updating or creating GitHub issues, comments, labels, or other tracker state, follow `os/connections/SAFETY_RULES.md` and `os/playbook/GITHUB_WORKFLOW.md`. If writes are not authorized there or by the current user request, ask. If the user declines a GitHub update, create local documentation or the destination the user chooses.
 
 Follow `os/playbook/GITHUB_WORKFLOW.md` for issue and PR writing conventions, branch discipline, and external tracker safety.
 
@@ -148,5 +148,5 @@ Before implementing feature-sized work, confirm:
 3. The readiness marker is present, or the inferred readiness was confirmed with the user.
 4. Meaningful deferred questions are out of scope and captured in durable follow-up artifacts.
 5. The current design source links to those follow-up artifacts when they exist.
-6. External tracker writes were approved or covered by a matching Personal Overlay GitHub allowance before they happened.
+6. External tracker writes complied with the applicable external-write policy before they happened.
 7. Any PR body for the implementation cites readiness evidence and a readiness verdict, preferring a GitHub issue for issue-driven work, or explains the gate skip.

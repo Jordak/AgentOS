@@ -18,30 +18,9 @@ Do not use these skills or equivalent workflows as the default for simple PR des
 
 When using `/triage`, follow its posting rules, including the AI-generated triage disclaimer. If the repository's issue-tracker or triage-label mapping is missing, run `/setup-matt-pocock-skills` or ask the user for the mapping.
 
-## Personal Overlay GitHub Write Allowances
+## GitHub Write Permissions
 
-GitHub write policy starts with `os/connections/SAFETY_RULES.md`, then applies the user's matching Personal Overlay connection rules.
-
-When the Personal Overlay allows scoped writes for repositories the user owns or maintains, agents may perform the named write types without asking again if the current task clearly targets that repository and the write is part of the requested workflow.
-
-Typical allowed scoped writes can include:
-
-- creating or updating issues;
-- creating or updating pull requests;
-- posting factual issue or PR comments;
-- pushing commits or branches to the targeted repository.
-
-Still ask before:
-
-- merging pull requests;
-- closing issues;
-- creating new labels or milestones;
-- changing permissions, visibility, branch protections, or repository settings;
-- deleting branches, comments, labels, milestones, releases, repositories, or other nontrivial data;
-- pushing outside the target repository or target branch scope;
-- posting to repositories the user does not own or maintain.
-
-When using a scoped allowance, state the target repository and write types in the work summary. If scope changes, pause and ask.
+GitHub writes follow `os/connections/SAFETY_RULES.md` plus any matching Personal Overlay connection allowances. If no allowance or current user request covers the target repository, account, action, and task scope, ask before writing externally.
 
 ## Issue and PR Writing
 

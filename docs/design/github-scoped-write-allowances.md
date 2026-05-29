@@ -4,9 +4,9 @@ Design readiness: ready to implement
 
 ## Problem
 
-AgentOS Core currently treats external GitHub writes as approval-gated by default. Jordan's Personal Overlay also says GitHub comments, issues, PRs, pushes, repository settings, permissions, and visibility changes require explicit approval.
+AgentOS Core currently treats external GitHub writes as approval-gated by default. Jordan's Personal Overlay can also define narrower account- or repository-specific rules, but Core does not yet give those rules a clean way to supersede generic defaults.
 
-That default is safe, but too restrictive for Jordan-owned or Jordan-maintained repositories. It makes agents pause for routine workflow writes after the user has already assigned the task.
+That default is safe, but too restrictive when a trusted Personal Overlay has already authorized a narrow class of routine writes.
 
 ## Chosen Design
 
@@ -19,47 +19,31 @@ Core should define the shape of such allowances:
 - task conditions that activate the allowance;
 - actions that still require explicit approval.
 
-GitHub workflow policy should interpret those allowances for GitHub work. In a matching user-owned or maintained repository, agents may perform allowed routine writes when the current task clearly targets that repo.
+GitHub workflow policy should not define its own permission taxonomy. It should point to the central safety policy and apply any matching Personal Overlay allowance.
 
-## Intended Allowed Writes
+Skills should avoid restating Personal Overlay allowance mechanics. They should link to the central external-write policy and keep only skill-specific safety rules.
 
-A Personal Overlay GitHub allowance may permit:
+## Approval Boundary
 
-- creating or updating issues;
-- creating or updating pull requests;
-- posting factual issue or PR comments;
-- pushing commits or branches to the targeted repository.
-
-## Required Approval Boundary
-
-Agents should still ask before:
-
-- merging pull requests;
-- closing issues;
-- creating new labels or milestones;
-- changing permissions, visibility, branch protections, or repository settings;
-- deleting branches, comments, labels, milestones, releases, repositories, or other nontrivial data;
-- pushing outside the target repository or target branch scope;
-- posting to repositories the user does not own or maintain;
-- credentials/MFA, purchases, new external services, or automations that act without manual review.
+This PR should define where approval rules live, not enumerate GitHub-specific allowances. Personal Overlay files remain responsible for naming concrete accounts, repositories, write types, activation conditions, and actions that still require approval.
 
 ## Non-goals
 
 - Do not grant broad write permission to all GitHub repositories.
 - Do not remove Core's conservative default for users without Personal Overlay allowances.
-- Do not allow PR merges or issue closure without explicit approval.
+- Do not define Jordan's concrete GitHub allowance in Core.
 - Do not change Google Drive, Gmail, Calendar, Slack, or other connector rules in this PR.
 - Do not update Jordan's ignored Personal Overlay file in this Core PR.
 
 ## Acceptance Criteria
 
 - `os/connections/SAFETY_RULES.md` says Core defaults may be superseded by explicit Personal Overlay scoped-write allowances.
-- `os/playbook/GITHUB_WORKFLOW.md` defines GitHub-specific scoped write behavior and required approval boundaries.
-- Feature-readiness, issue-audit, and other Core issue-write surfaces no longer contradict the Personal Overlay allowance model for routine GitHub issue/PR comments and issue creation.
+- `os/playbook/GITHUB_WORKFLOW.md` points GitHub writes to the centralized safety policy instead of repeating allowance examples.
+- Feature-readiness, issue-audit, and other Core issue-write surfaces defer to the centralized external-write policy instead of duplicating Personal Overlay allowance mechanics.
 - PR body includes readiness evidence pointing to this design doc.
 - `scripts/run-validator` passes.
 
 ## Validation Plan
 
 - Run `scripts/run-validator`.
-- Inspect policy text for contradictions around GitHub issue creation, PR creation, comments, pushes, merges, and issue closure.
+- Inspect policy text for repeated Personal Overlay allowance mechanics outside `os/connections/SAFETY_RULES.md`.
