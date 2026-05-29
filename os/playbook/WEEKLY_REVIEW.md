@@ -27,9 +27,16 @@ Review whether AgentOS state is current, useful, and safely filed.
    ```
 
    Replace `<agentos-home>` with the resolved path to the current AgentOS checkout. If setup used `--all-default-adapters` or custom `--adapter <path>` flags, repeat those same flags here so the check covers those managed adapter files. Confirm the canonical `<home>/.agents/AGENTS.md` file and any managed harness adapters still point to the intended AgentOS installation.
-4. Identify stale state, missing templates, private-data risks, and useful follow-up work.
-5. Draft a report as a private generated output under `personal/os/memory/weekly-review/`.
-6. Ask the user to approve any durable state changes or external actions.
+4. If any Core skills have `UPSTREAM.md` provenance files, run the vendored skill upstream freshness check:
+
+   ```bash
+   python3 os/skills/check-vendored-skill-upstreams/scripts/check_vendored_skill_upstreams.py --agentos-root <agentos-home>
+   ```
+
+   Treat update availability as report-only evidence for a separate reviewed vendoring update. Do not auto-update vendored skills during Weekly Review.
+5. Identify stale state, missing templates, private-data risks, and useful follow-up work.
+6. Draft a report as a private generated output under `personal/os/memory/weekly-review/`.
+7. Ask the user to approve any durable state changes or external actions.
 
 ## Retrospective Checklist
 
