@@ -207,9 +207,14 @@ def test_partial_failure_reports_prior_backup_path() -> None:
         _case.assertEqual([result.status for result in results], ["replaced-copy-with-symlink", "blocked"])
         _case.assertTrue(any("backed up existing directory to:" in note for note in results[0].notes))
         _case.assertTrue(any("forced beta symlink failure" in note for note in results[1].notes))
+        beta_failure_note = " ".join(results[1].notes)
+        _case.assertIn("No replacement backup remains because the original directory was restored.", beta_failure_note)
+        legacy_backup_phrase = "Existing " + "copy " + "backup"
+        _case.assertNotIn(legacy_backup_phrase, beta_failure_note)
         assert_symlink_to(adapter_root / "alpha", root / "os/skills/alpha")
         _case.assertTrue((backup_root / "alpha/custom.txt").is_file())
         _case.assertTrue((adapter_root / "beta/custom.txt").is_file())
+        _case.assertFalse((backup_root / "beta").exists())
         _case.assertFalse((adapter_root / "beta").is_symlink())
 
 

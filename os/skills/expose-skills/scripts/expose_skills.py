@@ -310,8 +310,15 @@ def replace_copy_with_symlink(entry: SkillEntry, adapter_path: Path, backup_root
         create_symlink(entry, adapter_path)
     except SystemExit as error:
         restore_note = restore_backup(adapter_path, backup_path)
-        raise SystemExit(f"{error}. Existing copy backup: {backup_path}. {restore_note}")
+        backup_note = replacement_backup_note(backup_path)
+        raise SystemExit(f"{error}. {backup_note} {restore_note}")
     return backup_path
+
+
+def replacement_backup_note(backup_path: Path) -> str:
+    if backup_path.exists() or backup_path.is_symlink():
+        return f"Replacement backup remains at: {backup_path}."
+    return "No replacement backup remains because the original directory was restored."
 
 
 def restore_backup(adapter_path: Path, backup_path: Path) -> str:
