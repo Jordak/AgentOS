@@ -13,6 +13,7 @@ Before sending a reviewer prompt, confirm it includes:
 - custom lens notes when provided;
 - reviewer continuity preference plus source reviewer aliases and source finding IDs in verification mode when applicable; source reviewer handles stay in the orchestration request when needed for resumption;
 - reviewer continuity handle availability in verification mode when applicable, without exposing opaque handle values;
+- deep-review lens instructions when that lens is assigned;
 - structural-depth lens instructions when that lens is assigned;
 - reporting mode: chat to review-pass orchestrator only;
 - instruction to read repository instructions before inspecting the target;
@@ -40,8 +41,23 @@ Named lenses are weighted attention, not exclusive scopes. Every reviewer still 
 - `design-compliance`: fit against the durable design source, ADRs, PRD, or architecture decision, including drift from explicit alternatives and non-goals.
 - `issue-compliance`: fit against the current issue's requested outcomes, acceptance criteria, non-goals, and validation plan.
 - `ux-api-docs`: user-facing behavior, API ergonomics, compatibility, docs accuracy, confusing names, and workflow regressions.
+- `deep-review`: changed-code correctness, security vulnerabilities, breaking behavior, developer-experience regressions, feature-gate leaks, side effects across packages/modules, intended breakage, and severity calibration.
 - `security-privacy`: permissions, secrets, data exposure, auth boundaries, injection, privacy markers, external-account effects, and publication safety.
 - `release-risk`: migration safety, rollout, operational visibility, fallback, dependency risk, performance cliffs, and support burden.
+
+## Deep-Review Lens
+
+Use this lens only when the reviewer prompt assigns `deep-review` as the optional lens. It is the correctness/security/devex branch-audit lens sourced from `thermo-nuclear-review`. It is a lens inside `review-pass`, not a request to run the full Cursor Thermos orchestrator or spawn Thermos subagents.
+
+Additional priorities:
+
+- Scope findings to code added or modified by the target change. Do not report untouched pre-existing vulnerabilities unless the changed code newly exposes or worsens them.
+- Trace cross-package and cross-module side effects before reporting. Do not leave client/server, caller/callee, or flag boundary questions unresolved when the code is available.
+- Check breaking functionality, breaking developer experience, security vulnerabilities, and feature-gate leaks.
+- Treat required new environment variables, secret lookup changes, port/network remaps, and required manual setup scripts as developer-experience risks when they change existing workflows.
+- Calibrate severity honestly. Do not label a finding high priority unless the impact and path are concrete.
+- If the branch intentionally introduces a risky breakage and the scope is clearly constrained, do not report it as accidental. Escalate only when implications look under-weighted, unclear, or unsafe.
+- If medium-or-higher findings exist and PR/MR discussion is available through read-only metadata already provided to the panel, incorporate valid external findings after the independent audit and attribute them. Do not post comments or perform external writes.
 
 ## Structural-Depth Lens
 
@@ -70,7 +86,7 @@ Head: <head ref or commit>
 Baseline intent: <brief summary of required outcomes, explicit alternatives, non-goals, chosen implementation shape, and risky assumptions; say when weak or missing>
 Mode: fresh
 Reviewer alias: <P1-R1, P1-R2, etc.>
-Optional lens: <general | correctness | tests-regressions | edge-cases-data-integrity | architecture-depth | code-judo | design-compliance | issue-compliance | ux-api-docs | security-privacy | release-risk | structural-depth | none>
+Optional lens: <general | correctness | tests-regressions | edge-cases-data-integrity | architecture-depth | code-judo | design-compliance | issue-compliance | ux-api-docs | deep-review | security-privacy | release-risk | structural-depth | none>
 Custom lens notes: <target-specific concerns or none>
 Reporting mode: chat to review-pass orchestrator only
 
@@ -79,6 +95,7 @@ Rules:
 - Use existing validation output only. Do not run validation commands that may dirty the target checkout; recommend validation signals for the caller instead.
 - Read the repository instructions and inspect the full target against the base.
 - Your optional lens is a prompt for extra attention, not a limit; still review the full target.
+- If your optional lens is `deep-review`, apply the Deep-Review Lens above.
 - If your optional lens is `structural-depth`, apply the Structural-Depth Lens above.
 - Prioritize correctness, regressions, missing tests, safety, maintainability risks, user-facing behavior, and design drift.
 - Report findings first, ordered by severity, with file/line evidence and suggested fixes.
@@ -104,7 +121,7 @@ Current head: <new head ref or commit>
 Baseline intent: <brief summary of required outcomes, explicit alternatives, non-goals, chosen implementation shape, and risky assumptions; say when weak or missing>
 Mode: verification
 Reviewer alias: <P2-R1, P2-R2, etc.>
-Optional lens: <general | correctness | tests-regressions | edge-cases-data-integrity | architecture-depth | code-judo | design-compliance | issue-compliance | ux-api-docs | security-privacy | release-risk | structural-depth | none>
+Optional lens: <general | correctness | tests-regressions | edge-cases-data-integrity | architecture-depth | code-judo | design-compliance | issue-compliance | ux-api-docs | deep-review | security-privacy | release-risk | structural-depth | none>
 Custom lens notes: <target-specific concerns or none>
 Reviewer continuity: <same-source reviewer resumed | packet/finding-source fallback | none; include source reviewer aliases and finding IDs when applicable>
 Continuity handle availability: <private handoff available | unavailable | not applicable; never include opaque handle values>
@@ -121,6 +138,7 @@ Rules:
 - Use existing validation output only. Do not run validation commands that may dirty the target checkout; recommend validation signals for the caller instead.
 - Read the repository instructions and inspect the full current target against the base.
 - Your optional lens is a prompt for extra attention, not a limit; still review the full target.
+- If your optional lens is `deep-review`, apply the Deep-Review Lens above.
 - If your optional lens is `structural-depth`, apply the Structural-Depth Lens above.
 
 Tasks:
@@ -205,6 +223,7 @@ Do not reconstruct these prompts from memory. Each reviewer prompt must include:
 - target, repository, base, and current head;
 - baseline intent summary and source or limitation;
 - mode, reviewer alias, optional lens, and custom lens notes;
+- deep-review lens instructions when that lens is assigned;
 - structural-depth lens instructions when that lens is assigned;
 - reporting mode: chat to review-pass orchestrator only;
 - the repository-instruction rule;
