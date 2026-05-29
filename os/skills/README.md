@@ -17,14 +17,14 @@ Use `os/skills/` for reusable workflows: repeatable procedures that an agent can
 - Durable recurring jobs with their own role, cadence, reports, and operational memory: use `personal/os/agents/`; use `os/agents/` for public-safe templates and examples.
 - Broad operating policy: use `os/playbook/`.
 - Project-specific implementation procedures: use the mapped project from the appropriate source map.
-- Machine-local installed harness mirrors as source of truth. Keep canonical behavior here and use `mirror-skills` to check or sync current-machine mirrors.
+- Machine-local installed harness adapters or mirrors as source of truth. Keep canonical behavior here and use `expose-skills` to check or create current-machine Core skill adapters.
 
 ## Common Tie-Breakers
 
 - Skill vs agent: use a skill for a callable repeated workflow; use an agent for a durable role with its own job, inputs, outputs, cadence, reports, and history.
 - Skill vs playbook: use a skill when the workflow is invoked as a capability; use the playbook for cross-cutting AgentOS operating policy.
 - Skill vs manifest: the manifest tracks maintenance facts. It is not the invocation surface and should not duplicate harness-provided descriptions.
-- Skill vs installed mirror: edit canonical files first, then use `mirror-skills` to update current-machine mirrors when needed. Canonical public skills live in Core; canonical private skills can live in the Personal Overlay.
+- Skill vs installed adapter: edit canonical files first, then use `expose-skills` to update current-machine Core skill adapters when needed. Canonical public skills live in Core; canonical private skills can live in the Personal Overlay.
 
 ## Update Rules
 
@@ -37,7 +37,7 @@ Use `os/skills/` for reusable workflows: repeatable procedures that an agent can
 
 ## Provenance
 
-When a skill comes from a repeated user request, failed run, or external recipe, record the reason in the skill or manifest. Do not record current-machine mirror paths or state in the manifest; rerun `mirror-skills` on each machine.
+When a skill comes from a repeated user request, failed run, or external recipe, record the reason in the skill or manifest. Do not record current-machine adapter or mirror paths or state in the manifest; rerun `expose-skills` on each machine.
 
 ## Handoff Rules
 

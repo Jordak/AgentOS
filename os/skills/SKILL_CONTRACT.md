@@ -65,21 +65,23 @@ A skill's verification guidance should test observable behavior, not internal st
 - output-format checks for HTML, DOCX/PDF, slides, sheets, or issue bodies;
 - filing checks that generated state landed in the intended home.
 
-## Mirror Rules
+## Exposure And Mirror Rules
 
 Canonical public AgentOS skills live under `os/skills/`. Canonical private skills can live under `personal/os/skills/<skill-name>/SKILL.md`. Private inputs to a reusable Core skill belong in `personal/os/skills/<core-skill>/CONFIG.md`, not in the Core skill source.
 
-Installed harness mirrors are current-machine artifacts, not portable AgentOS state. Do not record machine-local mirror paths or mirror sync status in `os/skills/MANIFEST.md`.
+Installed harness adapters and mirrors are current-machine artifacts, not portable AgentOS state. Do not record machine-local adapter paths, mirror paths, or sync status in `os/skills/MANIFEST.md`.
 
 Installed skills that adapt private live agents must route private job definitions, histories, reports, briefs, queues, and generated outputs to `personal/os/agents/`, `personal/os/automations/`, or Personal Overlay skill config. They must not route private live agent state into Core `os/agents/` or `os/automations/`.
 
-Use `os/skills/mirror-skills/SKILL.md` and its bundled script to audit or sync mirrors for the active machine. The audit covers Core manifest skills and Personal Overlay skills when present. If a harness needs intentionally different behavior, prefer a canonical thin adapter skill under `os/skills/` or a private skill under `personal/os/skills/` rather than untracked drift in a local mirror.
+Use `os/skills/expose-skills/SKILL.md` and its bundled script when the active machine should expose Core skills through global symlink adapters. `expose-skills` v1 is Core-only and does not scan or expose Personal Overlay skills.
+
+Use `os/skills/mirror-skills/SKILL.md` only for the legacy copy-mirror workflow while it remains available. If a harness needs intentionally different behavior, prefer a canonical thin adapter skill under `os/skills/` or a private skill under `personal/os/skills/` rather than untracked drift in a local mirror.
 
 When changing skill behavior:
 
 1. Read `os/skills/MANIFEST.md`.
 2. Edit the canonical source first.
-3. Run or plan `mirror-skills` when current-machine discoverability matters.
+3. Run or plan `expose-skills` when current-machine Core skill discoverability matters.
 4. Run the skill's verification guidance or note why it was not run.
 
 ## Contract Adoption
