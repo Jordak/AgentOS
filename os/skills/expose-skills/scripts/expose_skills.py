@@ -5,11 +5,13 @@ from __future__ import annotations
 
 import argparse
 import errno
+import importlib.util
 import os
 import re
 import stat
 import sys
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 sys.dont_write_bytecode = True
@@ -18,8 +20,10 @@ SKILL_HEADING_RE = re.compile(r"^### `([^`]+)`\s*$", re.MULTILINE)
 FIELD_RE_TEMPLATE = r"^- {field}:\s*(.*)$"
 SYMLINK_PERMISSION_ERRNOS = {errno.EACCES, errno.EPERM, errno.EROFS}
 SYMLINK_PERMISSION_WINERRORS = {5, 1314}
-APPLY_SUCCESS_STATUSES = {"already-linked", "created-symlink"}
+APPLY_SUCCESS_STATUSES = {"already-linked", "created-symlink", "replaced-copy-with-symlink"}
 DRY_RUN_FAILURE_STATUSES = {"blocked", "missing-source"}
+BACKUP_PARENT = ".archive"
+BACKUP_NAMESPACE = "expose-skills"
 
 
 @dataclass(frozen=True)
@@ -178,7 +182,13 @@ def source_result(entry: SkillEntry, adapter_path: Path) -> ExposureResult | Non
     return None
 
 
-def inspect_adapter(entry: SkillEntry, adapter_root: Path, apply: bool) -> ExposureResult:
+def inspect_adapter(
+    entry: SkillEntry,
+    adapter_root: Path,
+    apply: bool,
+    replace_existing_copy: bool,
+    backup_root: Path,
+) -> ExposureResult:
     adapter_path = adapter_root / entry.name
     source_problem_result = source_result(entry, adapter_path)
     if source_problem_result:
@@ -229,6 +239,23 @@ def inspect_adapter(entry: SkillEntry, adapter_root: Path, apply: bool) -> Expos
         )
 
     if stat.S_ISDIR(adapter_stat.st_mode):
+        if replace_existing_copy:
+            if not apply:
+                return ExposureResult(
+                    "would-replace-existing-copy",
+                    entry.name,
+                    str(adapter_path),
+                    entry.canonical_source,
+                    (f"would move existing directory to backup under: {backup_root}",),
+                )
+            backup_path = replace_copy_with_symlink(entry, adapter_path, backup_root)
+            return ExposureResult(
+                "replaced-copy-with-symlink",
+                entry.name,
+                str(adapter_path),
+                entry.canonical_source,
+                (f"backed up existing directory to: {backup_path}",),
+            )
         return ExposureResult(
             "existing-copy",
             entry.name,
@@ -244,6 +271,67 @@ def inspect_adapter(entry: SkillEntry, adapter_root: Path, apply: bool) -> Expos
         entry.canonical_source,
         ("adapter path exists and is not a symlink or directory; v1 does not overwrite it",),
     )
+
+
+def ensure_safe_directory(path: Path) -> None:
+    problem = path_problem(path, expected_kind="directory", allow_missing=True)
+    if problem:
+        raise SystemExit(f"Unsafe backup directory: {path} ({problem})")
+    try:
+        path.mkdir(exist_ok=True)
+    except OSError as error:
+        raise SystemExit(f"Could not create backup directory: {path} ({error.__class__.__name__}: {error})")
+    problem = path_problem(path, expected_kind="directory", allow_missing=False)
+    if problem:
+        raise SystemExit(f"Unsafe backup directory: {path} ({problem})")
+
+
+def ensure_backup_root(adapter_root: Path, backup_root: Path) -> None:
+    ensure_safe_directory(adapter_root)
+    ensure_safe_directory(adapter_root / BACKUP_PARENT)
+    ensure_safe_directory(adapter_root / BACKUP_PARENT / BACKUP_NAMESPACE)
+    ensure_safe_directory(backup_root)
+
+
+def replace_copy_with_symlink(entry: SkillEntry, adapter_path: Path, backup_root: Path) -> Path:
+    backup_path = backup_root / entry.name
+    ensure_backup_root(adapter_path.parent, backup_root)
+    if backup_path.exists() or backup_path.is_symlink():
+        raise SystemExit(f"Backup path already exists; refusing to overwrite: {backup_path}")
+    try:
+        adapter_path.rename(backup_path)
+    except OSError as error:
+        raise SystemExit(
+            "Could not back up existing skill directory before replacement: "
+            f"{adapter_path} -> {backup_path}. "
+            f"Original error: {error.__class__.__name__}: {error}"
+        )
+    try:
+        create_symlink(entry, adapter_path)
+    except SystemExit as error:
+        restore_note = restore_backup(adapter_path, backup_path)
+        backup_note = replacement_backup_note(backup_path)
+        raise SystemExit(f"{error}. {backup_note} {restore_note}")
+    return backup_path
+
+
+def replacement_backup_note(backup_path: Path) -> str:
+    if backup_path.exists() or backup_path.is_symlink():
+        return f"Replacement backup remains at: {backup_path}."
+    return "No replacement backup remains because the original directory was restored."
+
+
+def restore_backup(adapter_path: Path, backup_path: Path) -> str:
+    if adapter_path.exists() or adapter_path.is_symlink():
+        return "The adapter path now exists; backup was left in place."
+    try:
+        backup_path.rename(adapter_path)
+    except OSError as error:
+        return (
+            "Could not restore the original directory automatically. "
+            f"Restore it manually from the backup. Restore error: {error.__class__.__name__}: {error}"
+        )
+    return "The original directory was restored because symlink creation failed."
 
 
 def create_symlink(entry: SkillEntry, adapter_path: Path) -> None:
@@ -296,6 +384,39 @@ def exit_code(results: list[ExposureResult], apply: bool) -> int:
     return 1 if any(result.status in DRY_RUN_FAILURE_STATUSES for result in results) else 0
 
 
+def collect_results(
+    entries: list[SkillEntry],
+    adapter_root: Path,
+    apply: bool,
+    replace_existing_copy: bool,
+    backup_root: Path,
+) -> list[ExposureResult]:
+    results: list[ExposureResult] = []
+    for entry in entries:
+        try:
+            results.append(
+                inspect_adapter(
+                    entry,
+                    adapter_root,
+                    apply=apply,
+                    replace_existing_copy=replace_existing_copy,
+                    backup_root=backup_root,
+                )
+            )
+        except SystemExit as error:
+            results.append(
+                ExposureResult(
+                    "blocked",
+                    entry.name,
+                    str(adapter_root / entry.name),
+                    entry.canonical_source,
+                    (str(error),),
+                )
+            )
+            break
+    return results
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -315,25 +436,66 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Apply planned exposure changes by creating missing symlink adapters.",
     )
+    parser.add_argument(
+        "--replace-existing-copy",
+        action="store_true",
+        help=(
+            "Replace same-name Core skill directories with symlink adapters after backup. "
+            "Dry run reports the plan; apply requires --no-dry-run."
+        ),
+    )
+    parser.add_argument(
+        "--self-test",
+        action="store_true",
+        help="Run temporary-directory self-tests and exit.",
+    )
     return parser
 
 
-def main() -> int:
-    args = build_parser().parse_args()
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    if args.self_test:
+        if args.agentos_root is not None or args.skill or args.no_dry_run or args.replace_existing_copy:
+            print("error: --self-test cannot be combined with other options", file=sys.stderr)
+            return 2
+        return run_self_tests()
+
     agentos_root = lexical_absolute(args.agentos_root) if args.agentos_root else find_agentos_root(lexical_absolute(Path.cwd()))
     root_problem = path_problem(agentos_root, expected_kind="directory", allow_missing=False)
     if root_problem:
         raise SystemExit(f"Unsafe AgentOS root: {agentos_root} ({root_problem})")
 
     adapter_root = Path.home() / ".agents/skills"
+    backup_run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + f"-pid{os.getpid()}"
+    backup_root = adapter_root / BACKUP_PARENT / BACKUP_NAMESPACE / backup_run_id
     entries = parse_manifest(agentos_root)
     selected_entries = select_entries(entries, args.skill)
 
     apply = bool(args.no_dry_run)
-    results = [inspect_adapter(entry, adapter_root, apply=apply) for entry in selected_entries]
-
+    results = collect_results(
+        selected_entries,
+        adapter_root,
+        apply=apply,
+        replace_existing_copy=bool(args.replace_existing_copy),
+        backup_root=backup_root,
+    )
     print_table(results)
     return exit_code(results, apply)
+
+
+def run_self_tests() -> int:
+    test_path = Path(__file__).with_name("tests") / "test_expose_skills.py"
+    spec = importlib.util.spec_from_file_location("expose_skills_self_tests", test_path)
+    if spec is None or spec.loader is None:
+        print(f"FAIL loading expose_skills self-tests from {test_path}", file=sys.stderr)
+        return 1
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except Exception as exc:  # pragma: no cover - keeps --self-test failures readable.
+        print(f"FAIL loading expose_skills self-tests: {exc}", file=sys.stderr)
+        return 1
+    return int(module.run_self_tests())
 
 
 if __name__ == "__main__":

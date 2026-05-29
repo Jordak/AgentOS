@@ -17,14 +17,14 @@ Use `os/skills/` for reusable workflows: repeatable procedures that an agent can
 - Durable recurring jobs with their own role, cadence, reports, and operational memory: use `personal/os/agents/`; use `os/agents/` for public-safe templates and examples.
 - Broad operating policy: use `os/playbook/`.
 - Project-specific implementation procedures: use the mapped project from the appropriate source map.
-- Machine-local installed harness adapters or mirrors as source of truth. Keep canonical behavior here and use `expose-skills` to check or create current-machine Core skill adapters.
+- Machine-local installed harness adapters or mirrors as source of truth. Keep canonical behavior here and use `expose-skills` to check, create, or explicitly replace current-machine Core skill adapters.
 
 ## Common Tie-Breakers
 
 - Skill vs agent: use a skill for a callable repeated workflow; use an agent for a durable role with its own job, inputs, outputs, cadence, reports, and history.
 - Skill vs playbook: use a skill when the workflow is invoked as a capability; use the playbook for cross-cutting AgentOS operating policy.
 - Skill vs manifest: the manifest tracks maintenance facts. It is not the invocation surface and should not duplicate harness-provided descriptions.
-- Skill vs installed adapter: edit canonical files first, then use `expose-skills` to update current-machine Core skill adapters when needed. Canonical public skills live in Core; canonical private skills can live in the Personal Overlay.
+- Skill vs installed adapter: edit canonical files first, then use `expose-skills` to update current-machine Core skill adapters when needed. Existing same-name Core skill directories require explicit backup-backed replacement. Canonical public skills live in Core; canonical private skills can live in the Personal Overlay.
 
 ## Update Rules
 

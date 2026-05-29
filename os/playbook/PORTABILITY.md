@@ -112,7 +112,7 @@ When moving AgentOS to a new tool:
 - Do not maintain duplicate global instruction mirrors.
 - Keep reusable knowledge in `os/`.
 - Keep installed tool-specific copies as thin as possible.
-- When installed skill adapters are needed, keep the source copy in `os/skills/` and run `expose-skills` on the current machine instead of storing adapter state in portable AgentOS metadata.
+- When installed skill adapters are needed, keep the source copy in `os/skills/` and run `expose-skills` on the current machine instead of storing adapter state in portable AgentOS metadata. Use its explicit replacement mode when migrating same-name Core skill directories to symlink adapters.
 
 ## What Is Not Portable
 
