@@ -17,7 +17,7 @@ Output artifact: a text or JSON freshness report with one row per vendored skill
 
 Mutability: read-only for the AgentOS checkout and upstream sources. The normal helper reads local files and public upstream metadata only; `--self-test` writes temporary fixtures under the system temporary directory.
 
-Tools and connectors: local filesystem, Python helper `scripts/check_vendored_skill_upstreams.py`, and public GitHub HTTP API for supported upstreams.
+Tools and connectors: local filesystem, Python helper `scripts/check_vendored_skill_upstreams.py`, sidecar no-network self-test module, and public GitHub HTTP API for supported upstreams.
 
 Safety: do not edit vendored skills, open PRs/issues, post comments, change automations, or write external state. Treat update availability as a prompt for a reviewed vendoring PR, not as approval to apply upstream changes.
 

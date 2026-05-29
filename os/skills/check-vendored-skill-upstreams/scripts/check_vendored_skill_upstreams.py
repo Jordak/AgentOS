@@ -4,13 +4,10 @@
 from __future__ import annotations
 
 import argparse
-import contextlib
-import io
 import json
 import os
 import re
 import sys
-import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -29,7 +26,6 @@ GITHUB_API = "https://api.github.com"
 @dataclass
 class UpstreamMetadata:
     skill: str
-    upstream_file: str
     source: str
     owner: str | None
     repo: str | None
@@ -130,18 +126,17 @@ def discover_upstream_metadata(root: Path) -> list[UpstreamMetadata]:
     items: list[UpstreamMetadata] = []
     for upstream_file in sorted(skills_root.glob("*/UPSTREAM.md")):
         skill = upstream_file.parent.name
-        items.append(parse_upstream_file(skill, upstream_file, root))
+        items.append(parse_upstream_file(skill, upstream_file))
     return items
 
 
-def parse_upstream_file(skill: str, upstream_file: Path, root: Path) -> UpstreamMetadata:
+def parse_upstream_file(skill: str, upstream_file: Path) -> UpstreamMetadata:
     fields: dict[str, str] = {}
     try:
         text = upstream_file.read_text(encoding="utf-8")
-    except OSError as error:
+    except OSError:
         return UpstreamMetadata(
             skill=skill,
-            upstream_file=relative_display(upstream_file, root),
             source="",
             owner=None,
             repo=None,
@@ -157,7 +152,6 @@ def parse_upstream_file(skill: str, upstream_file: Path, root: Path) -> Upstream
     owner, repo = parse_github_source(source)
     return UpstreamMetadata(
         skill=skill,
-        upstream_file=relative_display(upstream_file, root),
         source=source,
         owner=owner,
         repo=repo,
@@ -339,10 +333,14 @@ def upstream_path_url(owner: str, repo: str, branch: str, path: str) -> str:
 
 
 def print_text_report(root: Path, results: list[UpstreamResult]) -> None:
-    print(f"AgentOS root: {root}")
+    print(format_text_report(root, results))
+
+
+def format_text_report(root: Path, results: list[UpstreamResult]) -> str:
+    lines = [f"AgentOS root: {root}"]
     if not results:
-        print("No vendored skill upstream files found.")
-        return
+        lines.append("No vendored skill upstream files found.")
+        return "\n".join(lines)
     rows = [
         [
             result.status,
@@ -356,25 +354,19 @@ def print_text_report(root: Path, results: list[UpstreamResult]) -> None:
     ]
     headers = ["status", "skill", "vendored", "upstream", "branch", "note"]
     widths = [max(len(str(row[index])) for row in [headers, *rows]) for index in range(len(headers))]
-    print("  ".join(header.ljust(widths[index]) for index, header in enumerate(headers)))
-    print("  ".join("-" * width for width in widths))
+    lines.append("  ".join(header.ljust(widths[index]) for index, header in enumerate(headers)))
+    lines.append("  ".join("-" * width for width in widths))
     for row, result in zip(rows, results):
-        print("  ".join(str(value).ljust(widths[index]) for index, value in enumerate(row)))
+        lines.append("  ".join(str(value).ljust(widths[index]) for index, value in enumerate(row)))
         if result.status == "update-available" and result.compare_url:
-            print(f"  compare: {result.compare_url}")
+            lines.append(f"  compare: {result.compare_url}")
+    return "\n".join(lines)
 
 
 def short_ref(ref: str | None) -> str:
     if not ref:
         return "-"
     return ref[:12]
-
-
-def relative_display(path: Path, root: Path) -> str:
-    try:
-        return path.relative_to(root).as_posix()
-    except ValueError:
-        return path.as_posix()
 
 
 def trim(value: str, limit: int = 240) -> str:
@@ -397,192 +389,9 @@ class CheckError(Exception):
 
 
 def run_self_tests() -> int:
-    old_sha = "1" * 40
-    latest_sha = "2" * 40
-    snapshot_sha = "3" * 40
+    import check_vendored_skill_upstreams_self_test
 
-    with tempfile.TemporaryDirectory(prefix="agentos-upstream-check-") as temp_dir:
-        root = Path(temp_dir)
-        skill_root = root / "os/skills/example-skill"
-        skill_root.mkdir(parents=True)
-        (root / "os/skills/MANIFEST.md").write_text("# manifest\n", encoding="utf-8")
-        (skill_root / "UPSTREAM.md").write_text(
-            "\n".join(
-                [
-                    "# Upstream Provenance",
-                    "",
-                    "Source: `owner/repo`",
-                    "Path: `skills/example/SKILL.md`",
-                    f"Vendored ref: `{old_sha}`",
-                    "Branch: `main`",
-                    "",
-                ]
-            ),
-            encoding="utf-8",
-        )
-        metadata = discover_upstream_metadata(root)
-        assert len(metadata) == 1
-        item = metadata[0]
-        assert item.skill == "example-skill"
-        assert item.owner == "owner"
-        assert item.repo == "repo"
-        assert item.path == "skills/example/SKILL.md"
-        assert item.vendored_ref == old_sha
-        assert item.branch == "main"
-        assert parse_github_source("https://github.com/mattpocock/skills") == ("mattpocock", "skills")
-        assert parse_github_source("github.com/mattpocock/skills") == ("mattpocock", "skills")
-        assert parse_github_source("https://gitlab.com/acme/skill") == (None, None)
-        assert parse_github_source("gitlab.com/acme/skill") == (None, None)
-        assert exit_code([failed(item, "boom")], strict=False) == 1
-        assert exit_code([result_fixture("update-available")], strict=False) == 0
-        assert exit_code([result_fixture("update-available")], strict=True) == 1
-
-        original_request_json = request_json
-        try:
-            globals()["request_json"] = fake_request_json(old_sha, latest_sha, snapshot_sha)
-            update_result = check_upstream(
-                metadata_fixture("needs-update", old_sha, path="skills/update/SKILL.md"),
-                timeout=0.1,
-            )
-            assert update_result.status == "update-available"
-            assert update_result.upstream_ref == latest_sha
-            assert update_result.compare_url == f"https://github.com/owner/repo/compare/{old_sha}...{latest_sha}"
-
-            current_result = check_upstream(
-                metadata_fixture("current", latest_sha, path="skills/current/SKILL.md"),
-                timeout=0.1,
-            )
-            assert current_result.status == "up-to-date"
-            assert current_result.note == "vendored ref is the latest path-touching upstream commit"
-
-            snapshot_result = check_upstream(
-                metadata_fixture("snapshot", snapshot_sha, path="skills/snapshot/SKILL.md"),
-                timeout=0.1,
-            )
-            assert snapshot_result.status == "up-to-date"
-            assert "already contains" in snapshot_result.note
-
-            directory_result = check_upstream(
-                metadata_fixture("directory", old_sha, path="skills/directory/"),
-                timeout=0.1,
-            )
-            assert directory_result.status == "update-available"
-            assert "/tree/main/skills/directory/" in (directory_result.upstream_url or "")
-
-            malformed_ref_result = check_upstream(
-                metadata_fixture("bad-ref", "abc123", path="skills/update/SKILL.md"),
-                timeout=0.1,
-            )
-            assert malformed_ref_result.status == "check-failed"
-            assert "malformed Vendored ref" in malformed_ref_result.note
-
-            malformed_latest_result = check_upstream(
-                metadata_fixture("bad-latest", old_sha, path="skills/malformed-latest/SKILL.md"),
-                timeout=0.1,
-            )
-            assert malformed_latest_result.status == "check-failed"
-            assert "malformed commit SHA" in malformed_latest_result.note
-
-            missing_path_result = check_upstream(
-                metadata_fixture("missing-path", old_sha, path=None),
-                timeout=0.1,
-            )
-            assert missing_path_result.status == "check-failed"
-            assert missing_path_result.note == "missing Path"
-
-            unsupported_source_result = check_upstream(
-                metadata_fixture(
-                    "unsupported-source",
-                    old_sha,
-                    path="skills/unsupported/SKILL.md",
-                    source="https://gitlab.com/acme/skill",
-                    owner=None,
-                    repo=None,
-                ),
-                timeout=0.1,
-            )
-            assert unsupported_source_result.status == "check-failed"
-            assert "unsupported or malformed Source" in unsupported_source_result.note
-
-            text_buffer = io.StringIO()
-            with contextlib.redirect_stdout(text_buffer):
-                print_text_report(root, [update_result])
-            text_output = text_buffer.getvalue()
-            assert "update-available" in text_output
-            assert update_result.compare_url in text_output
-
-            json_payload = json.loads(json.dumps([asdict(update_result)]))
-            assert json_payload[0]["status"] == "update-available"
-            assert json_payload[0]["compare_url"] == update_result.compare_url
-        finally:
-            globals()["request_json"] = original_request_json
-    print("Self-tests passed.")
-    return 0
-
-
-def result_fixture(status: str) -> UpstreamResult:
-    return UpstreamResult(
-        skill="fixture",
-        status=status,
-        source="owner/repo",
-        path="skills/fixture/SKILL.md",
-        vendored_ref="1" * 40,
-        upstream_ref="2" * 40,
-        upstream_branch="main",
-        compare_url=None,
-        upstream_url=None,
-        note="fixture",
-    )
-
-
-def metadata_fixture(
-    skill: str,
-    vendored_ref: str,
-    path: str | None,
-    source: str = "owner/repo",
-    owner: str | None = "owner",
-    repo: str | None = "repo",
-) -> UpstreamMetadata:
-    return UpstreamMetadata(
-        skill=skill,
-        upstream_file=f"os/skills/{skill}/UPSTREAM.md",
-        source=source,
-        owner=owner,
-        repo=repo,
-        path=path,
-        vendored_ref=vendored_ref,
-        branch=None,
-    )
-
-
-def fake_request_json(old_sha: str, latest_sha: str, snapshot_sha: str):
-    def _fake_request_json(url: str, timeout: float) -> Any:
-        parsed = urllib.parse.urlparse(url)
-        if parsed.path == "/repos/owner/repo":
-            return {"default_branch": "main"}
-        if parsed.path == "/repos/owner/repo/commits":
-            query = urllib.parse.parse_qs(parsed.query)
-            path = query.get("path", [""])[0]
-            if path in {"skills/update/SKILL.md", "skills/directory/"}:
-                return [{"sha": latest_sha}]
-            if path == "skills/current/SKILL.md":
-                return [{"sha": latest_sha}]
-            if path == "skills/snapshot/SKILL.md":
-                return [{"sha": latest_sha}]
-            if path == "skills/malformed-latest/SKILL.md":
-                return [{"sha": "abc123"}]
-            return []
-        compare_prefix = "/repos/owner/repo/compare/"
-        if parsed.path.startswith(compare_prefix):
-            base_head = parsed.path[len(compare_prefix) :]
-            if base_head == f"{old_sha}...{latest_sha}":
-                return {"status": "ahead"}
-            if base_head == f"{snapshot_sha}...{latest_sha}":
-                return {"status": "behind"}
-            return {"status": "diverged"}
-        raise CheckError(f"unexpected self-test URL: {url}")
-
-    return _fake_request_json
+    return check_vendored_skill_upstreams_self_test.run()
 
 
 if __name__ == "__main__":
