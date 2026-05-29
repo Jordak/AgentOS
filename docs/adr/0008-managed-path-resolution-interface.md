@@ -24,11 +24,11 @@ If future AgentOS scripts need a genuinely different path-resolution interface, 
 
 This keeps the public modules deep. Callers ask for a managed-path safety result instead of learning the ordering and error modes of normalization, containment, parent walking, symlink rejection, and final-kind validation. Maintainers still get locality for the tricky filesystem mechanics because those mechanics live in one private implementation layer.
 
-This also preserves local policy ownership. The Privacy Validator owns managed-tree and publication-precheck checks. The public export script owns publication-candidate safety. The mirror skill owns mirror discovery, sync, and prune policy. The path-resolution package reports path-safety facts; callers decide labels, FAIL versus WARN, and domain wording.
+This also preserves local policy ownership. The Privacy Validator owns managed-tree and publication-precheck checks. The public export script owns publication-candidate safety. The path-resolution package reports path-safety facts; callers decide labels, FAIL versus WARN, and domain wording.
 
 The rejected alternative was a general public helper module for primitives such as `lexical_absolute`, `is_relative_to`, and final-kind checks. That would reduce visible duplication, but it would make each caller compose the safety policy itself. Under the deletion test, such a module would be shallow: deleting it would mostly move small helper code around while leaving the important sequencing and safety decisions spread across callers.
 
-Package integrity is owned by AgentOS validation and publication tooling, not by every caller. Scripts such as the mirror skill should import the public path-resolution module as a normal dependency and keep their local path checks focused on their own inputs and outputs. Validator/export code may use the private bootstrap support because those scripts own package-integrity checks. Until AgentOS has a first-class import convention for nested scripts, mirror-skills uses a small local import bridge; issue #51 tracks replacing that bridge with the repo-wide convention.
+Package integrity is owned by AgentOS validation and publication tooling, not by every caller. Validator/export code may use the private bootstrap support because those scripts own package-integrity checks and run before normal package imports are available. Other trusted scripts should import the public path-resolution module as a normal dependency and keep their local path checks focused on their own inputs and outputs.
 
 Readiness evidence: `docs/adr/0008-managed-path-resolution-interface.md`
 
