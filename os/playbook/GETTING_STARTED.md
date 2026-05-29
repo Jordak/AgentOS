@@ -90,25 +90,26 @@ Run AgentOS Doctor is not the installer and not mirror sync:
 - Use `os/skills/run-agentos-doctor/SKILL.md` for setup-health workflow and judgment over ambiguous notes.
 - Use `os/skills/run-agentos-doctor/scripts/agentos_doctor.py` for skill-local deterministic setup facts and exact read-only check commands.
 - Use `scripts/install_global_agent_instructions.py` when the user has approved creating, updating, checking, or removing global instruction adapters.
-- Use `os/skills/mirror-skills/scripts/mirror_skills.py` when the user wants to audit or, after approval, sync harness-discoverable skill mirrors.
+- Use `os/skills/expose-skills/scripts/expose_skills.py` when the user wants AgentOS Core skills exposed to the global harness skill root with symlink adapters.
+- Use `os/skills/mirror-skills/scripts/mirror_skills.py` only for the legacy copy-mirror workflow while it remains available.
 
-## Skill Mirrors
+## Skill Exposure
 
 AgentOS Core skills live under `os/skills/`. Private skills can live under `personal/os/skills/<skill-name>/SKILL.md`.
 
-When the user wants the active harness to discover AgentOS skills directly, run the mirror-skills workflow:
+When the user wants the active harness to discover AgentOS Core skills directly, run the expose-skills workflow:
 
 ```bash
-python3 os/skills/mirror-skills/scripts/mirror_skills.py
+python3 os/skills/expose-skills/scripts/expose_skills.py
 ```
 
-Show the audit result before syncing. If the user approves writes to the current-machine mirror root, run:
+Show the dry-run result before applying. If the user approves writes to the global skill root, run:
 
 ```bash
-python3 os/skills/mirror-skills/scripts/mirror_skills.py --sync
+python3 os/skills/expose-skills/scripts/expose_skills.py --no-dry-run
 ```
 
-The mirror audit includes Core skills and Personal Overlay skills. Use `--core-only` only when the user explicitly wants to skip private Personal Overlay skills.
+Expose-skills v1 covers Core manifest skills only. It does not discover or expose Personal Overlay skills. Missing entries become symlink adapters under `~/.agents/skills`; copied mirrors, wrong-target symlinks, and blocked paths are reported but not replaced.
 
 ## Recurring Checks
 

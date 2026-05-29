@@ -1,0 +1,4 @@
+interface:
+  display_name: "Expose Skills"
+  short_description: "Expose Core skills with symlink adapters."
+  default_prompt: "Use $expose-skills to dry-run or apply AgentOS Core skill exposure with global symlink adapters."

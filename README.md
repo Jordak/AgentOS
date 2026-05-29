@@ -45,7 +45,7 @@ Install AgentOS for me.
    python3 os/skills/run-agentos-doctor/scripts/agentos_doctor.py --agentos-home <resolved-agentos-home>
    If extra --all-default-adapters or --adapter <path> flags were used above, repeat those exact flags here. Treat script warnings as facts or next-step recommendations, then use agent judgment for ambiguous setup notes such as automation drafts or disabled notes. Do not make changes without approval.
 9. Summarize what changed, where backups were written, whether the adapter check passed, and what Run AgentOS Doctor recommends.
-10. Ask me whether I want AgentOS skills to be discoverable from my harnesses. If I do, use the mirror-skills workflow to check Core skills and Personal Overlay skills, show me the audit result, and ask before syncing any files outside this checkout.
+10. Ask me whether I want AgentOS Core skills to be discoverable from my harnesses. If I do, use the expose-skills workflow, show me the dry-run result, and ask before applying any writes outside this checkout.
 11. Ask me if I want to hear how to get the most out of AgentOS.
 ```
 
@@ -95,7 +95,7 @@ Use the tools this way:
 - `os/skills/run-agentos-doctor/SKILL.md`: read-only setup-health workflow with agent judgment for ambiguous local state.
 - `os/skills/run-agentos-doctor/scripts/agentos_doctor.py`: skill-local deterministic setup facts and exact read-only check commands.
 - `scripts/install_global_agent_instructions.py`: dry-run, install, check, or remove global instruction adapters after review.
-- `os/skills/mirror-skills/scripts/mirror_skills.py`: audit skill mirrors by default; sync only after approving current-machine writes.
+- `os/skills/expose-skills/scripts/expose_skills.py`: dry-run Core skill exposure by default; apply symlink adapters only after approving current-machine writes.
 
 ## Getting The Most Out Of AgentOS
 
@@ -107,7 +107,7 @@ Useful first moves:
 - When a task reveals a reusable workflow, ask whether it should become a skill, playbook entry, memory entry, verification check, or Personal Overlay note.
 - Keep private state in `$root/personal/os/`; keep public-safe templates, policies, and examples in [AgentOS Core](os/INDEX.md) under `$root/os/`.
 - Ask your agent to occasionally check whether the global instruction adapters still point at the right AgentOS installation, especially after moving the checkout or changing agent harnesses.
-- Ask your agent to run the mirror-skills workflow when you want AgentOS skills to be discoverable from your harness.
+- Ask your agent to run the expose-skills workflow when you want AgentOS Core skills to be discoverable from your harness.
 - Ask your agent to set up a recurring reminder or automation to check this repository for AgentOS updates, if your agent harness supports automations.
 
 For a guided first pass, use the [getting started playbook](os/playbook/GETTING_STARTED.md), or ask your agent:

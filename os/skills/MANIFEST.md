@@ -86,7 +86,19 @@ Each skill entry records:
 - Filing rule: keep canonical skill behavior in `os/skills/`; keep machine-local mirror state out of this manifest; mirror audit output stays in chat unless the user asks for a local report.
 - Safety posture: default to audit-only; ask before writing outside the workspace unless the active harness has already approved the exact mirror root and write scope; do not delete extra mirror files unless the user explicitly asks for pruning.
 - Verification coverage: run the mirror audit script in audit mode; run a `--sync` smoke test against a temporary mirror root; verify scoped `--skill` audit and sync behavior; verify Personal Overlay skill discovery and collision handling; run skill validation and the AgentOS validator when available.
-- Upgrade notes: private live mirror roots and validator paths belong in `personal/os/skills/mirror-skills/CONFIG.md`.
+- Upgrade notes: private live mirror roots and validator paths belong in `personal/os/skills/mirror-skills/CONFIG.md`; legacy copy-mirror workflow pending deletion after `expose-skills` validates through one migration cycle.
+
+### `expose-skills`
+
+- Canonical source: `os/skills/expose-skills/SKILL.md`
+- Contract status: full.
+- Mutability: mixed: read-only dry run by default; current-machine local-write with `--no-dry-run` when creating global symlink adapters under `~/.agents/skills`.
+- Tools and connectors: local filesystem, `os/skills/MANIFEST.md`, and `os/skills/expose-skills/scripts/expose_skills.py`.
+- Output artifact: skill exposure dry-run or apply report and optional current-machine symlink adapters under the global harness skill root.
+- Filing rule: keep canonical skill behavior in `os/skills/`; keep global adapter state out of this manifest; dry-run and apply output stays in chat unless the user asks for a local report.
+- Safety posture: default to dry run; ask before `--no-dry-run` writes unless the user explicitly requested apply behavior; expose only Core manifest skills in v1; do not scan Personal Overlay skills, copy skill files, create junctions, replace copied mirrors, overwrite wrong-target symlinks, or delete global skill dirs.
+- Verification coverage: run dry run with a temporary `HOME`; run `--no-dry-run` with a temporary `HOME` and confirm symlink creation; verify scoped `--skill` behavior; verify existing-copy, wrong-target, unknown-skill, and symlink-permission failure behavior; run `scripts/run-validator`.
+- Upgrade notes: introduced for GitHub Issue #62 as the symlink-adapter successor to copy-based `mirror-skills`; Personal Overlay exposure is doc-only in v1.
 
 ### `reverse-mirror-skills`
 
