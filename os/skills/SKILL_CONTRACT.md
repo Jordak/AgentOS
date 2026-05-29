@@ -73,7 +73,7 @@ Installed harness adapters and mirrors are current-machine artifacts, not portab
 
 Installed skills that adapt private live agents must route private job definitions, histories, reports, briefs, queues, and generated outputs to `personal/os/agents/`, `personal/os/automations/`, or Personal Overlay skill config. They must not route private live agent state into Core `os/agents/` or `os/automations/`.
 
-Use `os/skills/expose-skills/SKILL.md` and its bundled script when the active machine should expose Core skills through global symlink adapters. `expose-skills` v1 is Core-only and does not scan or expose Personal Overlay skills.
+Use `os/skills/expose-skills/SKILL.md` and its bundled script when the active machine should expose Core skills through global symlink adapters. `expose-skills` is Core-only, does not scan or expose Personal Overlay skills, and replaces existing copied Core skill mirrors only through explicit backup-backed replacement.
 
 Use `os/skills/mirror-skills/SKILL.md` only for the legacy copy-mirror workflow while it remains available. If a harness needs intentionally different behavior, prefer a canonical thin adapter skill under `os/skills/` or a private skill under `personal/os/skills/` rather than untracked drift in a local mirror.
 

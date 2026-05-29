@@ -65,7 +65,7 @@ Safety:
    python3 os/skills/expose-skills/scripts/expose_skills.py --agentos-root <agentos-root>
    ```
 
-   Do not use `--no-dry-run` without explicit approval. Use `mirror-skills` only for explicitly requested legacy copy-mirror diagnosis while that workflow remains available.
+   Do not use `--no-dry-run` or `--replace-existing-copy --no-dry-run` without explicit approval. Use `mirror-skills` only for explicitly requested legacy copy-mirror diagnosis while that workflow remains available.
 
 6. Interpret starter setup.
    When the user wants Personal Overlay starter-file diagnosis, this skill reads `os/playbook/GETTING_STARTED.md` and reasons about the relevant starter guidance. Keep that judgment in the agent layer: summarize gaps without quoting private contents, and ask before creating or editing Personal Overlay files.
@@ -82,7 +82,7 @@ Safety:
    Separate deterministic commands from judgment calls. Ask before adapter writes, Core skill exposure applies, legacy mirror syncs, Personal Overlay file creation, automation edits, or current-machine setup changes. Prefer the lower-level tools only after approval:
 
    - `scripts/install_global_agent_instructions.py` for global instruction adapters.
-   - `os/skills/expose-skills/scripts/expose_skills.py` for Core skill exposure dry runs and approved symlink adapter applies.
+   - `os/skills/expose-skills/scripts/expose_skills.py` for Core skill exposure dry runs, approved symlink adapter applies, and approved backup-backed copied mirror replacement.
    - `os/skills/mirror-skills/scripts/mirror_skills.py` only for legacy copy-mirror audits/syncs.
    - `os/playbook/GETTING_STARTED.md` for first-pass Personal Overlay setup.
 
