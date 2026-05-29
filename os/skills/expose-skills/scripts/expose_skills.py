@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import errno
+import importlib.util
 import os
 import re
 import stat
@@ -376,6 +377,39 @@ def exit_code(results: list[ExposureResult], apply: bool) -> int:
     return 1 if any(result.status in DRY_RUN_FAILURE_STATUSES for result in results) else 0
 
 
+def collect_results(
+    entries: list[SkillEntry],
+    adapter_root: Path,
+    apply: bool,
+    replace_existing_copy: bool,
+    backup_root: Path,
+) -> list[ExposureResult]:
+    results: list[ExposureResult] = []
+    for entry in entries:
+        try:
+            results.append(
+                inspect_adapter(
+                    entry,
+                    adapter_root,
+                    apply=apply,
+                    replace_existing_copy=replace_existing_copy,
+                    backup_root=backup_root,
+                )
+            )
+        except SystemExit as error:
+            results.append(
+                ExposureResult(
+                    "blocked",
+                    entry.name,
+                    str(adapter_root / entry.name),
+                    entry.canonical_source,
+                    (str(error),),
+                )
+            )
+            break
+    return results
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -399,15 +433,26 @@ def build_parser() -> argparse.ArgumentParser:
         "--replace-existing-copy",
         action="store_true",
         help=(
-            "Replace same-name copied Core skill directories with symlink adapters. "
+            "Replace same-name Core skill directories with symlink adapters after backup. "
             "Dry run reports the plan; apply requires --no-dry-run."
         ),
+    )
+    parser.add_argument(
+        "--self-test",
+        action="store_true",
+        help="Run temporary-directory self-tests and exit.",
     )
     return parser
 
 
-def main() -> int:
-    args = build_parser().parse_args()
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    if args.self_test:
+        if args.agentos_root is not None or args.skill or args.no_dry_run or args.replace_existing_copy:
+            print("error: --self-test cannot be combined with other options", file=sys.stderr)
+            return 2
+        return run_self_tests()
+
     agentos_root = lexical_absolute(args.agentos_root) if args.agentos_root else find_agentos_root(lexical_absolute(Path.cwd()))
     root_problem = path_problem(agentos_root, expected_kind="directory", allow_missing=False)
     if root_problem:
@@ -420,19 +465,30 @@ def main() -> int:
     selected_entries = select_entries(entries, args.skill)
 
     apply = bool(args.no_dry_run)
-    results = [
-        inspect_adapter(
-            entry,
-            adapter_root,
-            apply=apply,
-            replace_existing_copy=bool(args.replace_existing_copy),
-            backup_root=backup_root,
-        )
-        for entry in selected_entries
-    ]
-
+    results = collect_results(
+        selected_entries,
+        adapter_root,
+        apply=apply,
+        replace_existing_copy=bool(args.replace_existing_copy),
+        backup_root=backup_root,
+    )
     print_table(results)
     return exit_code(results, apply)
+
+
+def run_self_tests() -> int:
+    test_path = Path(__file__).with_name("tests") / "test_expose_skills.py"
+    spec = importlib.util.spec_from_file_location("expose_skills_self_tests", test_path)
+    if spec is None or spec.loader is None:
+        print(f"FAIL loading expose_skills self-tests from {test_path}", file=sys.stderr)
+        return 1
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except Exception as exc:  # pragma: no cover - keeps --self-test failures readable.
+        print(f"FAIL loading expose_skills self-tests: {exc}", file=sys.stderr)
+        return 1
+    return int(module.run_self_tests())
 
 
 if __name__ == "__main__":

@@ -24,7 +24,7 @@ Use `os/skills/` for reusable workflows: repeatable procedures that an agent can
 - Skill vs agent: use a skill for a callable repeated workflow; use an agent for a durable role with its own job, inputs, outputs, cadence, reports, and history.
 - Skill vs playbook: use a skill when the workflow is invoked as a capability; use the playbook for cross-cutting AgentOS operating policy.
 - Skill vs manifest: the manifest tracks maintenance facts. It is not the invocation surface and should not duplicate harness-provided descriptions.
-- Skill vs installed adapter: edit canonical files first, then use `expose-skills` to update current-machine Core skill adapters when needed. Existing copied Core mirrors require explicit backup-backed replacement. Canonical public skills live in Core; canonical private skills can live in the Personal Overlay.
+- Skill vs installed adapter: edit canonical files first, then use `expose-skills` to update current-machine Core skill adapters when needed. Existing same-name Core skill directories require explicit backup-backed replacement. Canonical public skills live in Core; canonical private skills can live in the Personal Overlay.
 
 ## Update Rules
 

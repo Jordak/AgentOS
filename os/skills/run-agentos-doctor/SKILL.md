@@ -82,7 +82,7 @@ Safety:
    Separate deterministic commands from judgment calls. Ask before adapter writes, Core skill exposure applies, legacy mirror syncs, Personal Overlay file creation, automation edits, or current-machine setup changes. Prefer the lower-level tools only after approval:
 
    - `scripts/install_global_agent_instructions.py` for global instruction adapters.
-   - `os/skills/expose-skills/scripts/expose_skills.py` for Core skill exposure dry runs, approved symlink adapter applies, and approved backup-backed copied mirror replacement.
+   - `os/skills/expose-skills/scripts/expose_skills.py` for Core skill exposure dry runs, approved symlink adapter applies, and approved backup-backed same-name Core skill directory replacement.
    - `os/skills/mirror-skills/scripts/mirror_skills.py` only for legacy copy-mirror audits/syncs.
    - `os/playbook/GETTING_STARTED.md` for first-pass Personal Overlay setup.
 

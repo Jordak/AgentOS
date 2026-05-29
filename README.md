@@ -95,7 +95,7 @@ Use the tools this way:
 - `os/skills/run-agentos-doctor/SKILL.md`: read-only setup-health workflow with agent judgment for ambiguous local state.
 - `os/skills/run-agentos-doctor/scripts/agentos_doctor.py`: skill-local deterministic setup facts and exact read-only check commands.
 - `scripts/install_global_agent_instructions.py`: dry-run, install, check, or remove global instruction adapters after review.
-- `os/skills/expose-skills/scripts/expose_skills.py`: dry-run Core skill exposure by default; apply symlink adapters only after approving current-machine writes; replace copied Core skill mirrors only with explicit backup-backed replacement.
+- `os/skills/expose-skills/scripts/expose_skills.py`: dry-run Core skill exposure by default; apply symlink adapters only after approving current-machine writes; replace same-name Core skill directories only with explicit backup-backed replacement.
 
 ## Getting The Most Out Of AgentOS
 

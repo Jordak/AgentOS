@@ -41,8 +41,9 @@ Safety:
 
 - Ask before applying writes to `~/.agents/skills` unless the user explicitly requested `--no-dry-run` or equivalent apply behavior.
 - Do not expose Personal Overlay skills in v1.
-- Do not copy skills, create Windows junctions, delete global skill dirs, replace copied mirrors without `--replace-existing-copy`, or overwrite wrong-target symlinks.
-- With `--replace-existing-copy --no-dry-run`, move same-name copied Core skill directories into `~/.agents/skills/.archive/expose-skills/<run-id>/` before creating symlink adapters.
+- Do not copy skills, create Windows junctions, delete global skill dirs, replace same-name Core skill directories without `--replace-existing-copy`, or overwrite wrong-target symlinks.
+- With `--replace-existing-copy --no-dry-run`, move same-name Core skill directories into `~/.agents/skills/.archive/expose-skills/<run-id>/` before creating symlink adapters.
+- Replacement mode does not byte-compare directory contents or prove copied-mirror provenance. Its approval surface is the dry-run report for each same-name Core skill directory.
 - If symlink creation is blocked by OS, filesystem, sandbox, or permission policy, stop and report the fix.
 - Do not record global adapter status in `os/skills/MANIFEST.md`.
 
@@ -56,15 +57,15 @@ Safety:
 
 2. Run dry run:
    - Use `python3 os/skills/expose-skills/scripts/expose_skills.py`.
-   - Report missing adapters, already-linked adapters, wrong-target symlinks, existing copied mirrors, blocked paths, and missing sources.
+   - Report missing adapters, already-linked adapters, wrong-target symlinks, existing same-name Core skill directories, blocked paths, and missing sources.
    - Ignore non-AgentOS skills that happen to live under the global skill root.
 
 3. Apply only when approved:
    - Use `python3 os/skills/expose-skills/scripts/expose_skills.py --no-dry-run`.
    - Use repeated `--skill <name>` with apply only when the user approved that subset.
    - Missing entries become directory symlinks to canonical Core skill directories.
-   - Existing copied mirrors and wrong-target symlinks are reported, not changed.
-   - To migrate copied Core skill mirrors, use `--replace-existing-copy --no-dry-run`; copied directories are backed up before symlinks are created.
+   - Existing same-name Core skill directories and wrong-target symlinks are reported, not changed.
+   - To migrate same-name Core skill directories, use `--replace-existing-copy --no-dry-run`; those directories are backed up before symlinks are created.
 
 4. Verify:
    - Re-run dry run after applying.
@@ -97,13 +98,13 @@ Apply one missing Core skill adapter:
 python3 os/skills/expose-skills/scripts/expose_skills.py --skill research-brief --no-dry-run
 ```
 
-Dry run replacement of copied Core skill mirrors:
+Dry run replacement of same-name Core skill directories:
 
 ```bash
 python3 os/skills/expose-skills/scripts/expose_skills.py --replace-existing-copy
 ```
 
-Apply replacement of copied Core skill mirrors after approval:
+Apply replacement of same-name Core skill directories after approval:
 
 ```bash
 python3 os/skills/expose-skills/scripts/expose_skills.py --replace-existing-copy --no-dry-run
@@ -117,8 +118,9 @@ Private skills may live under `personal/os/skills/<skill-name>/SKILL.md`, but v1
 
 - Dry run is the default and shows planned global adapter changes before writes.
 - Apply mode creates only missing symlink adapters for Core manifest skills.
-- Existing copied mirrors, wrong-target symlinks, and blocked paths for Core manifest skill names are visible in the report.
-- Existing copied mirrors are replaced only with `--replace-existing-copy --no-dry-run`, and their backups are reported.
+- Existing same-name Core skill directories, wrong-target symlinks, and blocked paths for Core manifest skill names are visible in the report.
+- Existing same-name Core skill directories are replaced only with `--replace-existing-copy --no-dry-run`, and their backups are reported.
+- The script does not prove those directories are byte-identical copies of Core. It treats same-name Core skill directories as eligible only after the user has seen and approved the dry run.
 - Wrong-target symlinks, files, blocked paths, and unrelated global harness skills are not replaced.
 - Unrelated global harness skills are outside this skill's scope and are not reported.
 - Unknown skills fail with the available Core skill list.
@@ -144,13 +146,14 @@ Before finishing changes to this skill:
 1. Run default dry run with a temporary `HOME`.
 2. Run `--no-dry-run` with a temporary `HOME` and confirm symlinks are created.
 3. Run scoped dry run and apply with repeated `--skill` where possible.
-4. Confirm existing copied mirrors are reported but not changed.
-5. Confirm `--replace-existing-copy` dry run reports copied mirror replacement plans without changes.
-6. Confirm `--replace-existing-copy --no-dry-run` backs up copied mirrors and creates symlinks.
+4. Confirm existing same-name Core skill directories are reported but not changed.
+5. Confirm `--replace-existing-copy` dry run reports same-name Core skill directory replacement plans without changes.
+6. Confirm `--replace-existing-copy --no-dry-run` backs up same-name Core skill directories and creates symlinks.
 7. Confirm wrong-target symlinks are reported but not changed.
 8. Confirm regular files are reported but not changed.
 9. Confirm unknown skills fail clearly.
 10. Confirm permission-style symlink failures fail with remediation.
 11. Confirm unrelated global harness skills are ignored.
 12. Confirm dry run exits nonzero only for blocked or missing-source statuses, while apply exits nonzero when requested Core adapters remain unlinked.
-13. Run `scripts/run-validator`.
+13. Run `python3 os/skills/expose-skills/scripts/expose_skills.py --self-test`.
+14. Run `scripts/run-validator`.

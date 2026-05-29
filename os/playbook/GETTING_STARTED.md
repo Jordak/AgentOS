@@ -109,7 +109,7 @@ Show the dry-run result before applying. If the user approves writes to the glob
 python3 os/skills/expose-skills/scripts/expose_skills.py --no-dry-run
 ```
 
-Expose-skills covers Core manifest skills only. It does not discover or expose Personal Overlay skills. Missing entries become symlink adapters under `~/.agents/skills`; wrong-target symlinks and blocked paths are reported but not replaced. Existing copied Core skill mirrors are replaced only after explicit approval with `--replace-existing-copy --no-dry-run`, which moves copied directories into `~/.agents/skills/.archive/expose-skills/<run-id>/` before creating symlink adapters.
+Expose-skills covers Core manifest skills only. It does not discover or expose Personal Overlay skills. Missing entries become symlink adapters under `~/.agents/skills`; wrong-target symlinks and blocked paths are reported but not replaced. Existing same-name Core skill directories are replaced only after explicit approval with `--replace-existing-copy --no-dry-run`, which moves those directories into `~/.agents/skills/.archive/expose-skills/<run-id>/` before creating symlink adapters. The replacement mode does not byte-compare or prove copied-mirror provenance; the dry run is the approval surface for each same-name directory.
 
 ## Recurring Checks
 
