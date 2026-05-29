@@ -7,7 +7,7 @@ description: Run an extremely strict maintainability review for abstraction qual
 
 ## Vendored Source
 
-Vendored from `cursor/plugins` at commit `26878d6606afd611197c900bf2dc451ee2e80a74`, path `cursor-team-kit/skills/thermo-nuclear-code-quality-review/SKILL.md`.
+Vendored from `cursor/plugins` at commit `5102244dabd626b101cff40accbe7f7d1eeefa15`, path `thermos/skills/thermo-nuclear-code-quality-review/SKILL.md`. The original import came from the matching `cursor-team-kit` copy; AgentOS now tracks Thermos as the primary upstream because it is Cursor's dedicated review package.
 
 Use this as a standalone strict maintainability review skill, and as source material for `review-pass`'s structural-depth lens when a PR needs a sharper architecture and code-quality pass.
 
