@@ -110,7 +110,7 @@ Each skill entry records:
 - Filing rule: review output stays in chat or the calling review artifact by default; durable follow-up belongs in the mapped project or the invoking workflow's report, not in AgentOS.
 - Safety posture: do not edit files, post comments, push, or change external state unless another explicitly invoked workflow owns those actions; this skill is reviewer guidance by default.
 - Verification coverage: confirm the target diff or code area was inspected, findings prioritize structural risks over nits, no external writes happened, and skill validation plus `scripts/run-validator` pass after skill changes.
-- Upgrade notes: vendored from `cursor/plugins` path `cursor-team-kit/skills/thermo-nuclear-code-quality-review/SKILL.md` at ref `26878d6606afd611197c900bf2dc451ee2e80a74`; review upstream diffs deliberately, preserve `UPSTREAM.md`, and use `mirror-skills` after accepted updates.
+- Upgrade notes: vendored from `cursor/plugins` path `thermos/skills/thermo-nuclear-code-quality-review/SKILL.md` at ref `5102244dabd626b101cff40accbe7f7d1eeefa15`; the original import used the matching `cursor-team-kit` copy at ref `26878d6606afd611197c900bf2dc451ee2e80a74`; review upstream diffs deliberately, preserve `UPSTREAM.md`, and use `mirror-skills` after accepted updates.
 
 ### `improve-codebase-architecture`
 
