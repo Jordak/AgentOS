@@ -140,12 +140,12 @@ Each skill entry records:
 
 - Canonical source: `os/skills/check-vendored-skill-upstreams/SKILL.md`
 - Contract status: full.
-- Mutability: read-only.
+- Mutability: read-only for the AgentOS checkout and upstream sources; local-write only for temporary fixtures when `--self-test` runs under the system temporary directory.
 - Tools and connectors: local filesystem, `os/skills/*/UPSTREAM.md`, skill-local Python helper, and public GitHub HTTP API for supported upstream sources.
 - Output artifact: text or JSON freshness report with one row per vendored skill, including status, vendored ref, latest path-touching upstream ref, notes, and compare URLs when useful.
 - Filing rule: output stays in chat or the invoking weekly review report by default; no run history or upstream status snapshot is written to Core.
 - Safety posture: never auto-update vendored files, open PRs or issues, post comments, change automations, or write external state; update availability is only a prompt for a reviewed vendoring PR.
-- Verification coverage: run the helper with `--self-test`, run text and JSON checks against the AgentOS root, run skill validation, run `scripts/run-validator`, and run scoped `mirror-skills` audit/sync when current-machine discoverability matters.
+- Verification coverage: run the helper with `--self-test` for parser discovery, status classification, malformed metadata, strict exits, directory-style upstream paths, and report shape; run text and JSON checks against the AgentOS root; run skill validation; run `scripts/run-validator`; and run scoped `mirror-skills` in audit-only mode before review or merge when current-machine discoverability matters. Sync current-machine mirrors only after explicit user approval or after the reviewed PR lands.
 - Upgrade notes: Core reusable freshness check for vendored skill `UPSTREAM.md` files; compare against the latest commit touching the upstream path rather than repository HEAD to avoid noisy unrelated updates.
 
 ### `review-pass`

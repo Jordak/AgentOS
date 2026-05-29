@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
+import io
 import json
 import os
 import re
@@ -19,6 +21,7 @@ from typing import Any
 sys.dont_write_bytecode = True
 
 FIELD_RE = re.compile(r"^([A-Za-z][A-Za-z ]+):\s*(.*?)\s*$")
+COMMIT_SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 DEFAULT_TIMEOUT_SECONDS = 20
 GITHUB_API = "https://api.github.com"
 
@@ -201,6 +204,8 @@ def check_upstream(metadata: UpstreamMetadata, timeout: float) -> UpstreamResult
         return failed(metadata, "missing Path")
     if not metadata.vendored_ref:
         return failed(metadata, "missing Vendored ref")
+    if not is_commit_sha(metadata.vendored_ref):
+        return failed(metadata, "malformed Vendored ref; expected full 40-character commit SHA")
 
     try:
         branch = metadata.branch or fetch_default_branch(metadata.owner, metadata.repo, timeout)
@@ -240,11 +245,17 @@ def fetch_latest_path_commit(owner: str, repo: str, path: str, branch: str, time
     sha = data[0].get("sha")
     if not isinstance(sha, str) or not sha:
         raise CheckError("GitHub commits response missing sha")
+    if not is_commit_sha(sha):
+        raise CheckError("GitHub commits response returned a malformed commit SHA")
     return sha
 
 
 def classify_ref_status(owner: str, repo: str, vendored_ref: str, latest_path_ref: str, timeout: float) -> tuple[str, str]:
-    if same_prefix(vendored_ref, latest_path_ref):
+    if not is_commit_sha(vendored_ref):
+        return "check-failed", "malformed Vendored ref; expected full 40-character commit SHA"
+    if not is_commit_sha(latest_path_ref):
+        return "check-failed", "upstream latest path commit was not a full 40-character commit SHA"
+    if vendored_ref.lower() == latest_path_ref.lower():
         return "up-to-date", "vendored ref is the latest path-touching upstream commit"
     compare = fetch_compare(owner, repo, vendored_ref, latest_path_ref, timeout)
     status = compare.get("status")
@@ -257,9 +268,8 @@ def classify_ref_status(owner: str, repo: str, vendored_ref: str, latest_path_re
     return "check-failed", f"unexpected GitHub compare status: {status!r}"
 
 
-def same_prefix(left: str, right: str) -> bool:
-    short, long = (left, right) if len(left) <= len(right) else (right, left)
-    return bool(short) and long.startswith(short)
+def is_commit_sha(ref: str) -> bool:
+    return bool(COMMIT_SHA_RE.fullmatch(ref))
 
 
 def fetch_compare(owner: str, repo: str, base: str, head: str, timeout: float) -> dict[str, Any]:
@@ -378,6 +388,10 @@ class CheckError(Exception):
 
 
 def run_self_tests() -> int:
+    old_sha = "1" * 40
+    latest_sha = "2" * 40
+    snapshot_sha = "3" * 40
+
     with tempfile.TemporaryDirectory(prefix="agentos-upstream-check-") as temp_dir:
         root = Path(temp_dir)
         skill_root = root / "os/skills/example-skill"
@@ -390,7 +404,7 @@ def run_self_tests() -> int:
                     "",
                     "Source: `owner/repo`",
                     "Path: `skills/example/SKILL.md`",
-                    "Vendored ref: `abc123`",
+                    f"Vendored ref: `{old_sha}`",
                     "Branch: `main`",
                     "",
                 ]
@@ -404,13 +418,138 @@ def run_self_tests() -> int:
         assert item.owner == "owner"
         assert item.repo == "repo"
         assert item.path == "skills/example/SKILL.md"
-        assert item.vendored_ref == "abc123"
+        assert item.vendored_ref == old_sha
         assert item.branch == "main"
         assert parse_github_source("https://github.com/mattpocock/skills") == ("mattpocock", "skills")
-        assert same_prefix("abc123", "abc123fff")
         assert exit_code([failed(item, "boom")], strict=False) == 1
+        assert exit_code([result_fixture("update-available")], strict=False) == 0
+        assert exit_code([result_fixture("update-available")], strict=True) == 1
+
+        original_request_json = request_json
+        try:
+            globals()["request_json"] = fake_request_json(old_sha, latest_sha, snapshot_sha)
+            update_result = check_upstream(
+                metadata_fixture("needs-update", old_sha, path="skills/update/SKILL.md"),
+                timeout=0.1,
+            )
+            assert update_result.status == "update-available"
+            assert update_result.upstream_ref == latest_sha
+            assert update_result.compare_url == f"https://github.com/owner/repo/compare/{old_sha}...{latest_sha}"
+
+            current_result = check_upstream(
+                metadata_fixture("current", latest_sha, path="skills/current/SKILL.md"),
+                timeout=0.1,
+            )
+            assert current_result.status == "up-to-date"
+            assert current_result.note == "vendored ref is the latest path-touching upstream commit"
+
+            snapshot_result = check_upstream(
+                metadata_fixture("snapshot", snapshot_sha, path="skills/snapshot/SKILL.md"),
+                timeout=0.1,
+            )
+            assert snapshot_result.status == "up-to-date"
+            assert "already contains" in snapshot_result.note
+
+            directory_result = check_upstream(
+                metadata_fixture("directory", old_sha, path="skills/directory/"),
+                timeout=0.1,
+            )
+            assert directory_result.status == "update-available"
+            assert "/tree/main/skills/directory/" in (directory_result.upstream_url or "")
+
+            malformed_ref_result = check_upstream(
+                metadata_fixture("bad-ref", "abc123", path="skills/update/SKILL.md"),
+                timeout=0.1,
+            )
+            assert malformed_ref_result.status == "check-failed"
+            assert "malformed Vendored ref" in malformed_ref_result.note
+
+            malformed_latest_result = check_upstream(
+                metadata_fixture("bad-latest", old_sha, path="skills/malformed-latest/SKILL.md"),
+                timeout=0.1,
+            )
+            assert malformed_latest_result.status == "check-failed"
+            assert "malformed commit SHA" in malformed_latest_result.note
+
+            missing_path_result = check_upstream(
+                metadata_fixture("missing-path", old_sha, path=None),
+                timeout=0.1,
+            )
+            assert missing_path_result.status == "check-failed"
+            assert missing_path_result.note == "missing Path"
+
+            text_buffer = io.StringIO()
+            with contextlib.redirect_stdout(text_buffer):
+                print_text_report(root, [update_result])
+            text_output = text_buffer.getvalue()
+            assert "update-available" in text_output
+            assert update_result.compare_url in text_output
+
+            json_payload = json.loads(json.dumps([asdict(update_result)]))
+            assert json_payload[0]["status"] == "update-available"
+            assert json_payload[0]["compare_url"] == update_result.compare_url
+        finally:
+            globals()["request_json"] = original_request_json
     print("Self-tests passed.")
     return 0
+
+
+def result_fixture(status: str) -> UpstreamResult:
+    return UpstreamResult(
+        skill="fixture",
+        status=status,
+        source="owner/repo",
+        path="skills/fixture/SKILL.md",
+        vendored_ref="1" * 40,
+        upstream_ref="2" * 40,
+        upstream_branch="main",
+        compare_url=None,
+        upstream_url=None,
+        note="fixture",
+    )
+
+
+def metadata_fixture(skill: str, vendored_ref: str, path: str | None) -> UpstreamMetadata:
+    return UpstreamMetadata(
+        skill=skill,
+        upstream_file=f"os/skills/{skill}/UPSTREAM.md",
+        source="owner/repo",
+        owner="owner",
+        repo="repo",
+        path=path,
+        vendored_ref=vendored_ref,
+        branch=None,
+    )
+
+
+def fake_request_json(old_sha: str, latest_sha: str, snapshot_sha: str):
+    def _fake_request_json(url: str, timeout: float) -> Any:
+        parsed = urllib.parse.urlparse(url)
+        if parsed.path == "/repos/owner/repo":
+            return {"default_branch": "main"}
+        if parsed.path == "/repos/owner/repo/commits":
+            query = urllib.parse.parse_qs(parsed.query)
+            path = query.get("path", [""])[0]
+            if path in {"skills/update/SKILL.md", "skills/directory/"}:
+                return [{"sha": latest_sha}]
+            if path == "skills/current/SKILL.md":
+                return [{"sha": latest_sha}]
+            if path == "skills/snapshot/SKILL.md":
+                return [{"sha": latest_sha}]
+            if path == "skills/malformed-latest/SKILL.md":
+                return [{"sha": "abc123"}]
+            return []
+        compare_prefix = "/repos/owner/repo/compare/"
+        if parsed.path.startswith(compare_prefix):
+            base_head = parsed.path[len(compare_prefix) :]
+            if base_head == f"{old_sha}...{latest_sha}":
+                return {"status": "ahead"}
+            if base_head == f"{snapshot_sha}...{latest_sha}":
+                return {"status": "behind"}
+            return {"status": "diverged"}
+        raise CheckError(f"unexpected self-test URL: {url}")
+
+    return _fake_request_json
 
 
 if __name__ == "__main__":

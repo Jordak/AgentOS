@@ -15,7 +15,7 @@ Inputs: an AgentOS checkout, defaulting to the current workspace, with vendored 
 
 Output artifact: a text or JSON freshness report with one row per vendored skill.
 
-Mutability: read-only. The helper reads local files and public upstream metadata only.
+Mutability: read-only for the AgentOS checkout and upstream sources. The normal helper reads local files and public upstream metadata only; `--self-test` writes temporary fixtures under the system temporary directory.
 
 Tools and connectors: local filesystem, Python helper `scripts/check_vendored_skill_upstreams.py`, and public GitHub HTTP API for supported upstreams.
 
@@ -62,9 +62,9 @@ Use `--strict` only when update availability should make the command fail.
 
 Before trusting changes to this skill:
 
-1. Run the helper with `--self-test`.
+1. Run the helper with `--self-test` to cover parser discovery, status classification, malformed metadata, strict exits, directory-style upstream paths, and text/JSON report shape without network access.
 2. Run the helper against the AgentOS root with `--format text`.
 3. Run the helper against the AgentOS root with `--format json`.
 4. Run Codex skill validation for this skill.
 5. Run `scripts/run-validator`.
-6. Run scoped `mirror-skills` audit/sync for `check-vendored-skill-upstreams` when current-machine discoverability matters.
+6. Before review or merge, run scoped `mirror-skills` in audit-only mode when current-machine discoverability matters; sync the mirror only after explicit user approval or after the reviewed PR lands.

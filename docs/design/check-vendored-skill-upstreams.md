@@ -54,13 +54,13 @@ Out of scope:
 - Network or upstream failures are visible as `check-failed` rows.
 - The skill is listed in `os/skills/MANIFEST.md`.
 - `scripts/run-validator` passes.
-- `mirror-skills` can mirror the new skill to the current-machine skill root.
+- `mirror-skills` can audit whether the new skill is ready for current-machine mirroring; actual mirror sync happens only after explicit user approval or after the reviewed PR lands.
 
 ## Validation Plan
 
 - Run the helper with `--format text` against the AgentOS root.
 - Run the helper with `--format json` and inspect parseability.
-- Run a failure smoke check with a synthetic malformed `UPSTREAM.md` fixture or invalid path when practical.
+- Run the helper with `--self-test`; it should cover parser discovery, `up-to-date`, `update-available`, malformed metadata, strict exits, directory-style upstream paths, and text/JSON report shape without network access.
 - Run Codex skill validation for the new skill.
 - Run `scripts/run-validator`.
-- Run scoped `mirror-skills` audit/sync for `check-vendored-skill-upstreams`.
+- Run scoped `mirror-skills` in audit-only mode for `check-vendored-skill-upstreams`; do not sync current-machine mirrors until explicit user approval or after the reviewed PR lands.
