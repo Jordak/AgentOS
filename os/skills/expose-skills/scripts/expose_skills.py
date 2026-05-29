@@ -18,8 +18,8 @@ SKILL_HEADING_RE = re.compile(r"^### `([^`]+)`\s*$", re.MULTILINE)
 FIELD_RE_TEMPLATE = r"^- {field}:\s*(.*)$"
 SYMLINK_PERMISSION_ERRNOS = {errno.EACCES, errno.EPERM, errno.EROFS}
 SYMLINK_PERMISSION_WINERRORS = {5, 1314}
-GOOD_STATUSES = {"already-linked", "created-symlink"}
-IGNORED_EXTRA_NAMES = {".DS_Store", ".archive"}
+APPLY_SUCCESS_STATUSES = {"already-linked", "created-symlink"}
+DRY_RUN_FAILURE_STATUSES = {"blocked", "missing-source"}
 
 
 @dataclass(frozen=True)
@@ -277,53 +277,6 @@ def permission_fix_text() -> str:
     )
 
 
-def extra_results(adapter_root: Path, selected_names: set[str] | None, known_names: set[str]) -> list[ExposureResult]:
-    if selected_names is not None:
-        return []
-    try:
-        root_stat = adapter_root.lstat()
-    except FileNotFoundError:
-        return []
-    except OSError as error:
-        return [
-            ExposureResult(
-                "blocked",
-                "<adapter-root>",
-                str(adapter_root),
-                "",
-                (f"could not inspect adapter root: {error.__class__.__name__}: {error}",),
-            )
-        ]
-    if stat.S_ISLNK(root_stat.st_mode):
-        return [
-            ExposureResult(
-                "blocked",
-                "<adapter-root>",
-                str(adapter_root),
-                "",
-                ("adapter root is a symlink; v1 does not follow it",),
-            )
-        ]
-    if not stat.S_ISDIR(root_stat.st_mode):
-        return [
-            ExposureResult(
-                "blocked",
-                "<adapter-root>",
-                str(adapter_root),
-                "",
-                ("adapter root exists and is not a directory",),
-            )
-        ]
-
-    results = []
-    for path in sorted(adapter_root.iterdir()):
-        if path.name in IGNORED_EXTRA_NAMES:
-            continue
-        if path.name not in known_names:
-            results.append(ExposureResult("extra", path.name, str(path), "", ("not in Core manifest",)))
-    return results
-
-
 def print_table(results: list[ExposureResult]) -> None:
     status_width = max(12, *(len(result.status) for result in results))
     skill_width = max(24, *(len(result.skill) for result in results))
@@ -335,6 +288,12 @@ def print_table(results: list[ExposureResult]) -> None:
             print(f"              source: {result.canonical_source}")
         for note in result.notes:
             print(f"              note: {note}")
+
+
+def exit_code(results: list[ExposureResult], apply: bool) -> int:
+    if apply:
+        return 0 if all(result.status in APPLY_SUCCESS_STATUSES for result in results) else 1
+    return 1 if any(result.status in DRY_RUN_FAILURE_STATUSES for result in results) else 0
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -369,15 +328,12 @@ def main() -> int:
     adapter_root = Path.home() / ".agents/skills"
     entries = parse_manifest(agentos_root)
     selected_entries = select_entries(entries, args.skill)
-    known_names = {entry.name for entry in entries}
-    selected_names = set(args.skill) if args.skill else None
 
     apply = bool(args.no_dry_run)
     results = [inspect_adapter(entry, adapter_root, apply=apply) for entry in selected_entries]
-    results.extend(extra_results(adapter_root, selected_names=selected_names, known_names=known_names))
 
     print_table(results)
-    return 0 if all(result.status in GOOD_STATUSES for result in results) else 1
+    return exit_code(results, apply)
 
 
 if __name__ == "__main__":

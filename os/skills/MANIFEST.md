@@ -97,7 +97,7 @@ Each skill entry records:
 - Output artifact: skill exposure dry-run or apply report and optional current-machine symlink adapters under the global harness skill root.
 - Filing rule: keep canonical skill behavior in `os/skills/`; keep global adapter state out of this manifest; dry-run and apply output stays in chat unless the user asks for a local report.
 - Safety posture: default to dry run; ask before `--no-dry-run` writes unless the user explicitly requested apply behavior; expose only Core manifest skills in v1; do not scan Personal Overlay skills, copy skill files, create junctions, replace copied mirrors, overwrite wrong-target symlinks, or delete global skill dirs.
-- Verification coverage: run dry run with a temporary `HOME`; run `--no-dry-run` with a temporary `HOME` and confirm symlink creation; verify scoped `--skill` behavior; verify existing-copy, wrong-target, unknown-skill, and symlink-permission failure behavior; run `scripts/run-validator`.
+- Verification coverage: run dry run with a temporary `HOME`; run `--no-dry-run` with a temporary `HOME` and confirm symlink creation; verify scoped `--skill` behavior; verify existing-copy, wrong-target, unknown-skill, unrelated global skill, dry-run exit-code, apply exit-code, and symlink-permission failure behavior; run `scripts/run-validator`.
 - Upgrade notes: introduced for GitHub Issue #62 as the symlink-adapter successor to copy-based `mirror-skills`; Personal Overlay exposure is doc-only in v1.
 
 ### `reverse-mirror-skills`
@@ -188,12 +188,12 @@ Each skill entry records:
 
 - Canonical source: `os/skills/run-agentos-doctor/SKILL.md`
 - Contract status: full.
-- Mutability: read-only by default; local-write or current-machine write only after explicit user approval when applying adapter remediation, syncing mirrors, editing Personal Overlay files, changing automations, or writing outside the checkout.
-- Tools and connectors: local filesystem, skill-local `os/skills/run-agentos-doctor/scripts/agentos_doctor.py`, `scripts/install_global_agent_instructions.py`, `os/skills/mirror-skills/scripts/mirror_skills.py`, `os/playbook/GETTING_STARTED.md`, and relevant Personal Overlay automation notes when present.
+- Mutability: read-only by default; local-write or current-machine write only after explicit user approval when applying adapter remediation, applying Core skill exposure, syncing legacy mirrors, editing Personal Overlay files, changing automations, or writing outside the checkout.
+- Tools and connectors: local filesystem, skill-local `os/skills/run-agentos-doctor/scripts/agentos_doctor.py`, `scripts/install_global_agent_instructions.py`, `os/skills/expose-skills/scripts/expose_skills.py`, legacy `os/skills/mirror-skills/scripts/mirror_skills.py`, `os/playbook/GETTING_STARTED.md`, and relevant Personal Overlay automation notes when present.
 - Output artifact: concise setup health report with deterministic script facts, agent interpretation for ambiguous local state, and approval-gated next steps.
-- Filing rule: default output stays in chat; deterministic helper and tests stay under `os/skills/run-agentos-doctor/scripts/`; private setup notes and automation state stay in the Personal Overlay; current-machine mirror state is not recorded in the Core manifest.
+- Filing rule: default output stays in chat; deterministic helper and tests stay under `os/skills/run-agentos-doctor/scripts/`; private setup notes and automation state stay in the Personal Overlay; current-machine adapter or mirror state is not recorded in the Core manifest.
 - Safety posture: read-only by default; distinguish script facts from agent judgment; do not expose private file contents; do not treat helper automation counts or ambiguous automation prose as active recurring evidence; ask before writes or current-machine changes.
-- Verification coverage: run the doctor script or explain why it could not run; confirm feature worktree runs use `--primary-agentos-home` or warn about limited interpretation; use mirror-skills audit mode for mirror diagnosis when requested; classify automation evidence conservatively in the skill, not from helper counts alone; run `python3 os/verification/scripts/validate_agentos.py` after skill or manifest changes.
+- Verification coverage: run the doctor script or explain why it could not run; confirm feature worktree runs use `--primary-agentos-home` or warn about limited interpretation; use expose-skills dry-run mode for Core skill exposure diagnosis when requested; use mirror-skills audit mode only for explicitly requested legacy mirror diagnosis; classify automation evidence conservatively in the skill, not from helper counts alone; run `python3 os/verification/scripts/validate_agentos.py` after skill or manifest changes.
 - Upgrade notes: Core skill wrapper for AgentOS setup health checks; keeps vague judgment in agent instructions while deterministic checks remain in the script.
 
 ### `double-steelman`

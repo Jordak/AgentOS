@@ -54,7 +54,8 @@ Safety:
 
 2. Run dry run:
    - Use `python3 os/skills/expose-skills/scripts/expose_skills.py`.
-   - Report missing adapters, already-linked adapters, wrong-target symlinks, existing copied mirrors, blocked paths, missing sources, and extras.
+   - Report missing adapters, already-linked adapters, wrong-target symlinks, existing copied mirrors, blocked paths, and missing sources.
+   - Ignore non-AgentOS skills that happen to live under the global skill root.
 
 3. Apply only when approved:
    - Use `python3 os/skills/expose-skills/scripts/expose_skills.py --no-dry-run`.
@@ -101,7 +102,8 @@ Private skills may live under `personal/os/skills/<skill-name>/SKILL.md`, but v1
 
 - Dry run is the default and shows planned global adapter changes before writes.
 - Apply mode creates only missing symlink adapters for Core manifest skills.
-- Existing copied mirrors, wrong-target symlinks, blocked paths, and extras are visible in the report and are not modified.
+- Existing copied mirrors, wrong-target symlinks, and blocked paths for Core manifest skill names are visible in the report and are not modified.
+- Unrelated global harness skills are outside this skill's scope and are not reported.
 - Unknown skills fail with the available Core skill list.
 - Permission-style symlink failures stop with OS-appropriate remediation and no fallback.
 - Personal Overlay skills are documented but not scanned or exposed in v1.
@@ -129,4 +131,6 @@ Before finishing changes to this skill:
 5. Confirm wrong-target symlinks are reported but not changed.
 6. Confirm unknown skills fail clearly.
 7. Confirm permission-style symlink failures fail with remediation.
-8. Run `scripts/run-validator`.
+8. Confirm unrelated global harness skills are ignored.
+9. Confirm dry run exits nonzero only for blocked or missing-source statuses, while apply exits nonzero when requested Core adapters remain unlinked.
+10. Run `scripts/run-validator`.
