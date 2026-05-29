@@ -33,7 +33,7 @@ Output artifact:
 Mutability:
 
 - Local-write. This workflow may edit AgentOS Markdown files and local scripts.
-- External-write only if the user explicitly asks for GitHub issue edits, comments, labels, or other external state changes.
+- External-write only when permitted by the applicable external-write policy.
 
 Tools and connectors:
 
@@ -44,7 +44,7 @@ Tools and connectors:
 
 Safety:
 
-- Ask before external sends, public posts, permission changes, automation activation, destructive edits, or connector writes not already approved.
+- Follow the applicable external-write policy before external sends, public posts, permission changes, or connector writes. Ask before automation activation or destructive edits.
 - Do not copy private connector data into skills, smoke examples, validators, or memory.
 - Do not install a harness mirror unless the issue or the user explicitly asks for discoverability outside the AgentOS workspace.
 - Use a propagation queue entry instead of canonical edits when the durable change is plausible but not approved.
@@ -127,4 +127,4 @@ Before finishing:
 4. Run `scripts/run-validator`.
 5. If the validator changed, also run `scripts/run-validator --self-test`.
 6. Run any skill-specific verification named by the changed skill.
-7. Confirm no private connector data, literal private contact details, or external write happened without approval.
+7. Confirm no private connector data, literal private contact details, or external write happened outside the applicable external-write policy.

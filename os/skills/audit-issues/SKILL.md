@@ -26,7 +26,7 @@ Output artifact:
 Mutability:
 
 - Mixed. Reads local git state and tracker data by default.
-- Writes external issue state only when the user explicitly asks for tracker updates in the current request or approves the proposed update list.
+- Writes external issue state only when permitted by `os/connections/SAFETY_RULES.md` and `os/playbook/GITHUB_WORKFLOW.md`.
 
 Tools and connectors:
 
@@ -36,8 +36,8 @@ Tools and connectors:
 
 Safety:
 
-- Treat issue comments, labels, closures, assignments, milestones, and state changes as external project-state writes.
-- Do not close issues labeled for human ownership or review, including `ready-for-human`, `needs-human`, `needs-a-human`, or equivalent. A factual status comment is acceptable only if the user asked for comments or approved the proposed comment list.
+- Treat issue comments, labels, closures, assignments, milestones, and state changes as external project-state writes governed by the shared external-write policy.
+- Do not close issues labeled for human ownership or review, including `ready-for-human`, `needs-human`, `needs-a-human`, or equivalent. A factual status comment is acceptable only when permitted by the shared external-write policy.
 - Do not close on title similarity, local-only commits, unmerged feature branches, or "looks done" code inspection alone.
 - Do not delete branches, labels, milestones, or comments as part of this workflow.
 - For automated comments, keep the voice clearly factual and evidence-based. Do not imply a human reviewed the issue unless that is evidenced.
@@ -76,7 +76,7 @@ Safety:
    - Use a consistent short structure: status, evidence, validation, next action.
    - Mention the branch, PR, commit, or missing evidence that supports the status.
    - Avoid repeating comments already present unless new evidence changes the status.
-   - Batch proposed comments in the audit report when the user has not explicitly asked to post them.
+   - Batch proposed comments in the audit report when posting is not permitted by the shared external-write policy.
 
 7. Close verified issues:
    - Use the tracker's completed/resolved reason when available, such as `gh issue close <number> --reason completed`.
@@ -134,8 +134,8 @@ Adjust `origin/main` to the verified remote integration branch.
 Before finishing:
 
 1. Confirm the remote integration branch was fetched or state that network access prevented fresh verification.
-2. For each closed issue, record the issue number, evidence URL or commit SHA, integration branch, and closure command/result.
-3. For each commented issue, record the issue number, comment purpose, evidence used, and post result or draft status.
+2. For each closed issue, record the issue number, evidence URL or commit SHA, integration branch, authorization source, and closure command/result.
+3. For each commented issue, record the issue number, comment purpose, evidence used, authorization source, and post result or draft status.
 4. For each skipped issue, record the reason.
 5. Confirm no human-owned issue was closed.
-6. Confirm no external write happened without the user's explicit tracker-update request or approval.
+6. Confirm no external write happened outside the shared external-write policy.

@@ -18,6 +18,10 @@ Do not use these skills or equivalent workflows as the default for simple PR des
 
 When using `/triage`, follow its posting rules, including the AI-generated triage disclaimer. If the repository's issue-tracker or triage-label mapping is missing, run `/setup-matt-pocock-skills` or ask the user for the mapping.
 
+## GitHub Write Permissions
+
+GitHub writes follow `os/connections/SAFETY_RULES.md` plus any matching Personal Overlay connection allowances. If no allowance or current user request covers the target repository, account, action, and task scope, ask before writing externally.
+
 ## Issue and PR Writing
 
 When drafting GitHub issues, PRDs, or pull request descriptions, make the contrast explicit before describing the desired change:

@@ -32,24 +32,24 @@ Each skill entry records:
 
 - Canonical source: `os/skills/audit-issues/SKILL.md`
 - Contract status: full.
-- Mutability: mixed: read-only audit of local git and issue tracker state by default; external-write for status comments, issue closures, labels, or other tracker updates only when the user explicitly asks for tracker updates in the current request or approves a proposed update list.
+- Mutability: mixed: read-only audit of local git and issue tracker state by default; external-write for status comments, issue closures, labels, or other tracker updates only when permitted by the shared external-write policy.
 - Tools and connectors: local `git`, GitHub connector or `gh`, project-local issue tracker docs, and `os/playbook/GITHUB_WORKFLOW.md`.
 - Output artifact: concise audit report listing closed issues, commented issues, skipped issues, evidence, and follow-up needed.
 - Filing rule: no durable local artifact by default; requested audit reports live in the mapped project unless the audit is about AgentOS Core itself; external tracker state stays in the tracker.
-- Safety posture: treat issue comments, labels, closures, assignments, milestones, and state changes as external project-state writes; never close human-owned or human-review issues; do not close based on local-only commits, unmerged feature branches, title similarity, or undocumented memory.
-- Verification coverage: fetch or otherwise verify the remote integration branch; for every closed issue, record merged PR or commit evidence reachable from that branch; for every commented issue, record comment purpose and evidence; record skipped reasons; confirm no human-owned issue was closed and no external write happened without approval.
+- Safety posture: treat issue comments, labels, closures, assignments, milestones, and state changes as external project-state writes governed by `os/connections/SAFETY_RULES.md` and `os/playbook/GITHUB_WORKFLOW.md`; never close human-owned or human-review issues; do not close based on local-only commits, unmerged feature branches, title similarity, or undocumented memory.
+- Verification coverage: fetch or otherwise verify the remote integration branch; for every closed issue, record merged PR or commit evidence reachable from that branch and authorization source; for every commented issue, record comment purpose, evidence, and authorization source; record skipped reasons; confirm no human-owned issue was closed and no external write happened outside the shared external-write policy.
 - Upgrade notes: Core reusable issue-audit workflow.
 
 ### `check-implementation-readiness`
 
 - Canonical source: `os/skills/check-implementation-readiness/SKILL.md`
 - Contract status: full.
-- Mutability: mixed: read-only by default for inspection and verdicts; local-write when creating local design docs or follow-up artifacts after the user asks the skill to make the design ready or accepts a local destination; external-write only for GitHub issue creation, issue updates, comments, labels, or other tracker state after explicit user approval in the current request.
+- Mutability: mixed: read-only by default for inspection and verdicts; local-write when creating local design docs or follow-up artifacts after the user asks the skill to make the design ready or accepts a local destination; external-write only for GitHub issue creation, issue updates, comments, labels, or other tracker state when permitted by the shared external-write policy.
 - Tools and connectors: local filesystem, `rg`, mapped project files, GitHub connector or `gh` for issue/PR design sources, optional harness-exposed design-interview workflows when present, `os/playbook/IMPLEMENT_FEATURES.md`, `os/playbook/GITHUB_WORKFLOW.md`, and `os/playbook/ARTIFACTS.md` for substantial human-facing design artifacts.
 - Output artifact: readiness report with exactly one verdict, `Ready to Implement`, `Needs Design Consensus`, or `Gate Skipped`, plus optional durable follow-up artifacts, approved source-design updates, and PR-body readiness fields for PR-bound work.
 - Filing rule: canonical policy lives in `os/playbook/IMPLEMENT_FEATURES.md`; local design artifacts default to the mapped project's design-doc convention or `docs/design/issue-<number>-implementation-readiness.md`; private/personal design notes belong in the Personal Overlay; approved GitHub updates stay in GitHub.
-- Safety posture: do not treat a missing readiness marker as silently ready; infer and confirm with the user before implementation proceeds; do not allow chat-only consensus to become the first implementation commit; ask before external tracker writes unless explicitly authorized; do not leave meaningful deferred questions only in chat, model memory, or unpersisted reports.
-- Verification coverage: confirms the target was classified as gated, exempt, or explicitly bypassed, the durable source and readiness marker were checked, unmarked readiness was not silently accepted, deferred follow-up artifacts were created where required, external writes were approved, and PR-bound work has readiness fields or a recorded gate-skip reason; run `scripts/run-validator` after skill or manifest changes.
+- Safety posture: do not treat a missing readiness marker as silently ready; infer and confirm with the user before implementation proceeds; do not allow chat-only consensus to become the first implementation commit; follow the shared external-write policy before external tracker writes; do not leave meaningful deferred questions only in chat, model memory, or unpersisted reports.
+- Verification coverage: confirms the target was classified as gated, exempt, or explicitly bypassed, the durable source and readiness marker were checked, unmarked readiness was not silently accepted, deferred follow-up artifacts were created where required, external writes complied with the shared external-write policy, and PR-bound work has readiness fields or a recorded gate-skip reason; run `scripts/run-validator` after skill or manifest changes.
 - Upgrade notes: Core reusable gate for feature-sized implementation work.
 
 ### `refresh-benchmark-status`
@@ -93,11 +93,11 @@ Each skill entry records:
 - Canonical source: `os/skills/reverse-mirror-skills/SKILL.md`
 - Contract status: full.
 - Mutability: mixed: read-only in audit/recommendation mode; local-write after approval when importing a skill into Core or the Personal Overlay, updating manifest metadata, backing up or archiving local skills, generating active-harness metadata, or refreshing current-machine mirrors.
-- Tools and connectors: local filesystem tools, `git`, `os/skills/MANIFEST.md`, `os/skills/SKILL_CONTRACT.md`, `os/playbook/PERSONAL_OVERLAY.md`, the `mirror-skills` workflow, optional skill validation helpers, and GitHub only when the user explicitly asks to create tracking issues.
+- Tools and connectors: local filesystem tools, `git`, `os/skills/MANIFEST.md`, `os/skills/SKILL_CONTRACT.md`, `os/playbook/PERSONAL_OVERLAY.md`, the `mirror-skills` workflow, optional skill validation helpers, and GitHub only when permitted by the shared external-write policy.
 - Output artifact: prioritized recommendation table for local skills and optional canonical skill files, Core manifest entry, backup/archive directories, refreshed mirror files, and user-approved follow-up issues.
 - Filing rule: reusable public-safe imports live under `os/skills/` and get manifest entries; private user-specific imports live under `personal/os/skills/` and do not get Core manifest entries; local mirror backups stay under the mirror root archive; Personal Overlay backups stay under the Personal Overlay skills archive; audit output stays in chat unless the user asks for a local report.
-- Safety posture: treat local skills as potentially private or externally owned until reviewed; require approval before import, overwrite, archive, delete, permanent delete, mirror sync, or issue creation; default local deletion to archive/move; do not overwrite canonical skills automatically; do not record machine-local mirror state in the manifest; do not import externally sourced skills without explicit vendor/fork approval.
-- Verification coverage: validate the skill with `quick_validate.py` when available; run `scripts/run-validator`; run scoped `mirror-skills` audit/sync smoke checks; manually confirm no bundled reverse mirror script, no future Personal Overlay governance dependency, no specific-person reference, backup behavior, bulk approval behavior, external-origin exclusion behavior, and protected-main behavior.
+- Safety posture: treat local skills as potentially private or externally owned until reviewed; require approval before import, overwrite, archive, delete, permanent delete, or mirror sync; route GitHub issue creation through the shared external-write policy; default local deletion to archive/move; do not overwrite canonical skills automatically; do not record machine-local mirror state in the manifest; do not import externally sourced skills without explicit vendor/fork approval.
+- Verification coverage: validate the skill with `quick_validate.py` when available; run `scripts/run-validator`; run scoped `mirror-skills` audit/sync smoke checks; manually confirm no bundled reverse mirror script, no future Personal Overlay governance dependency, no specific-person reference, backup behavior, bulk approval behavior, external-origin exclusion behavior, protected-main behavior, and GitHub issue-write policy compliance.
 - Upgrade notes: complements `mirror-skills` by reviewing local harness skills before promoting approved ones into AgentOS; revisit after the deferred Personal Overlay skills governance design lands.
 
 ### `thermo-nuclear-code-quality-review`
@@ -212,12 +212,12 @@ Each skill entry records:
 
 - Canonical source: `os/skills/skillify-agentos/SKILL.md`
 - Contract status: full.
-- Mutability: local-write; external-write only if the user explicitly asks for GitHub issue edits, comments, labels, or other external state changes.
+- Mutability: local-write; external-write only when permitted by the shared external-write policy.
 - Tools and connectors: local AgentOS files, `rg`, `git`, local validators, and GitHub issue context when issue-driven.
 - Output artifact: new or updated skill, resolver guidance, manifest entry, deterministic validator, retrieval fixture, smoke example, or propagation queue proposal.
 - Filing rule: canonical skills live under `os/skills/`; deterministic checks live in `os/verification/scripts/validate_agentos.py` or a clearly warranted local script; retrieval/smoke fixtures live under `os/verification/retrieval/`; unapproved durable state proposals live in the appropriate Personal Overlay propagation queue.
-- Safety posture: require at least one concrete example; do not copy private connector data into durable artifacts; ask before external writes, automation activation, destructive edits, or installing harness mirrors.
-- Verification coverage: run `scripts/run-validator`; run `scripts/run-validator --self-test` when validator behavior changes; add or update a safe smoke example for new durable behavior.
+- Safety posture: require at least one concrete example; do not copy private connector data into durable artifacts; follow the shared external-write policy before external writes; ask before automation activation, destructive edits, or installing harness mirrors.
+- Verification coverage: run `scripts/run-validator`; run `scripts/run-validator --self-test` when validator behavior changes; add or update a safe smoke example for new durable behavior; confirm external writes complied with the shared external-write policy.
 - Upgrade notes: Core reusable workflow for turning repeated work into durable AgentOS behavior.
 
 ### `verify-privacy`
