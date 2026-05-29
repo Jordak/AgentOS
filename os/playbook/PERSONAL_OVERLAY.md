@@ -124,8 +124,8 @@ Skills that are thin adapters to live private agents or workflows centered on pr
 Examples:
 
 - `$root/os/skills/research-brief/SKILL.md`
-- `$root/os/skills/mirror-skills/SKILL.md`
-- `$root/personal/os/skills/mirror-skills/CONFIG.md`
+- `$root/os/skills/expose-skills/SKILL.md`
+- `$root/personal/os/skills/current-awareness-agent/CONFIG.md`
 - `$root/personal/os/skills/current-awareness-agent/SKILL.md`
 - `$root/personal/os/skills/private-document-maintenance/SKILL.md`
 
@@ -253,7 +253,7 @@ Examples:
 
 Root adapter files such as `$root/AGENTS.md` and `$root/CLAUDE.md` are publishable repository support files, not files under the Core Root. They may live at repository root when they are generic launchers into AgentOS Core and the optional Personal Overlay.
 
-Publishable root adapters must not contain private identity, private absolute paths, private repository URLs, installed mirror paths, account identifiers, or local machine setup state.
+Publishable root adapters must not contain private identity, private absolute paths, private repository URLs, installed adapter paths, account identifiers, or local machine setup state.
 
 Local adapter install state belongs in the Personal Overlay.
 

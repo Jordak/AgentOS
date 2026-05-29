@@ -110,7 +110,7 @@ For relevant targets, have reviewers check a lightweight matrix:
 
 `Semantic | Owner | Inputs | Outputs | Prompt/Recovery | Ledger/Report | Privacy/Filing | Validation`
 
-The matrix is not a design doc and does not authorize mutation. It helps reviewers find propagation gaps across the owning skill, caller or called skills, prompt templates, recovery prompts, packet or report schemas, manifest entry, retrieval or validator coverage when relevant, privacy/filing rules, mirrors, and final report guidance. Report missing propagation as an issue family with the affected surfaces, not as isolated wording.
+The matrix is not a design doc and does not authorize mutation. It helps reviewers find propagation gaps across the owning skill, caller or called skills, prompt templates, recovery prompts, packet or report schemas, manifest entry, retrieval or validator coverage when relevant, privacy/filing rules, current-machine adapters or exposure, and final report guidance. Report missing propagation as an issue family with the affected surfaces, not as isolated wording.
 
 ## Workflow Phases
 

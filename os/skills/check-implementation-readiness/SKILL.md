@@ -72,7 +72,7 @@ Safety:
 - Follow the implementation-readiness playbook for follow-up artifact destinations.
 - Approved GitHub issue updates and follow-up issues stay in GitHub.
 - Private or personal design notes belong in the Personal Overlay.
-- Do not store current-machine mirror state or private live inputs in Core.
+- Do not store current-machine exposure state or private live inputs in Core.
 
 ## Quality Bar
 

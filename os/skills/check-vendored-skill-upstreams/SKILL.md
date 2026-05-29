@@ -67,4 +67,4 @@ Before trusting changes to this skill:
 3. Run the helper against the AgentOS root with `--format json`.
 4. Run Codex skill validation for this skill.
 5. Run `scripts/run-validator`.
-6. Before review or merge, run scoped `mirror-skills` in audit-only mode when current-machine discoverability matters; sync the mirror only after explicit user approval or after the reviewed PR lands.
+6. Before review or merge, run `expose-skills` in dry-run mode when current-machine discoverability matters; apply exposure changes only after explicit user approval or after the reviewed PR lands.

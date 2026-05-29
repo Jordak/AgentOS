@@ -45,7 +45,7 @@ Common adapter surfaces:
 
 - Global instructions in the tool's home directory.
 - Workspace instructions such as `AGENTS.md`.
-- Discoverable skill mirrors.
+- Discoverable skill adapters.
 - Automation definitions.
 
 ## Global Instruction Installer

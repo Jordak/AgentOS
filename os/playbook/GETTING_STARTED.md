@@ -79,19 +79,18 @@ Use the Run AgentOS Doctor skill when the user wants a read-only setup health ch
 python3 os/skills/run-agentos-doctor/scripts/agentos_doctor.py
 ```
 
-The helper script discovers `$root` from the current directory, or accepts `--agentos-home <root>`. It reports the resolved AgentOS home, checks adapter drift through `scripts/install_global_agent_instructions.py --check`, and reports automation registry/file locations and counts only. It prints bounded facts and helper output only; it must not audit Core skill exposure or legacy skill mirrors, parse this Markdown for starter paths, print Personal Overlay file contents, or classify automation lifecycle state.
+The helper script discovers `$root` from the current directory, or accepts `--agentos-home <root>`. It reports the resolved AgentOS home, checks adapter drift through `scripts/install_global_agent_instructions.py --check`, and reports automation registry/file locations and counts only. It prints bounded facts and helper output only; it must not audit Core skill exposure, parse this Markdown for starter paths, print Personal Overlay file contents, or classify automation lifecycle state.
 
 If the installer or adapter check used `--all-default-adapters` or any custom `--adapter <path>` flags, repeat those exact flags when using Run AgentOS Doctor or the helper script so the read-only adapter drift result covers the same harness files.
 
-If the command is running from an isolated feature worktree, pass `--primary-agentos-home <primary-agentos-home>` so Personal Overlay automation location counts refer to the canonical checkout. The helper still runs read-only checks only and suppresses feature-worktree write commands when the audit root and primary checkout differ; starter-file interpretation, Core skill exposure diagnosis, legacy skill mirror diagnosis, adapter writes, mirror syncs, Personal Overlay edits, and automation changes require the Run AgentOS Doctor skill and explicit approval.
+If the command is running from an isolated feature worktree, pass `--primary-agentos-home <primary-agentos-home>` so Personal Overlay automation location counts refer to the canonical checkout. The helper still runs read-only checks only and suppresses feature-worktree write commands when the audit root and primary checkout differ; starter-file interpretation, Core skill exposure diagnosis, adapter writes, Core skill exposure changes, Personal Overlay edits, and automation changes require the Run AgentOS Doctor skill and explicit approval.
 
-Run AgentOS Doctor is not the installer and not mirror sync:
+Run AgentOS Doctor is not the installer and not the skill exposure applier:
 
 - Use `os/skills/run-agentos-doctor/SKILL.md` for setup-health workflow and judgment over ambiguous notes.
 - Use `os/skills/run-agentos-doctor/scripts/agentos_doctor.py` for skill-local deterministic setup facts and exact read-only check commands.
 - Use `scripts/install_global_agent_instructions.py` when the user has approved creating, updating, checking, or removing global instruction adapters.
 - Use `os/skills/expose-skills/scripts/expose_skills.py` when the user wants AgentOS Core skills exposed to the global harness skill root with symlink adapters.
-- Use `os/skills/mirror-skills/scripts/mirror_skills.py` only for the legacy copy-mirror workflow while it remains available.
 
 ## Skill Exposure
 
@@ -109,7 +108,7 @@ Show the dry-run result before applying. If the user approves writes to the glob
 python3 os/skills/expose-skills/scripts/expose_skills.py --no-dry-run
 ```
 
-Expose-skills covers Core manifest skills only. It does not discover or expose Personal Overlay skills. Missing entries become symlink adapters under `~/.agents/skills`; wrong-target symlinks and blocked paths are reported but not replaced. Existing same-name Core skill directories are replaced only after explicit approval with `--replace-existing-copy --no-dry-run`, which moves those directories into `~/.agents/skills/.archive/expose-skills/<run-id>/` before creating symlink adapters. The replacement mode does not byte-compare or prove copied-mirror provenance; the dry run is the approval surface for each same-name directory.
+Expose-skills covers Core manifest skills only. It does not discover or expose Personal Overlay skills. Missing entries become symlink adapters under `~/.agents/skills`; wrong-target symlinks and blocked paths are reported but not replaced. Existing same-name Core skill directories are replaced only after explicit approval with `--replace-existing-copy --no-dry-run`, which moves those directories into `~/.agents/skills/.archive/expose-skills/<run-id>/` before creating symlink adapters. The replacement mode does not byte-compare or prove same-name directory provenance; the dry run is the approval surface for each same-name directory.
 
 ## Recurring Checks
 

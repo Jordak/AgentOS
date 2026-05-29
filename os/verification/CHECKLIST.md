@@ -26,7 +26,7 @@ For Core/Personal Overlay guidance, push-safety, and stale installed-instruction
 
 `scripts/audit_agentos_leak_paths.sh`
 
-This audit checks `os/`, `personal/os/`, installed skill mirrors, and Codex automation mirrors for suspicious Core generated-output paths, live history/queue/report routing, raw Git persistence instructions, and private live-agent adapters that still point into Core.
+This audit checks `os/`, `personal/os/`, installed skill adapters, and Codex automation mirrors for suspicious Core generated-output paths, live history/queue/report routing, raw Git persistence instructions, and private live-agent adapters that still point into Core.
 
 Safe smoke fixture:
 

@@ -17,7 +17,7 @@ Use `os/skills/` for reusable workflows: repeatable procedures that an agent can
 - Durable recurring jobs with their own role, cadence, reports, and operational memory: use `personal/os/agents/`; use `os/agents/` for public-safe templates and examples.
 - Broad operating policy: use `os/playbook/`.
 - Project-specific implementation procedures: use the mapped project from the appropriate source map.
-- Machine-local installed harness adapters or mirrors as source of truth. Keep canonical behavior here and use `expose-skills` to check, create, or explicitly replace current-machine Core skill adapters.
+- Machine-local installed harness adapters as source of truth. Keep canonical behavior here and use `expose-skills` to check, create, or explicitly replace current-machine Core skill adapters.
 
 ## Common Tie-Breakers
 
@@ -37,7 +37,7 @@ Use `os/skills/` for reusable workflows: repeatable procedures that an agent can
 
 ## Provenance
 
-When a skill comes from a repeated user request, failed run, or external recipe, record the reason in the skill or manifest. Do not record current-machine adapter or mirror paths or state in the manifest; rerun `expose-skills` on each machine.
+When a skill comes from a repeated user request, failed run, or external recipe, record the reason in the skill or manifest. Do not record current-machine adapter paths or exposure state in the manifest; rerun `expose-skills` on each machine.
 
 ## Handoff Rules
 

@@ -3,7 +3,7 @@
 
 The checks in this script intentionally avoid network calls and connector reads.
 They inspect local Markdown files, local path existence, and portable AgentOS
-metadata. Machine-local skill mirrors are checked by the mirror-skills
+metadata. Machine-local Core skill exposure is checked by the expose-skills
 skill instead of this portable validator.
 """
 
@@ -1035,7 +1035,7 @@ class AgentOSValidator:
                 self.add_error(
                     check,
                     manifest_path,
-                    f"manifest records machine-local mirror state: {forbidden}",
+                    f"manifest records legacy machine-local installed-skill state: {forbidden}",
                 )
 
         for skill_name, source_path in sorted(expected.items()):
