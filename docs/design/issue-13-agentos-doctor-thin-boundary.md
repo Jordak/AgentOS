@@ -29,7 +29,7 @@ Use this boundary:
 - The Doctor helper is small enough to audit directly and remains obviously read-only.
 - The Doctor helper and its tests live under `os/skills/run-agentos-doctor/scripts/` so the skill is the visible workflow owner.
 - The helper runs `install_global_agent_instructions.py --check` only and reports command/output/exit status without applying remediation.
-- The Doctor helper does not run or parse mirror-skills; the Run AgentOS Doctor skill delegates mirror diagnosis to the mirror-skills audit-only workflow.
+- The Doctor helper does not run or parse `expose-skills`; the Run AgentOS Doctor skill delegates Core skill exposure diagnosis to the `expose-skills` dry-run workflow when requested.
 - The Doctor helper does not parse getting-started Markdown or judge Personal Overlay starter completeness; the skill handles starter interpretation without quoting private file contents.
 - Feature-worktree checks keep Core evidence tied to the audited checkout and Personal Overlay evidence tied to the primary checkout.
 - Automation checks report registry/file/directory presence, counts, and locations only.
@@ -46,5 +46,5 @@ Use this boundary:
 
 ## Deferred Follow-Ups
 
-- Broader mirror-skills hardening can be reviewed separately if it remains larger than Doctor needs.
+- A future validator may check that Core skill exposure adapters stay in the expected symlink form.
 - A future validator may check that Doctor-like scripts stay within a read-only/no-remediation contract.

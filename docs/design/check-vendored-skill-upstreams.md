@@ -54,7 +54,7 @@ Out of scope:
 - Network or upstream failures are visible as `check-failed` rows.
 - The skill is listed in `os/skills/MANIFEST.md`.
 - `scripts/run-validator` passes.
-- `mirror-skills` can audit whether the new skill is ready for current-machine mirroring; actual mirror sync happens only after explicit user approval or after the reviewed PR lands.
+- `expose-skills` can dry-run whether the new Core skill is ready for current-machine exposure; actual adapter writes happen only after explicit user approval or after the reviewed PR lands.
 
 ## Validation Plan
 
@@ -63,4 +63,4 @@ Out of scope:
 - Run the helper with `--self-test`; it should cover parser discovery, `up-to-date`, `update-available`, malformed metadata, strict exits, directory-style upstream paths, and text/JSON report shape without network access.
 - Run Codex skill validation for the new skill.
 - Run `scripts/run-validator`.
-- Run scoped `mirror-skills` in audit-only mode for `check-vendored-skill-upstreams`; do not sync current-machine mirrors until explicit user approval or after the reviewed PR lands.
+- Run scoped `expose-skills` in dry-run mode for `check-vendored-skill-upstreams`; do not apply current-machine exposure adapters until explicit user approval or after the reviewed PR lands.
