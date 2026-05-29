@@ -20,7 +20,7 @@ Inputs:
 - `os/skills/MANIFEST.md`, `os/skills/SKILL_CONTRACT.md`, `os/skills/README.md`, `os/playbook/PERSONAL_OVERLAY.md`, and `os/skills/mirror-skills/SKILL.md`.
 - Local skill directories containing `SKILL.md`.
 - Local skill metadata that may indicate third-party origin, such as package manager metadata, source URLs, author/license fields, upstream README text, or install-tool markers.
-- User approval for each import, replacement, archive, deletion, or follow-up issue.
+- User approval for each import, replacement, archive, or deletion; user approval or a matching Personal Overlay GitHub allowance for follow-up issue creation or updates.
 
 Output artifact:
 
@@ -29,13 +29,13 @@ Output artifact:
 - Optional canonical skill files under `os/skills/<skill-name>/` or `personal/os/skills/<skill-name>/`.
 - Optional Core manifest updates for Core imports.
 - Optional local or Personal Overlay backup directories.
-- Optional follow-up issue drafts or created issues only when the user explicitly asks.
+- Optional follow-up issue drafts or created issues only when authorized by the current request, explicit approval, or a matching Personal Overlay GitHub allowance.
 
 Mutability:
 
 - Read-only in audit and recommendation mode.
 - Local-write after approval when importing skills, updating Core manifest metadata, backing up local or Personal Overlay skills, archiving local skills, generating active-harness metadata, or syncing mirrors through `mirror-skills`.
-- External-write only when the user explicitly asks to create or update GitHub issues.
+- External-write only when the user explicitly asks to create or update GitHub issues, approves the proposed issue writes, or a matching Personal Overlay GitHub allowance permits the issue write type for the target repository.
 
 Tools and connectors:
 
@@ -43,7 +43,7 @@ Tools and connectors:
 - `git` for Core protected-main state and diff checks.
 - The `mirror-skills` workflow for local mirror refresh after approved changes.
 - Skill validation helpers such as `skill-creator` when available.
-- GitHub only when the user explicitly asks to create tracking issues.
+- GitHub only when authorized by the current request, explicit approval, or a matching Personal Overlay GitHub allowance for tracking issue writes.
 
 Safety:
 
@@ -65,7 +65,7 @@ Filing Rules:
 - Core imports live under `os/skills/<skill-name>/` and must be listed in `os/skills/MANIFEST.md`.
 - Personal Overlay imports live under `personal/os/skills/<skill-name>/` and must not be listed in the Core manifest.
 - Recommendation reports stay in chat unless the user asks for a durable artifact.
-- Follow-up issue creation is recommended in the report when useful, but issue writes happen only after explicit user approval.
+- Follow-up issue creation is recommended in the report when useful, but issue writes happen only after current-request authorization, explicit user approval, or a matching Personal Overlay GitHub allowance.
 - Local mirrors remain install artifacts, not canonical source of truth.
 
 ## Workflow Phases
@@ -175,6 +175,6 @@ Before finishing:
 4. Run `mirror-skills` scoped to `reverse-mirror-skills`.
 5. Run a scoped `mirror-skills` regression check on at least one existing Core skill.
 6. Confirm `os/skills/MANIFEST.md` includes `reverse-mirror-skills` and no machine-local mirror state.
-7. Confirm no Personal Overlay import, local archive/delete, GitHub issue write, or permanent deletion happened without explicit approval.
+7. Confirm no Personal Overlay import, local archive/delete, or permanent deletion happened without explicit approval, and no GitHub issue write happened without explicit approval, current-request authorization, or a matching Personal Overlay GitHub allowance.
 8. Confirm any local mirror or Personal Overlay backup cleanup was separately approved, or report remaining backup paths.
 9. Confirm externally sourced local skills were excluded from import recommendations, or record the user's explicit vendor/fork approval.

@@ -14,20 +14,20 @@ Inputs:
 - A feature request, GitHub issue, PRD, ADR, local design document, planning note, PR, branch, or user request to implement work.
 - Repository or mapped-project context when the work is project-specific.
 - The durable design source when one exists.
-- User approval for external tracker writes when the workflow needs to create or update GitHub issues, comments, labels, or other external project state.
+- User approval or a matching Personal Overlay GitHub allowance for external tracker writes when the workflow needs to create or update GitHub issues, comments, labels, or other external project state.
 
 Output artifact:
 
 - A concise readiness report with exactly one verdict: `Ready to Implement`, `Needs Design Consensus`, or `Gate Skipped`.
 - Optional durable local follow-up artifacts for deferred questions.
 - Optional proposed or approved updates to the source design artifact.
-- Optional GitHub issue updates or follow-up issues only when the user approves tracker writes or explicitly authorized them in the current request.
+- Optional GitHub issue updates or follow-up issues only when the user approves tracker writes, explicitly authorized them in the current request, or a matching Personal Overlay GitHub allowance permits the write type for the target repository.
 
 Mutability:
 
 - Mixed. Read-only by default for inspection and verdicts.
 - Local-write when creating local design docs or follow-up artifacts after the user asked the skill to make the design ready, or after the user declines external tracker updates and accepts a local destination.
-- External-write only for GitHub issue creation, issue updates, comments, labels, or other tracker state after explicit user approval in the current request.
+- External-write only for GitHub issue creation, issue updates, comments, labels, or other tracker state after explicit user approval in the current request or under a matching Personal Overlay GitHub allowance.
 
 Tools and connectors:
 
@@ -40,7 +40,7 @@ Tools and connectors:
 
 Safety:
 
-- Ask before external tracker writes unless the current user request explicitly authorized them.
+- Ask before external tracker writes unless the current user request explicitly authorized them or a matching Personal Overlay GitHub allowance permits the write type for the target repository.
 - Do not treat a missing readiness marker as silently ready. Infer, explain, and confirm with the user before implementation proceeds.
 - Do not override `Design readiness: needs consensus` without user confirmation and an authorized design-source update.
 - Do not leave meaningful deferred questions only in chat, model memory, or an unpersisted report.
@@ -62,7 +62,7 @@ Safety:
    If the source lacks `Design readiness:`, infer readiness from the content. Tell the user the inferred verdict, reasons, implementation boundary, and marker or edit you plan to make. Wait for confirmation before implementation proceeds. If edits are authorized, add or propose the marker after confirmation.
 
 5. Handle open questions.
-   Classify open questions as blocking or deferred using the playbook's rules. When an optional design-interview workflow is available and useful for the blocking question, use it; for simple questions or when no such workflow is available, ask targeted questions directly. Ask before GitHub issue creation or updates unless tracker writes were explicitly authorized. If GitHub writes are not authorized, create the local artifact named by the playbook unless the project has a better convention or the user redirects. If required durable follow-up artifacts are not created, the verdict remains `Needs Design Consensus`. Update or propose updating the current design source with a `Deferred Follow-ups` section linking to created artifacts.
+   Classify open questions as blocking or deferred using the playbook's rules. When an optional design-interview workflow is available and useful for the blocking question, use it; for simple questions or when no such workflow is available, ask targeted questions directly. Ask before GitHub issue creation or updates unless tracker writes were explicitly authorized or a matching Personal Overlay GitHub allowance permits the write type for the target repository. If GitHub writes are not authorized, create the local artifact named by the playbook unless the project has a better convention or the user redirects. If required durable follow-up artifacts are not created, the verdict remains `Needs Design Consensus`. Update or propose updating the current design source with a `Deferred Follow-ups` section linking to created artifacts.
 
 6. Report the verdict.
    Include the source reviewed, satisfied and missing readiness fields, implementation boundary, non-goals, created follow-up artifacts, proposed source-design updates, and whether external writes happened, were proposed, or were skipped. If the work will become a PR, include the exact `Readiness evidence:` and `Readiness verdict:` lines the PR body should carry. Prefer a GitHub issue as readiness evidence for issue-driven work; use a design doc only when the design is too large, architectural, private, or not naturally issue-shaped.
@@ -80,7 +80,7 @@ Safety:
 - The design source is durable, or the report says why it is not.
 - Missing marker inference is explicit and confirmed before implementation proceeds.
 - Meaningful deferred questions are captured durably, not only in chat.
-- External writes are approved before they happen.
+- External writes are approved or covered by a matching Personal Overlay GitHub allowance before they happen.
 - The implementation boundary is clear enough that another agent can avoid design creep.
 - For PR-bound work, the readiness report supplies PR-body readiness fields.
 
@@ -94,6 +94,6 @@ Before finishing:
 4. Confirm the design source's marker and content were both checked.
 5. Confirm unmarked readiness was not silently accepted.
 6. Confirm deferred follow-up artifacts were created where required.
-7. Confirm external tracker writes were approved before they happened.
+7. Confirm external tracker writes were approved or covered by a matching Personal Overlay GitHub allowance before they happened.
 8. Confirm PR-bound work has visible PR-body readiness fields or a recorded `Gate Skipped` reason.
 9. If this skill or its manifest entry changed, run `scripts/run-validator`.
