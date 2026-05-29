@@ -182,11 +182,20 @@ def parse_github_source(source: str) -> tuple[str | None, str | None]:
     clean = clean_value(source)
     if not clean:
         return None, None
-    if clean.startswith("https://github.com/") or clean.startswith("http://github.com/"):
-        parsed = urllib.parse.urlparse(clean)
+    parsed = urllib.parse.urlparse(clean)
+    if parsed.scheme or parsed.netloc:
+        host = parsed.netloc.lower()
+        if host.startswith("www."):
+            host = host[4:]
+        if host != "github.com":
+            return None, None
         parts = [part for part in parsed.path.split("/") if part]
     else:
         parts = [part for part in clean.split("/") if part]
+        if parts and parts[0].lower() in {"github.com", "www.github.com"}:
+            parts = parts[1:]
+        elif parts and "." in parts[0]:
+            return None, None
     if len(parts) < 2:
         return None, None
     owner, repo = parts[0], parts[1]
@@ -421,6 +430,9 @@ def run_self_tests() -> int:
         assert item.vendored_ref == old_sha
         assert item.branch == "main"
         assert parse_github_source("https://github.com/mattpocock/skills") == ("mattpocock", "skills")
+        assert parse_github_source("github.com/mattpocock/skills") == ("mattpocock", "skills")
+        assert parse_github_source("https://gitlab.com/acme/skill") == (None, None)
+        assert parse_github_source("gitlab.com/acme/skill") == (None, None)
         assert exit_code([failed(item, "boom")], strict=False) == 1
         assert exit_code([result_fixture("update-available")], strict=False) == 0
         assert exit_code([result_fixture("update-available")], strict=True) == 1
@@ -478,6 +490,20 @@ def run_self_tests() -> int:
             assert missing_path_result.status == "check-failed"
             assert missing_path_result.note == "missing Path"
 
+            unsupported_source_result = check_upstream(
+                metadata_fixture(
+                    "unsupported-source",
+                    old_sha,
+                    path="skills/unsupported/SKILL.md",
+                    source="https://gitlab.com/acme/skill",
+                    owner=None,
+                    repo=None,
+                ),
+                timeout=0.1,
+            )
+            assert unsupported_source_result.status == "check-failed"
+            assert "unsupported or malformed Source" in unsupported_source_result.note
+
             text_buffer = io.StringIO()
             with contextlib.redirect_stdout(text_buffer):
                 print_text_report(root, [update_result])
@@ -509,13 +535,20 @@ def result_fixture(status: str) -> UpstreamResult:
     )
 
 
-def metadata_fixture(skill: str, vendored_ref: str, path: str | None) -> UpstreamMetadata:
+def metadata_fixture(
+    skill: str,
+    vendored_ref: str,
+    path: str | None,
+    source: str = "owner/repo",
+    owner: str | None = "owner",
+    repo: str | None = "repo",
+) -> UpstreamMetadata:
     return UpstreamMetadata(
         skill=skill,
         upstream_file=f"os/skills/{skill}/UPSTREAM.md",
-        source="owner/repo",
-        owner="owner",
-        repo="repo",
+        source=source,
+        owner=owner,
+        repo=repo,
         path=path,
         vendored_ref=vendored_ref,
         branch=None,
