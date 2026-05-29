@@ -4,7 +4,7 @@ Status: Core manifest v1.
 
 This manifest records publishable reusable skills, their safety posture, output conventions, filing rules, and verification coverage.
 
-Machine-local discoverable mirrors and private live skill adapters belong in the Personal Overlay. Use `personal/os/skills/<skill-name>/CONFIG.md` for private live inputs to Core skills.
+Machine-local exposure state and private live skill adapters belong outside portable Core metadata. Use `personal/os/skills/<skill-name>/CONFIG.md` for private live inputs to Core skills.
 
 Contract reference: `os/skills/SKILL_CONTRACT.md`.
 
@@ -76,18 +76,6 @@ Each skill entry records:
 - Verification coverage: confirm benchmark manifest and Personal Overlay policy were read, configured report directories were resolved through the Personal Overlay rule, script help was inspected, compatible scripts and harness choices were selected from the CLI contract, dry-runs were treated as diagnostic/ineligible, Git preflight ran before status-eligible saved reports, model-call work was approved and run from a sanitized Core-only checkout or export when applicable, and status refresh ran or was followed in proposal/report mode unless blocked or declined.
 - Upgrade notes: thin orchestration layer for Issue #32; avoids benchmark-specific internals and delegates status interpretation to `refresh-benchmark-status`.
 
-### `mirror-skills`
-
-- Canonical source: `os/skills/mirror-skills/SKILL.md`
-- Contract status: full.
-- Mutability: mixed: read-only in audit mode; local-write in sync mode when creating or updating current-machine skill mirrors.
-- Tools and connectors: local filesystem, `os/skills/MANIFEST.md`, optional Personal Overlay config, and `os/skills/mirror-skills/scripts/mirror_skills.py`.
-- Output artifact: mirror audit report and optional current-machine mirror files under a configured mirror root.
-- Filing rule: keep canonical skill behavior in `os/skills/`; keep machine-local mirror state out of this manifest; mirror audit output stays in chat unless the user asks for a local report.
-- Safety posture: default to audit-only; ask before writing outside the workspace unless the active harness has already approved the exact mirror root and write scope; do not delete extra mirror files unless the user explicitly asks for pruning.
-- Verification coverage: run the mirror audit script in audit mode; run a `--sync` smoke test against a temporary mirror root; verify scoped `--skill` audit and sync behavior; verify Personal Overlay skill discovery and collision handling; run skill validation and the AgentOS validator when available.
-- Upgrade notes: private live mirror roots and validator paths belong in `personal/os/skills/mirror-skills/CONFIG.md`; legacy copy-mirror workflow pending deletion after `expose-skills` validates through one migration cycle.
-
 ### `expose-skills`
 
 - Canonical source: `os/skills/expose-skills/SKILL.md`
@@ -96,21 +84,21 @@ Each skill entry records:
 - Tools and connectors: local filesystem, `os/skills/MANIFEST.md`, and `os/skills/expose-skills/scripts/expose_skills.py`.
 - Output artifact: skill exposure dry-run or apply report, optional current-machine symlink adapters under the global harness skill root, and optional same-name Core skill directory backups under `~/.agents/skills/.archive/expose-skills/`.
 - Filing rule: keep canonical skill behavior in `os/skills/`; keep global adapter state out of this manifest; dry-run and apply output stays in chat unless the user asks for a local report.
-- Safety posture: default to dry run; ask before `--no-dry-run` writes unless the user explicitly requested apply behavior; expose only Core manifest skills in v1; do not scan Personal Overlay skills, copy skill files, create junctions, replace same-name Core skill directories without `--replace-existing-copy`, overwrite wrong-target symlinks, replace files, or delete global skill dirs; replacement mode intentionally does not byte-compare copied-mirror provenance.
+- Safety posture: default to dry run; ask before `--no-dry-run` writes unless the user explicitly requested apply behavior; expose only Core manifest skills in v1; do not scan Personal Overlay skills, copy skill files, create junctions, replace same-name Core skill directories without `--replace-existing-copy`, overwrite wrong-target symlinks, replace files, or delete global skill dirs; replacement mode intentionally does not byte-compare same-name directory provenance.
 - Verification coverage: run dry run with a temporary `HOME`; run `--no-dry-run` with a temporary `HOME` and confirm symlink creation; verify scoped `--skill` behavior; run `python3 os/skills/expose-skills/scripts/expose_skills.py --self-test`; verify existing-copy, `--replace-existing-copy` dry-run and apply behavior, backup creation, partial-failure reporting, wrong-target, regular-file, unknown-skill, unrelated global skill, dry-run exit-code, apply exit-code, and symlink-permission failure behavior; run `scripts/run-validator`.
-- Upgrade notes: introduced for GitHub Issue #62 as the symlink-adapter successor to copy-based `mirror-skills`; Personal Overlay exposure is doc-only in v1.
+- Upgrade notes: introduced for GitHub Issue #62 as the symlink-adapter successor to the retired copy-based exposure workflow; Personal Overlay exposure is doc-only in v1.
 
 ### `reverse-mirror-skills`
 
 - Canonical source: `os/skills/reverse-mirror-skills/SKILL.md`
 - Contract status: full.
-- Mutability: mixed: read-only in audit/recommendation mode; local-write after approval when importing a skill into Core or the Personal Overlay, updating manifest metadata, backing up or archiving local skills, generating active-harness metadata, or refreshing current-machine mirrors.
-- Tools and connectors: local filesystem tools, `git`, `os/skills/MANIFEST.md`, `os/skills/SKILL_CONTRACT.md`, `os/playbook/PERSONAL_OVERLAY.md`, the `mirror-skills` workflow, optional skill validation helpers, and GitHub only when permitted by the shared external-write policy.
-- Output artifact: prioritized recommendation table for local skills and optional canonical skill files, Core manifest entry, backup/archive directories, refreshed mirror files, and user-approved follow-up issues.
-- Filing rule: reusable public-safe imports live under `os/skills/` and get manifest entries; private user-specific imports live under `personal/os/skills/` and do not get Core manifest entries; local mirror backups stay under the mirror root archive; Personal Overlay backups stay under the Personal Overlay skills archive; audit output stays in chat unless the user asks for a local report.
-- Safety posture: treat local skills as potentially private or externally owned until reviewed; require approval before import, overwrite, archive, delete, permanent delete, or mirror sync; route GitHub issue creation through the shared external-write policy; default local deletion to archive/move; do not overwrite canonical skills automatically; do not record machine-local mirror state in the manifest; do not import externally sourced skills without explicit vendor/fork approval.
-- Verification coverage: validate the skill with `quick_validate.py` when available; run `scripts/run-validator`; run scoped `mirror-skills` audit/sync smoke checks; manually confirm no bundled reverse mirror script, no future Personal Overlay governance dependency, no specific-person reference, backup behavior, bulk approval behavior, external-origin exclusion behavior, protected-main behavior, and GitHub issue-write policy compliance.
-- Upgrade notes: complements `mirror-skills` by reviewing local harness skills before promoting approved ones into AgentOS; revisit after the deferred Personal Overlay skills governance design lands.
+- Mutability: mixed: read-only in audit/recommendation mode; local-write after approval when importing a skill into Core or the Personal Overlay, updating manifest metadata, backing up or archiving local skills, generating active-harness metadata, or recommending approved current-machine exposure through `expose-skills`.
+- Tools and connectors: local filesystem tools, `git`, `os/skills/MANIFEST.md`, `os/skills/SKILL_CONTRACT.md`, `os/playbook/PERSONAL_OVERLAY.md`, `os/skills/expose-skills/SKILL.md`, optional skill validation helpers, and GitHub only when permitted by the shared external-write policy.
+- Output artifact: prioritized recommendation table for local skills and optional canonical skill files, Core manifest entry, backup/archive directories, current-machine exposure recommendations, and user-approved follow-up issues.
+- Filing rule: reusable public-safe imports live under `os/skills/` and get manifest entries; private user-specific imports live under `personal/os/skills/` and do not get Core manifest entries; local skill backups stay under the local skill root archive; Personal Overlay backups stay under the Personal Overlay skills archive; audit output stays in chat unless the user asks for a local report.
+- Safety posture: treat local skills as potentially private or externally owned until reviewed; require approval before import, overwrite, archive, delete, permanent delete, or current-machine exposure changes; route GitHub issue creation through the shared external-write policy; default local deletion to archive/move; do not overwrite canonical skills automatically; do not record machine-local installed-skill state in the manifest; do not import externally sourced skills without explicit vendor/fork approval.
+- Verification coverage: validate the skill with `quick_validate.py` when available; run `scripts/run-validator`; run `expose-skills` dry run when current-machine Core exposure matters; manually confirm no bundled reverse mirror script, no future Personal Overlay governance dependency, no specific-person reference, backup behavior, bulk approval behavior, external-origin exclusion behavior, protected-main behavior, and GitHub issue-write policy compliance.
+- Upgrade notes: reviews local harness skills before promoting approved ones into AgentOS; revisit after the deferred Personal Overlay skills governance design lands.
 
 ### `thermo-nuclear-code-quality-review`
 
@@ -122,7 +110,7 @@ Each skill entry records:
 - Filing rule: review output stays in chat or the calling review artifact by default; durable follow-up belongs in the mapped project or the invoking workflow's report, not in AgentOS.
 - Safety posture: do not edit files, post comments, push, or change external state unless another explicitly invoked workflow owns those actions; this skill is reviewer guidance by default.
 - Verification coverage: confirm the target diff or code area was inspected, findings prioritize structural risks over nits, no external writes happened, and skill validation plus `scripts/run-validator` pass after skill changes.
-- Upgrade notes: vendored from `cursor/plugins` path `thermos/skills/thermo-nuclear-code-quality-review/SKILL.md` at ref `5102244dabd626b101cff40accbe7f7d1eeefa15`; the original import used the matching `cursor-team-kit` copy at ref `26878d6606afd611197c900bf2dc451ee2e80a74`; review upstream diffs deliberately, preserve `UPSTREAM.md`, and use `mirror-skills` after accepted updates.
+- Upgrade notes: vendored from `cursor/plugins` path `thermos/skills/thermo-nuclear-code-quality-review/SKILL.md` at ref `5102244dabd626b101cff40accbe7f7d1eeefa15`; the original import used the matching `cursor-team-kit` copy at ref `26878d6606afd611197c900bf2dc451ee2e80a74`; review upstream diffs deliberately, preserve `UPSTREAM.md`, and run `expose-skills` dry run when current-machine discoverability matters after accepted updates.
 
 ### `thermo-nuclear-review`
 
@@ -134,7 +122,7 @@ Each skill entry records:
 - Filing rule: review output stays in chat or the calling review artifact by default; durable follow-up belongs in the mapped project or the invoking workflow's report, not in AgentOS.
 - Safety posture: do not edit files, post comments, push, change PR state, label or close issues, change permissions, or perform external writes unless another explicitly invoked workflow owns those actions; this skill is reviewer guidance by default.
 - Verification coverage: confirm the target diff or code area was inspected, findings are scoped to added or modified code, severity is calibrated, PR/MR discussion was checked when required and available, no unfinished-research findings were reported, and skill validation plus `scripts/run-validator` pass after skill changes.
-- Upgrade notes: vendored from `cursor/plugins` path `thermos/skills/thermo-nuclear-review/SKILL.md` at ref `5102244dabd626b101cff40accbe7f7d1eeefa15`; review upstream diffs deliberately, preserve `UPSTREAM.md`, keep `review-pass` deep-review lens guidance aligned, and use `mirror-skills` after accepted updates.
+- Upgrade notes: vendored from `cursor/plugins` path `thermos/skills/thermo-nuclear-review/SKILL.md` at ref `5102244dabd626b101cff40accbe7f7d1eeefa15`; review upstream diffs deliberately, preserve `UPSTREAM.md`, keep `review-pass` deep-review lens guidance aligned, and run `expose-skills` dry run when current-machine discoverability matters after accepted updates.
 
 ### `improve-codebase-architecture`
 
@@ -146,7 +134,7 @@ Each skill entry records:
 - Filing rule: reports live under the system temporary directory; project-specific domain docs and ADRs live in the mapped project; no durable AgentOS state is created by default.
 - Safety posture: do not write project domain docs or ADRs until the user has selected a candidate or approved the specific update; do not treat a review candidate as implementation approval; external writes require separate approval through the relevant workflow.
 - Verification coverage: confirm domain docs and relevant ADRs were checked, generated reports exist under the temp directory when produced, proposed modules use the skill's architecture vocabulary, ADR conflicts are surfaced when real, and skill validation plus `scripts/run-validator` pass after skill changes.
-- Upgrade notes: vendored from `mattpocock/skills` path `skills/engineering/improve-codebase-architecture/` at ref `0288510dd61ff6ef7c2003834082ab8f2387e80e`; preserve companion references and `UPSTREAM.md`, reapply AgentOS domain-doc alias patches after upstream updates, and use `mirror-skills` after accepted updates.
+- Upgrade notes: vendored from `mattpocock/skills` path `skills/engineering/improve-codebase-architecture/` at ref `0288510dd61ff6ef7c2003834082ab8f2387e80e`; preserve companion references and `UPSTREAM.md`, reapply AgentOS domain-doc alias patches after upstream updates, and run `expose-skills` dry run when current-machine discoverability matters after accepted updates.
 
 ### `check-vendored-skill-upstreams`
 
@@ -157,7 +145,7 @@ Each skill entry records:
 - Output artifact: text or JSON freshness report with one row per vendored skill, including status, vendored ref, latest path-touching upstream ref, notes, and compare URLs when useful.
 - Filing rule: output stays in chat or the invoking weekly review report by default; no run history or upstream status snapshot is written to Core.
 - Safety posture: never auto-update vendored files, open PRs or issues, post comments, change automations, or write external state; update availability is only a prompt for a reviewed vendoring PR.
-- Verification coverage: run the helper with `--self-test` for parser discovery, status classification, malformed metadata, strict exits, directory-style upstream paths, and report shape; run text and JSON checks against the AgentOS root; run skill validation; run `scripts/run-validator`; and run scoped `mirror-skills` in audit-only mode before review or merge when current-machine discoverability matters. Sync current-machine mirrors only after explicit user approval or after the reviewed PR lands.
+- Verification coverage: run the helper with `--self-test` for parser discovery, status classification, malformed metadata, strict exits, directory-style upstream paths, and report shape; run text and JSON checks against the AgentOS root; run skill validation; run `scripts/run-validator`; and run `expose-skills` dry run before review or merge when current-machine discoverability matters. Apply current-machine exposure only after explicit user approval or after the reviewed PR lands.
 - Upgrade notes: Core reusable freshness check for vendored skill `UPSTREAM.md` files; compare against the latest commit touching the upstream path rather than repository HEAD to avoid noisy unrelated updates.
 
 ### `review-pass`
@@ -188,12 +176,12 @@ Each skill entry records:
 
 - Canonical source: `os/skills/run-agentos-doctor/SKILL.md`
 - Contract status: full.
-- Mutability: read-only by default; local-write or current-machine write only after explicit user approval when applying adapter remediation, applying Core skill exposure, syncing legacy mirrors, editing Personal Overlay files, changing automations, or writing outside the checkout.
-- Tools and connectors: local filesystem, skill-local `os/skills/run-agentos-doctor/scripts/agentos_doctor.py`, `scripts/install_global_agent_instructions.py`, `os/skills/expose-skills/scripts/expose_skills.py`, legacy `os/skills/mirror-skills/scripts/mirror_skills.py`, `os/playbook/GETTING_STARTED.md`, and relevant Personal Overlay automation notes when present.
+- Mutability: read-only by default; local-write or current-machine write only after explicit user approval when applying adapter remediation, applying Core skill exposure, editing Personal Overlay files, changing automations, or writing outside the checkout.
+- Tools and connectors: local filesystem, skill-local `os/skills/run-agentos-doctor/scripts/agentos_doctor.py`, `scripts/install_global_agent_instructions.py`, `os/skills/expose-skills/scripts/expose_skills.py`, `os/playbook/GETTING_STARTED.md`, and relevant Personal Overlay automation notes when present.
 - Output artifact: concise setup health report with deterministic script facts, agent interpretation for ambiguous local state, and approval-gated next steps.
-- Filing rule: default output stays in chat; deterministic helper and tests stay under `os/skills/run-agentos-doctor/scripts/`; private setup notes and automation state stay in the Personal Overlay; current-machine adapter or mirror state is not recorded in the Core manifest.
+- Filing rule: default output stays in chat; deterministic helper and tests stay under `os/skills/run-agentos-doctor/scripts/`; private setup notes and automation state stay in the Personal Overlay; current-machine adapter state is not recorded in the Core manifest.
 - Safety posture: read-only by default; distinguish script facts from agent judgment; do not expose private file contents; do not treat helper automation counts or ambiguous automation prose as active recurring evidence; ask before writes or current-machine changes.
-- Verification coverage: run the doctor script or explain why it could not run; confirm feature worktree runs use `--primary-agentos-home` or warn about limited interpretation; use expose-skills dry-run mode for Core skill exposure diagnosis when requested; use mirror-skills audit mode only for explicitly requested legacy mirror diagnosis; classify automation evidence conservatively in the skill, not from helper counts alone; run `python3 os/verification/scripts/validate_agentos.py` after skill or manifest changes.
+- Verification coverage: run the doctor script or explain why it could not run; confirm feature worktree runs use `--primary-agentos-home` or warn about limited interpretation; use expose-skills dry-run mode for Core skill exposure diagnosis when requested; classify automation evidence conservatively in the skill, not from helper counts alone; run `python3 os/verification/scripts/validate_agentos.py` after skill or manifest changes.
 - Upgrade notes: Core skill wrapper for AgentOS setup health checks; keeps vague judgment in agent instructions while deterministic checks remain in the script.
 
 ### `double-steelman`
@@ -217,7 +205,7 @@ Each skill entry records:
 - Output artifact: real temporary file path or paths created by the helper and returned in chat.
 - Filing rule: temporary files stay in the system temporary directory; no durable AgentOS filing by default.
 - Safety posture: do not hand-assemble temp paths; reject path-like prefixes; ask before creating many files or handling sensitive data that needs stricter storage controls.
-- Verification coverage: run the helper with default and explicit prefix/extension arguments; confirm reported paths exist and multiple paths are unique when requested; run skill validation and mirror audit after canonical changes.
+- Verification coverage: run the helper with default and explicit prefix/extension arguments; confirm reported paths exist and multiple paths are unique when requested; run skill validation and `expose-skills` dry run after canonical changes when current-machine discoverability matters.
 - Upgrade notes: Core reusable temp-file helper workflow.
 
 ### `meeting-notes`
@@ -252,7 +240,7 @@ Each skill entry records:
 - Tools and connectors: local AgentOS files, `rg`, `git`, local validators, and GitHub issue context when issue-driven.
 - Output artifact: new or updated skill, resolver guidance, manifest entry, deterministic validator, retrieval fixture, smoke example, or propagation queue proposal.
 - Filing rule: canonical skills live under `os/skills/`; deterministic checks live in `os/verification/scripts/validate_agentos.py` or a clearly warranted local script; retrieval/smoke fixtures live under `os/verification/retrieval/`; unapproved durable state proposals live in the appropriate Personal Overlay propagation queue.
-- Safety posture: require at least one concrete example; do not copy private connector data into durable artifacts; follow the shared external-write policy before external writes; ask before automation activation, destructive edits, or installing harness mirrors.
+- Safety posture: require at least one concrete example; do not copy private connector data into durable artifacts; follow the shared external-write policy before external writes; ask before automation activation, destructive edits, or current-machine skill exposure changes.
 - Verification coverage: run `scripts/run-validator`; run `scripts/run-validator --self-test` when validator behavior changes; add or update a safe smoke example for new durable behavior; confirm external writes complied with the shared external-write policy.
 - Upgrade notes: Core reusable workflow for turning repeated work into durable AgentOS behavior.
 
@@ -288,4 +276,4 @@ Future validators can use this manifest to check:
 - mutating skills name safety rules;
 - skills that produce durable artifacts name filing rules;
 - skills marked `full` include verification guidance;
-- manifest entries do not record current-machine mirror paths or state.
+- manifest entries do not record current-machine installed-skill paths or exposure state.

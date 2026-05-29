@@ -26,7 +26,7 @@ Update procedure:
 2. Diff against this vendored copy.
 3. Accept upstream changes deliberately.
 4. Reapply local AgentOS patches above.
-5. Run skill validation, `scripts/run-validator`, and scoped `mirror-skills` audit/sync.
+5. Run skill validation, `scripts/run-validator`, and an `expose-skills` dry run when current-machine discoverability matters.
 
 ## License
 

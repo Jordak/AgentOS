@@ -33,7 +33,7 @@ Update procedure:
 3. Accept upstream changes deliberately.
 4. Reapply local AgentOS patches above.
 5. Check whether the alternate `cursor-team-kit` path still mirrors the same content, and record any divergence if it matters.
-6. Run skill validation, `scripts/run-validator`, and scoped `mirror-skills` audit/sync.
+6. Run skill validation, `scripts/run-validator`, and an `expose-skills` dry run when current-machine discoverability matters.
 
 ## License
 

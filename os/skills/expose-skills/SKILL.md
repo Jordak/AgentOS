@@ -1,6 +1,6 @@
 ---
 name: expose-skills
-description: Expose AgentOS Core skills to the global harness skill root with symlink adapters. Use when checking, planning, or applying discoverable skill exposure for AgentOS skills, especially replacing copy-based mirror thinking with adapter links.
+description: Expose AgentOS Core skills to the global harness skill root with symlink adapters. Use when checking, planning, or applying discoverable skill exposure for AgentOS skills, especially replacing copy-based exposure with adapter links.
 ---
 
 # Expose Skills
@@ -9,7 +9,7 @@ description: Expose AgentOS Core skills to the global harness skill root with sy
 
 Expose canonical AgentOS Core skills to the current machine's global harness skill root with per-skill symlink adapters.
 
-This skill is not a copy mirror workflow. Canonical skill behavior stays under `os/skills/`; exposed entries under `~/.agents/skills` are current-machine adapters.
+This skill is not a copy workflow. Canonical skill behavior stays under `os/skills/`; exposed entries under `~/.agents/skills` are current-machine adapters.
 
 ## Contract
 
@@ -43,7 +43,7 @@ Safety:
 - Do not expose Personal Overlay skills in v1.
 - Do not copy skills, create Windows junctions, delete global skill dirs, replace same-name Core skill directories without `--replace-existing-copy`, or overwrite wrong-target symlinks.
 - With `--replace-existing-copy --no-dry-run`, move same-name Core skill directories into `~/.agents/skills/.archive/expose-skills/<run-id>/` before creating symlink adapters.
-- Replacement mode does not byte-compare directory contents or prove copied-mirror provenance. Its approval surface is the dry-run report for each same-name Core skill directory.
+- Replacement mode does not byte-compare directory contents or prove same-name directory provenance. Its approval surface is the dry-run report for each same-name Core skill directory.
 - If symlink creation is blocked by OS, filesystem, sandbox, or permission policy, stop and report the fix.
 - Do not record global adapter status in `os/skills/MANIFEST.md`.
 
@@ -133,11 +133,10 @@ Private skills may live under `personal/os/skills/<skill-name>/SKILL.md`, but v1
 - Keep canonical skill behavior in each source skill directory under `os/skills/`.
 - Keep global adapter state out of `os/skills/MANIFEST.md` and other portable Core metadata.
 - Keep dry-run and apply reports in chat by default unless the user asks for a local report.
-- Track Mirror Skills retirement separately after `expose-skills` validates through one migration cycle.
 
-## Mirror Skills Retirement
+## Legacy Mirror Retirement
 
-`mirror-skills` is the legacy copy-mirror workflow. Build and validate `expose-skills` first, then delete `mirror-skills` in a follow-up PR after one successful migration and validation cycle.
+The legacy copy-based exposure workflow has been retired. Use this skill for current-machine AgentOS Core skill exposure.
 
 ## Verification
 

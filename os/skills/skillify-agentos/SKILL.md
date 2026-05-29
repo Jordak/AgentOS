@@ -46,7 +46,7 @@ Safety:
 
 - Follow the applicable external-write policy before external sends, public posts, permission changes, or connector writes. Ask before automation activation or destructive edits.
 - Do not copy private connector data into skills, smoke examples, validators, or memory.
-- Do not install a harness mirror unless the issue or the user explicitly asks for discoverability outside the AgentOS workspace.
+- Do not apply current-machine skill exposure unless the issue or the user explicitly asks for discoverability outside the AgentOS workspace.
 - Use a propagation queue entry instead of canonical edits when the durable change is plausible but not approved.
 
 ## Workflow Phases
@@ -70,8 +70,8 @@ Safety:
 5. Apply the AgentOS skill contract. New or materially changed skills must name inputs, output artifact, mutability, tools/connectors, safety, phases, quality bar, verification, and filing rules.
 6. Update maintenance surfaces:
    - `os/skills/MANIFEST.md` for any skill add/update;
-   - `os/skills/mirror-skills/SKILL.md` when current-machine mirror
-     audit or sync behavior changes;
+   - `os/skills/expose-skills/SKILL.md` when current-machine Core skill
+     exposure behavior changes;
    - `os/RESOLVER.md` only when lookup, routing, authority, safety, or filing
      tie-breakers change;
    - `os/verification/scripts/validate_agentos.py` when a deterministic invariant should be
@@ -100,7 +100,7 @@ Keep the behavior as Markdown guidance when:
 ## File Conventions
 
 - Canonical skills live under `os/skills/`.
-- Skill contract metadata lives in `os/skills/MANIFEST.md`; current-machine mirror checks live in `os/skills/mirror-skills/`.
+- Skill contract metadata lives in `os/skills/MANIFEST.md`; current-machine Core skill exposure checks live in `os/skills/expose-skills/`.
 - Resolver changes live in `os/RESOLVER.md` or the narrow directory resolver.
 - Deterministic local checks live in `os/verification/scripts/validate_agentos.py` unless a separate script is clearly warranted.
 - Retrieval and smoke fixtures live under `os/verification/retrieval/`.

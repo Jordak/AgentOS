@@ -84,11 +84,11 @@ Use the [Run AgentOS Doctor skill](os/skills/run-agentos-doctor/SKILL.md) when y
 python3 os/skills/run-agentos-doctor/scripts/agentos_doctor.py
 ```
 
-The helper script discovers the AgentOS checkout from the current directory, or you can pass `--agentos-home <agentos-home>`. It always prints the resolved home, runs the installer drift check in read-only `--check` mode, and reports automation registry/file locations and counts only. It does not remediate, install, sync, delete, audit skill mirrors, parse getting-started Markdown for starter paths, classify automation lifecycle state, or print private file contents.
+The helper script discovers the AgentOS checkout from the current directory, or you can pass `--agentos-home <agentos-home>`. It always prints the resolved home, runs the installer drift check in read-only `--check` mode, and reports automation registry/file locations and counts only. It does not remediate, install, sync, delete, audit Core skill exposure, parse getting-started Markdown for starter paths, classify automation lifecycle state, or print private file contents.
 
 When your setup uses `--all-default-adapters` or custom `--adapter <path>` targets, pass those same flags to Run AgentOS Doctor or the helper script so the adapter drift result covers the same harness instruction files as your installer check.
 
-When running the doctor from an isolated feature worktree, pass `--primary-agentos-home <primary-agentos-home>` so Personal Overlay automation location counts refer to the canonical checkout. The helper still runs read-only checks only; it suppresses feature-worktree write commands when the audit root and primary checkout differ. Any adapter writes, mirror syncs, Personal Overlay edits, starter-file interpretation, skill mirror diagnosis, or automation changes belong to the Run AgentOS Doctor skill after explicit approval.
+When running the doctor from an isolated feature worktree, pass `--primary-agentos-home <primary-agentos-home>` so Personal Overlay automation location counts refer to the canonical checkout. The helper still runs read-only checks only; it suppresses feature-worktree write commands when the audit root and primary checkout differ. Any adapter writes, Core skill exposure changes, Personal Overlay edits, starter-file interpretation, Core skill exposure diagnosis, or automation changes belong to the Run AgentOS Doctor skill after explicit approval.
 
 Use the tools this way:
 

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Mirror Skills"
-  short_description: "Audit and sync current-machine AgentOS skill mirrors."
-  default_prompt: "Use $mirror-skills to audit AgentOS skills and sync current-machine mirrors when requested."

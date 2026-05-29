@@ -129,7 +129,7 @@ Before editing, make a tiny matrix in the loop ledger or working notes:
 
 `Semantic | Owner | Inputs | Outputs | Prompt/Recovery | Ledger/Report | Privacy/Filing | Validation`
 
-Use the matrix to update affected contract surfaces in one pass. Check the owning skill, caller or called skills, prompt templates, recovery prompts, packet or report schemas, manifest entry, retrieval or validator coverage when relevant, privacy/filing rules, mirrors, and any final report guidance. Keep the matrix lightweight; it is a propagation guard, not a design doc.
+Use the matrix to update affected contract surfaces in one pass. Check the owning skill, caller or called skills, prompt templates, recovery prompts, packet or report schemas, manifest entry, retrieval or validator coverage when relevant, privacy/filing rules, current-machine adapters or exposure, and any final report guidance. Keep the matrix lightweight; it is a propagation guard, not a design doc.
 
 ## Workflow Phases
 
@@ -201,7 +201,7 @@ Use the matrix to update affected contract surfaces in one pass. Check the ownin
 
 Keep this skill focused on orchestration, mutation, convergence, PR-surface writes, and final reporting. Delegate reviewer-panel mechanics to `review-pass`.
 
-Use `review-pass` as a hard dependency once it is canonical and mirrored. If a harness cannot invoke the skill by name, read `os/skills/review-pass/SKILL.md` and `os/skills/review-pass/references/reviewer-prompts.md` directly as the fallback rather than rebuilding the templates here.
+Use `review-pass` as a hard dependency once it is canonical and exposed. If a harness cannot invoke the skill by name, read `os/skills/review-pass/SKILL.md` and `os/skills/review-pass/references/reviewer-prompts.md` directly as the fallback rather than rebuilding the templates here.
 
 Call narrower playbooks for their owned surfaces: GitHub workflow policy for PR state, `make-temp-file` for temporary paths, and repository-specific test or release skills when present. Use the vendored `thermo-nuclear-review`, `thermo-nuclear-code-quality-review`, and `improve-codebase-architecture` skills through `review-pass` lenses, not as nested workflows inside `review-loop`.
 
