@@ -40,6 +40,7 @@ Tools and connectors:
 - GitHub connector or `gh` for PR metadata reads when authorized and available.
 - The active harness's clean-context reviewer or subagent capability when available.
 - `make-temp-file` for optional temporary packet paths.
+- `os/skills/thermo-nuclear-review/SKILL.md` as source material for the `deep-review` lens.
 - `os/skills/thermo-nuclear-code-quality-review/SKILL.md` and `os/skills/improve-codebase-architecture/LANGUAGE.md` as source material for the `structural-depth` lens.
 
 Safety:
@@ -80,7 +81,7 @@ Default lens spread:
 - 1 reviewer: `general`.
 - 2 reviewers: `correctness` and `tests-regressions`.
 - 3 reviewers: add `structural-depth`.
-- 4 reviewers: add the most relevant of `security-privacy`, `release-risk`, `issue-compliance`, `design-compliance`, or `ux-api-docs`.
+- 4 reviewers: add the most relevant of `deep-review`, `security-privacy`, `release-risk`, `issue-compliance`, `design-compliance`, or `ux-api-docs`.
 - 5 reviewers: add a custom risk lens tied to the target's riskiest subsystem or assumption.
 
 Built-in lenses:
@@ -94,6 +95,7 @@ Built-in lenses:
 - `design-compliance`
 - `issue-compliance`
 - `ux-api-docs`
+- `deep-review`
 - `security-privacy`
 - `release-risk`
 - `structural-depth` as the composite architecture-depth/code-judo lens sourced from the vendored review-quality skills
@@ -184,11 +186,12 @@ Before finishing a review pass:
 2. Confirm target, repository, base, head or current head, mode, reviewer count, and lens plan.
 3. Confirm baseline intent source and any missing-baseline limitation.
 4. Confirm reviewer prompts included the read-only rule, no-comment rule, dirty-validation rule, issue-family instruction, Contract Surface Matrix rule when applicable, design-escape-hatch instruction, full-reread instruction, provisional-ID rule, and clean response sentinel.
-5. If `structural-depth` was assigned, confirm the reviewer received the structural-depth lens instructions and no full architecture-report workflow was run.
-6. Confirm raw findings were deduped into issue families and mapped back to reviewer sources.
-7. Confirm every likely accepted family has evidence, a sibling-search suggestion, and a validation signal.
-8. Confirm every likely declined finding has a short rationale.
-9. Confirm verification continuity mode was recorded when applicable.
-10. Confirm opaque reviewer handle availability was privately handed off or marked unavailable when same-source verification may be needed, and confirm handle values were not exposed in prompts or human-facing packets.
-11. Confirm every spawned or resumed reviewer was closed.
-12. Confirm no target files, PRs, issues, labels, branches, or external state were changed.
+5. If `deep-review` was assigned, confirm the reviewer received the deep-review lens instructions and no full Thermos orchestration workflow was run.
+6. If `structural-depth` was assigned, confirm the reviewer received the structural-depth lens instructions and no full architecture-report workflow was run.
+7. Confirm raw findings were deduped into issue families and mapped back to reviewer sources.
+8. Confirm every likely accepted family has evidence, a sibling-search suggestion, and a validation signal.
+9. Confirm every likely declined finding has a short rationale.
+10. Confirm verification continuity mode was recorded when applicable.
+11. Confirm opaque reviewer handle availability was privately handed off or marked unavailable when same-source verification may be needed, and confirm handle values were not exposed in prompts or human-facing packets.
+12. Confirm every spawned or resumed reviewer was closed.
+13. Confirm no target files, PRs, issues, labels, branches, or external state were changed.

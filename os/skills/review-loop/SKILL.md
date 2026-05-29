@@ -203,7 +203,7 @@ Keep this skill focused on orchestration, mutation, convergence, PR-surface writ
 
 Use `review-pass` as a hard dependency once it is canonical and mirrored. If a harness cannot invoke the skill by name, read `os/skills/review-pass/SKILL.md` and `os/skills/review-pass/references/reviewer-prompts.md` directly as the fallback rather than rebuilding the templates here.
 
-Call narrower playbooks for their owned surfaces: GitHub workflow policy for PR state, `make-temp-file` for temporary paths, and repository-specific test or release skills when present. Use the vendored `thermo-nuclear-code-quality-review` and `improve-codebase-architecture` skills through `review-pass` lenses, not as nested workflows inside `review-loop`.
+Call narrower playbooks for their owned surfaces: GitHub workflow policy for PR state, `make-temp-file` for temporary paths, and repository-specific test or release skills when present. Use the vendored `thermo-nuclear-review`, `thermo-nuclear-code-quality-review`, and `improve-codebase-architecture` skills through `review-pass` lenses, not as nested workflows inside `review-loop`.
 
 ## Quality Bar
 
@@ -245,11 +245,12 @@ Before finishing:
 9. Confirm accepted issue families were swept for sibling occurrences before verification.
 10. Confirm accepted semantic contract changes used a Contract Surface Matrix, or record why the matrix was skipped.
 11. Confirm review-pass requests used the current fresh or verification templates, including reporting mode, read-only rule, no-reviewer-PR-comment rule, dirty-validation rule, issue-family sweep instruction, design-escape-hatch instruction, full-reread instruction, provisional-ID rule, and clean response sentinel.
-12. If a structural-depth lens was assigned, confirm `review-pass` supplied the structural-depth lens instructions and no full architecture-report workflow was run inside `review-loop`.
-13. Confirm verification continuity mode and opaque handle availability were recorded for verification passes without exposing handle values.
-14. Confirm soft budget checkpoints were surfaced when checkpoint triggers occurred.
-15. Confirm validation commands and results are captured.
-16. Confirm fix commits use the active agent-name prefix.
-17. Confirm the temporary HTML report exists, follows `references/report-guidance.md`, hyperlinks commit hashes to GitHub commits when possible, and is linked in the orchestrator's chat as a clickable absolute-path `.html` Markdown link.
-18. Confirm consolidated "Agent Review" comments followed `references/agent-review-comment.md` when posted.
-19. Confirm no merges, issue closures, label creation, permission changes, non-target-branch pushes, or other out-of-loop external writes happened without current user authorization.
+12. If a deep-review lens was assigned, confirm `review-pass` supplied the deep-review lens instructions and no full Thermos orchestration workflow was run inside `review-loop`.
+13. If a structural-depth lens was assigned, confirm `review-pass` supplied the structural-depth lens instructions and no full architecture-report workflow was run inside `review-loop`.
+14. Confirm verification continuity mode and opaque handle availability were recorded for verification passes without exposing handle values.
+15. Confirm soft budget checkpoints were surfaced when checkpoint triggers occurred.
+16. Confirm validation commands and results are captured.
+17. Confirm fix commits use the active agent-name prefix.
+18. Confirm the temporary HTML report exists, follows `references/report-guidance.md`, hyperlinks commit hashes to GitHub commits when possible, and is linked in the orchestrator's chat as a clickable absolute-path `.html` Markdown link.
+19. Confirm consolidated "Agent Review" comments followed `references/agent-review-comment.md` when posted.
+20. Confirm no merges, issue closures, label creation, permission changes, non-target-branch pushes, or other out-of-loop external writes happened without current user authorization.
