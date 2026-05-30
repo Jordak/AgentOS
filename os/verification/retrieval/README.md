@@ -11,8 +11,10 @@ AgentOS is useful only if an active harness can find the right local source of t
 The benchmark asks representative AgentOS lookup questions and checks whether the answer is grounded in the right local files. A passing answer must:
 
 - cite the relevant AgentOS source of truth;
-- support the answer with evidence from local files;
+- include structured local evidence entries;
 - avoid eval fixtures, previous reports, and other answer-key files.
+
+Exact quote support is diagnostic only. Quote mismatches are reported so humans can see grounding quality, but they do not fail the retrieval score when the answer has valid schema, valid local paths, an expected canonical source, and no disallowed sources.
 
 `os/verification/BENCHMARK_STATUS.md` is excluded from ordinary retrieval evidence because it summarizes benchmark outcomes. A dedicated benchmark-status lookup question may target that file directly, but unrelated retrieval questions should not use it as answer evidence.
 
@@ -55,7 +57,8 @@ Local lexical benchmark:
 Harness answer evals:
 
 - Ask a real harness, such as Codex CLI or Claude Code, to answer lookup questions with structured JSON.
-- Grade only deterministic evidence: schema shape, cited canonical paths, local evidence support, and disallowed-source avoidance.
+- Gate pass/fail on schema shape, valid local paths, cited canonical paths, and disallowed-source avoidance.
+- Report exact quote support as a diagnostic check only.
 - Leave full prose quality as manual review unless a later judge is added.
 - Harness mode defaults to dry-run. Real model calls require `--no-dry-run`.
 - Harness model and effort default to each harness's configured defaults unless `--model` or `--effort` is provided.

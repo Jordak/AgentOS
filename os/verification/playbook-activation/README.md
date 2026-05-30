@@ -16,6 +16,8 @@ A passing fixture means the run transcript shows real access to the required gui
 
 This benchmark grades only guidance activation: whether the transcript shows observed access to each fixture's `must_access` guidance files.
 
+Observed guidance-file access remains gating because it is the activation behavior under test. Prose claims, exact quotes, task completion, and implementation correctness remain diagnostic only.
+
 Task completion, final-answer quality, write success, read-only sandbox failures, blocked patch attempts, and implementation correctness are diagnostic context only. They do not affect activation pass/fail.
 
 ## Contents
