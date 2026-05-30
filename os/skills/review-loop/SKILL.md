@@ -17,7 +17,7 @@ Inputs:
 
 - A target PR URL or number, branch/base pair, commit range, patch, or local change set.
 - A checkout for the target repository, or enough remote context for `gh` or the GitHub connector to inspect the PR.
-- Explicit user authorization for a review loop. A request to run `review-loop`, "run a review loop", or equivalent delegated review/fix loop is authorization to use clean-context reviewer subagents through `review-pass` when the harness supports them. If the user only says something like "review PR #X", first ask whether to run `review-loop` or do a normal review, and name the ordinary PR-scoped writes listed below.
+- Explicit user authorization for a review loop. A request to run `review-loop`, "run a review loop", or equivalent delegated review/fix loop includes explicit authorization to request `review-pass` panel cycles, including clean-context reviewer subagents when the harness supports them. If the user only says something like "review PR #X", first ask whether to run `review-loop` or do a normal review, and name the ordinary PR-scoped writes listed below.
 - For a PR target, an explicit request to run `review-loop`, made through a current user request or adapter prompt that names the write scope, grants permission for read-only reviewer subagents plus ordinary PR-scoped loop writes: posting consolidated "Agent Review" comments, pushing fix commits to the PR branch, and applying the repository's established ready-for-human marker at the end.
 - Ask before non-PR-target writes, pushes to branches outside the target PR, merges, issue closures, creating new labels, permission changes, deletion, posting outside the target PR, or other external actions beyond the loop.
 
@@ -45,7 +45,7 @@ Safety:
 
 - Use this mutating loop only when the user explicitly asked for this skill, a review loop, fresh review subagents plus fixes, or equivalent delegated review/fix work.
 - If the user only asked for a normal review, ask before upgrading to `review-loop`; the question must state that the loop may post consolidated "Agent Review" comments, push fix commits to the PR branch, and apply the established ready-for-human marker.
-- Treat a request to run `review-loop` on a specific PR as permission to use read-only reviewer subagents and for the listed PR-scoped writes when the current request or invocation surface made that write scope explicit. Do not ask for separate subagent permission, and do not ask before each reviewer spawn or ordinary loop write.
+- Treat a request to run `review-loop` on a specific PR as permission to request read-only `review-pass` panel cycles and for the listed PR-scoped writes when the current request or invocation surface made that write scope explicit. Do not ask for separate reviewer-panel permission, and do not ask before each reviewer spawn or ordinary loop write.
 - Keep `review-pass` reviewers read-only. They report to the parent through `review-pass`; the parent is the single PR-comment writer.
 - Before spawning reviewers for feature-sized work, run or honor the implementation-readiness gate. If no durable design source exists, or if the source is not ready for the PR scope, pause before review unless the user explicitly chooses `Gate Skipped`.
 - Do not merge the PR, close issues, create labels, delete branches, change permissions, push outside the target PR branch, or publish outside the PR review surface unless separately requested and approved.
@@ -62,7 +62,7 @@ After any pause, interruption, resume, unusually long loop, or suspected compact
 - Reopen `os/skills/review-pass/SKILL.md` and `os/skills/review-pass/references/reviewer-prompts.md` before every fresh and verification pass. If the harness cannot discover `review-pass` by name, read those canonical files directly and follow them as the fallback.
 - Fill the pass request explicitly: target, repository, base, head or current head, mode, baseline intent, reviewer count or risk posture, optional lens overrides, custom lens notes, prior packet, finding IDs, fix commits, accepted fixes, declined rationales, consolidated comment URL, validation results, and reporting mode.
 - Preserve `review-pass` template rules about read-only review, no reviewer PR comments, issue-family sweeps, design-escape-hatch concerns, full-diff rereads, provisional IDs, and the clean response sentinel.
-- When the harness supports reviewer subagents, request a real multi-reviewer `review-pass` panel. Do not fall back to a single-agent review merely because the user did not separately say "subagents"; the explicit `review-loop` request is the subagent authorization.
+- When the harness supports reviewer subagents, request a real multi-reviewer `review-pass` panel. Do not fall back to a single-agent review merely because the user did not separately say "subagents"; the loop's explicit `review-pass` panel request carries that authorization.
 - Treat the review packet as advisory. The parent owns final accept/decline decisions and records the durable ledger.
 - Do not ask the user to manage reviewer opening, reviewer closure, or pass-level prompt assembly; that is `review-pass` responsibility.
 - After compaction, rebuild the ledger first, then reload `review-pass`, then request the next pass.
@@ -248,7 +248,7 @@ Before finishing:
 11. Confirm review-pass requests used the current fresh or verification templates, including reporting mode, read-only rule, no-reviewer-PR-comment rule, dirty-validation rule, issue-family sweep instruction, design-escape-hatch instruction, full-reread instruction, provisional-ID rule, and clean response sentinel.
 12. If a deep-review lens was assigned, confirm `review-pass` supplied the deep-review lens instructions and no full standalone `thermo-nuclear-review` workflow was run inside `review-loop`.
 13. If a structural-depth lens was assigned, confirm `review-pass` supplied the structural-depth lens instructions and no full standalone `improve-codebase-architecture` or `thermo-nuclear-code-quality-review` workflow was run inside `review-loop`.
-14. Confirm explicit `review-loop` authorization was passed through as permission for read-only reviewer subagents when the harness supported them, or record why `review-pass` used fallback.
+14. Confirm explicit `review-pass` panel requests were treated as permission for read-only reviewer subagents when the harness supported them, or record why `review-pass` used fallback.
 15. Confirm verification continuity mode and opaque handle availability were recorded for verification passes without exposing handle values.
 16. Confirm soft budget checkpoints were surfaced when checkpoint triggers occurred.
 17. Confirm validation commands and results are captured.

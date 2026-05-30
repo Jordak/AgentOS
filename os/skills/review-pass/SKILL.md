@@ -22,6 +22,7 @@ Inputs:
 - Optional prior review packet, finding IDs, accepted fixes, declined rationales, fix commits, validation results, and consolidated comment URL for verification mode.
 - Optional verification continuity preference, source reviewer aliases, opaque source reviewer handles, and source finding IDs when a caller wants same-reviewer verification and the harness can safely resume prior reviewers.
 - Optional reviewer count, lens plan, custom lens notes, and reporting constraints.
+- An explicit user request to run `review-pass`, run a review pass, use a reviewer panel, or perform equivalent read-only panel review counts as authorization to spawn or resume multiple read-only clean-context reviewers when the harness supports them. This authorization covers reviewer reads only, not target edits or external writes.
 
 Output artifact:
 
@@ -38,7 +39,7 @@ Tools and connectors:
 
 - Local filesystem, `git`, `rg`, and existing validation output for read-only inspection.
 - GitHub connector or `gh` for PR metadata reads when authorized and available.
-- The active harness's clean-context reviewer or subagent capability when available and authorized directly by the user or by a caller such as `review-loop`.
+- The active harness's clean-context reviewer or subagent capability when available and authorized by an explicit review-pass or reviewer-panel request, or by a caller such as `review-loop`.
 - `make-temp-file` for optional temporary packet paths.
 - Per-lens reviewer instructions under `os/skills/review-pass/references/lenses/`.
 - `os/skills/thermo-nuclear-review/SKILL.md` as source material for the `deep-review` lens.
@@ -48,7 +49,7 @@ Safety:
 
 - Do not edit files, commit, push, merge, comment on PRs, label issues, close issues, mark PRs ready, change permissions, or perform external writes.
 - Do not run validation commands that may dirty the target checkout. Recommend validation signals for the caller when proof requires a mutating test, build, coverage, or fixture command.
-- Treat an explicit `review-loop` request as caller-provided authorization to spawn or resume read-only reviewer subagents for the current pass when the harness supports them.
+- Treat an explicit `review-pass` or reviewer-panel request as authorization to spawn or resume read-only reviewer subagents for the current pass when the harness supports them. Treat caller-provided panel requests from `review-loop` the same way.
 - Keep spawned or resumed reviewers read-only and instruct them not to post comments or mutate state.
 - Close every spawned or resumed reviewer after its current pass completes so stale context does not leak into unrelated later passes.
 - If the user asks for fixes, commits, PR comments, pushes, ready markers, or loop convergence, route that work to the caller or to `review-loop`.
@@ -138,7 +139,7 @@ When applicable, read `references/lenses/contract-surface-matrix.md` and include
    - When the target triggers the Contract Surface Matrix lens, read `references/lenses/contract-surface-matrix.md` and include its prompt snippet or equivalent instructions in every relevant reviewer prompt.
    - Fill the fresh or verification template explicitly for every reviewer.
    - Include target, repository, base/head or current head, baseline intent, reviewer alias, lens, assigned lens guidance, Contract Surface Matrix guidance when applicable, custom lens notes, verification continuity when applicable, reporting mode, read-only rule, full-reread rule, issue-family rule, design-escape-hatch instruction, provisional-ID rule, and clean response sentinel.
-   - Spawn clean-context reviewers in parallel when the harness supports it and the pass is authorized directly by the user or by a caller such as `review-loop`. If subagents are unavailable, or if a direct non-loop request does not authorize them, run the pass as a clearly labeled single-agent fallback and state the limitation in the packet.
+   - Spawn clean-context reviewers in parallel when the harness supports it and the pass is authorized by an explicit review-pass or reviewer-panel request, or by a caller such as `review-loop`. If subagents are unavailable, run the pass as a clearly labeled single-agent fallback and state the limitation in the packet.
 
 5. Collect and close:
    - Wait for every reviewer in the pass to report.
@@ -195,10 +196,11 @@ Before finishing a review pass:
 6. Confirm reviewer prompts included the read-only rule, no-comment rule, dirty-validation rule, assigned lens guidance, Contract Surface Matrix guidance when applicable, issue-family instruction, design-escape-hatch instruction, full-reread instruction, provisional-ID rule, and clean response sentinel.
 7. If `deep-review` was assigned, confirm the reviewer received the deep-review lens instructions and no full Thermos orchestration or standalone `thermo-nuclear-review` workflow was run.
 8. If `structural-depth` was assigned, confirm the reviewer received the structural-depth lens instructions and no full `improve-codebase-architecture` or `thermo-nuclear-code-quality-review` workflow was run.
-9. Confirm raw findings were deduped into issue families and mapped back to reviewer sources.
-10. Confirm every likely accepted family has evidence, a sibling-search suggestion, and a validation signal.
-11. Confirm every likely declined finding has a short rationale.
-12. Confirm verification continuity mode was recorded when applicable.
-13. Confirm opaque reviewer handle availability was privately handed off or marked unavailable when same-source verification may be needed, and confirm handle values were not exposed in prompts or human-facing packets.
-14. Confirm every spawned or resumed reviewer was closed.
-15. Confirm no target files, PRs, issues, labels, branches, or external state were changed.
+9. Confirm an explicit review-pass or reviewer-panel request was treated as authorization for read-only reviewer subagents when the harness supported them, or record why fallback was used.
+10. Confirm raw findings were deduped into issue families and mapped back to reviewer sources.
+11. Confirm every likely accepted family has evidence, a sibling-search suggestion, and a validation signal.
+12. Confirm every likely declined finding has a short rationale.
+13. Confirm verification continuity mode was recorded when applicable.
+14. Confirm opaque reviewer handle availability was privately handed off or marked unavailable when same-source verification may be needed, and confirm handle values were not exposed in prompts or human-facing packets.
+15. Confirm every spawned or resumed reviewer was closed.
+16. Confirm no target files, PRs, issues, labels, branches, or external state were changed.
