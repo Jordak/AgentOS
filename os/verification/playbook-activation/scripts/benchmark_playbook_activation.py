@@ -12,14 +12,19 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 
 KNOWN_HARNESSES = ("codex",)
-ACCESS_COMMAND_RE = re.compile(
-    r"\b(cat|sed|nl|head|tail|less|more|rg|grep|find|ls|wc|awk|python3?|perl|jq)\b"
+FILE_ACCESS_COMMAND_RE = re.compile(
+    r"\b(cat|sed|nl|head|tail|less|more|find|ls|wc|awk|jq)\b"
+)
+SEARCH_COMMAND_RE = re.compile(r"\b(rg|grep)\b")
+SEARCH_NO_FILENAME_RE = re.compile(
+    r"(?:^|\s)(?:--no-filename|-[A-Za-z]*h[A-Za-z]*)(?:\s|$)"
 )
 DIRECT_COMMAND_RE = re.compile(
     r"^(?:[$+>]\s*)?(?:(?:/[\w.-]+)+/)?"
@@ -29,6 +34,7 @@ SHELL_WRAPPER_RE = re.compile(
     r"^(?:[$+>]\s*)?(?:(?:/[\w.-]+)+/)?(?:bash|sh|zsh)\s+-[a-z]*c\s+"
 )
 CODE_ACCESS_RE = re.compile(r"\b(read_text|open)\s*\(")
+RESULT_HEADER_RE = re.compile(r"^(?:succeeded|failed) in .+:$")
 CODEX_MODEL_RE = re.compile(r"(?im)^model:\s*(.+?)\s*$")
 CODEX_EFFORT_RE = re.compile(r"(?im)^reasoning effort:\s*(.+?)\s*$")
 HARNESS_UNAVAILABLE_PATTERNS = (
@@ -39,6 +45,12 @@ HARNESS_UNAVAILABLE_PATTERNS = (
     "Error finding codex home",
     "CODEX_HOME points to",
 )
+
+
+@dataclass(frozen=True)
+class CommandBlock:
+    command: str
+    output: tuple[str, ...]
 
 
 def default_root() -> Path:
@@ -247,16 +259,85 @@ def collect_transcript_parts(value: Any, parts: list[str]) -> None:
             collect_transcript_parts(item, parts)
 
 
-def access_lines(transcript: str) -> list[str]:
-    lines: list[str] = []
+def command_blocks(transcript: str) -> list[CommandBlock]:
+    blocks: list[CommandBlock] = []
+    pending_exec = False
+    pending_commands: list[str] = []
+    active_command: str | None = None
+    output: list[str] = []
+
+    def flush_active() -> None:
+        nonlocal active_command, output
+        if active_command is not None:
+            blocks.append(CommandBlock(active_command, tuple(output)))
+        active_command = None
+        output = []
+
+    def flush_pending() -> None:
+        while pending_commands:
+            blocks.append(CommandBlock(pending_commands.pop(0), ()))
+
     for line in transcript.splitlines():
         stripped = line.strip()
         if not stripped:
             continue
-        command_like = DIRECT_COMMAND_RE.search(stripped) or SHELL_WRAPPER_RE.search(stripped)
-        if command_like and (ACCESS_COMMAND_RE.search(stripped) or CODE_ACCESS_RE.search(stripped)):
-            lines.append(stripped)
-    return lines
+        if stripped == "exec":
+            flush_active()
+            pending_exec = True
+            continue
+        if stripped in {"codex", "tokens used"}:
+            flush_active()
+            flush_pending()
+            pending_exec = False
+            continue
+        if pending_exec:
+            pending_commands.append(stripped)
+            pending_exec = False
+            continue
+        if RESULT_HEADER_RE.match(stripped):
+            flush_active()
+            if pending_commands:
+                active_command = pending_commands.pop(0)
+                output = []
+            continue
+        if active_command is not None:
+            output.append(stripped)
+            continue
+        if pending_commands:
+            active_command = pending_commands.pop(0)
+            output = [stripped]
+    flush_active()
+    flush_pending()
+    return blocks
+
+
+def is_command_like(command: str) -> bool:
+    return bool(DIRECT_COMMAND_RE.search(command) or SHELL_WRAPPER_RE.search(command))
+
+
+def is_direct_path_access_command(command: str) -> bool:
+    return bool(
+        is_command_like(command)
+        and (
+            FILE_ACCESS_COMMAND_RE.search(command)
+            or CODE_ACCESS_RE.search(command)
+        )
+    )
+
+
+def is_search_output_command(command: str) -> bool:
+    return bool(
+        is_command_like(command)
+        and SEARCH_COMMAND_RE.search(command)
+        and not SEARCH_NO_FILENAME_RE.search(command)
+    )
+
+
+def output_line_cites_path(root: Path, rel_path: str, line: str) -> bool:
+    return any(
+        re.search(rf"^{re.escape(variant)}:\d+(?::\d+)?:", line)
+        for variant in path_variants(root, rel_path)
+    )
 
 
 def path_variants(root: Path, rel_path: str) -> list[str]:
@@ -271,11 +352,16 @@ def path_variants(root: Path, rel_path: str) -> list[str]:
 
 def observed_access(root: Path, rel_path: str, transcript: str) -> dict[str, Any]:
     variants = path_variants(root, rel_path)
-    matches = [
-        line
-        for line in access_lines(transcript)
-        if any(variant in line for variant in variants)
-    ]
+    matches: list[str] = []
+    for block in command_blocks(transcript):
+        if any(variant in block.command for variant in variants) and is_direct_path_access_command(block.command):
+            matches.append(block.command)
+        if is_search_output_command(block.command):
+            matches.extend(
+                f"{block.command} -> {line}"
+                for line in block.output
+                if output_line_cites_path(root, rel_path, line)
+            )
     return {
         "path": rel_path,
         "accessed": bool(matches),
@@ -813,9 +899,145 @@ def run_self_test(root: Path) -> int:
         fixture,
         f"exec\n/bin/bash -lc 'cat {root / 'os/playbook/programming/CLI.md'}'\n",
     )
+    broad_search_grade = grade_fixture(
+        root,
+        fixture,
+        "\n".join(
+            [
+                "exec",
+                "/bin/bash -lc 'rg -n \"terminal\" os/playbook os/skills'",
+                "succeeded in 0ms:",
+                "os/playbook/programming/CLI.md:1:# Command-Line Interfaces",
+            ]
+        ),
+    )
+    leaked_output_grade = grade_fixture(
+        root,
+        fixture,
+        "\n".join(
+            [
+                "exec",
+                "/bin/bash -lc 'rg -n \"terminal\" os/skills'",
+                "succeeded in 0ms:",
+                "os/skills/SKILL_CONTRACT.md:1:# AgentOS Skill Contract",
+                "exec",
+                "/bin/bash -lc 'printf \"os/playbook/programming/CLI.md:1:# Command-Line Interfaces\\n\"'",
+                "succeeded in 0ms:",
+                "os/playbook/programming/CLI.md:1:# Command-Line Interfaces",
+            ]
+        ),
+    )
+    stale_access_command_output_grade = grade_fixture(
+        root,
+        fixture,
+        "\n".join(
+            [
+                "exec",
+                "/bin/bash -lc 'cat stale-report.log'",
+                "succeeded in 0ms:",
+                "os/playbook/programming/CLI.md:1:# Command-Line Interfaces",
+            ]
+        ),
+    )
+    generated_access_command_output_grade = grade_fixture(
+        root,
+        fixture,
+        "\n".join(
+            [
+                "exec",
+                "/bin/bash -lc 'python3 -c \"print(\\\"os/playbook/programming/CLI.md:1:# Command-Line Interfaces\\\")\"'",
+                "succeeded in 0ms:",
+                "os/playbook/programming/CLI.md:1:# Command-Line Interfaces",
+            ]
+        ),
+    )
+    wrong_prefix_search_output_grade = grade_fixture(
+        root,
+        fixture,
+        "\n".join(
+            [
+                "exec",
+                "/bin/bash -lc 'rg -n \"CLI\" os/skills'",
+                "succeeded in 0ms:",
+                "os/skills/example.md:12:os/playbook/programming/CLI.md:1:# Command-Line Interfaces",
+            ]
+        ),
+    )
+    search_pattern_grade = grade_fixture(
+        root,
+        fixture,
+        "\n".join(
+            [
+                "exec",
+                "/bin/bash -lc 'rg -n \"os/playbook/programming/CLI.md\" os/skills'",
+                "succeeded in 0ms:",
+                "os/skills/example.md:12:os/playbook/programming/CLI.md",
+            ]
+        ),
+    )
+    no_filename_search_output_grade = grade_fixture(
+        root,
+        fixture,
+        "\n".join(
+            [
+                "exec",
+                "/bin/bash -lc 'rg --no-filename -n \"CLI\" stale-report.log'",
+                "succeeded in 0ms:",
+                "os/playbook/programming/CLI.md:1:# Command-Line Interfaces",
+            ]
+        ),
+    )
+    queued_exec_output_grade = grade_fixture(
+        root,
+        fixture,
+        "\n".join(
+            [
+                "exec",
+                "/bin/bash -lc 'printf \"os/playbook/programming/CLI.md:1:# Command-Line Interfaces\\n\"'",
+                "exec",
+                "/bin/bash -lc 'rg -n \"Skill Contract\" os/skills'",
+                "succeeded in 0ms:",
+                "os/playbook/programming/CLI.md:1:# Command-Line Interfaces",
+                "succeeded in 0ms:",
+                "os/skills/SKILL_CONTRACT.md:1:# AgentOS Skill Contract",
+            ]
+        ),
+    )
     if not positive_grade["overall_pass"]:
         print("SELF-TEST FAIL: command transcript was not accepted.")
         print(json.dumps(positive_grade, indent=2))
+        return 1
+    if not broad_search_grade["overall_pass"]:
+        print("SELF-TEST FAIL: access command output was not accepted.")
+        print(json.dumps(broad_search_grade, indent=2))
+        return 1
+    if leaked_output_grade["overall_pass"]:
+        print("SELF-TEST FAIL: later non-access command output was accepted as observed tool access.")
+        print(json.dumps(leaked_output_grade, indent=2))
+        return 1
+    if stale_access_command_output_grade["overall_pass"]:
+        print("SELF-TEST FAIL: stale access-command output was accepted as observed tool access.")
+        print(json.dumps(stale_access_command_output_grade, indent=2))
+        return 1
+    if generated_access_command_output_grade["overall_pass"]:
+        print("SELF-TEST FAIL: generated access-command output was accepted as observed tool access.")
+        print(json.dumps(generated_access_command_output_grade, indent=2))
+        return 1
+    if wrong_prefix_search_output_grade["overall_pass"]:
+        print("SELF-TEST FAIL: wrong-prefix search output was accepted as observed tool access.")
+        print(json.dumps(wrong_prefix_search_output_grade, indent=2))
+        return 1
+    if search_pattern_grade["overall_pass"]:
+        print("SELF-TEST FAIL: search pattern text was accepted as observed tool access.")
+        print(json.dumps(search_pattern_grade, indent=2))
+        return 1
+    if no_filename_search_output_grade["overall_pass"]:
+        print("SELF-TEST FAIL: filename-suppressed search output was accepted as observed tool access.")
+        print(json.dumps(no_filename_search_output_grade, indent=2))
+        return 1
+    if queued_exec_output_grade["overall_pass"]:
+        print("SELF-TEST FAIL: output from a prior queued exec was accepted for a later access command.")
+        print(json.dumps(queued_exec_output_grade, indent=2))
         return 1
     if negative_grade["overall_pass"]:
         print("SELF-TEST FAIL: model claim without tool access was accepted.")
