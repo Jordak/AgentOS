@@ -1099,6 +1099,8 @@ class AgentOSValidator:
         for path in skills_dir.glob("*.md"):
             if path.name in {"MANIFEST.md", "README.md", "SKILL_CONTRACT.md"}:
                 continue
+            if path.name.endswith(".template.md"):
+                continue
             skills[path.stem] = path
         for path in skills_dir.glob("*/SKILL.md"):
             skills[path.parent.name] = path
@@ -2238,6 +2240,8 @@ def run_self_test() -> int:
             "---\nname: empty-description\ndescription:\n---\n# Empty Description\n",
             encoding="utf-8",
         )
+        manifest_template = skill_frontmatter_root / "os/skills/PERSONAL_OVERLAY_MANIFEST.template.md"
+        manifest_template.write_text("# Personal Overlay Skills Manifest\n\nStatus: template.\n", encoding="utf-8")
         skill_frontmatter_validator = AgentOSValidator(skill_frontmatter_root)
         skill_frontmatter_validator.check_skill_frontmatter()
         skill_frontmatter_missing_rejected = any(
@@ -2268,6 +2272,10 @@ def run_self_test() -> int:
             error.check == "skill frontmatter"
             and error.path == "os/skills/empty-description/SKILL.md"
             and "frontmatter.description must be a non-empty string" in error.message
+            for error in skill_frontmatter_validator.errors
+        )
+        skill_manifest_template_ignored = not any(
+            error.path == "os/skills/PERSONAL_OVERLAY_MANIFEST.template.md"
             for error in skill_frontmatter_validator.errors
         )
         marker_symlink_root = root / "_marker_symlink_fixture"
@@ -2502,6 +2510,7 @@ def run_self_test() -> int:
             and skill_frontmatter_colon_rejected
             and skill_frontmatter_list_rejected
             and skill_frontmatter_empty_rejected
+            and skill_manifest_template_ignored
             and marker_symlink_rejected
             and marker_symlink_not_loaded
             and personal_symlink_rejected

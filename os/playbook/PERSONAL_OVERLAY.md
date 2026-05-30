@@ -107,7 +107,11 @@ Examples:
 
 Reusable skill procedures, safety contracts, and verification workflows may live in AgentOS Core when they are useful without private user-specific state.
 
-Private live inputs for those skills belong in Personal Overlay skill config files.
+Personal Overlay skills implement the Core skill contract in `$root/os/skills/SKILL_CONTRACT.md`; AgentOS does not define a separate private skill contract in v1.
+
+A maintained canonical private skill needs an ignored manifest entry under `$root/personal/os/skills/MANIFEST.md` with `Lifecycle status: maintained`. Directory-only private skill folders are drafts or ad hoc local files until the manifest records their governance facts. Use the public-safe template at `$root/os/skills/PERSONAL_OVERLAY_MANIFEST.template.md` when creating the ignored private manifest.
+
+Private config is optional for private skills. Since `$root/personal/os/skills/<skill-name>/SKILL.md` is already private, stable private settings can live directly in the private skill. Use a separate config file when settings are volatile, machine-specific, generated, profile-like, useful to audit separately, or when a reusable Core skill needs private inputs without changing the Core source.
 
 Personal Overlay skill config may include local paths, account IDs, artifact roots, user-specific defaults, private examples, and current-machine adapter locations.
 
@@ -118,6 +122,8 @@ Core skills that support private configuration should name the optional config p
 Personal Overlay config is Markdown-first. Use clear labels and fenced or inline code for paths and identifiers so agents can read it naturally.
 
 Add a structured sidecar such as `CONFIG.json` or `CONFIG.yaml` only when scripts or validators need deterministic parsing.
+
+Do not make `$root/personal/os/skills/MANIFEST.md` the source map or connection inventory. Stable project directories, repositories, document folders, account workspaces, connector maturity, and account-specific approval allowances belong in `$root/personal/os/context/SOURCE_MAP.md` or `$root/personal/os/connections/CONNECTIONS.md`; manifest entries should reference those files for nontrivial dependencies.
 
 Skills that are thin adapters to live private agents or workflows centered on private artifacts belong in the Personal Overlay by default.
 

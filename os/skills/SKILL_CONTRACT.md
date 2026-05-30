@@ -67,13 +67,21 @@ A skill's verification guidance should test observable behavior, not internal st
 
 ## Exposure Rules
 
-Canonical public AgentOS skills live under `os/skills/`. Canonical private skills can live under `personal/os/skills/<skill-name>/SKILL.md`. Private inputs to a reusable Core skill belong in `personal/os/skills/<core-skill>/CONFIG.md`, not in the Core skill source.
+Canonical public AgentOS skills live under `os/skills/`. Canonical private skills can live under `personal/os/skills/<skill-name>/SKILL.md`. Personal Overlay skills implement this same Core contract; do not fork a separate private skill contract in v1.
 
-Installed harness adapters are current-machine artifacts, not portable AgentOS state. Do not record machine-local adapter paths or exposure state in `os/skills/MANIFEST.md`.
+A Personal Overlay skill counts as a maintained canonical private skill only when `personal/os/skills/MANIFEST.md` has an entry for it with `Lifecycle status: maintained`. Directory-only private skills are drafts or ad hoc local files until the private manifest records their governance facts. Use `os/skills/PERSONAL_OVERLAY_MANIFEST.template.md` as the public-safe template when creating the ignored private manifest.
+
+Private config is optional for private skills. Since `personal/os/skills/<skill-name>/SKILL.md` is already private, stable private settings may live directly in that file. Use `personal/os/skills/<skill-name>/CONFIG.md` when settings are volatile, machine-specific, generated, profile-like, useful to audit separately, or needed by scripts. Private inputs to a reusable Core skill belong in `personal/os/skills/<core-skill>/CONFIG.md`, not in the Core skill source.
+
+The private skills manifest should reference `personal/os/context/SOURCE_MAP.md` for nontrivial private source routes and `personal/os/connections/CONNECTIONS.md` for connector/account permissions instead of duplicating their full inventories.
+
+Installed harness adapters are current-machine artifacts, not portable AgentOS state. Do not record machine-local adapter paths or exposure state in `os/skills/MANIFEST.md` or `personal/os/skills/MANIFEST.md`.
 
 Installed skills that adapt private live agents must route private job definitions, histories, reports, briefs, queues, and generated outputs to `personal/os/agents/`, `personal/os/automations/`, or Personal Overlay skill config. They must not route private live agent state into Core `os/agents/` or `os/automations/`.
 
 Use `os/skills/expose-skills/SKILL.md` and its bundled script when the active machine should expose Core skills through global symlink adapters. `expose-skills` is Core-only, does not scan or expose Personal Overlay skills, and replaces existing same-name Core skill directories only through explicit backup-backed replacement.
+
+Do not automatically create `personal/os/skills/MANIFEST.md` just because private skill directories exist. Create or update it only when the user asks, or when the current task is explicitly maintaining, importing, promoting, or governance-reviewing a private skill.
 
 If a harness needs intentionally different skill behavior, prefer a canonical thin adapter skill under `os/skills/` or a private skill under `personal/os/skills/` rather than untracked drift in a current-machine installed skill.
 
