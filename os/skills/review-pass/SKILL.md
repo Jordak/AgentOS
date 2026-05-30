@@ -9,7 +9,7 @@ description: Run one read-only review panel pass for a PR, branch/base pair, com
 
 Run one read-only review panel pass and return a review packet that a human or calling workflow can adjudicate. This skill owns the ephemeral reviewer-panel mechanics for a single pass; callers own final decisions and all mutation.
 
-Read `references/reviewer-prompts.md` immediately before assembling reviewer prompts or normalizing a packet. Do not reconstruct prompt templates, lens guidance, or packet headings from memory after compaction or interruption.
+Read `references/reviewer-prompts.md` immediately before assembling reviewer prompts or normalizing a packet. When a reviewer is assigned a named lens, also read that lens's file under `references/lenses/` before sending the prompt. Do not reconstruct prompt templates, lens guidance, or packet headings from memory after compaction or interruption.
 
 ## Contract
 
@@ -22,6 +22,7 @@ Inputs:
 - Optional prior review packet, finding IDs, accepted fixes, declined rationales, fix commits, validation results, and consolidated comment URL for verification mode.
 - Optional verification continuity preference, source reviewer aliases, opaque source reviewer handles, and source finding IDs when a caller wants same-reviewer verification and the harness can safely resume prior reviewers.
 - Optional reviewer count, lens plan, custom lens notes, and reporting constraints.
+- An explicit user request to run `review-pass`, run a review pass, use a reviewer panel, or perform equivalent read-only panel review counts as authorization to spawn or resume multiple read-only clean-context reviewers when the harness supports them. This authorization covers reviewer reads only, not target edits or external writes.
 
 Output artifact:
 
@@ -38,8 +39,9 @@ Tools and connectors:
 
 - Local filesystem, `git`, `rg`, and existing validation output for read-only inspection.
 - GitHub connector or `gh` for PR metadata reads when authorized and available.
-- The active harness's clean-context reviewer or subagent capability when available.
+- The active harness's clean-context reviewer or subagent capability when available and authorized by an explicit review-pass or reviewer-panel request, or by a caller such as `review-loop`.
 - `make-temp-file` for optional temporary packet paths.
+- Per-lens reviewer instructions under `os/skills/review-pass/references/lenses/`.
 - `os/skills/thermo-nuclear-review/SKILL.md` as source material for the `deep-review` lens.
 - `os/skills/thermo-nuclear-code-quality-review/SKILL.md` and `os/skills/improve-codebase-architecture/LANGUAGE.md` as source material for the `structural-depth` lens.
 
@@ -47,6 +49,7 @@ Safety:
 
 - Do not edit files, commit, push, merge, comment on PRs, label issues, close issues, mark PRs ready, change permissions, or perform external writes.
 - Do not run validation commands that may dirty the target checkout. Recommend validation signals for the caller when proof requires a mutating test, build, coverage, or fixture command.
+- Treat an explicit `review-pass` or reviewer-panel request as authorization to spawn or resume read-only reviewer subagents for the current pass when the harness supports them. Treat caller-provided panel requests from `review-loop` the same way.
 - Keep spawned or resumed reviewers read-only and instruct them not to post comments or mutate state.
 - Close every spawned or resumed reviewer after its current pass completes so stale context does not leak into unrelated later passes.
 - If the user asks for fixes, commits, PR comments, pushes, ready markers, or loop convergence, route that work to the caller or to `review-loop`.
@@ -84,33 +87,33 @@ Default lens spread:
 - 4 reviewers: add the most relevant of `deep-review`, `security-privacy`, `release-risk`, `issue-compliance`, `design-compliance`, or `ux-api-docs`.
 - 5 reviewers: add a custom risk lens tied to the target's riskiest subsystem or assumption.
 
-Built-in lenses:
+Lens activation criteria:
 
-- `general`
-- `correctness`
-- `tests-regressions`
-- `edge-cases-data-integrity`
-- `architecture-depth`
-- `code-judo`
-- `design-compliance`
-- `issue-compliance`
-- `ux-api-docs`
-- `deep-review`
-- `security-privacy`
-- `release-risk`
-- `structural-depth` as the composite architecture-depth/code-judo lens sourced from the vendored review-quality skills
+| Lens | Use when | Reference |
+| --- | --- | --- |
+| `general` | The pass is quick, tiny, or needs one balanced reviewer. | `references/lenses/general.md` |
+| `correctness` | The target changes behavior, invariants, state transitions, control flow, API contracts, or error paths. | `references/lenses/correctness.md` |
+| `tests-regressions` | The target has meaningful regression risk, test coverage questions, fixture changes, migration paths, or user-visible behavior. | `references/lenses/tests-regressions.md` |
+| `edge-cases-data-integrity` | The target touches persistence, migration, concurrency, idempotency, partial failure, boundary values, invalid input, or data-loss risk. | `references/lenses/edge-cases-data-integrity.md` |
+| `architecture-depth` | The target changes module boundaries, ownership, interfaces, locality, or abstraction shape but does not need the heavier composite structural lens. | `references/lenses/architecture-depth.md` |
+| `code-judo` | The target looks behaviorally plausible but may have a smaller implementation shape that deletes concepts, branches, wrappers, flags, conditionals, or layers. | `references/lenses/code-judo.md` |
+| `design-compliance` | A durable design source, ADR, PRD, or architecture decision exists and the review should check fit against it. | `references/lenses/design-compliance.md` |
+| `issue-compliance` | A tracker issue or acceptance criteria define the expected outcome, non-goals, or validation plan. | `references/lenses/issue-compliance.md` |
+| `ux-api-docs` | The target changes user-facing behavior, API ergonomics, compatibility, documentation, naming, or workflows. | `references/lenses/ux-api-docs.md` |
+| `deep-review` | The target is broad, correctness-sensitive, security-sensitive, devex-sensitive, feature-gated, cross-package, or otherwise benefits from a harsher branch-audit posture. | `references/lenses/deep-review.md` |
+| `security-privacy` | The target touches permissions, secrets, auth boundaries, data exposure, external-account effects, privacy markers, or publication safety. | `references/lenses/security-privacy.md` |
+| `release-risk` | The target affects rollout, migration, fallback, observability, dependency risk, performance, or support burden. | `references/lenses/release-risk.md` |
+| `structural-depth` | The target is normal-to-broad product or code work where architecture-depth and code-judo attention should be combined into one heavier structural reviewer. | `references/lenses/structural-depth.md` |
 
-Use at most one `structural-depth` reviewer in a normal panel. If structural findings imply a larger architecture effort, report a design-escape-hatch concern rather than proposing a broad redesign inside the pass.
+Use at most one `structural-depth` reviewer in a normal panel. If structural findings imply larger architecture or code-quality work, report a `Design escape hatch` concern that recommends a standalone `improve-codebase-architecture` or `thermo-nuclear-code-quality-review` pass rather than proposing a broad redesign or invoking those skills inside the pass.
+
+Use `deep-review` as an in-panel lens when a review needs sharper correctness, security, developer-experience, or feature-gate scrutiny. If the target deserves a full branch audit, report a `Design escape hatch` concern that recommends a standalone `thermo-nuclear-review` pass rather than invoking that skill inside the pass.
 
 ## Contract Surface Matrix Lens
 
-Use this as a read-only inspection lens when the target changes skill behavior, workflow semantics, cross-skill ownership, safety rules, state or lifecycle behavior, prompt behavior, artifact schemas, validation policy, privacy boundaries, or filing rules. Skip it for typo fixes, local prose cleanup, narrow examples, and implementation details that do not change a reusable contract.
+Use this conditional read-only inspection lens when the target changes skill behavior, workflow semantics, cross-skill ownership, safety rules, state or lifecycle behavior, prompt behavior, artifact schemas, validation policy, privacy boundaries, or filing rules. Skip it for typo fixes, local prose cleanup, narrow examples, and implementation details that do not change a reusable contract.
 
-For relevant targets, have reviewers check a lightweight matrix:
-
-`Semantic | Owner | Inputs | Outputs | Prompt/Recovery | Ledger/Report | Privacy/Filing | Validation`
-
-The matrix is not a design doc and does not authorize mutation. It helps reviewers find propagation gaps across the owning skill, caller or called skills, prompt templates, recovery prompts, packet or report schemas, manifest entry, retrieval or validator coverage when relevant, privacy/filing rules, current-machine adapters or exposure, and final report guidance. Report missing propagation as an issue family with the affected surfaces, not as isolated wording.
+When applicable, read `references/lenses/contract-surface-matrix.md` and include its guidance in every relevant reviewer prompt. The matrix is not a design doc and does not authorize mutation; it helps reviewers report missing propagation as an issue family with the affected surfaces, not as isolated wording.
 
 ## Workflow Phases
 
@@ -132,9 +135,11 @@ The matrix is not a design doc and does not authorize mutation. It helps reviewe
 
 4. Assemble and run prompts:
    - Reopen `references/reviewer-prompts.md`.
+   - For each assigned named lens, read only the matching file under `references/lenses/` and include its prompt snippet or equivalent instructions in that reviewer's prompt.
+   - When the target triggers the Contract Surface Matrix lens, read `references/lenses/contract-surface-matrix.md` and include its prompt snippet or equivalent instructions in every relevant reviewer prompt.
    - Fill the fresh or verification template explicitly for every reviewer.
-   - Include target, repository, base/head or current head, baseline intent, reviewer alias, lens, custom lens notes, verification continuity when applicable, reporting mode, read-only rule, full-reread rule, issue-family rule, Contract Surface Matrix rule for skill or workflow changes, design-escape-hatch instruction, provisional-ID rule, and clean response sentinel.
-   - Spawn clean-context reviewers in parallel when the harness supports it. If subagents are unavailable, run the pass as a clearly labeled single-agent fallback and state the limitation in the packet.
+   - Include target, repository, base/head or current head, baseline intent, reviewer alias, lens, assigned lens guidance, Contract Surface Matrix guidance when applicable, custom lens notes, verification continuity when applicable, reporting mode, read-only rule, full-reread rule, issue-family rule, design-escape-hatch instruction, provisional-ID rule, and clean response sentinel.
+   - Spawn clean-context reviewers in parallel when the harness supports it and the pass is authorized by an explicit review-pass or reviewer-panel request, or by a caller such as `review-loop`. If subagents are unavailable, run the pass as a clearly labeled single-agent fallback and state the limitation in the packet.
 
 5. Collect and close:
    - Wait for every reviewer in the pass to report.
@@ -167,13 +172,14 @@ The matrix is not a design doc and does not authorize mutation. It helps reviewe
 ## Quality Bar
 
 - The target, base, head or current head, mode, reviewer count, lens plan, and baseline-intent quality are explicit.
-- Reviewers get clean, read-only prompts assembled from the current reference template.
+- Reviewers get clean, read-only prompts assembled from the current reference template and assigned per-lens files.
 - Every reviewer reviews the full target, even when assigned a lens.
 - The packet groups findings by issue family, not only by reviewer chronology.
 - Recommendations are clearly non-final and preserve caller authority.
 - For skill, workflow, or reusable contract changes, reviewers check whether changed semantics propagated across affected contract surfaces rather than only the representative paragraph.
 - Design-compliance and issue-compliance concerns are compared against the baseline intent when available.
-- Structural-depth findings stay review-sized and escalate larger architecture work through the design escape hatch.
+- Structural-depth findings stay review-sized and escalate larger architecture or code-quality work through the design escape hatch.
+- Deep-review findings stay review-sized and escalate larger branch-audit work through the design escape hatch.
 - Verification mode checks prior findings and performs a full current-diff reread.
 - Verification mode records whether same-source reviewers were resumed or packet/finding-source fallback was used, and whether opaque handles were privately handed off or unavailable.
 - Spawned or resumed reviewers are closed after the pass.
@@ -185,13 +191,16 @@ Before finishing a review pass:
 1. Confirm the prompt reference was read for the current pass.
 2. Confirm target, repository, base, head or current head, mode, reviewer count, and lens plan.
 3. Confirm baseline intent source and any missing-baseline limitation.
-4. Confirm reviewer prompts included the read-only rule, no-comment rule, dirty-validation rule, issue-family instruction, Contract Surface Matrix rule when applicable, design-escape-hatch instruction, full-reread instruction, provisional-ID rule, and clean response sentinel.
-5. If `deep-review` was assigned, confirm the reviewer received the deep-review lens instructions and no full Thermos orchestration workflow was run.
-6. If `structural-depth` was assigned, confirm the reviewer received the structural-depth lens instructions and no full architecture-report workflow was run.
-7. Confirm raw findings were deduped into issue families and mapped back to reviewer sources.
-8. Confirm every likely accepted family has evidence, a sibling-search suggestion, and a validation signal.
-9. Confirm every likely declined finding has a short rationale.
-10. Confirm verification continuity mode was recorded when applicable.
-11. Confirm opaque reviewer handle availability was privately handed off or marked unavailable when same-source verification may be needed, and confirm handle values were not exposed in prompts or human-facing packets.
-12. Confirm every spawned or resumed reviewer was closed.
-13. Confirm no target files, PRs, issues, labels, branches, or external state were changed.
+4. Confirm every assigned named lens file under `references/lenses/` was read, and unassigned lens files were not required for prompt assembly.
+5. Confirm `references/lenses/contract-surface-matrix.md` was read when the target changed reusable contract surfaces.
+6. Confirm reviewer prompts included the read-only rule, no-comment rule, dirty-validation rule, assigned lens guidance, Contract Surface Matrix guidance when applicable, issue-family instruction, design-escape-hatch instruction, full-reread instruction, provisional-ID rule, and clean response sentinel.
+7. If `deep-review` was assigned, confirm the reviewer received the deep-review lens instructions and no full Thermos orchestration or standalone `thermo-nuclear-review` workflow was run.
+8. If `structural-depth` was assigned, confirm the reviewer received the structural-depth lens instructions and no full `improve-codebase-architecture` or `thermo-nuclear-code-quality-review` workflow was run.
+9. Confirm an explicit review-pass or reviewer-panel request was treated as authorization for read-only reviewer subagents when the harness supported them, or record why fallback was used.
+10. Confirm raw findings were deduped into issue families and mapped back to reviewer sources.
+11. Confirm every likely accepted family has evidence, a sibling-search suggestion, and a validation signal.
+12. Confirm every likely declined finding has a short rationale.
+13. Confirm verification continuity mode was recorded when applicable.
+14. Confirm opaque reviewer handle availability was privately handed off or marked unavailable when same-source verification may be needed, and confirm handle values were not exposed in prompts or human-facing packets.
+15. Confirm every spawned or resumed reviewer was closed.
+16. Confirm no target files, PRs, issues, labels, branches, or external state were changed.
