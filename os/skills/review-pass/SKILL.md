@@ -38,7 +38,7 @@ Tools and connectors:
 
 - Local filesystem, `git`, `rg`, and existing validation output for read-only inspection.
 - GitHub connector or `gh` for PR metadata reads when authorized and available.
-- The active harness's clean-context reviewer or subagent capability when available.
+- The active harness's clean-context reviewer or subagent capability when available and authorized directly by the user or by a caller such as `review-loop`.
 - `make-temp-file` for optional temporary packet paths.
 - Per-lens reviewer instructions under `os/skills/review-pass/references/lenses/`.
 - `os/skills/thermo-nuclear-review/SKILL.md` as source material for the `deep-review` lens.
@@ -48,6 +48,7 @@ Safety:
 
 - Do not edit files, commit, push, merge, comment on PRs, label issues, close issues, mark PRs ready, change permissions, or perform external writes.
 - Do not run validation commands that may dirty the target checkout. Recommend validation signals for the caller when proof requires a mutating test, build, coverage, or fixture command.
+- Treat an explicit `review-loop` request as caller-provided authorization to spawn or resume read-only reviewer subagents for the current pass when the harness supports them.
 - Keep spawned or resumed reviewers read-only and instruct them not to post comments or mutate state.
 - Close every spawned or resumed reviewer after its current pass completes so stale context does not leak into unrelated later passes.
 - If the user asks for fixes, commits, PR comments, pushes, ready markers, or loop convergence, route that work to the caller or to `review-loop`.
@@ -137,7 +138,7 @@ When applicable, read `references/lenses/contract-surface-matrix.md` and include
    - When the target triggers the Contract Surface Matrix lens, read `references/lenses/contract-surface-matrix.md` and include its prompt snippet or equivalent instructions in every relevant reviewer prompt.
    - Fill the fresh or verification template explicitly for every reviewer.
    - Include target, repository, base/head or current head, baseline intent, reviewer alias, lens, assigned lens guidance, Contract Surface Matrix guidance when applicable, custom lens notes, verification continuity when applicable, reporting mode, read-only rule, full-reread rule, issue-family rule, design-escape-hatch instruction, provisional-ID rule, and clean response sentinel.
-   - Spawn clean-context reviewers in parallel when the harness supports it. If subagents are unavailable, run the pass as a clearly labeled single-agent fallback and state the limitation in the packet.
+   - Spawn clean-context reviewers in parallel when the harness supports it and the pass is authorized directly by the user or by a caller such as `review-loop`. If subagents are unavailable, or if a direct non-loop request does not authorize them, run the pass as a clearly labeled single-agent fallback and state the limitation in the packet.
 
 5. Collect and close:
    - Wait for every reviewer in the pass to report.
