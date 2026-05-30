@@ -24,7 +24,7 @@ Use this when creating the final temporary HTML report for a review-loop run. Th
    - Explain what changed at the family level, not only at the individual commit level.
 
 5. Review-loop convergence:
-   - Show review-pass cycles, reviewer aliases, reviewer continuity mode and opaque handle availability for verification passes, accepted finding clusters, fix commits, and final clean status. Include source aliases when useful, but never expose opaque reviewer handles.
+   - Show review-pass cycles, reviewer aliases, reviewer continuity mode and opaque handle availability for verification passes, accepted issue families, fix commits, and final clean status. Include source aliases when useful, but never expose opaque reviewer handles.
    - Name the final fresh review-pass packet and terminal condition.
 
 6. Validation evidence:
@@ -46,8 +46,8 @@ Use this when creating the final temporary HTML report for a review-loop run. Th
 
 - Write families as reusable lessons: "suffixless publishable files skipped privacy scans" is better than "`.gitignore` had a bug."
 - Include a sibling-sweep note: what related files, paths, suffixes, validators, fixtures, or commands were checked after the representative issue was found.
-- Distinguish fixed families, declined findings, follow-up proposals, and residual risks.
-- If a finding led to several commits, tell the family story once and put the commit sequence in chips or a table.
+- Distinguish fixed families, declined issue families, follow-up proposals, and residual risks.
+- If an issue family led to several commits, tell the family story once and put the commit sequence in chips or a table.
 
 ## Efficiency Notes
 
