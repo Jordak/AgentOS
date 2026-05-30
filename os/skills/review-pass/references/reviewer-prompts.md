@@ -13,14 +13,15 @@ Before sending a reviewer prompt, confirm it includes:
 - custom lens notes when provided;
 - reviewer continuity preference plus source reviewer aliases and source finding IDs in verification mode when applicable; source reviewer handles stay in the orchestration request when needed for resumption;
 - reviewer continuity handle availability in verification mode when applicable, without exposing opaque handle values;
-- deep-review lens instructions when that lens is assigned;
-- structural-depth lens instructions when that lens is assigned;
+- assigned lens guidance loaded from the matching `references/lenses/<lens>.md` file when a named lens is assigned;
+- Contract Surface Matrix guidance loaded from `references/lenses/contract-surface-matrix.md` when the target changes reusable contract surfaces;
+- source-workflow boundary and design-escape-hatch escalation guidance from the lens file when `deep-review` or `structural-depth` is assigned;
 - reporting mode: chat to review-pass orchestrator only;
 - instruction to read repository instructions before inspecting the target;
 - read-only rule, including no PR comments by reviewers;
 - dirty-validation rule: use existing validation output only, do not run validation commands that may dirty the target checkout, and recommend validation signals for the caller instead;
 - instruction to generalize each finding into an issue family and look for related occurrences;
-- instruction to use the Contract Surface Matrix for skill, workflow, or reusable contract changes;
+- instruction to apply the Contract Surface Matrix guidance for skill, workflow, or reusable contract changes when provided;
 - instruction to report design-escape-hatch concerns when repeated findings suggest scope reduction, design clarification, or a different implementation shape;
 - instruction to compare implementation shape against the durable design source on fresh review when one is provided;
 - finding IDs, fix commits, accepted fixes, declined rationales, consolidated comment URL, and validation results in verification mode when applicable;
@@ -32,47 +33,27 @@ Before sending a reviewer prompt, confirm it includes:
 
 Named lenses are weighted attention, not exclusive scopes. Every reviewer still reviews the full target.
 
-- `general`: balanced correctness, regression, tests, maintainability, safety, user-facing behavior, and design-drift review.
-- `correctness`: invariants, control flow, state transitions, API contracts, error paths, and false success or false failure cases.
-- `tests-regressions`: missing tests, weakened coverage, fixture drift, brittle assertions, untested migration or rollback paths, and likely regressions.
-- `edge-cases-data-integrity`: boundary values, partial failure, concurrency, idempotency, invalid input, persistence, migration, and data-loss risks.
-- `architecture-depth`: module boundaries, interface depth, locality, abstraction leverage, wrong-layer logic, and whether new structure earns its keep.
-- `code-judo`: smaller moves that preserve behavior while deleting concepts, branches, wrappers, flags, conditionals, or layers.
-- `design-compliance`: fit against the durable design source, ADRs, PRD, or architecture decision, including drift from explicit alternatives and non-goals.
-- `issue-compliance`: fit against the current issue's requested outcomes, acceptance criteria, non-goals, and validation plan.
-- `ux-api-docs`: user-facing behavior, API ergonomics, compatibility, docs accuracy, confusing names, and workflow regressions.
-- `deep-review`: changed-code correctness, security vulnerabilities, breaking behavior, developer-experience regressions, feature-gate leaks, side effects across packages/modules, intended breakage, and severity calibration.
-- `security-privacy`: permissions, secrets, data exposure, auth boundaries, injection, privacy markers, external-account effects, and publication safety.
-- `release-risk`: migration safety, rollout, operational visibility, fallback, dependency risk, performance cliffs, and support burden.
+The orchestrator chooses lenses from `SKILL.md`, then loads only the matching reference files below before sending prompts. Do not require every reviewer to read every lens file.
 
-## Deep-Review Lens
+| Lens | Reference |
+| --- | --- |
+| `general` | `references/lenses/general.md` |
+| `correctness` | `references/lenses/correctness.md` |
+| `tests-regressions` | `references/lenses/tests-regressions.md` |
+| `edge-cases-data-integrity` | `references/lenses/edge-cases-data-integrity.md` |
+| `architecture-depth` | `references/lenses/architecture-depth.md` |
+| `code-judo` | `references/lenses/code-judo.md` |
+| `design-compliance` | `references/lenses/design-compliance.md` |
+| `issue-compliance` | `references/lenses/issue-compliance.md` |
+| `ux-api-docs` | `references/lenses/ux-api-docs.md` |
+| `deep-review` | `references/lenses/deep-review.md` |
+| `security-privacy` | `references/lenses/security-privacy.md` |
+| `release-risk` | `references/lenses/release-risk.md` |
+| `structural-depth` | `references/lenses/structural-depth.md` |
 
-Use this lens only when the reviewer prompt assigns `deep-review` as the optional lens. It is the correctness/security/devex branch-audit lens sourced from `thermo-nuclear-review`. It is a lens inside `review-pass`, not a request to run the full Cursor Thermos orchestrator or spawn Thermos subagents.
+Conditional lens:
 
-Additional priorities:
-
-- Scope findings to code added or modified by the target change. Do not report untouched pre-existing vulnerabilities unless the changed code newly exposes or worsens them.
-- Trace cross-package and cross-module side effects before reporting. Do not leave client/server, caller/callee, or flag boundary questions unresolved when the code is available.
-- Check breaking functionality, breaking developer experience, security vulnerabilities, and feature-gate leaks.
-- Treat required new environment variables, secret lookup changes, port/network remaps, and required manual setup scripts as developer-experience risks when they change existing workflows.
-- Calibrate severity honestly. Do not label a finding high priority unless the impact and path are concrete.
-- If the branch intentionally introduces a risky breakage and the scope is clearly constrained, do not report it as accidental. Escalate only when implications look under-weighted, unclear, or unsafe.
-- If medium-or-higher findings exist and PR/MR discussion is available through read-only metadata already provided to the panel, incorporate valid external findings after the independent audit and attribute them. Do not post comments or perform external writes.
-
-## Structural-Depth Lens
-
-Use this lens only when the reviewer prompt assigns `structural-depth` as the optional lens. It is the composite architecture-depth/code-judo lens, and it blends `thermo-nuclear-code-quality-review` and `improve-codebase-architecture` into a PR-review posture. It is a lens inside `review-pass`, not a request to run the full `improve-codebase-architecture` HTML-report workflow.
-
-Additional priorities:
-
-- Be ambitious about structural simplification. Look for a code-judo move that preserves behavior while deleting concepts, branches, wrappers, conditionals, or layers.
-- Treat spaghetti growth as a design risk: new ad-hoc conditionals, scattered special cases, one-off flags, cast-heavy contracts, wrong-layer logic, and bespoke helpers should be flagged when they make the code harder to reason about.
-- Watch file-size and decomposition pressure, especially a PR pushing a file from below 1000 lines to above 1000 lines.
-- Use the architecture vocabulary exactly where relevant: **module**, **interface**, **implementation**, **depth**, **deep**, **shallow**, **seam**, **adapter**, **leverage**, **locality**.
-- Apply the deletion test to suspicious modules: if deleting the module makes complexity vanish, it is probably pass-through; if complexity would reappear across callers, it may be earning its keep.
-- Prefer deeper modules with smaller interfaces, better locality, and tests that cross the same interface callers use.
-- Do not approve merely because behavior works if the PR clearly makes the codebase structurally messier.
-- If the best answer is a separate architecture pass rather than another local patch, report it as a `Design escape hatch` concern instead of proposing a broad redesign inside the review pass.
+- `contract-surface-matrix`: load `references/lenses/contract-surface-matrix.md` when the target changes reusable contract surfaces.
 
 ## Fresh Reviewer Prompt
 
@@ -88,6 +69,8 @@ Mode: fresh
 Reviewer alias: <P1-R1, P1-R2, etc.>
 Optional lens: <general | correctness | tests-regressions | edge-cases-data-integrity | architecture-depth | code-judo | design-compliance | issue-compliance | ux-api-docs | deep-review | security-privacy | release-risk | structural-depth | none>
 Custom lens notes: <target-specific concerns or none>
+Assigned lens guidance: <paste the prompt snippet or equivalent instructions from references/lenses/<lens>.md, or none>
+Contract Surface Matrix guidance: <paste the prompt snippet or equivalent instructions from references/lenses/contract-surface-matrix.md when applicable, or none>
 Reporting mode: chat to review-pass orchestrator only
 
 Rules:
@@ -95,14 +78,13 @@ Rules:
 - Use existing validation output only. Do not run validation commands that may dirty the target checkout; recommend validation signals for the caller instead.
 - Read the repository instructions and inspect the full target against the base.
 - Your optional lens is a prompt for extra attention, not a limit; still review the full target.
-- If your optional lens is `deep-review`, apply the Deep-Review Lens above.
-- If your optional lens is `structural-depth`, apply the Structural-Depth Lens above.
+- Apply the assigned lens guidance exactly as provided. If it is `none`, continue with the baseline review priorities.
 - Prioritize correctness, regressions, missing tests, safety, maintainability risks, user-facing behavior, and design drift.
 - Report findings first, ordered by severity, with file/line evidence and suggested fixes.
 - Give each finding a provisional ID using your reviewer alias, such as `<alias>-F1`; the review-pass orchestrator may normalize IDs later.
 - For each finding, step back and identify the broader issue family or invariant it represents. Look for sibling occurrences in the diff or nearby code before reporting.
 - For accepted-risk findings, include the specific instance, generalized family, related occurrences or search strategy, and suggested family-level fix.
-- For skill, workflow, prompt, safety, lifecycle, schema, validation-policy, privacy, filing, or cross-skill ownership changes, use a lightweight Contract Surface Matrix: `Semantic | Owner | Inputs | Outputs | Prompt/Recovery | Ledger/Report | Privacy/Filing | Validation`. Check whether the changed semantic propagated across affected surfaces: owning skill, caller or called skills, prompt templates, recovery prompts, packet or report schemas, manifest, retrieval or validator coverage when relevant, privacy/filing rules, current-machine adapters or exposure, and final report guidance. Report missing propagation as an issue family, not as isolated wording.
+- Apply the Contract Surface Matrix guidance when provided.
 - Compare the implementation shape against the baseline intent and durable design source when provided. If the target added major architecture, parsing, synchronization, lifecycle, validation, or public-policy semantics that the design source did not agree to, report that as a design-readiness finding rather than treating only the symptoms as bugs.
 - If repeated findings seem to come from an over-expanded or under-designed feature shape, or if the best fix may be scope reduction, design clarification, or a different implementation shape, report a `Design escape hatch` section. In that section compare the current target against the baseline intent and name the smaller or clearer design you would consider.
 - Do not pad the review with low-value style preferences.
@@ -123,6 +105,8 @@ Mode: verification
 Reviewer alias: <P2-R1, P2-R2, etc.>
 Optional lens: <general | correctness | tests-regressions | edge-cases-data-integrity | architecture-depth | code-judo | design-compliance | issue-compliance | ux-api-docs | deep-review | security-privacy | release-risk | structural-depth | none>
 Custom lens notes: <target-specific concerns or none>
+Assigned lens guidance: <paste the prompt snippet or equivalent instructions from references/lenses/<lens>.md, or none>
+Contract Surface Matrix guidance: <paste the prompt snippet or equivalent instructions from references/lenses/contract-surface-matrix.md when applicable, or none>
 Reviewer continuity: <same-source reviewer resumed | packet/finding-source fallback | none; include source reviewer aliases and finding IDs when applicable>
 Continuity handle availability: <private handoff available | unavailable | not applicable; never include opaque handle values>
 Prior packet or findings for you to verify: <finding IDs and summaries relevant to this reviewer or lens>
@@ -138,8 +122,7 @@ Rules:
 - Use existing validation output only. Do not run validation commands that may dirty the target checkout; recommend validation signals for the caller instead.
 - Read the repository instructions and inspect the full current target against the base.
 - Your optional lens is a prompt for extra attention, not a limit; still review the full target.
-- If your optional lens is `deep-review`, apply the Deep-Review Lens above.
-- If your optional lens is `structural-depth`, apply the Structural-Depth Lens above.
+- Apply the assigned lens guidance exactly as provided. If it is `none`, continue with the baseline review priorities.
 
 Tasks:
 - If same-source reviewer continuity is active, verify your own prior findings while still rereading the full current target. If packet/finding-source fallback is active, use the source reviewer aliases and finding IDs as the continuity trail without assuming access to the original reviewer context.
@@ -148,7 +131,7 @@ Tasks:
 - Re-read the full current target against the base, not only the changed lines from the fix commit.
 - Look for issues missed last time and regressions introduced by the fix.
 - For each remaining or new issue, step back and identify the broader issue family. Look for sibling occurrences before reporting so the caller can fix the family, not one instance.
-- For skill, workflow, prompt, safety, lifecycle, schema, validation-policy, privacy, filing, or cross-skill ownership changes, use a lightweight Contract Surface Matrix: `Semantic | Owner | Inputs | Outputs | Prompt/Recovery | Ledger/Report | Privacy/Filing | Validation`. Check whether the changed semantic propagated across affected surfaces: owning skill, caller or called skills, prompt templates, recovery prompts, packet or report schemas, manifest, retrieval or validator coverage when relevant, privacy/filing rules, current-machine adapters or exposure, and final report guidance. Report missing propagation as an issue family, not as isolated wording.
+- Apply the Contract Surface Matrix guidance when provided.
 - If the same issue family is recurring, or if the fix added schema, grammar, lifecycle, synchronization, parser, or publication semantics beyond the baseline intent, report a `Design escape hatch` section with the smaller or clearer design you would consider.
 - If issues remain or new issues exist, report them in chat with provisional IDs using your reviewer alias.
 - If no accepted issues remain and you find no new issues, start your response with exactly `No new findings.` on its own first line. Then add the reviewed scope and validation you performed.
@@ -217,20 +200,29 @@ Before sending any more reviewer prompts, reopen:
 `os/skills/review-pass/references/reviewer-prompts.md`
 or the current harness's configured adapter path for `review-pass/references/reviewer-prompts.md`, if it is known.
 
+For every assigned named lens, also reopen only the matching file under:
+`os/skills/review-pass/references/lenses/`
+or the current harness's configured adapter path for `review-pass/references/lenses/`, if it is known.
+
+When the target changes reusable contract surfaces, also reopen:
+`os/skills/review-pass/references/lenses/contract-surface-matrix.md`
+or the current harness's configured adapter path for `review-pass/references/lenses/contract-surface-matrix.md`, if it is known.
+
 For every fresh reviewer, fill and send the "Fresh Reviewer Prompt" template. For every verification reviewer, fill and send the "Verification Reviewer Prompt" template.
 
 Do not reconstruct these prompts from memory. Each reviewer prompt must include:
 - target, repository, base, and current head;
 - baseline intent summary and source or limitation;
 - mode, reviewer alias, optional lens, and custom lens notes;
-- deep-review lens instructions when that lens is assigned;
-- structural-depth lens instructions when that lens is assigned;
+- assigned lens guidance loaded from `references/lenses/<lens>.md` when a named lens is assigned;
+- Contract Surface Matrix guidance loaded from `references/lenses/contract-surface-matrix.md` when the target changes reusable contract surfaces;
+- source-workflow boundary and design-escape-hatch escalation guidance from the assigned lens file when `deep-review` or `structural-depth` is assigned;
 - reporting mode: chat to review-pass orchestrator only;
 - the repository-instruction rule;
 - the read-only rule, including no PR comments by reviewers;
 - the dirty-validation rule: use existing validation output only, do not run validation commands that may dirty the target checkout, and recommend validation signals for the caller instead;
 - the issue-family instruction: generalize each finding and look for related occurrences before reporting;
-- the Contract Surface Matrix rule for skill, workflow, or reusable contract changes;
+- the Contract Surface Matrix guidance for skill, workflow, or reusable contract changes when applicable;
 - the design-escape-hatch instruction: call out when scope reduction, design clarification, or a different implementation shape may be better than another patch;
 - prior finding IDs, fixes, declined rationales, comments, and validation when it is a verification pass;
 - reviewer continuity preference plus source reviewer aliases and source finding IDs when applicable; source reviewer handles stay in the orchestration request when needed for resumption;
