@@ -1,6 +1,6 @@
 # Review Pass Reviewer Prompts
 
-Use these prompts as templates for one read-only review panel pass. Fill the target, base/head or commit range, reviewer alias, optional lens, mode, prior findings when applicable, and reporting instructions. Keep prompts narrow enough that reviewers start clean: do not include the parent agent's analysis, suspected fixes, or opinions unless verification mode requires prior adjudication context.
+Use these prompts as templates for one read-only review panel pass. Fill the target, base/head or commit range, reviewer alias, optional lens, mode, prior issue families when applicable, and reporting instructions. Keep prompts narrow enough that reviewers start clean: do not include the parent agent's analysis, suspected fixes, or opinions unless verification mode requires prior adjudication context. Use `review-packet-template.md` for packet rendering; this file owns reviewer prompt mechanics only.
 
 ## Prompt Checklist
 
@@ -9,9 +9,9 @@ Before sending a reviewer prompt, confirm it includes:
 - target, repository, base, and head or current head;
 - baseline intent summary from the issue, PR description, spec, design doc, ADR, commit range, patch, or user request;
 - mode: `fresh` or `verification`;
-- reviewer alias and optional lens;
+- reviewer alias and optional lens; reviewer aliases use `P<panel-number>-R<reviewer-number>`, where `P` means panel;
 - custom lens notes when provided;
-- reviewer continuity preference plus source reviewer aliases and source finding IDs in verification mode when applicable; source reviewer handles stay in the orchestration request when needed for resumption;
+- reviewer continuity preference plus source reviewer aliases and source reviewer finding IDs in verification mode when applicable; source reviewer handles stay in the orchestration request when needed for resumption;
 - reviewer continuity handle availability in verification mode when applicable, without exposing opaque handle values;
 - assigned lens guidance loaded from the matching `references/lenses/<lens>.md` file when a named lens is assigned;
 - Contract Surface Matrix guidance loaded from `references/lenses/contract-surface-matrix.md` when the target changes reusable contract surfaces;
@@ -24,7 +24,7 @@ Before sending a reviewer prompt, confirm it includes:
 - instruction to apply the Contract Surface Matrix guidance for skill, workflow, or reusable contract changes when provided;
 - instruction to report design-escape-hatch concerns when repeated findings suggest scope reduction, design clarification, or a different implementation shape;
 - instruction to compare implementation shape against the durable design source on fresh review when one is provided;
-- finding IDs, fix commits, accepted fixes, declined rationales, consolidated comment URL, and validation results in verification mode when applicable;
+- reviewer finding IDs, issue-family IDs, fix commits, accepted fixes, declined rationales, consolidated comment URL, and validation results in verification mode when applicable;
 - full-diff reread instruction;
 - provisional-ID instruction for new findings;
 - clean response sentinel: start the response with exactly `No new findings.` on its own first line.
@@ -94,7 +94,7 @@ Rules:
 ## Verification Reviewer Prompt
 
 ```md
-You are an independent reviewer in a read-only review-pass verification panel. The caller has addressed or adjudicated prior findings. Verify the prior findings and reread the full current target.
+You are an independent reviewer in a read-only review-pass verification panel. The caller has addressed or adjudicated prior issue families. Verify those issue families and reread the full current target.
 
 Target: <same target>
 Repository: <repo path or owner/name>
@@ -107,12 +107,12 @@ Optional lens: <general | correctness | tests-regressions | edge-cases-data-inte
 Custom lens notes: <target-specific concerns or none>
 Assigned lens guidance: <paste the prompt snippet or equivalent instructions from references/lenses/<lens>.md, or none>
 Contract Surface Matrix guidance: <paste the prompt snippet or equivalent instructions from references/lenses/contract-surface-matrix.md when applicable, or none>
-Reviewer continuity: <same-source reviewer resumed | packet/finding-source fallback | none; include source reviewer aliases and finding IDs when applicable>
+Reviewer continuity: <same-source reviewer resumed | packet/finding-source fallback | none; include source reviewer aliases and reviewer finding IDs when applicable>
 Continuity handle availability: <private handoff available | unavailable | not applicable; never include opaque handle values>
-Prior packet or findings for you to verify: <finding IDs and summaries relevant to this reviewer or lens>
+Prior packet or issue families for you to verify: <reviewer finding IDs, issue-family IDs, and summaries relevant to this reviewer or lens>
 Fix commits: <commit SHAs and one-line summaries>
-Accepted findings fixed: <brief list>
-Declined findings and rationale: <brief list>
+Accepted issue families fixed: <brief list>
+Declined issue families and rationale: <brief list>
 Consolidated Agent Review comment: <URL or none>
 Validation run by caller: <commands and results>
 Reporting mode: chat to review-pass orchestrator only
@@ -125,9 +125,9 @@ Rules:
 - Apply the assigned lens guidance exactly as provided. If it is `none`, continue with the baseline review priorities.
 
 Tasks:
-- If same-source reviewer continuity is active, verify your own prior findings while still rereading the full current target. If packet/finding-source fallback is active, use the source reviewer aliases and finding IDs as the continuity trail without assuming access to the original reviewer context.
-- Verify whether the prior accepted findings were actually fixed.
-- Check whether declined findings remain worth escalating after reading the rationale.
+- If same-source reviewer continuity is active, verify your own prior Reviewer Findings while still rereading the full current target. If packet/finding-source fallback is active, use the source reviewer aliases and reviewer finding IDs as the continuity trail without assuming access to the original reviewer context.
+- Verify whether the prior accepted issue families were actually fixed.
+- Check whether declined issue families remain worth escalating after reading the rationale.
 - Re-read the full current target against the base, not only the changed lines from the fix commit.
 - Look for issues missed last time and regressions introduced by the fix.
 - For each remaining or new issue, step back and identify the broader issue family. Look for sibling occurrences before reporting so the caller can fix the family, not one instance.
@@ -137,53 +137,9 @@ Tasks:
 - If no accepted issues remain and you find no new issues, start your response with exactly `No new findings.` on its own first line. Then add the reviewed scope and validation you performed.
 ```
 
-## Review Packet Schema
+## Review Packet Template
 
-Return review packets with this structure unless the caller requested a narrower format:
-
-```md
-Review Packet
-
-Target: <target>
-Repository: <repo path or owner/name>
-Mode: <fresh | verification>
-Base: <base ref or commit>
-Head: <head or current head>
-Baseline Intent: <summary and source, or limitation>
-Panel: <reviewer aliases and count>
-Lens Plan: <reviewer alias -> lens>
-Coverage: <scope inspected, metadata read, limitations>
-Reviewer Continuity: <same-source reviewers resumed | packet/finding-source fallback | none; include source aliases or limitation, never opaque reviewer handles>
-Continuity Handle Availability: <private handoff available | unavailable | not applicable; never include opaque handle values>
-
-Issue Families:
-1. [<family-id>] [Severity] <family title>
-   Recommended disposition: <likely accept | likely decline | needs user/design judgment>
-   Found by: <reviewer aliases and provisional finding IDs>
-   Evidence: <file:line, diff hunk, command output, or source link>
-   Failure mode: <generalized invariant or risk>
-   Representative findings: <short summaries>
-   Related occurrences or sibling search: <siblings found, search performed, or recommended search>
-   Suggested fix shape: <family-level fix, simplification, scope reduction, or none>
-   Validation signal: <test, command, inspection, or proof that would close it>
-
-Design Escape Hatch:
-- <none, or specific concern comparing target shape against baseline intent>
-
-Recommended Dispositions:
-- Likely accept: <family IDs>
-- Likely decline: <finding/family IDs and rationale>
-- Needs user/design judgment: <family IDs and the decision needed>
-
-Reviewer Crosswalk:
-- <reviewer alias>: <raw finding IDs, clean sentinel, lens, notable coverage>
-
-Residual Risks And Limitations:
-- <missing metadata, weak baseline, unavailable subagents, skipped commands, or confidence limits>
-
-Temporary Packet Artifact:
-- <path or none>
-```
+Before normalizing or returning a packet, reopen `references/review-packet-template.md` and use its exact headings, section order, ID vocabulary, field labels, empty states, examples, and temporary artifact wording. Do not reconstruct packet headings or field labels from this prompt file.
 
 ## Caller Handoff Notes
 
@@ -199,6 +155,10 @@ Please realign the active review-pass run with the current prompt templates.
 Before sending any more reviewer prompts, reopen:
 `os/skills/review-pass/references/reviewer-prompts.md`
 or the current harness's configured adapter path for `review-pass/references/reviewer-prompts.md`, if it is known.
+
+Before normalizing or returning the packet, reopen:
+`os/skills/review-pass/references/review-packet-template.md`
+or the current harness's configured adapter path for `review-pass/references/review-packet-template.md`, if it is known.
 
 For every assigned named lens, also reopen only the matching file under:
 `os/skills/review-pass/references/lenses/`
@@ -224,12 +184,12 @@ Do not reconstruct these prompts from memory. Each reviewer prompt must include:
 - the issue-family instruction: generalize each finding and look for related occurrences before reporting;
 - the Contract Surface Matrix guidance for skill, workflow, or reusable contract changes when applicable;
 - the design-escape-hatch instruction: call out when scope reduction, design clarification, or a different implementation shape may be better than another patch;
-- prior finding IDs, fixes, declined rationales, comments, and validation when it is a verification pass;
-- reviewer continuity preference plus source reviewer aliases and source finding IDs when applicable; source reviewer handles stay in the orchestration request when needed for resumption;
+- prior reviewer finding IDs, issue-family IDs, fixes, declined rationales, comments, and validation when it is a verification pass;
+- reviewer continuity preference plus source reviewer aliases and source reviewer finding IDs when applicable; source reviewer handles stay in the orchestration request when needed for resumption;
 - continuity handle availability when applicable, without exposing opaque handle values;
 - the full-diff reread instruction;
 - the provisional-ID instruction for new findings;
 - the clean response sentinel: start with exactly `No new findings.` on its own first line.
 
-Keep review-pass read-only. Close every spawned or resumed reviewer after collecting its report, then return a packet using the Review Packet Schema.
+Keep review-pass read-only. Close every spawned or resumed reviewer after collecting its report, then return a packet using the canonical Review Packet Template.
 ```

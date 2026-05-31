@@ -128,6 +128,30 @@ _Avoid_: live agent
 A publishable reusable skill procedure, safety contract, and verification workflow that does not require private user-specific inputs to understand.
 _Avoid_: private skill
 
+**Review Pass**:
+One read-only review execution over a target, run in `fresh` or `verification` mode, that assembles a Review Panel and returns a Review Packet. A Review Pass does not edit files, post PR comments, push commits, or decide final disposition.
+_Avoid_: review loop, PR review comment, whole review workflow
+
+**Review Panel**:
+The cohort of reviewers assembled for one Review Pass. Reviewer aliases use `P<panel-number>-R<reviewer-number>`, where `P` means Review Panel.
+_Avoid_: pass, priority, individual reviewer
+
+**Review Packet**:
+The structured Markdown output from a Review Pass. It is advisory evidence for a human or caller such as `review-loop`; it is not raw reviewer output, a durable loop ledger, or a PR comment.
+_Avoid_: raw findings dump, Agent Review comment, final report
+
+**Reviewer Finding**:
+A concrete issue reported by one reviewer during a Review Pass. Reviewer Finding IDs append `F<finding-number>` to the reviewer alias, such as `P1-R2-F3`; `F` means finding.
+_Avoid_: issue family, accepted fix, reviewer alias
+
+**Issue Family**:
+A normalized group of Reviewer Findings that share a failure mode, invariant, missing validation, API contract risk, privacy risk, UX regression, or structural smell. Review Packet issue-family IDs use `IF<family-number>`, such as `IF1`; `IF` means Issue Family.
+_Avoid_: individual finding, reviewer finding ID, fix commit
+
+**Reviewer Continuity**:
+Verification-mode evidence about whether a Review Pass resumed the same source reviewer context or used packet/finding-source fallback. Reviewer Continuity records source quality and handle availability without exposing opaque reviewer handles.
+_Avoid_: issue-family continuity, per-reviewer table column, handle value
+
 **Personal Skill Config**:
 A Personal Overlay file that supplies a Core Skill with private live inputs such as local paths, account IDs, artifact roots, user-specific defaults, or private examples.
 _Avoid_: hardcoded path in skill, private example in core
@@ -188,6 +212,12 @@ _Avoid_: AgentOS Core
 - A **Live Agent Instance** belongs in the **Personal Overlay** by default.
 - An **Agent Template** may live in **AgentOS Core**.
 - A **Core Skill** may read an optional **Personal Skill Config** from the **Personal Overlay**.
+- A **Review Pass** assembles one **Review Panel** and returns one **Review Packet**.
+- A **Review Packet** groups **Reviewer Findings** into **Issue Families**.
+- A **Reviewer Finding** keeps its reviewer-scoped `F` ID even when it is grouped into an **Issue Family**.
+- An **Issue Family** may preserve its `IF` ID across verification packets when a prior packet is supplied and the family is clearly the same. New issue families receive new `IF` IDs.
+- `P` means panel in **Review Panel** reviewer aliases such as `P1-R2`; `P0` / `P1` / `P2` / `P3` mean severity only when explicitly labeled as severity.
+- A **Reviewer Continuity** record belongs in packet-level metadata, not in the Review Panel table.
 - A **Personal Skill Config** keeps private live inputs out of reusable skill logic.
 - Personal Overlay config is Markdown-first; use a **Structured Config Sidecar** only when automation needs deterministic parsing.
 - Live `context` files belong in the **Personal Overlay** by default; AgentOS Core may keep context templates, generic glossary terms, and **Firewall Templates**.
@@ -213,3 +243,5 @@ _Avoid_: AgentOS Core
 - "Context" conflicted with `os/context/`; resolved: domain vocabulary lives in `DOMAIN.md`.
 - "Core layer" versus "personal layer" implied layer ownership; resolved: AgentOS uses **Layer Parity** plus **Content Residency**.
 - "Core" versus "publishable repository root" was ambiguous; resolved: **AgentOS Core** means the **Core Root** at `$root/os/`, while root-level and sibling compatibility files are **Publishable Support Files** in the broader **Publishable File Set** or **AgentOS-Managed File Set**.
+- "P" in review artifacts was ambiguous between priority, pass, and panel; resolved: `P` in reviewer aliases means **Review Panel**, while `P0` / `P1` / `P2` / `P3` are severity values only when labeled as severity.
+- "F" in review artifacts was ambiguous between finding and family; resolved: `F` means **Reviewer Finding** and `IF` means **Issue Family**.
