@@ -614,14 +614,14 @@ def render_harness_grade_markdown(harness: dict[str, Any]) -> list[str]:
         f"Model: {summary.get('model', 'harness-default')}",
         f"Effort: {summary.get('effort', 'harness-default')}",
         "",
-        "| harness | question | status | schema | source | evidence | disallowed | overall |",
-        "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: |",
+        "| harness | question | status | schema | path | source | quote support (diagnostic) | disallowed | overall |",
+        "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for item in harness["results"]:
         status = item.get("status", "graded")
         if status == "harness-unavailable":
             lines.append(
-                "| {harness} | {question} | {status}: {reason} | n/a | n/a | n/a | n/a | unavailable |".format(
+                "| {harness} | {question} | {status}: {reason} | n/a | n/a | n/a | n/a | n/a | unavailable |".format(
                     harness=item["harness"],
                     question=item["question_id"],
                     status=status,
@@ -631,11 +631,12 @@ def render_harness_grade_markdown(harness: dict[str, Any]) -> list[str]:
             continue
         grade = item["grade"]
         lines.append(
-            "| {harness} | {question} | {status} | {schema} | {source} | {evidence} | {disallowed} | {overall} |".format(
+            "| {harness} | {question} | {status} | {schema} | {path} | {source} | {evidence} | {disallowed} | {overall} |".format(
                 harness=item["harness"],
                 question=item["question_id"],
                 status=status,
                 schema=mark(grade["schema_pass"]),
+                path=mark(grade["path_pass"]),
                 source=mark(grade["source_pass"]),
                 evidence=mark(grade["evidence_pass"]),
                 disallowed=mark(grade["disallowed_pass"]),

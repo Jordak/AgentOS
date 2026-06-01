@@ -16,6 +16,8 @@ A passing fixture means the run transcript shows real access to the required gui
 
 This benchmark grades only guidance activation: whether the transcript shows observed access to each fixture's `must_access` guidance files.
 
+Observed guidance-file access remains gating because it is the activation behavior under test. Prose claims, exact quotes, task completion, and implementation correctness remain diagnostic only.
+
 Task completion, final-answer quality, write success, read-only sandbox failures, blocked patch attempts, and implementation correctness are diagnostic context only. They do not affect activation pass/fail.
 
 ## Contents
@@ -43,7 +45,7 @@ python3 os/verification/playbook-activation/scripts/benchmark_playbook_activatio
 
 That runs every configured harness. Right now, that means Codex.
 
-When producing evidence for `os/verification/BENCHMARK_STATUS.md`, run from a clean `main` checkout and add `--check-remote-main` so the saved report proves whether the reviewed commit matched live `origin/main` at run time. Default dry-run and transcript reports avoid remote network checks unless that flag is set.
+Playbook-activation reports are currently diagnostic/historical for Core status refresh because `os/verification/BENCHMARKS.json` has `weekly_review.check_freshness: false` for this suite. Saved playbook-activation reports do not refresh current `os/verification/BENCHMARK_STATUS.md` entries unless the manifest explicitly revives this suite as a status-refresh target. You can still add `--check-remote-main` to diagnostic runs when provenance matters. Default dry-run and transcript reports avoid remote network checks unless that flag is set.
 
 Run only one harness:
 

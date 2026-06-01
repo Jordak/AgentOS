@@ -1614,7 +1614,7 @@ class AgentOSValidator:
                         f"{benchmark_id}: weekly_review.check_freshness must be true or false",
                     )
                 elif check_freshness:
-                    for field in ["min_behavioral_total", "max_age_days"]:
+                    for field in ["min_status_counting_total", "max_age_days"]:
                         value = weekly_review.get(field)
                         if type(value) is not int or value <= 0:
                             self.add_error(

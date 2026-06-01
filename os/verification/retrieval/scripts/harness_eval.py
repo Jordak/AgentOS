@@ -1,8 +1,9 @@
 """Run and grade AgentOS retrieval questions against real agent harnesses.
 
-The deterministic grader does not try to judge prose quality. It checks only
-local, inspectable evidence: structured response shape, cited canonical paths,
-whitespace-normalized evidence quotes, and avoidance of eval answer keys.
+The deterministic grader does not try to judge prose quality. It gates on
+local, inspectable retrieval behavior: structured response shape, valid local
+paths, expected canonical source citation, and disallowed-source avoidance.
+Whitespace-normalized quote support is reported as a diagnostic check only.
 """
 
 from __future__ import annotations
@@ -23,12 +24,20 @@ CONFIDENCE_VALUES = {"low", "medium", "high"}
 KNOWN_HARNESSES = ("codex", "claude")
 DEFAULT_DISALLOWED_EXACT_PATHS = (
     "os/verification/BENCHMARK_STATUS.md",
+    "os/verification/guidance-eval/fixtures.json",
+    "os/verification/guidance-eval/judge_prompt.md",
+    "os/verification/guidance-eval/judge_response.schema.json",
+    "os/verification/playbook-activation/coverage.json",
+    "os/verification/playbook-activation/fixtures.json",
+    "os/verification/retrieval/fixtures.json",
+    "os/verification/retrieval/harness_response.schema.json",
     "os/verification/retrieval/questions.json",
 )
 TARGETED_DISALLOWED_EXACT_PATH_EXCEPTIONS = (
     "os/verification/BENCHMARK_STATUS.md",
 )
 DEFAULT_DISALLOWED_PATH_PREFIXES = (
+    "os/verification/guidance-eval/reports/",
     "os/verification/retrieval/reports/",
     "os/verification/playbook-activation/reports/",
     "personal/",
@@ -544,7 +553,7 @@ def grade_response(
     source_pass = bool(observed_paths & expected_paths)
     evidence_pass = bool(evidence_paths) and not quote_errors
     disallowed_pass = not disallowed_used
-    overall_pass = schema_pass and path_pass and source_pass and evidence_pass and disallowed_pass
+    overall_pass = schema_pass and path_pass and source_pass and disallowed_pass
 
     return {
         "question_id": question["id"],
@@ -558,6 +567,8 @@ def grade_response(
         "evidence_pass": evidence_pass,
         "disallowed_pass": disallowed_pass,
         "overall_pass": overall_pass,
+        "gating_checks": ["schema_pass", "path_pass", "source_pass", "disallowed_pass"],
+        "diagnostic_checks": ["evidence_pass"],
         "answer_review": "manual",
         "errors": {
             "shape": shape_errors,
@@ -746,15 +757,16 @@ def print_summary(report: dict[str, Any]) -> None:
     summary = report["summary"]
     print(f"Harness retrieval eval: {summary['overall_pass']}/{summary['total']} overall pass")
     print()
-    print("| harness | question | schema | source | evidence | disallowed | overall |")
-    print("| --- | --- | ---: | ---: | ---: | ---: | ---: |")
+    print("| harness | question | schema | path | source | quote support (diagnostic) | disallowed | overall |")
+    print("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |")
     for item in report["results"]:
         grade = item["grade"]
         print(
-            "| {harness} | {question} | {schema} | {source} | {evidence} | {disallowed} | {overall} |".format(
+            "| {harness} | {question} | {schema} | {path} | {source} | {evidence} | {disallowed} | {overall} |".format(
                 harness=item["harness"],
                 question=item["question_id"],
                 schema=mark(grade["schema_pass"]),
+                path=mark(grade["path_pass"]),
                 source=mark(grade["source_pass"]),
                 evidence=mark(grade["evidence_pass"]),
                 disallowed=mark(grade["disallowed_pass"]),
@@ -795,6 +807,27 @@ def run_self_test(root: Path, questions_path: Path) -> int:
         print(json.dumps(grade, indent=2))
         return 1
 
+    unsupported_quote_response = {
+        **response,
+        "evidence": [
+            {
+                "path": source_path,
+                "locator": "self-test",
+                "quote": f"{quote} intentionally unsupported suffix",
+            }
+        ],
+        "notes": "Synthetic response with non-contiguous quote support.",
+    }
+    unsupported_quote_grade = grade_response(root, question, unsupported_quote_response)
+    if not unsupported_quote_grade["overall_pass"] or unsupported_quote_grade["evidence_pass"]:
+        print("SELF-TEST FAIL: unsupported quote support was not diagnostic-only.")
+        print(json.dumps(unsupported_quote_grade, indent=2))
+        return 1
+    if not unsupported_quote_grade["errors"]["quotes"]:
+        print("SELF-TEST FAIL: unsupported quote support did not report quote diagnostics.")
+        print(json.dumps(unsupported_quote_grade, indent=2))
+        return 1
+
     contract_questions = load_questions(questions_path, {"skills-contract"})
     if not contract_questions:
         print("SELF-TEST FAIL: missing skills-contract fixture")
@@ -825,6 +858,7 @@ def run_self_test(root: Path, questions_path: Path) -> int:
         synthetic_source_path.write_text(quote + "\n", encoding="utf-8")
         synthetic_question = {**question, "expected_paths": [source_path]}
         disallowed_evidence_paths = (
+            "os/verification/guidance-eval/reports/private.md",
             "personal/os/context/SOURCE_MAP.md",
             "personal/os/verification/reports/private.md",
             "personal/os/verification/markdown-audit/private.md",
@@ -950,30 +984,36 @@ def run_self_test(root: Path, questions_path: Path) -> int:
             print(json.dumps(status_grade, indent=2))
             return 1
 
-        answer_key_path = "os/verification/retrieval/questions.json"
-        answer_key_quote = "answer key"
-        synthetic_answer_key = synthetic_root / answer_key_path
-        synthetic_answer_key.parent.mkdir(parents=True, exist_ok=True)
-        synthetic_answer_key.write_text(answer_key_quote + "\n", encoding="utf-8")
-        answer_key_question = {**question, "expected_paths": [answer_key_path]}
-        answer_key_response = {
-            "answer": "This should not be allowed even when expected.",
-            "cited_paths": [answer_key_path],
-            "evidence": [
-                {
-                    "path": answer_key_path,
-                    "locator": "self-test",
-                    "quote": answer_key_quote,
-                }
-            ],
-            "confidence": "high",
-            "notes": "Synthetic answer-key contamination response.",
-        }
-        answer_key_grade = grade_response(synthetic_root, answer_key_question, answer_key_response)
-        if answer_key_grade["overall_pass"] or answer_key_grade["disallowed_pass"]:
-            print("SELF-TEST FAIL: retrieval answer key was allowed as targeted evidence.")
-            print(json.dumps(answer_key_grade, indent=2))
-            return 1
+        for answer_key_path in DEFAULT_DISALLOWED_EXACT_PATHS:
+            if answer_key_path in TARGETED_DISALLOWED_EXACT_PATH_EXCEPTIONS:
+                continue
+            answer_key_quote = f"answer key from {answer_key_path}"
+            synthetic_answer_key = synthetic_root / answer_key_path
+            synthetic_answer_key.parent.mkdir(parents=True, exist_ok=True)
+            synthetic_answer_key.write_text(answer_key_quote + "\n", encoding="utf-8")
+            answer_key_question = {**question, "expected_paths": [answer_key_path]}
+            answer_key_response = {
+                "answer": "This should not be allowed even when expected.",
+                "cited_paths": [answer_key_path],
+                "evidence": [
+                    {
+                        "path": answer_key_path,
+                        "locator": "self-test",
+                        "quote": answer_key_quote,
+                    }
+                ],
+                "confidence": "high",
+                "notes": "Synthetic answer-key contamination response.",
+            }
+            answer_key_grade = grade_response(synthetic_root, answer_key_question, answer_key_response)
+            if answer_key_grade["overall_pass"] or answer_key_grade["disallowed_pass"]:
+                print("SELF-TEST FAIL: benchmark answer-key path was allowed as targeted evidence.")
+                print(json.dumps(answer_key_grade, indent=2))
+                return 1
+            if answer_key_path not in answer_key_grade["errors"]["disallowed"]:
+                print("SELF-TEST FAIL: benchmark answer-key path was not reported as disallowed.")
+                print(json.dumps(answer_key_grade, indent=2))
+                return 1
 
     synthetic_result = HarnessResult(
         harness="codex",

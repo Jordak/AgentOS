@@ -8,6 +8,8 @@ Raw benchmark reports, generated run JSON, transcripts, local paths, session det
 
 Use `os/skills/refresh-benchmark-status/SKILL.md` to refresh this snapshot from eligible local evidence. Eligible evidence must come from current-schema benchmark reports produced on clean, remote-fresh `main` at a committed AgentOS revision.
 
+Only suites marked with `weekly_review.check_freshness: true` in `os/verification/BENCHMARKS.json` are current status-refresh freshness targets. Older retrieval and playbook-activation entries remain historical benchmark posture until they are explicitly revived or replaced. This does not delete those suites or make them unrunnable; it narrows which benchmark evidence is allowed to refresh current Core status.
+
 Allowed status labels:
 
 - `passing`
@@ -56,3 +58,14 @@ Do not use `stale` as a Core status. Staleness is relative to the current checko
 - Evidence scope: `playbook-activation Codex harness; 10 fixtures; gpt-5.5 xhigh`
 - Summary: Codex accessed the required guidance for all 10 playbook-activation fixtures, covering programming CLI, artifact format selection, GitHub workflow, implementation readiness, propagation review, weekly review, portability, Markdown style, and skill contract upgrade routing.
 - Caveats: Claude is not currently a configured playbook-activation harness, so there is no Claude playbook-activation entry in this snapshot.
+
+## Guidance Eval
+
+### Codex
+
+- Status: `not run`
+- Reviewed Core revision: `not reviewed`
+- Last reviewed evidence: `none`
+- Evidence scope: `guidance-eval Codex harness; judge-assisted AgentOS guidance scenarios`
+- Summary: No status-eligible Guidance Eval evidence has been reviewed yet.
+- Caveats: This entry is initialized with the new `guidance-eval` suite and should be refreshed only from eligible saved evidence produced on clean, remote-fresh `main`.

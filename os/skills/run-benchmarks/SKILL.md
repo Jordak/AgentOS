@@ -1,13 +1,13 @@
 ---
 name: run-benchmarks
-description: "Run AgentOS benchmark scripts from the benchmark manifest, save status-eligible evidence when possible, and route the result through `refresh-benchmark-status`. Use when the user asks to run AgentOS benchmarks, run all benchmarks, produce fresh benchmark evidence, or run benchmarks and refresh Core benchmark status."
+description: "Run AgentOS benchmark scripts from the benchmark manifest, save status-eligible evidence for current status targets when possible, and route the result through `refresh-benchmark-status`. Use when the user asks to run AgentOS benchmarks, run all benchmarks, produce fresh benchmark evidence, or run benchmarks and refresh Core benchmark status."
 ---
 
 # Run Benchmarks
 
 ## Goal
 
-Run AgentOS benchmarks end to end without embedding benchmark-specific internals: discover configured scripts from `os/verification/BENCHMARKS.json`, run only scripts that expose the expected CLI contract, save raw reports in the configured Personal Overlay report directories, and then invoke or follow `refresh-benchmark-status` so Core status is not left behind the evidence. External/model-call harnesses run from a sanitized Core-only checkout or export so private Personal Overlay state is not placed next to model prompts.
+Run AgentOS benchmarks end to end without embedding benchmark-specific internals: discover configured scripts from `os/verification/BENCHMARKS.json`, classify manifest entries as current status-refresh targets or diagnostic/historical runnable suites, run only scripts that expose the expected CLI contract, save raw reports in the configured Personal Overlay report directories, and then invoke or follow `refresh-benchmark-status` for eligible current status targets. External/model-call harnesses either run from a clean git checkout whose script owns HUT sanitization, or from a sanitized Core-only checkout/export when the suite is diagnostic and export-compatible.
 
 ## Contract
 
@@ -39,7 +39,8 @@ Tools and connectors:
 Safety:
 
 - Ask before running external harnesses, model-call benchmarks, or any command that may spend credits or require authenticated CLIs.
-- Run external/model-call harnesses from a sanitized Core-only checkout or export, not from a primary checkout that has a live Personal Overlay nearby, unless the user explicitly accepts that risk for a diagnostic run.
+- Run current status-refresh targets from a clean, remote-fresh git checkout when the suite depends on Git metadata or the Git index. Guidance Eval status-eligible runs use the runner's internal HUT sanitization and are not raw-export-compatible.
+- Run diagnostic external/model-call harnesses from a sanitized Core-only checkout or export when the suite supports that shape, not from a primary checkout that has a live Personal Overlay nearby, unless the user explicitly accepts that risk for a diagnostic run.
 - Do not copy raw reports, `run.json` bodies, transcripts, stdout, stderr, local paths, prompts, session details, account details, private diagnostics, or private evidence into Core.
 - Do not update `os/verification/BENCHMARK_STATUS.md` directly; route all status interpretation and edits through `refresh-benchmark-status`.
 - If the checkout is not clean, current `main`, do not produce status-eligible evidence. Offer diagnostic/non-eligible runs only when useful and clearly label them.
@@ -47,7 +48,7 @@ Safety:
 ## Workflow Phases
 
 1. Inspect the benchmark surface.
-   Read `os/verification/BENCHMARKS.json`, `os/playbook/PERSONAL_OVERLAY.md`, and `os/skills/refresh-benchmark-status/SKILL.md`. Resolve each manifest `reports_dir` through the Personal Overlay rule before any saved run. For each manifest entry, resolve the script path and run its help output, usually `python3 <script> --help`.
+   Read `os/verification/BENCHMARKS.json`, `os/playbook/PERSONAL_OVERLAY.md`, and `os/skills/refresh-benchmark-status/SKILL.md`. Resolve each manifest `reports_dir` through the Personal Overlay rule before any saved run. Classify entries with `weekly_review.check_freshness: true` as current status-refresh targets; entries with `check_freshness: false` are runnable diagnostic/historical suites unless the manifest is explicitly changed. For each manifest entry, resolve the script path and run its help output, usually `python3 <script> --help`.
 
 2. Check the script contract.
    Treat a script as compatible only when its help exposes the flags needed for the requested mode:
@@ -62,15 +63,15 @@ Safety:
    Before status-eligible saved runs, confirm the checkout is on `main`, clean, aligned with `origin/main` after fetching when network is available, and using the canonical or user-assigned Personal Overlay report directories. If the current checkout would save into a feature worktree's ignored `personal/os/` skeleton, switch to the clean current `main` checkout that owns the canonical Personal Overlay or label the run diagnostic/ineligible. The scripts' own `--check-remote-main` metadata remains the evidence of remote freshness at run time.
 
 4. Run safe checks first.
-   Default to deterministic/local-safe work: run compatible scripts' `--self-test`, then run diagnostic previews with `--dry-run` when supported. Save status-eligible evidence only from behavior-bearing local runs advertised by the script help, or from approved real harness runs. If the next useful command could call external harnesses or spend credits, ask before running it.
+   Default to deterministic/local-safe work: run compatible scripts' `--self-test`, then run diagnostic previews with `--dry-run` when supported. Save status-eligible evidence only for current status-refresh targets, from behavior-bearing local runs advertised by the script help or from approved real harness runs. Runs for diagnostic/historical suites may still save reports, but those reports do not refresh current Core status while `check_freshness` is false. If the next useful command could call external harnesses or spend credits, ask before running it.
 
 5. Ask before model-call harnesses.
    If the user explicitly asked for model-call harnesses or all external benchmarks, summarize the commands, the compatible harness choices advertised by each script's help, and any spending/authentication risk. Ask for confirmation unless the current request clearly approved spending model calls. Interpret `--harness all` as all configured harnesses advertised by that script, not every conceivable harness.
 
-   For approved external/model-call harness runs, create or use a sanitized Core-only checkout or export at the same clean, remote-fresh `main` commit. Verify it contains no live Personal Overlay files beyond tracked skeleton/placeholders before running commands. Run the compatible script contract from that sanitized root, usually `python3 <script> --no-dry-run --check-remote-main --save-report`, adding `--harness all` only when advertised. After the run, copy generated report directories back into the canonical or user-assigned Personal Overlay only after confirming the reports derive from public Core inputs.
+   For approved external/model-call harness runs that are current status-refresh targets, use a clean, remote-fresh `main` git checkout or clone at the reviewed commit. Do not use a raw file export for Guidance Eval status-eligible runs; the runner uses the Git index as its source snapshot and builds its own sanitized HUT workspace. For approved diagnostic suites that are export-compatible, create or use a sanitized Core-only checkout or export at the same commit and verify it contains no live Personal Overlay files beyond tracked skeleton/placeholders before running commands. Run the compatible script contract from the selected root, usually `python3 <script> --no-dry-run --check-remote-main --save-report`, adding `--harness all` only when advertised. After the run, copy generated report directories back into the canonical or user-assigned Personal Overlay only after confirming the reports derive from public Core inputs.
 
 6. Refresh status.
-   After scripts finish, run or follow `refresh-benchmark-status` in update, proposal, or report mode as allowed by the user's request and the available evidence. If the user asked for "run benchmarks and refresh status", continue through eligible updates allowed by that skill. If write authorization is unclear, run the refresh workflow in proposal/report mode rather than stopping at an offer. Leave refresh as a next step only when blocked, declined, or impossible; in that case state that the benchmark process is not complete until `refresh-benchmark-status` has run.
+   After scripts finish, run or follow `refresh-benchmark-status` in update, proposal, or report mode as allowed by the user's request and the available evidence. If the user asked for "run benchmarks and refresh status", continue through eligible updates for current status-refresh targets. Diagnostic/historical suite reports can be summarized, but they do not drive current Core status while their manifest entries have `check_freshness: false`. If write authorization is unclear, run the refresh workflow in proposal/report mode rather than stopping at an offer. Leave refresh as a next step only when blocked, declined, or impossible; in that case state that the benchmark process is not complete until `refresh-benchmark-status` has run.
 
 ## Filing Rules
 
@@ -95,7 +96,7 @@ Before finishing:
 2. Confirm configured report directories were resolved through the Personal Overlay rule, script help was inspected, and compatibility was reported.
 3. Confirm Git preflight was performed before status-eligible saved runs.
 4. Confirm no model-call harness ran without approval.
-5. Confirm external/model-call harnesses ran from a sanitized Core-only checkout or export, or explicitly did not run.
+5. Confirm external/model-call harnesses ran from the required root shape: clean git checkout for current status-refresh targets that need Git metadata/index state, sanitized checkout/export only for export-compatible diagnostic runs, or explicitly did not run.
 6. Confirm the configured harness choices were reported per script before any `--harness all` run.
 7. Confirm raw report content was not copied into Core.
 8. Confirm `refresh-benchmark-status` ran or was followed in proposal/report mode, or that a blocked/declined refresh was labeled incomplete with the next action.
