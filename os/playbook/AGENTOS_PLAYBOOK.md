@@ -87,7 +87,7 @@ Use the narrowest path that can answer the request.
 - Output artifact policy: `os/playbook/ARTIFACTS.md`
 - GitHub issue, PR, branch, and closure workflow: `os/playbook/GITHUB_WORKFLOW.md`
 - Programming preferences: `os/playbook/programming/README.md`
-- Propagation review queue: `os/playbook/PROPAGATION_REVIEW_QUEUE.md`
+- Propagation review queue for private, tentative, connector-derived, personal, cross-project, or pre-issue generated durable-state proposals: `os/playbook/PROPAGATION_REVIEW_QUEUE.md`
 - Weekly AgentOS review template: `os/playbook/WEEKLY_REVIEW.md`; private generated reports and live review state: `personal/os/memory/weekly-review/`
 
 When a request belongs in another project, do not duplicate that project's context here. Inspect the mapped source, then produce a handoff for the right project.

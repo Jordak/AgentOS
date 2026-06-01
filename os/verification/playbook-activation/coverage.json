@@ -43,7 +43,7 @@
   {
     "id": "propagation-review",
     "source_path": "os/playbook/AGENTOS_PLAYBOOK.md",
-    "trigger": "Use PROPAGATION_REVIEW_QUEUE.md when agent outputs propose durable AgentOS state changes.",
+    "trigger": "Use PROPAGATION_REVIEW_QUEUE.md when generated durable-state recommendations need inbox classification, especially private or pre-issue proposals.",
     "guidance_path": "os/playbook/PROPAGATION_REVIEW_QUEUE.md",
     "fixture_ids": [
       "generated-findings-propagation"

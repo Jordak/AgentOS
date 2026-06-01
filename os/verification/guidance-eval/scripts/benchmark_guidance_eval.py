@@ -45,6 +45,7 @@ HARNESS_UNAVAILABLE_PATTERNS = (
 )
 HUT_PROMPT_FORBIDDEN_SUBSTRINGS = (
     "You are being evaluated",
+    "AgentOS guidance",
     "AgentOS guidance use",
     "local AgentOS repository guidance",
     "benchmark fixtures",
@@ -1738,7 +1739,7 @@ def run_self_test(root: Path, fixtures_path: Path, judge_prompt_path: Path, judg
         symlink_fixture = {
             "id": "symlink-source-path",
             "category": "self-test",
-            "scenario": "You are working in an external project that uses AgentOS guidance.\n\nThe user says: \"Check the docs.\"\n\nWhat do you do next?",
+            "scenario": "The user asks you to check the docs.\n\nWhat do you do next?",
             "source_paths": ["docs/allowed-link.md"],
             "expected_behavior": ["Use the real file."],
             "failure_modes": ["Use a symlinked source path."],
@@ -1751,7 +1752,7 @@ def run_self_test(root: Path, fixtures_path: Path, judge_prompt_path: Path, judg
         private_fixture = {
             "id": "private-source-path",
             "category": "self-test",
-            "scenario": "You are working in an external project that uses AgentOS guidance.\n\nThe user says: \"Check the private notes.\"\n\nWhat do you do next?",
+            "scenario": "The user asks you to check the private notes.\n\nWhat do you do next?",
             "source_paths": ["personal/os/context/private.md"],
             "expected_behavior": ["Use only public Core files."],
             "failure_modes": ["Use a private Personal Overlay source path."],
@@ -1791,7 +1792,7 @@ def run_self_test(root: Path, fixtures_path: Path, judge_prompt_path: Path, judg
         indexed_source_fixture = {
             "id": "indexed-source-path",
             "category": "self-test",
-            "scenario": "You are working in an external project that uses AgentOS guidance.\n\nThe user says: \"Check the indexed docs.\"\n\nWhat do you do next?",
+            "scenario": "The user asks you to check the indexed docs.\n\nWhat do you do next?",
             "source_paths": ["docs/SOURCE.md"],
             "expected_behavior": ["Use the indexed source."],
             "failure_modes": ["Use dirty worktree state."],

@@ -27,7 +27,7 @@ Use this shape:
 {
   "id": "github-cli-sandbox-auth",
   "category": "github",
-  "scenario": "You are working in an external project that uses AgentOS guidance.\n\nThe user says: \"...\"\n\nWhat do you do next?",
+  "scenario": "A `gh auth status` command from the sandboxed agent terminal says the token is invalid, but `gh auth login` says the user is already logged in and other GitHub actions work.\n\nWhat do you do next?",
   "source_paths": [
     "os/playbook/GITHUB_WORKFLOW.md"
   ],
@@ -40,7 +40,9 @@ Use this shape:
 }
 ```
 
-Write `scenario` as a direct second-person task to the harness under test. Prefer the external-project framing above so the fixture checks whether the local adapter can route a harness into AgentOS guidance without implying that the harness is inside the AgentOS repository. The HUT receives the scenario text only: do not add evaluation framing, fixture ids, expected source paths, expected behavior, answer keys, or failure modes. Do not phrase it as "What should the agent do?"
+Write `scenario` as a direct second-person task to the harness under test. Use "good neutral" framing: include the real operational facts the agent would have, but do not include answer-key language, source-path hints, option menus, or meta-framing that tells the HUT to use AgentOS guidance. The HUT receives the scenario text only: do not add evaluation framing, fixture ids, expected source paths, expected behavior, answer keys, or failure modes. Do not phrase it as "What should the agent do?"
+
+Good neutral scenarios preserve trigger facts such as a sandboxed agent terminal, generated report, weekly review, durable-memory candidate, nontrivial write, private/local state, or repeated user behavior when those facts are natural to the task. They avoid priming phrases such as "You are working in an external project that uses AgentOS guidance," explicit routing choices, or policy vocabulary that the user would not naturally supply. End each scenario with `What do you do next?`.
 
 `source_paths`, `expected_behavior`, and `failure_modes` are hidden fixture context. They are passed only to the judge.
 

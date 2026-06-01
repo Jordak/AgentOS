@@ -30,7 +30,7 @@ Use `os/memory/` for public-safe memory mechanics, templates, and publishable Ag
 - Decisions log vs context: if the value is "we decided X on this date," use `personal/os/memory/DECISIONS_LOG.md` for live personal state. Use `os/memory/DECISIONS_LOG.md` only for publishable AgentOS architecture decisions. If the value is "future agents need to know X about the world/project," use `os/context/` for public-safe context or `personal/os/context/` for private context.
 - Memory vs agent history: if it is specific to one agent's runs, keep it with that agent unless it affects the whole OS.
 - Memory vs backlog: if it is a candidate action rather than a fact or decision, use `personal/os/playbook/BACKLOG.md` for live private backlog state, `os/playbook/BACKLOG.md` for public-safe Core templates, or the relevant issue tracker.
-- Memory vs propagation queue: if an agent output proposes a durable update but approval, confidence, or target placement is still unresolved, add it to `personal/os/memory/propagation-review/QUEUE.md` instead of editing canonical state directly.
+- Memory vs propagation queue vs issue tracker: if an agent output proposes a private or tentative durable update but approval, confidence, or target placement is still unresolved, add it to `personal/os/memory/propagation-review/QUEUE.md` instead of editing canonical state directly. If it is public-safe actionable project work, use the relevant issue tracker or mapped project.
 
 ## Update Rules
 
@@ -38,7 +38,7 @@ Use `os/memory/` for public-safe memory mechanics, templates, and publishable Ag
 - Append durable personal decisions with concrete dates when possible; use Core memory only for publishable AgentOS architecture decisions.
 - For live compiled-truth pages under `personal/os/memory/compiled-truth/`, update the current synthesis while preserving the timeline as append-only evidence. Core keeps only the template shape.
 - Do not overwrite user corrections with weaker generated reports.
-- Preserve the difference between evidence and canonical state: generated reports are evidence until promoted into the appropriate Personal Overlay file, Core architecture file, or another canonical layer.
+- Preserve the difference between evidence and canonical state: generated reports are evidence until filed in the right inbox, promoted into the appropriate Personal Overlay file, Core architecture file, mapped project, issue tracker, or another canonical layer.
 - Treat propagation queue entries as non-canonical until approved and applied.
 
 ## Provenance

@@ -170,7 +170,7 @@ When applicable, read `references/lenses/contract-surface-matrix.md` and include
 - Optional temporary packet files live under the system temporary directory.
 - Do not create durable AgentOS state by default.
 - Project-specific fixes, PR comments, and ready markers belong to the caller, usually `review-loop`.
-- If a pass discovers a durable AgentOS improvement, route it through the propagation review queue unless the user explicitly asks for the canonical edit.
+- If a pass discovers a durable AgentOS improvement, classify the right inbox: GitHub issue or mapped tracker for public-safe actionable project work, propagation review queue for private/tentative/pre-issue proposals, or direct edit only when the user explicitly asks for the canonical edit.
 
 ## Quality Bar
 

@@ -111,7 +111,7 @@ Before finishing AgentOS work:
 2. Did project-specific claims inspect the mapped source?
 3. Did fast-moving public/tool facts use current official or primary sources?
 4. Did external actions or private-data handling receive approval?
-5. Did generated recommendations for durable AgentOS state go through the appropriate review path?
+5. Did generated durable-state recommendations go to the right inbox: GitHub or mapped tracker for public-safe actionable project work, propagation review queue for private/tentative/pre-issue proposals, or direct edit only for exact approved changes?
 6. Did durable new state land in one canonical home?
 7. Did publication work preserve the fresh-history gate in `os/playbook/PUBLICATION.md`?
 8. For feature-sized implementation, did the work pass or intentionally skip the implementation-readiness gate in `os/playbook/IMPLEMENT_FEATURES.md`, and is that verdict visible in the PR body when there is a PR?

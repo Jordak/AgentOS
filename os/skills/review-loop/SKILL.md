@@ -229,7 +229,7 @@ Call narrower playbooks for their owned surfaces: GitHub workflow policy for PR 
 - Temporary reports live under the system temporary directory unless the user asks for a project-local artifact.
 - Project-specific code fixes, commits, branches, and reports live in the target project, not AgentOS.
 - PR comments and ready markers stay in GitHub.
-- If the loop discovers a durable AgentOS improvement, file it through the propagation review queue unless the user explicitly asks for the exact canonical edit.
+- If the loop discovers a durable AgentOS improvement, classify the right inbox: GitHub issue or mapped tracker for public-safe actionable project work, propagation review queue for private/tentative/pre-issue proposals, or direct edit only when the user explicitly asks for the exact canonical edit.
 
 ## Verification
 

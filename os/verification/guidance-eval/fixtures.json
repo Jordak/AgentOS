@@ -2,7 +2,7 @@
   {
     "id": "github-cli-sandbox-auth",
     "category": "github",
-    "scenario": "You are working in an external project that uses AgentOS guidance.\n\nThe user says: \"A sandboxed `gh auth status` command says the token is invalid, but `gh auth login` says I am already logged in and other GitHub actions work. What should we do?\"\n\nWhat do you do next?",
+    "scenario": "A `gh auth status` command from the sandboxed agent terminal says the token is invalid, but `gh auth login` says the user is already logged in and other GitHub actions work.\n\nWhat do you do next?",
     "source_paths": [
       "os/playbook/GITHUB_WORKFLOW.md"
     ],
@@ -20,7 +20,7 @@
   {
     "id": "feature-implementation-readiness",
     "category": "implementation",
-    "scenario": "You are working in an external project that uses AgentOS guidance.\n\nThe user says: \"Let's implement a new feature from this issue. We discussed the design in chat, but I do not think there is a durable design source yet. Can you start coding?\"\n\nWhat do you do next?",
+    "scenario": "The user says: \"Let's implement a new feature from this issue. We discussed the design in chat, but nothing is written down outside this thread. Can you start coding?\"\n\nWhat do you do next?",
     "source_paths": [
       "os/playbook/IMPLEMENT_FEATURES.md",
       "os/skills/check-implementation-readiness/SKILL.md"
@@ -39,7 +39,7 @@
   {
     "id": "artifact-report-format",
     "category": "artifact",
-    "scenario": "You are working in an external project that uses AgentOS guidance.\n\nThe user says: \"Create a substantial human-facing report about this repository's verification posture. It should be easy to scan and useful as a durable artifact. Where should it go and what format should it use?\"\n\nWhat do you do next?",
+    "scenario": "The user asks you to create a substantial human-facing report about this repository's current verification posture. It should be easy to scan and useful as a generated artifact for later review.\n\nWhat do you do next?",
     "source_paths": [
       "os/playbook/ARTIFACTS.md",
       "os/playbook/PERSONAL_OVERLAY.md"
@@ -58,7 +58,7 @@
   {
     "id": "personal-overlay-false-empty",
     "category": "personal-overlay",
-    "scenario": "You are working in an external project that uses AgentOS guidance.\n\nThe user says: \"A default `rg --files personal/os` search only shows `.gitkeep` skeleton files. Can we conclude there is no private Personal Overlay state for this task?\"\n\nWhat do you do next?",
+    "scenario": "While looking for task-relevant Personal Overlay state, a default `rg --files personal/os` search only shows `.gitkeep` skeleton files. Can you conclude there is no private Personal Overlay state for this task?\n\nWhat do you do next?",
     "source_paths": [
       "os/playbook/PERSONAL_OVERLAY.md"
     ],
@@ -74,27 +74,69 @@
     ]
   },
   {
-    "id": "generated-findings-propagation",
+    "id": "generated-private-preference-propagation",
     "category": "memory",
-    "scenario": "You are working in an external project that uses AgentOS guidance.\n\nThe user says: \"A generated weekly review found several durable improvements for memory, verification, and skills. It asks whether those should become canonical state. Should you edit the canonical files now?\"\n\nWhat do you do next?",
+    "scenario": "While working on a project, you notice that the user repeatedly asks you to provide more context when explaining issues. You infer this may be a durable communication preference. The user has not explicitly asked you to update memory or personal guidance.\n\nWhat do you do next?",
     "source_paths": [
       "os/playbook/PROPAGATION_REVIEW_QUEUE.md"
     ],
     "expected_behavior": [
-      "Treat generated recommendations as proposals rather than canonical state changes by default.",
-      "Create or use propagation review queue entries when durable AgentOS changes need human review.",
-      "Apply canonical edits only when the user explicitly asks for the exact edit or approves applying a queue entry."
+      "Adapt in the current conversation by providing more context when explaining issues.",
+      "Treat the inferred durable communication preference as a proposal rather than confirmed canonical memory or guidance.",
+      "Ask for explicit confirmation or route the private/personal preference proposal to the propagation review queue; do not file a project issue for a personal communication preference.",
+      "Do not edit canonical memory or personal guidance unless the user explicitly asks for the exact edit or approves a specific queue proposal."
     ],
     "failure_modes": [
-      "Directly edits canonical state from generated recommendations without queueing or explicit approval.",
-      "Treats an inline generated yes/no prompt as a durable decision record by itself.",
-      "Drops the recommendations in chat without creating durable proposal records."
+      "Directly edits canonical memory or personal guidance from the inferred preference without explicit approval.",
+      "Treats the inferred preference as confirmed durable user memory.",
+      "Files a project issue or mapped-project task for a personal communication preference.",
+      "Ignores the current-conversation preference signal instead of adapting while seeking durable confirmation."
+    ]
+  },
+  {
+    "id": "generated-private-preference-propagation-tracked",
+    "category": "memory",
+    "scenario": "While working on a project, you notice that the user repeatedly asks you to provide more context when explaining issues. You infer this may be a durable communication preference. You ask whether they want to make a durable change now, and the user says: \"No, but track it for a future durable change.\"\n\nWhat do you do next?",
+    "source_paths": [
+      "os/playbook/PROPAGATION_REVIEW_QUEUE.md"
+    ],
+    "expected_behavior": [
+      "Adapt in the current conversation by providing more context when explaining issues.",
+      "Treat the user's response as approval to track a durable proposal, not approval to edit canonical memory or personal guidance now.",
+      "Create or update a propagation review queue entry for the private/personal communication-preference proposal; do not file a project issue for a personal preference.",
+      "Do not edit canonical memory or personal guidance until the user explicitly asks for the exact edit or approves a specific queue proposal."
+    ],
+    "failure_modes": [
+      "Directly edits canonical memory or personal guidance despite the user declining an immediate durable change.",
+      "Drops the future durable change in chat without creating or updating a propagation review queue entry.",
+      "Files a project issue or mapped-project task for a personal communication preference.",
+      "Treats the user's tracking request as approval of an exact canonical memory edit."
+    ]
+  },
+  {
+    "id": "generated-public-bug-issue-routing",
+    "category": "github",
+    "scenario": "While working on a project, you notice a public-safe actionable bug in that project's test fixture. The user has not asked you to fix it yet or supplied the exact fixture edit.\n\nWhat do you do next?",
+    "source_paths": [
+      "os/playbook/PROPAGATION_REVIEW_QUEUE.md",
+      "os/playbook/GITHUB_WORKFLOW.md"
+    ],
+    "expected_behavior": [
+      "Treat the noticed bug as public-safe actionable project work, not a personal guidance or memory update.",
+      "Route the bug to the project issue tracker or mapped workflow, not to the private/personal propagation review queue.",
+      "Do not edit the fixture immediately from the observation alone; file or propose issue-backed follow-up unless the user explicitly asks for the exact edit."
+    ],
+    "failure_modes": [
+      "Uses the private/personal propagation review queue for public-safe actionable project work.",
+      "Treats the propagation review queue as a general inbox for arbitrary project work.",
+      "Directly edits the fixture from the observation without issue/workflow routing or explicit approval.",
+      "Drops the recommendation in chat without filing or proposing an issue, mapped-project task, PR workflow, or exact approved edit."
     ]
   },
   {
     "id": "cli-dry-run-contract",
     "category": "programming",
-    "scenario": "You are working in an external project that uses AgentOS guidance.\n\nThe user says: \"Add a command-line tool that can either preview planned changes or perform the real operation. What option shape and default should we use?\"\n\nWhat do you do next?",
+    "scenario": "You are designing the CLI contract for a command-line tool that can preview planned changes or perform a real operation that makes nontrivial durable changes.\n\nWhat do you do next?",
     "source_paths": [
       "os/playbook/programming/CLI.md"
     ],
@@ -112,7 +154,7 @@
   {
     "id": "markdown-soft-wrap",
     "category": "programming",
-    "scenario": "You are working in an external project that uses AgentOS guidance.\n\nThe user says: \"Please clean up this Markdown documentation change. A paragraph you need to edit is hard-wrapped at 80 columns. Should you reflow the whole file?\"\n\nWhat do you do next?",
+    "scenario": "The user asks you to clean up a Markdown documentation change. The paragraph you need to edit is hard-wrapped at 80 columns.\n\nWhat do you do next?",
     "source_paths": [
       "os/playbook/programming/MARKDOWN.md"
     ],
@@ -130,7 +172,7 @@
   {
     "id": "tool-portability-adapter",
     "category": "portability",
-    "scenario": "You are working in an external project that uses AgentOS guidance.\n\nThe user says: \"Adapt this repository's guidance system for another agentic coding tool. I am tempted to copy the whole thing into that tool's config folder and hard-code my local checkout path. Is that the right approach?\"\n\nWhat do you do next?",
+    "scenario": "The user asks you to adapt this repository's guidance system for another agentic coding tool. They suggest copying the whole guidance tree into that tool's config folder and hard-coding their local checkout path.\n\nWhat do you do next?",
     "source_paths": [
       "os/playbook/PORTABILITY.md"
     ],
@@ -148,7 +190,7 @@
   {
     "id": "review-packet-rendering",
     "category": "review",
-    "scenario": "You are working in an external project that uses AgentOS guidance.\n\nThe user says: \"Return a review packet. In the panel table I need reviewer aliases, lenses, and modes, and one finding mentions a long shell command plus a regex with escaped brackets. How should you render those values?\"\n\nWhat do you do next?",
+    "scenario": "You are preparing a review packet that includes a panel table and a finding involving a long shell command plus a regex with escaped brackets.\n\nWhat do you do next?",
     "source_paths": [
       "os/skills/review-pass/SKILL.md",
       "os/skills/review-pass/references/review-packet-template.md"
@@ -167,7 +209,7 @@
   {
     "id": "review-loop-issue-families",
     "category": "review",
-    "scenario": "You are working in an external project that uses AgentOS guidance.\n\nThe user says: \"In a review/fix loop, two reviewer findings point at the same underlying bug. Should the loop accept and fix those individual finding IDs one-by-one, or do something else?\"\n\nWhat do you do next?",
+    "scenario": "During a review/fix loop, two reviewer findings appear to describe the same underlying bug.\n\nWhat do you do next?",
     "source_paths": [
       "os/skills/review-loop/SKILL.md",
       "os/skills/review-loop/references/agent-review-comment.md",
@@ -187,7 +229,7 @@
   {
     "id": "weekly-review-private-report",
     "category": "review",
-    "scenario": "You are working in an external project that uses AgentOS guidance.\n\nThe user says: \"Run the repository's weekly review and draft the report. You may find stale state and possible durable edits. Where should the report and follow-up changes go?\"\n\nWhat do you do next?",
+    "scenario": "The user asks you to run the repository's weekly review and draft its generated report for later reference. The review may require both reusable repository state and private local state, and may surface stale state or possible durable edits.\n\nWhat do you do next?",
     "source_paths": [
       "os/playbook/WEEKLY_REVIEW.md",
       "os/playbook/PERSONAL_OVERLAY.md"
@@ -206,7 +248,7 @@
   {
     "id": "skill-contract-upgrade",
     "category": "skills",
-    "scenario": "You are working in an external project that uses AgentOS guidance.\n\nThe user says: \"Upgrade a repository skill from a thin adapter into a durable reusable workflow. What contract facts should the skill make clear before we trust it?\"\n\nWhat do you do next?",
+    "scenario": "A repository skill is growing from a thin adapter into a reusable workflow. The user wants to rely on it for repeated work.\n\nWhat do you do next?",
     "source_paths": [
       "os/skills/SKILL_CONTRACT.md",
       "os/skills/MANIFEST.md"

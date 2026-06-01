@@ -36,7 +36,8 @@ Review whether AgentOS state is current, useful, and safely filed.
    Treat update availability as report-only evidence for a separate reviewed vendoring update. Do not auto-update vendored skills during Weekly Review.
 5. Identify stale state, missing templates, private-data risks, and useful follow-up work.
 6. Draft a report as a private generated output under `personal/os/memory/weekly-review/`.
-7. Ask the user to approve any durable state changes or external actions.
+7. Classify generated durable-state recommendations by inbox: GitHub issue or mapped-project tracker for public-safe actionable project work; `personal/os/memory/propagation-review/QUEUE.md` for private, tentative, connector-derived, personal, cross-project, or pre-issue proposals; direct edit only for exact approved changes.
+8. Ask the user to approve any durable state changes or external actions. Inline approval can approve exact requested edits or specific queue entries, but vague generated yes/no prompts are not durable decision records by themselves.
 
 ## Retrospective Checklist
 
@@ -55,4 +56,4 @@ Check whether the OS is still serving the user:
 
 - Do not inspect external accounts unless the user explicitly asks.
 - Do not perform external writes, delete files, or change automation state without approval.
-- Treat generated durable state changes as proposals until approved.
+- Treat generated durable state changes as proposals until they are filed in the right inbox, approved when needed, and applied.
