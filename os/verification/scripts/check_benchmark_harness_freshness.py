@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -30,7 +31,7 @@ class BenchmarkTarget:
     reports_dir: Path
     run_glob: str
     summary_path: tuple[str, ...]
-    min_behavioral_total: int
+    min_status_counting_total: int
     max_age_days: int
 
 
@@ -42,6 +43,8 @@ class RunRecord:
     behavioral_total: int
     behavioral_pass: int
     behavioral_fail: int
+    fixture_stale: int
+    status_counting_total: int
     harness_unavailable: int
 
 
@@ -84,24 +87,66 @@ def load_run(path: Path, summary_path: tuple[str, ...]) -> RunRecord | None:
     summary = nested_get(data, summary_path)
     if summary is None:
         return None
-    total = int(summary.get("total", 0) or 0)
-    harness_unavailable = int(
-        summary.get("harness_unavailable", inferred_harness_unavailable(data, summary_path)) or 0
+    if not report_is_status_eligible(data, summary):
+        return None
+    total = summary_int(summary, "total", 0)
+    harness_unavailable = summary_int(
+        summary,
+        "harness_unavailable",
+        inferred_harness_unavailable(data, summary_path),
     )
-    behavioral_total = int(summary.get("behavioral_total", total - harness_unavailable) or 0)
+    if total is None or harness_unavailable is None:
+        return None
+    behavioral_total = summary_int(summary, "behavioral_total", total - harness_unavailable)
+    if behavioral_total is None:
+        return None
     behavioral_pass_default = summary.get("overall_pass", 0) if behavioral_total else 0
     behavioral_fail_default = summary.get("overall_fail", 0) if behavioral_total else 0
-    behavioral_pass = int(summary.get("behavioral_pass", behavioral_pass_default) or 0)
-    behavioral_fail = int(summary.get("behavioral_fail", behavioral_fail_default) or 0)
+    behavioral_pass = summary_int(summary, "behavioral_pass", behavioral_pass_default)
+    behavioral_fail = summary_int(summary, "behavioral_fail", behavioral_fail_default)
+    fixture_stale = summary_int(summary, "fixture_stale", 0)
+    if behavioral_pass is None or behavioral_fail is None or fixture_stale is None:
+        return None
+    status_counting_total = behavioral_total + fixture_stale
+    try:
+        generated_at = parse_timestamp(generated)
+    except ValueError:
+        return None
     return RunRecord(
         path=path,
-        generated_at=parse_timestamp(generated),
+        generated_at=generated_at,
         total=total,
         behavioral_total=behavioral_total,
         behavioral_pass=behavioral_pass,
         behavioral_fail=behavioral_fail,
+        fixture_stale=fixture_stale,
+        status_counting_total=status_counting_total,
         harness_unavailable=harness_unavailable,
     )
+
+
+def summary_int(summary: dict[str, Any], field: str, default: Any) -> int | None:
+    value = summary.get(field, default)
+    if value is None:
+        value = default
+    if type(value) is bool:
+        return None
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    if parsed < 0:
+        return None
+    return parsed
+
+
+def report_is_status_eligible(data: dict[str, Any], summary: dict[str, Any]) -> bool:
+    if summary.get("status_eligible") is not True:
+        return False
+    if data.get("mode") not in (None, "run"):
+        return False
+    git_state = data.get("git")
+    return isinstance(git_state, dict) and git_state.get("eligible_fresh_main") is True
 
 
 def inferred_harness_unavailable(data: dict[str, Any], summary_path: tuple[str, ...]) -> int:
@@ -116,7 +161,8 @@ def inferred_harness_unavailable(data: dict[str, Any], summary_path: tuple[str, 
 
 
 def result_is_harness_unavailable(result: dict[str, Any]) -> bool:
-    if int(result.get("exit_code", 0) or 0) == 0:
+    exit_code = summary_int(result, "exit_code", 0)
+    if exit_code is None or exit_code == 0:
         return False
     combined = "\n".join([
         str(result.get("stderr", "")),
@@ -137,9 +183,9 @@ def run_records(target: BenchmarkTarget) -> list[RunRecord]:
     return sorted(records, key=lambda item: item.generated_at, reverse=True)
 
 
-def latest_behavioral(records: list[RunRecord], min_behavioral_total: int) -> RunRecord | None:
+def latest_status_counting(records: list[RunRecord], min_status_counting_total: int) -> RunRecord | None:
     for record in records:
-        if record.behavioral_total >= min_behavioral_total:
+        if record.status_counting_total >= min_status_counting_total:
             return record
     return None
 
@@ -191,7 +237,7 @@ def load_targets_from_manifest(
         reports_dir = benchmark.get("reports_dir")
         run_glob = benchmark.get("run_glob")
         summary_path = benchmark.get("summary_path")
-        min_behavioral_total = weekly_review.get("min_behavioral_total")
+        min_status_counting_total = weekly_review.get("min_status_counting_total")
         max_age_days = (
             max_age_days_override
             if max_age_days_override is not None
@@ -208,8 +254,8 @@ def load_targets_from_manifest(
             raise ValueError(f"{benchmark_id}.summary_path must be a non-empty string list")
         if not all(isinstance(part, str) and part for part in summary_path):
             raise ValueError(f"{benchmark_id}.summary_path must contain only non-empty strings")
-        if not positive_int(min_behavioral_total):
-            raise ValueError(f"{benchmark_id}.weekly_review.min_behavioral_total must be a positive integer")
+        if not positive_int(min_status_counting_total):
+            raise ValueError(f"{benchmark_id}.weekly_review.min_status_counting_total must be a positive integer")
         if not positive_int(max_age_days):
             raise ValueError(f"{benchmark_id}.weekly_review.max_age_days must be a positive integer")
 
@@ -219,7 +265,7 @@ def load_targets_from_manifest(
                 reports_dir=resolve_root_path(root, Path(reports_dir)),
                 run_glob=run_glob,
                 summary_path=tuple(summary_path),
-                min_behavioral_total=min_behavioral_total,
+                min_status_counting_total=min_status_counting_total,
                 max_age_days=max_age_days,
             )
         )
@@ -236,28 +282,32 @@ def check_target(root: Path, target: BenchmarkTarget, now: datetime) -> int:
         return 1
 
     latest = records[0]
-    latest_behavior = latest_behavioral(records, target.min_behavioral_total)
+    latest_status = latest_status_counting(records, target.min_status_counting_total)
     latest_path = relative_path(root, latest.path.parent)
     print(
         f"INFO  {target.name}: latest report {latest.generated_at.isoformat()} "
         f"behavioral={latest.behavioral_pass}/{latest.behavioral_total} "
+        f"fixture_stale={latest.fixture_stale} "
+        f"status_counting={latest.status_counting_total} "
         f"unavailable={latest.harness_unavailable}/{latest.total} path={latest_path}"
     )
 
-    if latest_behavior is None:
+    if latest_status is None:
         print(
-            f"WARN  {target.name}: no saved behavioral harness run found "
-            f"with at least {target.min_behavioral_total} cases"
+            f"WARN  {target.name}: no saved status-counting harness run found "
+            f"with at least {target.min_status_counting_total} cases"
         )
         return 1
 
-    days = age_days(now, latest_behavior.generated_at)
-    behavior_path = relative_path(root, latest_behavior.path.parent)
+    days = age_days(now, latest_status.generated_at)
+    behavior_path = relative_path(root, latest_status.path.parent)
     status = "OK" if days <= target.max_age_days else "WARN"
     print(
-        f"{status:<5} {target.name}: latest full behavioral harness run "
-        f"{latest_behavior.generated_at.isoformat()} ({days:.1f} days old) "
-        f"behavioral={latest_behavior.behavioral_pass}/{latest_behavior.behavioral_total} "
+        f"{status:<5} {target.name}: latest full status-counting harness run "
+        f"{latest_status.generated_at.isoformat()} ({days:.1f} days old) "
+        f"behavioral={latest_status.behavioral_pass}/{latest_status.behavioral_total} "
+        f"fixture_stale={latest_status.fixture_stale} "
+        f"status_counting={latest_status.status_counting_total} "
         f"path={behavior_path}"
     )
     return 0 if days <= target.max_age_days else 1
@@ -270,7 +320,283 @@ def run_self_test(root: Path) -> int:
     if result == 0:
         print("SELF-TEST FAIL: missing reports were accepted")
         return 1
-    print("SELF-TEST PASS: missing reports trigger freshness warning")
+    with tempfile.TemporaryDirectory(prefix="agentos-benchmark-freshness-") as tmp:
+        tmp_root = Path(tmp)
+        reports_dir = tmp_root / "reports"
+        run_dir = reports_dir / "run"
+        run_dir.mkdir(parents=True)
+        (run_dir / "run.json").write_text(
+            json.dumps(
+                {
+                    "generated_at": now.isoformat(),
+                    "mode": "run",
+                    "git": {"eligible_fresh_main": True},
+                    "summary": {
+                        "total": 8,
+                        "behavioral_total": 8,
+                        "behavioral_pass": 8,
+                        "behavioral_fail": 0,
+                        "status_eligible": False,
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        ineligible_target = BenchmarkTarget("ineligible", reports_dir, "*/run.json", ("summary",), 8, 14)
+        if run_records(ineligible_target):
+            print("SELF-TEST FAIL: status-ineligible reports were accepted as freshness records")
+            return 1
+        missing_eligibility_dir = reports_dir / "missing-eligibility"
+        missing_eligibility_dir.mkdir()
+        (missing_eligibility_dir / "run.json").write_text(
+            json.dumps(
+                {
+                    "generated_at": now.isoformat(),
+                    "mode": "run",
+                    "git": {"eligible_fresh_main": True},
+                    "summary": {
+                        "total": 8,
+                        "behavioral_total": 8,
+                        "behavioral_pass": 8,
+                        "behavioral_fail": 0,
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        missing_git_dir = reports_dir / "missing-git"
+        missing_git_dir.mkdir()
+        (missing_git_dir / "run.json").write_text(
+            json.dumps(
+                {
+                    "generated_at": now.isoformat(),
+                    "mode": "run",
+                    "summary": {
+                        "total": 8,
+                        "behavioral_total": 8,
+                        "behavioral_pass": 8,
+                        "behavioral_fail": 0,
+                        "status_eligible": True,
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        stale_git_dir = reports_dir / "stale-git"
+        stale_git_dir.mkdir()
+        (stale_git_dir / "run.json").write_text(
+            json.dumps(
+                {
+                    "generated_at": now.isoformat(),
+                    "mode": "run",
+                    "git": {"eligible_fresh_main": False},
+                    "summary": {
+                        "total": 8,
+                        "behavioral_total": 8,
+                        "behavioral_pass": 8,
+                        "behavioral_fail": 0,
+                        "status_eligible": True,
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        dry_run_dir = reports_dir / "dry-run"
+        dry_run_dir.mkdir()
+        (dry_run_dir / "run.json").write_text(
+            json.dumps(
+                {
+                    "generated_at": now.isoformat(),
+                    "mode": "dry-run",
+                    "git": {"eligible_fresh_main": True},
+                    "summary": {
+                        "total": 8,
+                        "behavioral_total": 8,
+                        "behavioral_pass": 8,
+                        "behavioral_fail": 0,
+                        "status_eligible": True,
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        malformed_timestamp_dir = reports_dir / "malformed-timestamp"
+        malformed_timestamp_dir.mkdir()
+        (malformed_timestamp_dir / "run.json").write_text(
+            json.dumps(
+                {
+                    "generated_at": "not a timestamp",
+                    "mode": "run",
+                    "git": {"eligible_fresh_main": True},
+                    "summary": {
+                        "total": 8,
+                        "behavioral_total": 8,
+                        "behavioral_pass": 8,
+                        "behavioral_fail": 0,
+                        "status_eligible": True,
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        malformed_counts_dir = reports_dir / "malformed-counts"
+        malformed_counts_dir.mkdir()
+        (malformed_counts_dir / "run.json").write_text(
+            json.dumps(
+                {
+                    "generated_at": now.isoformat(),
+                    "mode": "run",
+                    "git": {"eligible_fresh_main": True},
+                    "summary": {
+                        "total": 8,
+                        "behavioral_total": 8,
+                        "behavioral_pass": "eight",
+                        "behavioral_fail": 0,
+                        "status_eligible": True,
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        negative_counts_dir = reports_dir / "negative-counts"
+        negative_counts_dir.mkdir()
+        (negative_counts_dir / "run.json").write_text(
+            json.dumps(
+                {
+                    "generated_at": now.isoformat(),
+                    "mode": "run",
+                    "git": {"eligible_fresh_main": True},
+                    "summary": {
+                        "total": 8,
+                        "behavioral_total": -1,
+                        "behavioral_pass": 0,
+                        "behavioral_fail": 0,
+                        "status_eligible": True,
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        stale_dir = reports_dir / "stale"
+        stale_dir.mkdir()
+        (stale_dir / "run.json").write_text(
+            json.dumps(
+                {
+                    "generated_at": now.isoformat(),
+                    "mode": "run",
+                    "git": {"eligible_fresh_main": True},
+                    "summary": {
+                        "total": 10,
+                        "behavioral_total": 8,
+                        "behavioral_pass": 8,
+                        "behavioral_fail": 0,
+                        "fixture_stale": 2,
+                        "status_eligible": True,
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        stale_heavy_dir = reports_dir / "stale-heavy"
+        stale_heavy_dir.mkdir()
+        (stale_heavy_dir / "run.json").write_text(
+            json.dumps(
+                {
+                    "generated_at": now.isoformat(),
+                    "mode": "run",
+                    "git": {"eligible_fresh_main": True},
+                    "summary": {
+                        "total": 12,
+                        "behavioral_total": 7,
+                        "behavioral_pass": 7,
+                        "behavioral_fail": 0,
+                        "fixture_stale": 5,
+                        "status_eligible": True,
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        stale_records = run_records(BenchmarkTarget("stale", reports_dir, "*/run.json", ("summary",), 8, 14))
+        if not any(record.path.parent.name == "stale" and record.fixture_stale == 2 for record in stale_records):
+            print("SELF-TEST FAIL: fixture_stale count was not preserved in freshness records")
+            return 1
+        accepted_paths = {record.path.parent.name for record in stale_records}
+        if accepted_paths != {"stale", "stale-heavy"}:
+            print("SELF-TEST FAIL: ineligible or malformed reports were accepted")
+            print(json.dumps(sorted(accepted_paths), indent=2))
+            return 1
+        if "stale-heavy" not in {
+            record.path.parent.name
+            for record in stale_records
+            if record.status_counting_total >= 8
+        }:
+            print("SELF-TEST FAIL: fixture_stale did not count toward freshness threshold")
+            return 1
+
+        inflated_legacy_dir = reports_dir / "inflated-legacy-total"
+        inflated_legacy_dir.mkdir()
+        (inflated_legacy_dir / "run.json").write_text(
+            json.dumps(
+                {
+                    "generated_at": now.isoformat(),
+                    "mode": "run",
+                    "git": {"eligible_fresh_main": True},
+                    "summary": {
+                        "total": 1,
+                        "behavioral_total": 0,
+                        "behavioral_pass": 0,
+                        "behavioral_fail": 0,
+                        "fixture_stale": 0,
+                        "status_counting_total": 8,
+                        "status_eligible": True,
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        inflated_record = load_run(inflated_legacy_dir / "run.json", ("summary",))
+        if inflated_record is None or inflated_record.status_counting_total != 0:
+            print("SELF-TEST FAIL: freshness checker did not recalculate legacy status_counting_total")
+            return 1
+
+        manifest_path = tmp_root / "BENCHMARKS.json"
+        manifest_path.write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "benchmarks": [
+                        {
+                            "id": "legacy",
+                            "script": "os/verification/legacy.py",
+                            "reports_dir": "missing-legacy",
+                            "run_glob": "*/run.json",
+                            "summary_path": ["summary"],
+                            "weekly_review": {"check_freshness": False},
+                        },
+                        {
+                            "id": "guidance-eval",
+                            "script": "os/verification/guidance-eval.py",
+                            "reports_dir": "reports",
+                            "run_glob": "*/run.json",
+                            "summary_path": ["summary"],
+                            "weekly_review": {
+                                "check_freshness": True,
+                                "min_status_counting_total": 8,
+                                "max_age_days": 14,
+                            },
+                        },
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        manifest_targets = load_targets_from_manifest(tmp_root, manifest_path)
+        if [target.name for target in manifest_targets] != ["guidance-eval"]:
+            print("SELF-TEST FAIL: check_freshness=false manifest entries were not skipped")
+            print(json.dumps([target.name for target in manifest_targets], indent=2))
+            return 1
+    print("SELF-TEST PASS: missing, status-ineligible, stale-metadata, fixture-stale, and manifest-skip reports are handled")
     return 0
 
 

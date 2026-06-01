@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "results"
+  ],
+  "properties": {
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fixture_id",
+          "verdict",
+          "rationale",
+          "source_alignment",
+          "source_alignment_rationale",
+          "staleness",
+          "staleness_rationale",
+          "confidence"
+        ],
+        "properties": {
+          "fixture_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "fail",
+              "fixture_stale",
+              "needs_user_judgment"
+            ]
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_alignment": {
+            "type": "string",
+            "enum": [
+              "aligned",
+              "partial",
+              "missing",
+              "wrong",
+              "not_applicable"
+            ]
+          },
+          "source_alignment_rationale": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "staleness": {
+            "type": "string",
+            "enum": [
+              "current",
+              "stale",
+              "uncertain"
+            ]
+          },
+          "staleness_rationale": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

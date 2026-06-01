@@ -16,6 +16,8 @@ The benchmark asks representative AgentOS lookup questions and checks whether th
 
 Exact quote support is diagnostic only. Quote mismatches are reported so humans can see grounding quality, but they do not fail the retrieval score when the answer has valid schema, valid local paths, an expected canonical source, and no disallowed sources.
 
+Disallowed answer-key files include retrieval, playbook-activation, and guidance-eval fixture/schema/judge assets. Adding a benchmark suite with hidden expected answers should update the harness disallowed-source list and self-test coverage.
+
 `os/verification/BENCHMARK_STATUS.md` is excluded from ordinary retrieval evidence because it summarizes benchmark outcomes. A dedicated benchmark-status lookup question may target that file directly, but unrelated retrieval questions should not use it as answer evidence.
 
 This gives AgentOS one score to watch during maintenance: can the current harness find and support the right answer from the control plane?
@@ -83,7 +85,7 @@ Save the full safe report. This creates a timestamped directory containing `repo
 python3 os/verification/retrieval/scripts/benchmark_retrieval.py --save-report
 ```
 
-When producing evidence for `os/verification/BENCHMARK_STATUS.md`, run from a clean `main` checkout and add `--check-remote-main` so the saved report proves whether the reviewed commit matched live `origin/main` at run time.
+Retrieval reports are currently diagnostic/historical for Core status refresh because `os/verification/BENCHMARKS.json` has `weekly_review.check_freshness: false` for this suite. Saved retrieval reports do not refresh current `os/verification/BENCHMARK_STATUS.md` entries unless the manifest explicitly revives this suite as a status-refresh target. You can still add `--check-remote-main` to diagnostic runs when provenance matters.
 
 Run only the local lexical benchmark:
 

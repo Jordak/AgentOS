@@ -120,6 +120,31 @@
       ]
     },
     {
+      "id": "review-packet-template-rendering",
+      "category": "code review",
+      "prompt": "Return a review packet and make sure the panel table, issue family IDs, and long command or regex examples follow the canonical rendering rules.",
+      "expected": {
+        "filing_path": "os/skills/review-pass/references/review-packet-template.md"
+      },
+      "evidence": [
+        {
+          "path": "os/skills/review-pass/references/review-packet-template.md",
+          "contains": [
+            "In `## Panel`, render reviewer aliases, lens names, and mode values as plain text",
+            "Avoid long inline code spans for shell commands, regexes, or searches",
+            "Issue Family IDs use `IF<family-number>`"
+          ]
+        },
+        {
+          "path": "os/skills/review-pass/SKILL.md",
+          "contains": [
+            "Read `references/review-packet-template.md`",
+            "exact packet template"
+          ]
+        }
+      ]
+    },
+    {
       "id": "review-pass-contract-surface",
       "category": "code review",
       "prompt": "Run a single read-only review pass on a skill change and check whether workflow semantics propagated through prompts, recovery, manifest, reports, and validation.",
@@ -173,6 +198,31 @@
           "contains": [
             "Contract Surface Matrix",
             "semantic contract changes"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "review-loop-issue-family-normalization",
+      "category": "code review loop",
+      "prompt": "Run a review/fix loop where multiple reviewer findings describe the same bug. Decide what unit the loop should accept, decline, fix, report, and verify.",
+      "expected": {
+        "skill": "review-loop"
+      },
+      "evidence": [
+        {
+          "path": "os/skills/review-loop/SKILL.md",
+          "contains": [
+            "candidate Reviewer Finding",
+            "normalize it into an Issue Family",
+            "preserve source reviewer finding IDs"
+          ]
+        },
+        {
+          "path": "os/skills/review-loop/references/agent-review-comment.md",
+          "contains": [
+            "Issue families",
+            "reviewer finding IDs only as provenance"
           ]
         }
       ]

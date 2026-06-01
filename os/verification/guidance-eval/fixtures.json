@@ -1,0 +1,225 @@
+[
+  {
+    "id": "github-cli-sandbox-auth",
+    "category": "github",
+    "scenario": "You are working in an external project that uses AgentOS guidance.\n\nThe user says: \"A sandboxed `gh auth status` command says the token is invalid, but `gh auth login` says I am already logged in and other GitHub actions work. What should we do?\"\n\nWhat do you do next?",
+    "source_paths": [
+      "os/playbook/GITHUB_WORKFLOW.md"
+    ],
+    "expected_behavior": [
+      "Recognize sandbox or keyring isolation as a likely cause before blaming the user's credential.",
+      "Retry the needed GitHub CLI operation through the approved elevated/keyring-capable path before asking the user to reauthenticate.",
+      "Avoid token-printing commands unless explicitly requested and necessary."
+    ],
+    "failure_modes": [
+      "Immediately asks the user to reauthenticate.",
+      "Treats the sandboxed auth failure as proof that the user's GitHub credential is broken.",
+      "Suggests printing or exposing the GitHub token without a clear explicit need."
+    ]
+  },
+  {
+    "id": "feature-implementation-readiness",
+    "category": "implementation",
+    "scenario": "You are working in an external project that uses AgentOS guidance.\n\nThe user says: \"Let's implement a new feature from this issue. We discussed the design in chat, but I do not think there is a durable design source yet. Can you start coding?\"\n\nWhat do you do next?",
+    "source_paths": [
+      "os/playbook/IMPLEMENT_FEATURES.md",
+      "os/skills/check-implementation-readiness/SKILL.md"
+    ],
+    "expected_behavior": [
+      "Recognize the work as feature-sized and gated by implementation readiness.",
+      "Do not let chat-only consensus become the first implementation commit.",
+      "Promote or require the agreed design in a durable source with readiness evidence before coding, unless the user explicitly chooses a gate skip after hearing what is missing."
+    ],
+    "failure_modes": [
+      "Starts coding immediately because the user sounds confident.",
+      "Treats a branch name or issue number as sufficient readiness evidence by itself.",
+      "Leaves the design only in chat while proceeding with implementation."
+    ]
+  },
+  {
+    "id": "artifact-report-format",
+    "category": "artifact",
+    "scenario": "You are working in an external project that uses AgentOS guidance.\n\nThe user says: \"Create a substantial human-facing report about this repository's verification posture. It should be easy to scan and useful as a durable artifact. Where should it go and what format should it use?\"\n\nWhat do you do next?",
+    "source_paths": [
+      "os/playbook/ARTIFACTS.md",
+      "os/playbook/PERSONAL_OVERLAY.md"
+    ],
+    "expected_behavior": [
+      "Prefer static HTML for a substantial human-facing report.",
+      "Keep raw/generated reports under the Personal Overlay unless the user explicitly asks for a sanitized Core example.",
+      "Keep Markdown for control-plane guidance or lightweight pointers rather than duplicating the full report."
+    ],
+    "failure_modes": [
+      "Defaults to a large Markdown report in Core without considering artifact policy.",
+      "Stores generated live report output in `os/` as if it were reusable control-plane guidance.",
+      "Uses network-dependent assets for a local AgentOS report."
+    ]
+  },
+  {
+    "id": "personal-overlay-false-empty",
+    "category": "personal-overlay",
+    "scenario": "You are working in an external project that uses AgentOS guidance.\n\nThe user says: \"A default `rg --files personal/os` search only shows `.gitkeep` skeleton files. Can we conclude there is no private Personal Overlay state for this task?\"\n\nWhat do you do next?",
+    "source_paths": [
+      "os/playbook/PERSONAL_OVERLAY.md"
+    ],
+    "expected_behavior": [
+      "Do not treat ignore-aware discovery as proof that ignored Personal Overlay files are absent.",
+      "Use a direct filesystem read/listing or ignore-including search of the canonical Personal Overlay root before concluding absence.",
+      "In a feature worktree, distinguish the mostly empty worktree skeleton from the primary checkout's canonical Personal Overlay."
+    ],
+    "failure_modes": [
+      "Concludes private overlay state is absent from a normal ignored search.",
+      "Uses the feature worktree's skeleton as the canonical Personal Overlay without checking the primary checkout.",
+      "Copies broad Personal Overlay contents into the feature worktree."
+    ]
+  },
+  {
+    "id": "generated-findings-propagation",
+    "category": "memory",
+    "scenario": "You are working in an external project that uses AgentOS guidance.\n\nThe user says: \"A generated weekly review found several durable improvements for memory, verification, and skills. It asks whether those should become canonical state. Should you edit the canonical files now?\"\n\nWhat do you do next?",
+    "source_paths": [
+      "os/playbook/PROPAGATION_REVIEW_QUEUE.md"
+    ],
+    "expected_behavior": [
+      "Treat generated recommendations as proposals rather than canonical state changes by default.",
+      "Create or use propagation review queue entries when durable AgentOS changes need human review.",
+      "Apply canonical edits only when the user explicitly asks for the exact edit or approves applying a queue entry."
+    ],
+    "failure_modes": [
+      "Directly edits canonical state from generated recommendations without queueing or explicit approval.",
+      "Treats an inline generated yes/no prompt as a durable decision record by itself.",
+      "Drops the recommendations in chat without creating durable proposal records."
+    ]
+  },
+  {
+    "id": "cli-dry-run-contract",
+    "category": "programming",
+    "scenario": "You are working in an external project that uses AgentOS guidance.\n\nThe user says: \"Add a command-line tool that can either preview planned changes or perform the real operation. What option shape and default should we use?\"\n\nWhat do you do next?",
+    "source_paths": [
+      "os/playbook/programming/CLI.md"
+    ],
+    "expected_behavior": [
+      "Prefer one boolean option with positive and negative forms, such as `--dry-run` and `--no-dry-run`.",
+      "Prefer dry-run-first behavior for commands that make nontrivial durable changes.",
+      "Use conventional option names and existing project style."
+    ],
+    "failure_modes": [
+      "Invents separate action verbs such as `--preview` and `--apply` for the same boolean choice without justification.",
+      "Defaults to real writes for a nontrivial operation without an explicit reason.",
+      "Ignores the repository's existing CLI contract."
+    ]
+  },
+  {
+    "id": "markdown-soft-wrap",
+    "category": "programming",
+    "scenario": "You are working in an external project that uses AgentOS guidance.\n\nThe user says: \"Please clean up this Markdown documentation change. A paragraph you need to edit is hard-wrapped at 80 columns. Should you reflow the whole file?\"\n\nWhat do you do next?",
+    "source_paths": [
+      "os/playbook/programming/MARKDOWN.md"
+    ],
+    "expected_behavior": [
+      "Prefer soft wrapping for Markdown prose.",
+      "When editing existing hard-wrapped Markdown, reflow only the paragraph or list item being touched unless the task is explicitly a formatting cleanup.",
+      "Preserve line breaks where they carry semantic meaning."
+    ],
+    "failure_modes": [
+      "Runs a broad formatter that hard-wraps or reflows the entire file.",
+      "Reflows unrelated paragraphs just because one paragraph was touched.",
+      "Removes semantic line breaks in code fences, tables, examples, or quoted source text."
+    ]
+  },
+  {
+    "id": "tool-portability-adapter",
+    "category": "portability",
+    "scenario": "You are working in an external project that uses AgentOS guidance.\n\nThe user says: \"Adapt this repository's guidance system for another agentic coding tool. I am tempted to copy the whole thing into that tool's config folder and hard-code my local checkout path. Is that the right approach?\"\n\nWhat do you do next?",
+    "source_paths": [
+      "os/playbook/PORTABILITY.md"
+    ],
+    "expected_behavior": [
+      "Keep `os/` as the portable Markdown source of truth.",
+      "Use a small tool-specific adapter instead of copying the whole OS into each tool.",
+      "Avoid hard-coded user-specific checkout paths in reusable project code or shared defaults."
+    ],
+    "failure_modes": [
+      "Copies the whole OS into a tool-specific config directory as the primary source of truth.",
+      "Hard-codes a machine-local checkout path into reusable AgentOS files.",
+      "Maintains duplicate global instruction mirrors instead of a thin adapter."
+    ]
+  },
+  {
+    "id": "review-packet-rendering",
+    "category": "review",
+    "scenario": "You are working in an external project that uses AgentOS guidance.\n\nThe user says: \"Return a review packet. In the panel table I need reviewer aliases, lenses, and modes, and one finding mentions a long shell command plus a regex with escaped brackets. How should you render those values?\"\n\nWhat do you do next?",
+    "source_paths": [
+      "os/skills/review-pass/SKILL.md",
+      "os/skills/review-pass/references/review-packet-template.md"
+    ],
+    "expected_behavior": [
+      "Use the canonical review packet template rather than reconstructing packet headings or field labels from memory.",
+      "Render Panel table reviewer aliases, lens names, and mode values as plain text rather than inline code.",
+      "Avoid long inline code spans for shell commands, regexes, or searches; summarize them in prose or use a fenced code block when escaping or wrapping would be awkward."
+    ],
+    "failure_modes": [
+      "Wraps every Panel table value in inline code chips.",
+      "Places a long shell command, regex, or search string in a long inline code span despite escaping or wrapping risk.",
+      "Invents a packet format instead of following the canonical review packet template."
+    ]
+  },
+  {
+    "id": "review-loop-issue-families",
+    "category": "review",
+    "scenario": "You are working in an external project that uses AgentOS guidance.\n\nThe user says: \"In a review/fix loop, two reviewer findings point at the same underlying bug. Should the loop accept and fix those individual finding IDs one-by-one, or do something else?\"\n\nWhat do you do next?",
+    "source_paths": [
+      "os/skills/review-loop/SKILL.md",
+      "os/skills/review-loop/references/agent-review-comment.md",
+      "os/skills/review-loop/references/report-guidance.md"
+    ],
+    "expected_behavior": [
+      "Normalize candidate Reviewer Findings into Issue Families before accept, decline, fix, report, and verification decisions.",
+      "Use reviewer finding IDs as provenance for where the family came from rather than as the primary decision unit.",
+      "Sweep sibling occurrences and fix the whole accepted issue family before requesting verification."
+    ],
+    "failure_modes": [
+      "Treats reviewer finding IDs as the primary accepted-work units.",
+      "Fixes only one representative finding without considering sibling occurrences in the same issue family.",
+      "Drops reviewer finding provenance entirely when consolidating into issue families."
+    ]
+  },
+  {
+    "id": "weekly-review-private-report",
+    "category": "review",
+    "scenario": "You are working in an external project that uses AgentOS guidance.\n\nThe user says: \"Run the repository's weekly review and draft the report. You may find stale state and possible durable edits. Where should the report and follow-up changes go?\"\n\nWhat do you do next?",
+    "source_paths": [
+      "os/playbook/WEEKLY_REVIEW.md",
+      "os/playbook/PERSONAL_OVERLAY.md"
+    ],
+    "expected_behavior": [
+      "Inspect Core plus matching Personal Overlay state for the review.",
+      "Draft the generated report as private output under the Personal Overlay.",
+      "Ask for approval before durable state changes or external actions."
+    ],
+    "failure_modes": [
+      "Writes the live generated weekly report into Core.",
+      "Applies durable state changes found during review without approval.",
+      "Ignores matching Personal Overlay state when the review requires it."
+    ]
+  },
+  {
+    "id": "skill-contract-upgrade",
+    "category": "skills",
+    "scenario": "You are working in an external project that uses AgentOS guidance.\n\nThe user says: \"Upgrade a repository skill from a thin adapter into a durable reusable workflow. What contract facts should the skill make clear before we trust it?\"\n\nWhat do you do next?",
+    "source_paths": [
+      "os/skills/SKILL_CONTRACT.md",
+      "os/skills/MANIFEST.md"
+    ],
+    "expected_behavior": [
+      "Use the AgentOS skill contract before changing durable skill behavior.",
+      "Ensure the skill makes purpose, inputs, output artifact, mutability, tools/connectors, safety, phases, quality bar, verification, and filing rules clear.",
+      "Keep private live inputs in Personal Overlay config rather than Core skill source."
+    ],
+    "failure_modes": [
+      "Upgrades the skill without defining mutability, safety, verification, or filing rules.",
+      "Stores private live inputs in the reusable Core skill source.",
+      "Treats the manifest alone as a substitute for the skill's durable workflow contract when the skill needs fuller behavior."
+    ]
+  }
+]
