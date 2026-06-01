@@ -63,9 +63,9 @@ Do not use `stale` as a Core status. Staleness is relative to the current checko
 
 ### Codex
 
-- Status: `not run`
-- Reviewed Core revision: `not reviewed`
-- Last reviewed evidence: `none`
-- Evidence scope: `guidance-eval Codex harness; judge-assisted AgentOS guidance scenarios`
-- Summary: No status-eligible Guidance Eval evidence has been reviewed yet.
-- Caveats: This entry is initialized with the new `guidance-eval` suite and should be refreshed only from eligible saved evidence produced on clean, remote-fresh `main`.
+- Status: `attention needed`
+- Reviewed Core revision: `5557f066edf67de5325e27c70452b7b2bcf5d02c`
+- Last reviewed evidence: `2026-06-01 07:49 PDT`
+- Evidence scope: `guidance-eval Codex harness; 12 default guidance fixtures; gpt-5.5 low; judge gpt-5.5 low`
+- Summary: Codex produced judged responses for all 12 default Guidance Eval scenarios. Eleven behavioral checks passed, covering GitHub CLI sandbox auth, implementation readiness, artifact format selection, Personal Overlay routing, programming CLI contracts, Markdown style, portability, review workflows, weekly-review storage, and skill-contract upgrade routing.
+- Caveats: One generated-findings propagation scenario failed because the response did not route recommended canonical changes through the durable propagation-review queue before promotion. No fixture-stale or needs-user-judgment cases were reported.
