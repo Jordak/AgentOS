@@ -56,8 +56,8 @@ PERSONAL_OVERLAY_SKELETON_FILES = {
     "personal/os/playbook/github-archive/settings/.gitkeep",
     "personal/os/skills/.gitkeep",
     "personal/os/verification/.gitkeep",
-    "personal/os/verification/guidance-eval/.gitkeep",
-    "personal/os/verification/guidance-eval/reports/.gitkeep",
+    "personal/os/verification/guidance/.gitkeep",
+    "personal/os/verification/guidance/reports/.gitkeep",
     "personal/os/verification/markdown-audit/.gitkeep",
     "personal/os/verification/reports/.gitkeep",
 }

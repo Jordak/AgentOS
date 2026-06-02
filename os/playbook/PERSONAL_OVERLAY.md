@@ -248,10 +248,10 @@ Examples:
 
 - `$root/os/verification/scripts/validate_agentos.py`
 - `$root/os/verification/source-routing/fixtures.json`
-- `$root/os/verification/guidance-eval/fixtures.json`
-- `$root/os/verification/guidance-eval/judge_response.schema.json`
+- `$root/os/verification/guidance/fixtures.json`
+- `$root/os/verification/guidance/judge_response.schema.json`
 - `$root/os/verification/*/README.md`
-- `$root/personal/os/verification/guidance-eval/reports/`
+- `$root/personal/os/verification/guidance/reports/`
 - `$root/personal/os/verification/markdown-audit/`
 
 ## Root Adapters

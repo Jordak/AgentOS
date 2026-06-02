@@ -2,9 +2,9 @@
   "version": 1,
   "benchmarks": [
     {
-      "id": "guidance-eval",
-      "script": "os/verification/guidance-eval/scripts/benchmark_guidance_eval.py",
-      "reports_dir": "personal/os/verification/guidance-eval/reports",
+      "id": "guidance",
+      "script": "os/verification/guidance/scripts/benchmark_guidance.py",
+      "reports_dir": "personal/os/verification/guidance/reports",
       "run_glob": "*/run.json",
       "summary_path": ["summary"],
       "weekly_review": {

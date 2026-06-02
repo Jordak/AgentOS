@@ -1,14 +1,14 @@
-# Guidance Eval
+# Guidance
 
-Status: first implementation.
+Status: current benchmark surface.
 
-Guidance Eval checks whether a real harness applies AgentOS guidance correctly in realistic scenarios. It is not a retrieval benchmark and does not require transcript-level proof that the harness opened a specific file.
+Guidance checks whether a real harness applies AgentOS guidance correctly in realistic scenarios. It is not a retrieval benchmark and does not require transcript-level proof that the harness opened a specific file.
 
 The suite asks the harness under test a direct task, captures its normal prose answer, and sends successful answers to a judge with hidden fixture context. By default, all successful answers for each harness are judged in one batch. The judge compares each answer against the expected behavior, failure modes, and current guidance sources, then returns structured verdicts.
 
 Harness-under-test calls run from a temporary external project that contains a harness-specific local adapter. For Codex, that adapter is `AGENTS.md`. The adapter points at a sanitized temporary AgentOS copy built from tracked/index-defined file contents. The copy excludes `.git/**`, `personal/**`, and `os/verification/**` so benchmark fixtures, saved reports, answer keys, and Personal Overlay state are unavailable at runtime. Untracked local files, unstaged tracked-file edits, and symlinks are not copied into the sanitized AgentOS copy.
 
-Guidance Eval owns the maintained source-boundary and answer-key guardrails for harness behavior. Fixture `source_paths` must point at tracked UTF-8 files that are available to the sanitized harness workspace, not at `personal/**`, `os/verification/**`, fixture files, schemas, judge prompts, reports, or other answer-key material. The judge treats reliance on benchmark fixtures, saved reports, answer keys, or private Personal Overlay files as a failure.
+Guidance owns the maintained source-boundary and answer-key guardrails for harness behavior. Fixture `source_paths` must point at tracked UTF-8 files that are available to the sanitized harness workspace, not at `personal/**`, `os/verification/**`, fixture files, schemas, judge prompts, reports, or other answer-key material. The judge treats reliance on benchmark fixtures, saved reports, answer keys, or private Personal Overlay files as a failure.
 
 The suite intentionally validates the portable project-local adapter path, not the user's installed global adapter. Installed global adapter verification is tracked separately in [#83](https://github.com/Jordak/AgentOS/issues/83).
 
@@ -16,8 +16,12 @@ Judge calls run from the trusted benchmark checkout as measurement instrumentati
 
 The judge instructions live in `judge_prompt.md` as a benchmark-owned prompt asset. They intentionally do not live in `os/skills/`: the judge is measurement instrumentation for this suite, not reusable AgentOS workflow behavior or part of the harness-under-test skill surface.
 
-Raw reports and run histories belong under `personal/os/verification/guidance-eval/reports/`.
+Raw reports and run histories belong under `personal/os/verification/guidance/reports/`.
 Saved reports include compact judge batch metadata so maintainers can confirm how many HUT answers were judged together without reading raw harness output.
+
+## Compatibility
+
+The public benchmark surface is now `guidance`. The old `guidance-eval` directory, script name, benchmark id, and default save path are not kept as command aliases. Existing local report directories under `personal/os/verification/guidance-eval/reports/` may remain as historical evidence, but new runs and status refreshes use `personal/os/verification/guidance/reports/`.
 
 ## Fixture Authoring
 
@@ -82,19 +86,19 @@ Codex structured-output schemas require every property to be listed in `required
 Preview without model calls:
 
 ```bash
-python3 os/verification/guidance-eval/scripts/benchmark_guidance_eval.py --dry-run
+python3 os/verification/guidance/scripts/benchmark_guidance.py --dry-run
 ```
 
 Run deterministic self-tests:
 
 ```bash
-python3 os/verification/guidance-eval/scripts/benchmark_guidance_eval.py --self-test
+python3 os/verification/guidance/scripts/benchmark_guidance.py --self-test
 ```
 
 Run Codex as the harness under test and save a diagnostic report:
 
 ```bash
-python3 os/verification/guidance-eval/scripts/benchmark_guidance_eval.py --no-dry-run --harness codex --save-report
+python3 os/verification/guidance/scripts/benchmark_guidance.py --no-dry-run --harness codex --save-report
 ```
 
 Use `--judge-prompt <path>` or `--judge-schema <path>` to test alternate judge assets. The prompt must contain the documented placeholder tokens from `judge_prompt.md`. Alternate judge assets are diagnostic and make the run status-ineligible.
@@ -106,14 +110,14 @@ Harness and judge prompts are passed to Codex through stdin. Dry-run command sha
 Status-eligible runs require a clean, remote-fresh `main` checkout and:
 
 ```bash
-python3 os/verification/guidance-eval/scripts/benchmark_guidance_eval.py --no-dry-run --harness codex --save-report --check-remote-main
+python3 os/verification/guidance/scripts/benchmark_guidance.py --no-dry-run --harness codex --save-report --check-remote-main
 ```
 
 ## Status Summary
 
 Saved reports expose a manifest-resolvable `summary` object and raw fixture provenance metadata. `behavioral_total` counts only `pass` and `fail`. Freshness checks derive the status-counting total from `behavioral_total + fixture_stale`; reports do not store a separate derived total. `fixture_stale` is reported separately and does not make the run ineligible. `needs_user_judgment` makes the run ineligible.
 
-`summary.status_eligible` includes fixture-scope and judge-protocol checks: status-eligible Guidance Eval reports must use the default canonical fixture file, the full default fixture set, no `--fixture-id` subset, default judge prompt, default judge schema, and default judge batch size. Alternate fixture files, selected fixture subsets, alternate judge assets, and non-default judge batch sizes are diagnostic runs.
+`summary.status_eligible` includes fixture-scope and judge-protocol checks: status-eligible Guidance reports must use the default canonical fixture file, the full default fixture set, no `--fixture-id` subset, default judge prompt, default judge schema, and default judge batch size. Alternate fixture files, selected fixture subsets, alternate judge assets, and non-default judge batch sizes are diagnostic runs.
 
 Example:
 

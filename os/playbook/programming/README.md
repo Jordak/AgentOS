@@ -19,4 +19,4 @@ Use this directory for durable programming preferences that should shape code, C
 
 - Add a new file in this directory only for a repeated programming preference that is stable across projects.
 - Keep each preference file narrow enough that agents can load only the relevant one.
-- When a preference affects guidance behavior, add or update a Guidance Eval fixture under `os/verification/guidance-eval/`.
+- When a preference affects guidance behavior, add or update a Guidance fixture under `os/verification/guidance/`.

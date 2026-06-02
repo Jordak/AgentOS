@@ -575,8 +575,8 @@ def run_self_test(root: Path) -> int:
                             "weekly_review": {"check_freshness": False},
                         },
                         {
-                            "id": "guidance-eval",
-                            "script": "os/verification/guidance-eval.py",
+                            "id": "guidance",
+                            "script": "os/verification/guidance/scripts/benchmark_guidance.py",
                             "reports_dir": "reports",
                             "run_glob": "*/run.json",
                             "summary_path": ["summary"],
@@ -592,7 +592,7 @@ def run_self_test(root: Path) -> int:
             encoding="utf-8",
         )
         manifest_targets = load_targets_from_manifest(tmp_root, manifest_path)
-        if [target.name for target in manifest_targets] != ["guidance-eval"]:
+        if [target.name for target in manifest_targets] != ["guidance"]:
             print("SELF-TEST FAIL: check_freshness=false manifest entries were not skipped")
             print(json.dumps([target.name for target in manifest_targets], indent=2))
             return 1
