@@ -72,9 +72,9 @@ Safety:
 
    Treat dry-run plans, saved-response regrades, transcript regrades, reports with `status_eligible: false`, and reports without remote-freshness proof as ineligible. They may be useful diagnostics, but they are not enough to mark Core status as `passing` or `attention needed`.
 
-   For Guidance Eval reports, `summary.status_eligible` includes fixture-scope checks for the default canonical fixture file, the full default fixture set, and no selected `--fixture-id` subset. It also includes judge-protocol checks for default judge prompt, default judge schema, and default judge batch size. Raw fixture and judge-protocol provenance remain report metadata for auditability. `fixture_stale` is allowed in eligible evidence and should be reported separately from behavioral pass/fail counts. `fixture_stale` means the fixture expectation needs review against the current guidance source; it does not by itself make the run ineligible. `needs_user_judgment` remains ineligible until resolved by a later workflow.
+   For Guidance reports, `summary.status_eligible` includes fixture-scope checks for the default canonical fixture file, the full default fixture set, and no selected `--fixture-id` subset. It also includes judge-protocol checks for default judge prompt, default judge schema, and default judge batch size. Raw fixture and judge-protocol provenance remain report metadata for auditability. `fixture_stale` is allowed in eligible evidence and should be reported separately from behavioral pass/fail counts. `fixture_stale` means the fixture expectation needs review against the current guidance source; it does not by itself make the run ineligible. `needs_user_judgment` remains ineligible until resolved by a later workflow.
 
-   Freshness thresholds use status-counting totals, not only behavioral pass/fail totals. For Guidance Eval, derive the status-counting total from `behavioral_total + fixture_stale`; do not rely on a saved derived total in the report.
+   Freshness thresholds use status-counting totals, not only behavioral pass/fail totals. For Guidance, derive the status-counting total from `behavioral_total + fixture_stale`; do not rely on a saved derived total in the report.
 
 4. Compare provenance.
    Compare eligible evidence to the matching status entry by `Reviewed Core revision` and `Last reviewed evidence`, not by prose. A later local run against an older commit does not refresh current Core status.
@@ -91,7 +91,7 @@ Safety:
 
 ## Status Rules
 
-- `passing`: eligible evidence exists from clean, remote-fresh `main`; behavioral checks meet the suite's pass criteria; and no caveat changes the reader's interpretation. Guidance Eval `fixture_stale` counts are a reported fixture-maintenance signal, not a harness behavior failure.
+- `passing`: eligible evidence exists from clean, remote-fresh `main`; behavioral checks meet the suite's pass criteria; and no caveat changes the reader's interpretation. Guidance `fixture_stale` counts are a reported fixture-maintenance signal, not a harness behavior failure.
 - `attention needed`: eligible evidence exists, but behavior failed, degraded, partially passed meaningfully, or has a maintainer-relevant caveat.
 - `not run`: no eligible evidence has been reviewed for the suite/harness entry.
 - `unknown`: evidence exists but cannot be interpreted confidently, such as malformed metadata, unsupported report version, unclear harness availability, or missing Git-state fields.

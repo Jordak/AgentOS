@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run AgentOS Guidance Eval against real agent harnesses."""
+"""Run AgentOS Guidance against real agent harnesses."""
 
 from __future__ import annotations
 
@@ -20,9 +20,9 @@ from typing import Any
 
 KNOWN_HARNESSES = ("codex",)
 KNOWN_JUDGES = ("codex",)
-DEFAULT_FIXTURES_PATH = Path("os/verification/guidance-eval/fixtures.json")
-DEFAULT_JUDGE_SCHEMA_PATH = Path("os/verification/guidance-eval/judge_response.schema.json")
-DEFAULT_JUDGE_PROMPT_PATH = Path("os/verification/guidance-eval/judge_prompt.md")
+DEFAULT_FIXTURES_PATH = Path("os/verification/guidance/fixtures.json")
+DEFAULT_JUDGE_SCHEMA_PATH = Path("os/verification/guidance/judge_response.schema.json")
+DEFAULT_JUDGE_PROMPT_PATH = Path("os/verification/guidance/judge_prompt.md")
 DEFAULT_JUDGE_BATCH_SIZE = 0
 VERDICTS = {"pass", "fail", "fixture_stale", "needs_user_judgment"}
 SOURCE_ALIGNMENTS = {"aligned", "partial", "missing", "wrong", "not_applicable"}
@@ -486,8 +486,8 @@ def validate_fixtures(root: Path, fixtures: Any) -> list[str]:
                 if normalized_source_path is None:
                     errors.append(f"{fixture_id}: source path must be root-relative without traversal: {raw_path}")
                     continue
-                if path_has_prefix(normalized_source_path, Path("os/verification/guidance-eval")):
-                    errors.append(f"{fixture_id}: source path must not point at Guidance Eval answer keys")
+                if path_has_prefix(normalized_source_path, Path("os/verification/guidance")):
+                    errors.append(f"{fixture_id}: source path must not point at Guidance answer keys")
                 if hut_workspace_path_is_excluded(normalized_source_path):
                     errors.append(f"{fixture_id}: source path is excluded from the HUT workspace: {raw_path}")
                 elif normalized_source_path not in index_modes:
@@ -635,7 +635,7 @@ def expand_harnesses(selected: list[str], dry_run: bool) -> list[str]:
     if not selected:
         if dry_run:
             return list(KNOWN_HARNESSES)
-        raise ValueError("real Guidance Eval runs require --harness codex or --harness all")
+        raise ValueError("real Guidance runs require --harness codex or --harness all")
     if "all" in selected:
         return list(KNOWN_HARNESSES)
 
@@ -690,7 +690,7 @@ def run_harness_call(
             "effort": requested_or_default(effort),
         }
 
-    with tempfile.TemporaryDirectory(prefix=f"agentos-guidance-eval-{harness}-") as tmp:
+    with tempfile.TemporaryDirectory(prefix=f"agentos-guidance-{harness}-") as tmp:
         output_path = Path(tmp) / "last-message.txt"
         command = harness_command(
             harness,
@@ -1089,7 +1089,7 @@ def planned_results(
     return results, judge_batches
 
 
-def run_guidance_eval(
+def run_guidance(
     root: Path,
     fixtures: list[dict[str, Any]],
     harnesses: list[str],
@@ -1395,7 +1395,7 @@ def build_report(
     judge_model: str | None = None,
     judge_effort: str | None = None,
     check_remote_main: bool = False,
-    run_guidance_eval_fn: Any = None,
+    run_guidance_fn: Any = None,
 ) -> dict[str, Any]:
     mode = "dry-run" if dry_run else "run"
     git_state = collect_git_state(root, check_remote=check_remote_main)
@@ -1426,7 +1426,7 @@ def build_report(
             judge_effort=judge_effort,
         )
     else:
-        runner = run_guidance_eval_fn or run_guidance_eval
+        runner = run_guidance_fn or run_guidance
         results, judge_batches, hut_workspace = runner(
             root,
             fixtures,
@@ -1454,7 +1454,7 @@ def build_report(
         judge_protocol=judge_protocol,
     )
     return {
-        "benchmark": "guidance-eval",
+        "benchmark": "guidance",
         "mode": mode,
         "generated_at": generated_at,
         "git": git_state,
@@ -1485,7 +1485,7 @@ def render_markdown(report: dict[str, Any]) -> str:
     fixtures = report.get("fixtures", {})
     judge_protocol = report.get("judge_protocol", {})
     lines = [
-        "# AgentOS Guidance Eval Benchmark",
+        "# AgentOS Guidance Benchmark",
         "",
         f"Generated: `{report['generated_at']}`",
         f"Mode: `{report['mode']}`",
@@ -1614,7 +1614,7 @@ def render_judge_batches(judge_batches: list[dict[str, Any]]) -> list[str]:
 
 def default_report_dir(root: Path) -> Path:
     stamp = utc_now().strftime("%Y-%m-%d-%H%M%S")
-    base = root / "personal/os/verification/guidance-eval/reports" / f"guidance-eval-{stamp}"
+    base = root / "personal/os/verification/guidance/reports" / f"guidance-{stamp}"
     if not base.exists():
         return base
     for suffix in range(2, 1000):
@@ -1657,7 +1657,7 @@ def run_self_test(root: Path, fixtures_path: Path, judge_prompt_path: Path, judg
     fixtures = read_json(fixtures_path)
     errors = validate_fixtures(root, fixtures)
     if errors:
-        print("SELF-TEST FAIL: actual Guidance Eval fixtures are invalid.")
+        print("SELF-TEST FAIL: actual Guidance fixtures are invalid.")
         print("\n".join(errors))
         return 1
 
@@ -1677,7 +1677,7 @@ def run_self_test(root: Path, fixtures_path: Path, judge_prompt_path: Path, judg
     invalid_paths = [
         Path.cwd().anchor + "outside.md",
         "../outside.md",
-        "os/../os/verification/guidance-eval/fixtures.json",
+        "os/../os/verification/guidance/fixtures.json",
         "os/verification",
         "personal/os/context/private.md",
     ]
@@ -1926,7 +1926,7 @@ def run_self_test(root: Path, fixtures_path: Path, judge_prompt_path: Path, judg
             root,
             judge_prompt,
             Path("<tmp>") / "judge-last-message.json",
-            schema_path=Path("os/verification/guidance-eval/judge_response.schema.json"),
+            schema_path=Path("os/verification/guidance/judge_response.schema.json"),
         )
     )
     leaked_to_command_shape = [value for value in hidden_values if value in judge_command_shape]
@@ -1947,7 +1947,7 @@ def run_self_test(root: Path, fixtures_path: Path, judge_prompt_path: Path, judg
         root,
         all_fixture_judge_prompt,
         Path("<tmp>") / "judge-all-fixtures.json",
-        schema_path=Path("os/verification/guidance-eval/judge_response.schema.json"),
+        schema_path=Path("os/verification/guidance/judge_response.schema.json"),
     )
     all_fixture_argv_bytes = sum(len(part.encode("utf-8")) + 1 for part in all_fixture_judge_command)
     if (
@@ -2018,7 +2018,7 @@ def run_self_test(root: Path, fixtures_path: Path, judge_prompt_path: Path, judg
         fixtures[:2],
         ["codex"],
         "codex",
-        Path("os/verification/guidance-eval/judge_response.schema.json"),
+        Path("os/verification/guidance/judge_response.schema.json"),
         judge_prompt_template,
         0,
     )
@@ -2048,7 +2048,7 @@ def run_self_test(root: Path, fixtures_path: Path, judge_prompt_path: Path, judg
         fixtures[:2],
         ["codex"],
         "codex",
-        Path("os/verification/guidance-eval/judge_response.schema.json"),
+        Path("os/verification/guidance/judge_response.schema.json"),
         judge_prompt_template,
         1,
     )
@@ -2070,7 +2070,7 @@ def run_self_test(root: Path, fixtures_path: Path, judge_prompt_path: Path, judg
         2,
     )
 
-    def fake_run_guidance_eval(*_: Any, **__: Any) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
+    def fake_run_guidance(*_: Any, **__: Any) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
         return [
             {
                 "fixture_id": "fixture-a",
@@ -2097,14 +2097,14 @@ def run_self_test(root: Path, fixtures_path: Path, judge_prompt_path: Path, judg
         ["codex"],
         False,
         "codex",
-        Path("os/verification/guidance-eval/judge_response.schema.json"),
-        Path("os/verification/guidance-eval/judge_response.schema.json"),
-        Path("os/verification/guidance-eval/judge_prompt.md"),
-        Path("os/verification/guidance-eval/judge_prompt.md"),
+        Path("os/verification/guidance/judge_response.schema.json"),
+        Path("os/verification/guidance/judge_response.schema.json"),
+        Path("os/verification/guidance/judge_prompt.md"),
+        Path("os/verification/guidance/judge_prompt.md"),
         judge_prompt_template,
         0,
         60,
-        run_guidance_eval_fn=fake_run_guidance_eval,
+        run_guidance_fn=fake_run_guidance,
     )
     fake_markdown = render_markdown(fake_report)
     with tempfile.TemporaryDirectory(prefix="agentos-guidance-report-self-test-") as tmp:
@@ -2390,12 +2390,12 @@ def run_self_test(root: Path, fixtures_path: Path, judge_prompt_path: Path, judg
         print(json.dumps(dry_summary, indent=2))
         return 1
 
-    print("SELF-TEST PASS: Guidance Eval fixture, judge, prompt, summary, and eligibility checks passed.")
+    print("SELF-TEST PASS: Guidance fixture, judge, prompt, summary, and eligibility checks passed.")
     return 0
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run AgentOS Guidance Eval.")
+    parser = argparse.ArgumentParser(description="Run AgentOS Guidance.")
     parser.add_argument("--root", type=Path, default=default_root())
     parser.add_argument("--fixtures", type=Path, default=DEFAULT_FIXTURES_PATH)
     parser.add_argument("--judge-schema", type=Path, default=DEFAULT_JUDGE_SCHEMA_PATH)
@@ -2419,7 +2419,7 @@ def main(argv: list[str] | None = None) -> int:
         "--save-report",
         action=argparse.BooleanOptionalAction,
         default=False,
-        help="Write report.md and run.json to a timestamped directory under personal/os/verification/guidance-eval/reports/.",
+        help="Write report.md and run.json to a timestamped directory under personal/os/verification/guidance/reports/.",
     )
     parser.add_argument("--timeout-seconds", type=int, default=600)
     parser.add_argument("--model", help="Optional model override passed through to the harness under test.")
@@ -2443,7 +2443,7 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Preview fixture, harness, and judge commands without invoking model-call harnesses. Default unless --no-dry-run is set.",
     )
-    parser.add_argument("--self-test", action="store_true", help="Run deterministic Guidance Eval self-tests.")
+    parser.add_argument("--self-test", action="store_true", help="Run deterministic Guidance self-tests.")
     args = parser.parse_args(argv)
 
     root = args.root.resolve()

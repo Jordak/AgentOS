@@ -20,4 +20,4 @@ Status: retired on 2026-06-02.
 
 The local retrieval pilot compared broad keyword lookup with a lightweight Markdown section index over AgentOS files. The section index improved fixture hit rate, but AgentOS keeps full GBrain-style retrieval and local lexical scoring out of scope.
 
-AgentOS no longer keeps retrieval as a runnable benchmark suite. The useful route-evidence fixtures from this pilot now live as deterministic validator coverage under `os/verification/source-routing/fixtures.json`; Guidance Eval owns harness behavior, hidden fixture, and source-boundary checks.
+AgentOS no longer keeps retrieval as a runnable benchmark suite. The useful route-evidence fixtures from this pilot now live as deterministic validator coverage under `os/verification/source-routing/fixtures.json`; Guidance owns harness behavior, hidden fixture, and source-boundary checks.

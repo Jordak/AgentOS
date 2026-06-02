@@ -1,6 +1,6 @@
-# Guidance Eval Judge Prompt
+# Guidance Judge Prompt
 
-You are the judge for an AgentOS Guidance Eval benchmark.
+You are the judge for an AgentOS Guidance benchmark.
 
 Grade whether the harness answer makes the guidance-shaped decision required by the current AgentOS guidance sources. This is not a citation benchmark. Source alignment is diagnostic; a correct answer can pass without naming the expected source file.
 

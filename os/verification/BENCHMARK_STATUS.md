@@ -19,13 +19,13 @@ Allowed status labels:
 
 Do not use `stale` as a Core status. Staleness is relative to the current checkout and local evidence, so refresh workflows should report it during refresh instead of writing it as the public status.
 
-## Guidance Eval
+## Guidance
 
 ### Codex
 
 - Status: `passing`
 - Reviewed Core revision: `d277d122dd043f63deb490b96394422a40de0798`
 - Last reviewed evidence: `2026-06-02 08:48 PDT`
-- Evidence scope: `guidance-eval Codex harness; 14 default guidance fixtures; gpt-5.5 low; judge gpt-5.5 low`
-- Summary: Codex produced judged responses for all 14 default Guidance Eval scenarios and passed every behavioral check. The covered scenarios include GitHub CLI sandbox auth, implementation readiness, artifact format routing, Personal Overlay discovery, generated preference propagation, public project issue routing, programming CLI contracts, Markdown style, portability, review workflows, weekly-review storage, and skill-contract upgrade routing.
+- Evidence scope: `guidance Codex harness; 14 default guidance fixtures; gpt-5.5 low; judge gpt-5.5 low`
+- Summary: Codex produced judged responses for all 14 default Guidance scenarios and passed every behavioral check. The covered scenarios include GitHub CLI sandbox auth, implementation readiness, artifact format routing, Personal Overlay discovery, generated preference propagation, public project issue routing, programming CLI contracts, Markdown style, portability, review workflows, weekly-review storage, and skill-contract upgrade routing.
 - Caveats: No behavioral failures, fixture-stale cases, or needs-user-judgment cases were reported. This status uses a full default, status-eligible run from clean remote-fresh `main`; diagnostic non-default fixture or judge-protocol runs remain useful for investigation but are not status evidence.
