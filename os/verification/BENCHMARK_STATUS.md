@@ -8,7 +8,7 @@ Raw benchmark reports, generated run JSON, transcripts, local paths, session det
 
 Use `os/skills/refresh-benchmark-status/SKILL.md` to refresh this snapshot from eligible local evidence. Eligible evidence must come from current-schema benchmark reports produced on clean, remote-fresh `main` at a committed AgentOS revision.
 
-Only suites marked with `weekly_review.check_freshness: true` in `os/verification/BENCHMARKS.json` are current status-refresh freshness targets. Older retrieval and playbook-activation entries remain historical benchmark posture until they are explicitly revived or replaced. This does not delete those suites or make them unrunnable; it narrows which benchmark evidence is allowed to refresh current Core status.
+Only suites marked with `weekly_review.check_freshness: true` in `os/verification/BENCHMARKS.json` are current status-refresh freshness targets. The older retrieval entries remain historical benchmark posture until they are explicitly revived, replaced, or removed. This does not delete retrieval or make it unrunnable; it narrows which benchmark evidence is allowed to refresh current Core status.
 
 Allowed status labels:
 
@@ -47,17 +47,6 @@ Do not use `stale` as a Core status. Staleness is relative to the current checko
 - Evidence scope: `retrieval Claude harness; 10 lookup questions; gpt-5.5 xhigh`
 - Summary: Claude produced graded responses for all 10 retrieval tasks but passed only the context-projects lookup.
 - Caveats: Nine tasks failed primarily on schema-shape, source-path, and evidence-support requirements. This indicates a harness/response-format alignment problem as much as a retrieval problem.
-
-## Playbook Activation
-
-### Codex
-
-- Status: `passing`
-- Reviewed Core revision: `36c707b40428033510432c921feeec5e4c9827df`
-- Last reviewed evidence: `2026-05-22 20:35 PDT`
-- Evidence scope: `playbook-activation Codex harness; 10 fixtures; gpt-5.5 xhigh`
-- Summary: Codex accessed the required guidance for all 10 playbook-activation fixtures, covering programming CLI, artifact format selection, GitHub workflow, implementation readiness, propagation review, weekly review, portability, Markdown style, and skill contract upgrade routing.
-- Caveats: Claude is not currently a configured playbook-activation harness, so there is no Claude playbook-activation entry in this snapshot.
 
 ## Guidance Eval
 

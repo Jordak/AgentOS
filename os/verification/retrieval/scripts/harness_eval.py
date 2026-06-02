@@ -27,8 +27,6 @@ DEFAULT_DISALLOWED_EXACT_PATHS = (
     "os/verification/guidance-eval/fixtures.json",
     "os/verification/guidance-eval/judge_prompt.md",
     "os/verification/guidance-eval/judge_response.schema.json",
-    "os/verification/playbook-activation/coverage.json",
-    "os/verification/playbook-activation/fixtures.json",
     "os/verification/retrieval/fixtures.json",
     "os/verification/retrieval/harness_response.schema.json",
     "os/verification/retrieval/questions.json",
@@ -39,7 +37,6 @@ TARGETED_DISALLOWED_EXACT_PATH_EXCEPTIONS = (
 DEFAULT_DISALLOWED_PATH_PREFIXES = (
     "os/verification/guidance-eval/reports/",
     "os/verification/retrieval/reports/",
-    "os/verification/playbook-activation/reports/",
     "personal/",
 )
 DEFAULT_DISALLOWED_PATHS = DEFAULT_DISALLOWED_EXACT_PATHS + DEFAULT_DISALLOWED_PATH_PREFIXES

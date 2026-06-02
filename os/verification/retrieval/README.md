@@ -16,7 +16,7 @@ The benchmark asks representative AgentOS lookup questions and checks whether th
 
 Exact quote support is diagnostic only. Quote mismatches are reported so humans can see grounding quality, but they do not fail the retrieval score when the answer has valid schema, valid local paths, an expected canonical source, and no disallowed sources.
 
-Disallowed answer-key files include retrieval, playbook-activation, and guidance-eval fixture/schema/judge assets. Adding a benchmark suite with hidden expected answers should update the harness disallowed-source list and self-test coverage.
+Disallowed answer-key files include retrieval and guidance-eval fixture/schema/judge assets. Adding a benchmark suite with hidden expected answers should update the harness disallowed-source list and self-test coverage.
 
 `os/verification/BENCHMARK_STATUS.md` is excluded from ordinary retrieval evidence because it summarizes benchmark outcomes. A dedicated benchmark-status lookup question may target that file directly, but unrelated retrieval questions should not use it as answer evidence.
 
