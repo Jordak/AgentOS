@@ -8,6 +8,8 @@ The suite asks the harness under test a direct task, captures its normal prose a
 
 Harness-under-test calls run from a temporary external project that contains a harness-specific local adapter. For Codex, that adapter is `AGENTS.md`. The adapter points at a sanitized temporary AgentOS copy built from tracked/index-defined file contents. The copy excludes `.git/**`, `personal/**`, and `os/verification/**` so benchmark fixtures, saved reports, answer keys, and Personal Overlay state are unavailable at runtime. Untracked local files, unstaged tracked-file edits, and symlinks are not copied into the sanitized AgentOS copy.
 
+Guidance Eval owns the maintained source-boundary and answer-key guardrails for harness behavior. Fixture `source_paths` must point at tracked UTF-8 files that are available to the sanitized harness workspace, not at `personal/**`, `os/verification/**`, fixture files, schemas, judge prompts, reports, or other answer-key material. The judge treats reliance on benchmark fixtures, saved reports, answer keys, or private Personal Overlay files as a failure.
+
 The suite intentionally validates the portable project-local adapter path, not the user's installed global adapter. Installed global adapter verification is tracked separately in [#83](https://github.com/Jordak/AgentOS/issues/83).
 
 Judge calls run from the trusted benchmark checkout as measurement instrumentation. Hidden fixture data reaches the judge through the rendered judge prompt, not through readable benchmark files available to the harness under test.

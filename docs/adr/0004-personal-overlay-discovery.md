@@ -28,7 +28,7 @@ In isolated worktrees, a skeleton-only `personal/os/` can be a real local state 
 
 Helper script: rejected for now. A small listing helper would create a stable affordance, but it would likely grow into a cross-platform locator with worktree resolution, privacy controls, symlink policy, JSON modes, and content-search edge cases. The failure being fixed is a rule-of-evidence problem, so the portable rule should come first.
 
-Validator check: rejected for now. A validator can prove checked-in wording exists, but once the wording is committed, that does not materially improve the real failure mode. Retrieval benchmarks can measure agent behavior without turning the exact documentation text into a maintenance gate.
+Validator-only check: rejected for now. A validator can prove checked-in wording exists, but once the wording is committed, that does not materially improve the real failure mode. Guidance Eval measures the agent behavior, while source-routing fixtures keep deterministic route evidence available without treating exact prose as the only acceptance signal.
 
 Command-specific rule: rejected. Requiring one command such as `rg -uuu` would make the contract less portable across machines, shells, operating systems, and harnesses.
 
@@ -37,7 +37,7 @@ Command-specific rule: rejected. Requiring one command such as `rg -uuu` would m
 - `os/playbook/PERSONAL_OVERLAY.md` states the portable absence-evidence rule and gives non-normative examples.
 - `os/RESOLVER.md` keeps local search as the default while naming the Personal Overlay exception.
 - Root and generated global adapter instructions route agents to `os/playbook/PERSONAL_OVERLAY.md` before they conclude private state is absent.
-- A retrieval benchmark question covers the false-empty scenario where default ignored-file discovery shows only `.gitkeep`.
+- A Guidance Eval fixture covers the false-empty scenario where default ignored-file discovery shows only `.gitkeep`; source-routing fixtures keep the relevant Core route evidence checked by the deterministic validator.
 - No helper script, validator check, copied Personal Overlay content, or tracked private filenames are added.
 
 ## Follow-Ups

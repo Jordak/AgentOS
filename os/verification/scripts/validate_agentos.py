@@ -303,7 +303,7 @@ class AgentOSValidator:
         self.check_automation_registry_completeness()
         self.check_resolver_reachability()
         self.check_pr_readiness_tripwire()
-        self.check_retrieval_eval_fixtures()
+        self.check_source_routing_fixtures()
         self.check_benchmark_manifest()
 
     def run_publication_precheck(self) -> int:
@@ -1467,9 +1467,9 @@ class AgentOSValidator:
 
         self.checked.append(check)
 
-    def check_retrieval_eval_fixtures(self) -> None:
-        check = "retrieval eval fixtures"
-        fixture_path = self.root / "os/verification/retrieval/fixtures.json"
+    def check_source_routing_fixtures(self) -> None:
+        check = "source routing fixtures"
+        fixture_path = self.root / "os/verification/source-routing/fixtures.json"
         raw = self.read_text(fixture_path, check)
         if not raw:
             return
@@ -2328,8 +2328,8 @@ def run_self_test() -> int:
         )
         managed_os_symlink_root = root / "_managed_os_symlink_fixture"
         real_os = managed_os_symlink_root / "real-os"
-        (real_os / "verification/retrieval").mkdir(parents=True)
-        (real_os / "verification/retrieval/fixtures.json").write_text("{not json\n", encoding="utf-8")
+        (real_os / "verification/source-routing").mkdir(parents=True)
+        (real_os / "verification/source-routing/fixtures.json").write_text("{not json\n", encoding="utf-8")
         (real_os / "verification/BENCHMARKS.json").write_text("{not json\n", encoding="utf-8")
         (managed_os_symlink_root / "os").symlink_to("real-os")
         managed_os_symlink_validator = AgentOSValidator(managed_os_symlink_root)
@@ -2407,7 +2407,7 @@ def run_self_test() -> int:
         core_gitkeep.parent.mkdir(parents=True)
         core_gitkeep.write_text("not empty\n", encoding="utf-8")
         (symlink_root / "os/reports/private.md").write_text("generated output with sanitized content\n", encoding="utf-8")
-        core_report_gitkeep = symlink_root / "os/verification/retrieval/reports/.gitkeep"
+        core_report_gitkeep = symlink_root / "os/verification/reports/.gitkeep"
         core_report_gitkeep.parent.mkdir(parents=True)
         core_report_gitkeep.write_text("", encoding="utf-8")
         (symlink_root / "personal/binary.md").write_bytes(b"\xff\xfeprivate")
@@ -2468,7 +2468,7 @@ def run_self_test() -> int:
             for error in publication_validator.errors
         )
         core_report_gitkeep_rejected = any(
-            error.path == "os/verification/retrieval/reports/.gitkeep"
+            error.path == "os/verification/reports/.gitkeep"
             and "generated output" in error.message
             for error in publication_validator.errors
         )

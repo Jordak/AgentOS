@@ -226,8 +226,8 @@ Each skill entry records:
 - Contract status: full.
 - Mutability: local-write; external-write only when permitted by the shared external-write policy.
 - Tools and connectors: local AgentOS files, `rg`, `git`, local validators, and GitHub issue context when issue-driven.
-- Output artifact: new or updated skill, resolver guidance, manifest entry, deterministic validator, retrieval fixture, smoke example, or propagation queue proposal.
-- Filing rule: canonical skills live under `os/skills/`; deterministic checks live in `os/verification/scripts/validate_agentos.py` or a clearly warranted local script; retrieval/smoke fixtures live under `os/verification/retrieval/`; unapproved durable state proposals live in the appropriate Personal Overlay propagation queue.
+- Output artifact: new or updated skill, resolver guidance, manifest entry, deterministic validator, source-routing fixture, smoke example, or propagation queue proposal.
+- Filing rule: canonical skills live under `os/skills/`; deterministic checks live in `os/verification/scripts/validate_agentos.py` or a clearly warranted local script; source-routing/smoke fixtures live under `os/verification/source-routing/`; unapproved durable state proposals live in the appropriate Personal Overlay propagation queue.
 - Safety posture: require at least one concrete example; do not copy private connector data into durable artifacts; follow the shared external-write policy before external writes; ask before automation activation, destructive edits, or current-machine skill exposure changes.
 - Verification coverage: run `scripts/run-validator`; run `scripts/run-validator --self-test` when validator behavior changes; add or update a safe smoke example for new durable behavior; confirm external writes complied with the shared external-write policy.
 - Upgrade notes: Core reusable workflow for turning repeated work into durable AgentOS behavior.

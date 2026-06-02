@@ -46,7 +46,7 @@ _Avoid_: LLM privacy vibes, private-looking file detector
 
 **Guidance Eval**:
 A benchmark style that asks an AgentOS scenario question and grades whether the answer makes the policy decision required by the relevant AgentOS guidance source. It evaluates guidance-shaped behavior, not transcript-level file access.
-_Avoid_: guidance decision verification, playbook decision verification, retrieval benchmark, transcript access check
+_Avoid_: guidance decision verification, playbook decision verification, source lookup benchmark, transcript access check
 
 **Judge-Assisted Grading**:
 A benchmark grading mode where a grader agent receives the scenario, harness answer, expected solution, grading rubric, and references to relevant AgentOS guidance sources, then returns a structured verdict with rationale.

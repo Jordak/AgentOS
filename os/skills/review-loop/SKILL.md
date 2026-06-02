@@ -130,7 +130,7 @@ Before editing, make a tiny matrix in the loop ledger or working notes:
 
 `Semantic | Owner | Inputs | Outputs | Prompt/Recovery | Ledger/Report | Privacy/Filing | Validation`
 
-Use the matrix to update affected contract surfaces in one pass. Check the owning skill, caller or called skills, prompt templates, recovery prompts, packet or report schemas, manifest entry, retrieval or validator coverage when relevant, privacy/filing rules, current-machine adapters or exposure, and any final report guidance. Keep the matrix lightweight; it is a propagation guard, not a design doc.
+Use the matrix to update affected contract surfaces in one pass. Check the owning skill, caller or called skills, prompt templates, recovery prompts, packet or report schemas, manifest entry, source-routing or validator coverage when relevant, privacy/filing rules, current-machine adapters or exposure, and any final report guidance. Keep the matrix lightweight; it is a propagation guard, not a design doc.
 
 ## Workflow Phases
 
