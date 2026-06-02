@@ -18,7 +18,7 @@ Use the matrix to find propagation gaps across affected surfaces:
 - recovery prompts;
 - packet or report schemas;
 - manifest entry;
-- retrieval or validator coverage when relevant;
+- source-routing or validator coverage when relevant;
 - privacy and filing rules;
 - current-machine adapters or exposure;
 - final report guidance.

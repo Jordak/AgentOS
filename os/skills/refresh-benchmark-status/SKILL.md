@@ -72,8 +72,6 @@ Safety:
 
    Treat dry-run plans, saved-response regrades, transcript regrades, reports with `status_eligible: false`, and reports without remote-freshness proof as ineligible. They may be useful diagnostics, but they are not enough to mark Core status as `passing` or `attention needed`.
 
-   For retrieval reports, classify the local lexical section independently from harness sections. A default retrieval report may contain a real local lexical run plus harness dry-run plans; the local section can refresh the Local Lexical entry when Git metadata is eligible, while the harness dry-run sections remain ineligible.
-
    For Guidance Eval reports, `summary.status_eligible` includes fixture-scope checks for the default canonical fixture file, the full default fixture set, and no selected `--fixture-id` subset. It also includes judge-protocol checks for default judge prompt, default judge schema, and default judge batch size. Raw fixture and judge-protocol provenance remain report metadata for auditability. `fixture_stale` is allowed in eligible evidence and should be reported separately from behavioral pass/fail counts. `fixture_stale` means the fixture expectation needs review against the current guidance source; it does not by itself make the run ineligible. `needs_user_judgment` remains ineligible until resolved by a later workflow.
 
    Freshness thresholds use status-counting totals, not only behavioral pass/fail totals. For Guidance Eval, derive the status-counting total from `behavioral_total + fixture_stale`; do not rely on a saved derived total in the report.

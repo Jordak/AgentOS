@@ -20,7 +20,7 @@ For AgentOS maintenance validation, use:
 
 `scripts/run-validator`
 
-This includes structural retrieval fixtures under `os/verification/retrieval/`. They check route evidence, not final model prose.
+This includes structural source-routing fixtures under `os/verification/source-routing/`. They check route evidence, not final model prose.
 
 For Core/Personal Overlay guidance, push-safety, and stale installed-instruction checks, also run:
 

@@ -27,7 +27,7 @@ Inputs:
 
 Output artifact:
 
-- A new or updated AgentOS skill, resolver entry, manifest entry, deterministic validator, retrieval fixture, smoke example, or review-queue proposal.
+- A new or updated AgentOS skill, resolver entry, manifest entry, deterministic validator, source-routing fixture, smoke example, or review-queue proposal.
 - A short implementation summary naming what changed and how it was verified.
 
 Mutability:
@@ -77,8 +77,8 @@ Safety:
      tie-breakers change;
    - `os/verification/scripts/validate_agentos.py` when a deterministic invariant should be
      checked locally;
-   - `os/verification/retrieval/fixtures.json` when route coverage or a
-     retrieval smoke example should be replayable.
+   - `os/verification/source-routing/fixtures.json` when route coverage or a
+     source-routing smoke example should be replayable.
 7. Add or update a smoke example. It must be safe, local, and specific enough for a future agent to tell whether the new behavior still routes and behaves.
 8. Verify. Run the relevant local validator and any skill-specific checks before calling the workflow complete.
 
@@ -104,7 +104,7 @@ Keep the behavior as Markdown guidance when:
 - Skill contract metadata lives in `os/skills/MANIFEST.md`; current-machine Core skill exposure checks live in `os/skills/expose-skills/`.
 - Resolver changes live in `os/RESOLVER.md` or the narrow directory resolver.
 - Deterministic local checks live in `os/verification/scripts/validate_agentos.py` unless a separate script is clearly warranted.
-- Retrieval and smoke fixtures live under `os/verification/retrieval/`.
+- Source-routing and smoke fixtures live under `os/verification/source-routing/`.
 - Private, tentative, or pre-issue durable update proposals live in `personal/os/memory/propagation-review/QUEUE.md`; public-safe actionable project work belongs in the relevant issue tracker or mapped project.
 
 Do not duplicate the same rule across layers. Put the canonical rule in the narrowest stable home and link to it elsewhere.

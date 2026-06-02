@@ -16,8 +16,8 @@ The HTML-first human artifacts experiment is now production AgentOS behavior. Se
 
 ### Local Markdown Retrieval
 
-Status: graduated to verification benchmark on 2026-05-16.
+Status: retired on 2026-06-02.
 
-The local retrieval pilot compared broad keyword lookup with a lightweight Markdown section index over AgentOS files. The section index improved fixture hit rate. AgentOS still keeps full GBrain-style retrieval out of scope, but the fixture set and local benchmark are now part of retrieval verification.
+The local retrieval pilot compared broad keyword lookup with a lightweight Markdown section index over AgentOS files. The section index improved fixture hit rate, but AgentOS keeps full GBrain-style retrieval and local lexical scoring out of scope.
 
-See `os/verification/retrieval/LOCAL_BENCHMARK.md` for the Core benchmark description. Live saved retrieval runs belong in `personal/os/verification/retrieval/reports/`.
+AgentOS no longer keeps retrieval as a runnable benchmark suite. The useful route-evidence fixtures from this pilot now live as deterministic validator coverage under `os/verification/source-routing/fixtures.json`; Guidance Eval owns harness behavior, hidden fixture, and source-boundary checks.

@@ -2,16 +2,6 @@
   "version": 1,
   "benchmarks": [
     {
-      "id": "retrieval",
-      "script": "os/verification/retrieval/scripts/benchmark_retrieval.py",
-      "reports_dir": "personal/os/verification/retrieval/reports",
-      "run_glob": "*/run.json",
-      "summary_path": ["harness", "summary"],
-      "weekly_review": {
-        "check_freshness": false
-      }
-    },
-    {
       "id": "guidance-eval",
       "script": "os/verification/guidance-eval/scripts/benchmark_guidance_eval.py",
       "reports_dir": "personal/os/verification/guidance-eval/reports",

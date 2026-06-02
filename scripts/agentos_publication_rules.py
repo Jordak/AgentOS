@@ -60,8 +60,6 @@ PERSONAL_OVERLAY_SKELETON_FILES = {
     "personal/os/verification/guidance-eval/reports/.gitkeep",
     "personal/os/verification/markdown-audit/.gitkeep",
     "personal/os/verification/reports/.gitkeep",
-    "personal/os/verification/retrieval/.gitkeep",
-    "personal/os/verification/retrieval/reports/.gitkeep",
 }
 
 
