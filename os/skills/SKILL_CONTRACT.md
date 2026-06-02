@@ -42,17 +42,17 @@ Every durable skill should state where outputs go:
 - Live automation records, delivery queues, and run histories live under `personal/os/automations/` or the relevant Personal Overlay agent/memory directory; `os/automations/` is for templates, examples, and policy.
 - Reusable workflow changes live under `os/skills/`.
 - Live durable decisions and lessons live under `personal/os/memory/`; publishable AgentOS architecture decisions can live under `os/memory/`.
-- Project-specific implementation artifacts live in the mapped project from the appropriate source map.
+- Project-specific implementation artifacts and public-safe actionable project work live in the mapped project or its issue tracker.
 - External account artifacts stay in their source system unless AgentOS has a safe pointer or summary rule.
-- Generated recommendations that would change durable AgentOS state go through `personal/os/memory/propagation-review/QUEUE.md` before canonical edits, unless the user explicitly asked for the exact edit in the current request.
+- Generated recommendations that would change durable AgentOS state should be classified before filing: use GitHub issues or mapped-project trackers for public-safe actionable project work, use `personal/os/memory/propagation-review/QUEUE.md` for private/tentative/connector-derived/personal/cross-project/pre-issue proposals, and edit canonical files directly only when the user explicitly asked for the exact edit in the current request or approved a specific proposal.
 
 Do not scatter the same durable fact across multiple layers. Link instead.
 
 ## Propagation Rule
 
-Skills with `local-write` or `mixed` mutability that produce reports, reviews, briefs, digests, or recommendations must use the propagation review queue for durable AgentOS state changes. This applies to proposed updates to identity, context, memory, source-map, skills, agents, verification, playbook, backlog, or automation state.
+Skills with `local-write` or `mixed` mutability that produce reports, reviews, briefs, digests, or recommendations must route durable follow-up through the right inbox instead of applying generated recommendations by default. Use issue trackers for public-safe actionable project work, mapped-project destinations for project-owned work, and the propagation review queue for private/tentative/connector-derived/personal/cross-project/pre-issue AgentOS proposals.
 
-Inline chat approval can approve a queue entry, but it should not replace the queue entry. Direct canonical edits are appropriate when the user explicitly asks for the exact edit, or when applying an approved queue entry.
+Inline chat approval can approve an exact edit or a specific queue entry, but it should not silently become the durable record for unresolved generated recommendations. Direct canonical edits are appropriate when the user explicitly asks for the exact edit, or when applying an approved queue entry or issue-backed change.
 
 ## Verification Coverage
 

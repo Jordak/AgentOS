@@ -47,7 +47,7 @@ Safety:
 - Follow the applicable external-write policy before external sends, public posts, permission changes, or connector writes. Ask before automation activation or destructive edits.
 - Do not copy private connector data into skills, smoke examples, validators, or memory.
 - Do not apply current-machine skill exposure unless the issue or the user explicitly asks for discoverability outside the AgentOS workspace.
-- Use a propagation queue entry instead of canonical edits when the durable change is plausible but not approved.
+- Use a propagation queue entry instead of canonical edits when the durable change is private, tentative, connector-derived, personal, cross-project, or not yet ready for an issue tracker.
 
 ## Workflow Phases
 
@@ -58,7 +58,8 @@ Safety:
    - exact manual check -> deterministic validator;
    - ambiguous filing/routing miss -> resolver, directory resolver, or routing
      eval fixture;
-   - unapproved durable state proposal -> propagation review queue.
+   - public-safe actionable project work -> GitHub issue or mapped-project tracker;
+   - private/tentative/pre-issue durable state proposal -> propagation review queue.
 3. Choose the smallest durable artifact. Update an existing skill before adding a new one when the trigger, workflow, and output are already owned by that skill.
 4. Decide code vs Markdown:
    - use deterministic code when the check is exact, repeated, and cheaply
@@ -104,7 +105,7 @@ Keep the behavior as Markdown guidance when:
 - Resolver changes live in `os/RESOLVER.md` or the narrow directory resolver.
 - Deterministic local checks live in `os/verification/scripts/validate_agentos.py` unless a separate script is clearly warranted.
 - Retrieval and smoke fixtures live under `os/verification/retrieval/`.
-- Proposed but unapproved durable updates live in `personal/os/memory/propagation-review/QUEUE.md`.
+- Private, tentative, or pre-issue durable update proposals live in `personal/os/memory/propagation-review/QUEUE.md`; public-safe actionable project work belongs in the relevant issue tracker or mapped project.
 
 Do not duplicate the same rule across layers. Put the canonical rule in the narrowest stable home and link to it elsewhere.
 

@@ -56,11 +56,11 @@
   {
     "id": "generated-findings-propagation",
     "category": "memory",
-    "task": "A generated review found durable AgentOS updates for context, skills, verification, and automations. Turn those findings into the proper reviewable proposals without applying the canonical edits yet.",
+    "task": "A generated review found a mix of durable AgentOS updates, including private personal/context changes and public-safe skills or verification work. Classify the proper inbox for each finding without applying canonical edits yet.",
     "must_access": [
       "os/playbook/PROPAGATION_REVIEW_QUEUE.md"
     ],
-    "rationale": "Generated recommendations for durable AgentOS state changes should activate the propagation review queue before canonical files are changed."
+    "rationale": "Generated durable-state recommendations should activate the inbox-classification guidance: issue trackers for public-safe actionable work, propagation review for private or pre-issue proposals, and direct edits only for exact approved changes."
   },
   {
     "id": "weekly-agentos-review",

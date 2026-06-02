@@ -17,6 +17,7 @@ AgentOS is not one giant prompt. Its control plane is a stack of small Markdown 
 - Verification keeps agent output trustworthy.
 - Playbooks explain operating policy and publication rules.
 - Automations describe safe scheduled or event-driven work.
+- Propagation review is the private pre-issue inbox for generated durable-state recommendations that are not yet public-safe actionable project work.
 - The Personal Overlay rule separates publishable Core files under `$root/os/` from private user-specific files under `$root/personal/os/`.
 - The publication rule explains how to create a fresh-history public repository without exposing private Git history.
 - The protected-main workflow keeps AgentOS Core and publishable support-file changes on isolated feature-branch worktrees and lands them through validated pull requests.
@@ -35,6 +36,7 @@ When updating AgentOS, prefer adding facts to the narrowest file:
 - Reusable workflow -> `os/skills/`
 - Durable personal decision or memory -> `personal/os/memory/`
 - Core architecture decision -> `docs/adr/` or `os/memory/DECISIONS_LOG.md`
+- Generated durable-state recommendation -> classify first: GitHub issue or mapped tracker for public-safe actionable project work; `personal/os/memory/propagation-review/QUEUE.md` for private, tentative, connector-derived, personal, cross-project, or pre-issue proposals; direct edit only for exact approved changes.
 - Tool access or permission -> `personal/os/connections/`
 - Specific live agent behavior -> `personal/os/agents/`
 - Generic agent template -> `os/agents/`

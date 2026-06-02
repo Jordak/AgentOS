@@ -44,7 +44,7 @@ This directory is not a live agent registry. Core agent folders must be template
 
 Agent outputs should identify their inputs and source discipline when the output will guide future work. Treat reports as evidence until their claims are promoted into context, memory, source map, playbook, skills, verification, or automation files.
 
-When an agent output proposes a durable OS update but should not apply it directly, add a proposal to `personal/os/memory/propagation-review/QUEUE.md` using `os/playbook/PROPAGATION_REVIEW_QUEUE.md`. Such proposals are not canonical until approved and applied.
+When an agent output proposes a durable OS update but should not apply it directly, classify the right inbox first. Use GitHub issues or mapped-project trackers for public-safe actionable project work, and use `personal/os/memory/propagation-review/QUEUE.md` with `os/playbook/PROPAGATION_REVIEW_QUEUE.md` for private, tentative, connector-derived, personal, cross-project, or pre-issue proposals. Such proposals are not canonical until approved and applied.
 
 ## Handoff Rules
 
