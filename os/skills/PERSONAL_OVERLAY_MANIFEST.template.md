@@ -6,6 +6,8 @@ Use this public-safe template to create the ignored local file at `personal/os/s
 
 Personal Overlay skills implement the Core skill contract in `os/skills/SKILL_CONTRACT.md`. This manifest records private governance facts; it is not a routing catalog, invocation surface, exposure registry, source map, or connection inventory.
 
+Use the same Markdown manifest API as Core: exact third-level headings shaped as ``### `skill-name` `` plus exact, case-sensitive list labels shaped as `- Field name: value`. Keep long-form safety, filing, verification, provenance, and maintenance notes as readable Markdown prose.
+
 Do not commit the live `personal/os/skills/MANIFEST.md` file. It may contain private skill names, project references, local paths, account references, and maintenance notes.
 
 ## Rules

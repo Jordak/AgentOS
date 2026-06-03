@@ -22,6 +22,8 @@ Durable AgentOS skills should make these facts clear, either in frontmatter, in 
 - Verification: checks to run before trusting or delivering the result.
 - Filing rules: where generated artifacts, decisions, notes, or state updates belong.
 
+When these facts live in a manifest, use the Markdown manifest API: exact third-level headings shaped as ``### `skill-name` `` plus exact, case-sensitive list labels shaped as `- Field name: value`. Keep long-form safety, filing, verification, provenance, and maintenance notes as readable Markdown prose. Add a structured sidecar only when scripts or validators need deterministic typed data that cannot be represented safely by the narrow Markdown convention.
+
 ## Mutability Levels
 
 Use the narrowest level that describes normal operation:
@@ -69,7 +71,7 @@ A skill's verification guidance should test observable behavior, not internal st
 
 Canonical public AgentOS skills live under `os/skills/`. Canonical private skills can live under `personal/os/skills/<skill-name>/SKILL.md`. Personal Overlay skills implement this same Core contract; do not fork a separate private skill contract in v1.
 
-A Personal Overlay skill counts as a maintained canonical private skill only when `personal/os/skills/MANIFEST.md` has an entry for it with `Lifecycle status: maintained`. Directory-only private skills are drafts or ad hoc local files until the private manifest records their governance facts. Use `os/skills/PERSONAL_OVERLAY_MANIFEST.template.md` as the public-safe template when creating the ignored private manifest.
+A Personal Overlay skill counts as a maintained canonical private skill only when `personal/os/skills/MANIFEST.md` has an entry for it with `Lifecycle status: maintained`. Directory-only private skills are drafts or ad hoc local files until the private manifest records their governance facts. Use `os/skills/PERSONAL_OVERLAY_MANIFEST.template.md` as the public-safe template when creating the ignored private manifest. Core and Personal Overlay skill manifests use the same Markdown manifest API in v1.
 
 Private config is optional for private skills. Since `personal/os/skills/<skill-name>/SKILL.md` is already private, stable private settings may live directly in that file. Use `personal/os/skills/<skill-name>/CONFIG.md` when settings are volatile, machine-specific, generated, profile-like, useful to audit separately, or needed by scripts. Private inputs to a reusable Core skill belong in `personal/os/skills/<core-skill>/CONFIG.md`, not in the Core skill source.
 

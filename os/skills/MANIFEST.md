@@ -12,6 +12,17 @@ Contract reference: `os/skills/SKILL_CONTRACT.md`.
 
 - Canonical Core skills: 20.
 
+## Markdown API
+
+This manifest stays Markdown-first. The stable machine-readable convention is intentionally narrow:
+
+- Each canonical skill entry uses an exact third-level heading shaped as ``### `skill-name` ``.
+- Required metadata uses exact, case-sensitive Markdown list labels shaped as `- Field name: value`.
+- `Canonical source` values are root-relative AgentOS paths, usually in a code span.
+- Long-form safety, filing, verification, provenance, and maintenance notes remain prose in the field value.
+
+Validators and exposure helpers may parse only this narrow convention. Do not migrate this manifest to YAML, JSON, or a structured sidecar unless multiple scripts need typed data, cross-field validation, generated machine output, or query/sort/merge behavior that this Markdown convention cannot support cleanly.
+
 ## Maintenance Fields
 
 Each skill entry records:
