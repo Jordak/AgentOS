@@ -10,7 +10,7 @@ Contract reference: `os/skills/SKILL_CONTRACT.md`.
 
 ## Summary
 
-- Canonical Core skills: 19.
+- Canonical Core skills: 20.
 
 ## Markdown API
 
@@ -242,6 +242,18 @@ Each skill entry records:
 - Safety posture: require at least one concrete example; do not copy private connector data into durable artifacts; follow the shared external-write policy before external writes; ask before automation activation, destructive edits, or current-machine skill exposure changes.
 - Verification coverage: run `scripts/run-validator`; run `scripts/run-validator --self-test` when validator behavior changes; add or update a safe smoke example for new durable behavior; confirm external writes complied with the shared external-write policy.
 - Upgrade notes: Core reusable workflow for turning repeated work into durable AgentOS behavior.
+
+### `promote-private-skill-to-core`
+
+- Canonical source: `os/skills/promote-private-skill-to-core/SKILL.md`
+- Contract status: full.
+- Mutability: mixed: read-only by default for promotion audits; local-write only when the user explicitly approves creating or updating Core skills, local design docs, safe fixtures, or Personal Overlay config; external-write only when permitted by the shared external-write policy.
+- Tools and connectors: local filesystem, `rg`, `git`, AgentOS validators, privacy scanners, `verify-privacy`, optional read-only GitHub issue or PR context, and no connector account reads by default.
+- Output artifact: promotion audit report by default; when implementation is explicitly approved, a sanitized Core skill or skill update, Core manifest update, optional safe smoke fixture, and optional Personal Overlay config or private thin-adapter instructions.
+- Filing rule: Core-safe promoted skills live under `os/skills/`; Core maintenance facts live in this manifest; private inputs for reusable Core skills live in `personal/os/skills/<skill-name>/CONFIG.md` when needed; private skill governance remains in ignored `personal/os/skills/MANIFEST.md`; private examples, generated outputs, live agent state, histories, reports, queues, and run logs remain in the Personal Overlay.
+- Safety posture: do not scan, enumerate, copy, expose, or summarize Personal Overlay skills without explicit private-scope authorization; require maintained private skill governance or stop with a governance-review recommendation; do not copy private examples, local paths, account IDs, connector details, live agent state, generated outputs, histories, queues, or run logs into Core; do not modify `expose-skills` to scan or expose Personal Overlay skills; ask before external writes, connector reads, Personal Overlay writes, current-machine exposure changes, or destructive edits.
+- Verification coverage: confirm audit-only versus implementation-approved mode, candidate governance status, reusable evidence, private/Core boundary map, mandatory sanitization checklist, private preservation plan, validator and diff-check results after Core edits, absence of unapproved Personal Overlay writes or external writes, and absence of private examples, paths, account details, live state, generated outputs, or run histories in Core.
+- Upgrade notes: Core reusable workflow introduced for GitHub Issue #23 after #19 established Personal Overlay skill manifest guidance and #74 kept skill manifests Markdown-first with a stricter Markdown API.
 
 ### `verify-privacy`
 

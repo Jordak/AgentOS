@@ -11,6 +11,8 @@ Use this when the user asks to "skillify" something, when the same AgentOS task 
 
 Do not use this for one-off preferences, speculative abstractions, or project implementation details that belong in a mapped project.
 
+When the candidate starts as a Personal Overlay skill or private skill config that may need sanitizing into Core, use `promote-private-skill-to-core` for the private/Core boundary workflow instead of handling promotion as ordinary skillification.
+
 ## Goal
 
 Turn real repeated work into durable AgentOS behavior with the smallest stable artifact that will prevent the repeated cost or failure.
@@ -61,6 +63,7 @@ Safety:
    - public-safe actionable project work -> GitHub issue or mapped-project tracker;
    - private/tentative/pre-issue durable state proposal -> propagation review queue.
 3. Choose the smallest durable artifact. Update an existing skill before adding a new one when the trigger, workflow, and output are already owned by that skill.
+   - Private-to-Core skill promotion -> use `promote-private-skill-to-core` for candidate governance, sanitization, private behavior preservation, and privacy validation.
 4. Decide code vs Markdown:
    - use deterministic code when the check is exact, repeated, and cheaply
      machine-verifiable;

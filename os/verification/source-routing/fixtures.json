@@ -103,6 +103,30 @@
       ]
     },
     {
+      "id": "private-skill-promotion",
+      "category": "skill promotion",
+      "prompt": "Sanitize this maintained Personal Overlay skill and promote the reusable workflow into AgentOS Core safely.",
+      "expected": {
+        "skill": "promote-private-skill-to-core"
+      },
+      "evidence": [
+        {
+          "path": "os/skills/promote-private-skill-to-core/SKILL.md",
+          "contains": [
+            "Personal Overlay skill",
+            "Mandatory Sanitization Checklist"
+          ]
+        },
+        {
+          "path": "os/skills/skillify-agentos/SKILL.md",
+          "contains": [
+            "promote-private-skill-to-core",
+            "Private-to-Core skill promotion"
+          ]
+        }
+      ]
+    },
+    {
       "id": "review-pass",
       "category": "code review",
       "prompt": "Run one manual review iteration on this PR and give me a structured review packet without fixing or posting anything.",
