@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import re
+import secrets
 import shlex
 import shutil
 import subprocess
@@ -58,10 +59,12 @@ HUT_WORKSPACE_EXCLUSION_RULES = (
     "personal/**",
     "os/verification/**",
 )
+HUT_HOST_BOUNDARY_SENTINEL_REASON = "hut_host_boundary_sentinel_observed"
 GIT_REGULAR_FILE_MODES = {"100644", "100755", "100664"}
 GIT_EXECUTABLE_FILE_MODES = {"100755"}
 HUT_PROJECT_PLACEHOLDER = Path("<external-project>")
 SANITIZED_AGENTOS_PLACEHOLDER = Path("<sanitized-agentos>")
+HOST_BOUNDARY_SENTINEL_PLACEHOLDER = Path("<host-boundary-sentinel>")
 HARNESS_ADAPTER_FILENAMES = {
     "codex": "AGENTS.md",
 }
@@ -139,6 +142,51 @@ def hut_workspace_metadata(
     if excluded_file_count is not None:
         metadata["excluded_file_count"] = excluded_file_count
     return metadata
+
+
+def host_boundary_sentinel_metadata(
+    observed: bool | None = None,
+    checked_output_count: int = 0,
+) -> dict[str, Any]:
+    metadata: dict[str, Any] = {
+        "mode": "passive_host_boundary_tripwire",
+        "sentinel_path": (HOST_BOUNDARY_SENTINEL_PLACEHOLDER / "personal/os/context/SENTINEL.md").as_posix(),
+        "marker_observed": observed,
+        "checked_output_count": checked_output_count,
+        "proves_isolation": False,
+        "eligibility_effect": HUT_HOST_BOUNDARY_SENTINEL_REASON,
+    }
+    return metadata
+
+
+def create_host_boundary_sentinel(parent: Path) -> tuple[Path, str, dict[str, Any]]:
+    sentinel_path = parent / "personal/os/context/SENTINEL.md"
+    marker = f"AGENTOS_GUIDANCE_HOST_BOUNDARY_SENTINEL_{secrets.token_hex(16)}"
+    sentinel_path.parent.mkdir(parents=True, exist_ok=True)
+    sentinel_path.write_text(
+        "\n".join(
+            [
+                "# Guidance Host Boundary Sentinel",
+                "",
+                "This file is non-private benchmark instrumentation.",
+                marker,
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return sentinel_path, marker, host_boundary_sentinel_metadata(observed=False)
+
+
+def text_contains_marker(value: Any, marker: str) -> bool:
+    return marker in output_text(value)
+
+
+def harness_result_contains_marker(result: dict[str, Any], marker: str) -> bool:
+    return any(
+        text_contains_marker(result.get(field), marker)
+        for field in ("raw_response", "stdout", "stderr")
+    )
 
 
 def project_local_adapter_text(agentos_root: Path) -> str:
@@ -1102,15 +1150,20 @@ def run_guidance(
     effort: str | None = None,
     judge_model: str | None = None,
     judge_effort: str | None = None,
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any], dict[str, Any]]:
     results: list[dict[str, Any]] = []
     judge_batches: list[dict[str, Any]] = []
     pending_by_harness: dict[str, list[tuple[dict[str, Any], dict[str, Any]]]] = {}
+    host_boundary = host_boundary_sentinel_metadata(observed=False)
 
-    with tempfile.TemporaryDirectory(prefix="agentos-guidance-hut-") as workspace_parent:
+    with tempfile.TemporaryDirectory(prefix="agentos-guidance-hut-") as workspace_parent, tempfile.TemporaryDirectory(
+        prefix="agentos-guidance-host-boundary-"
+    ) as sentinel_parent:
         project_root = Path(workspace_parent) / "external-project"
         agentos_root = Path(workspace_parent) / "agentos"
+        _sentinel_path, marker, host_boundary = create_host_boundary_sentinel(Path(sentinel_parent))
         hut_workspace = prepare_hut_project(root, project_root, agentos_root, harnesses)
+        checked_output_count = 0
 
         for harness in harnesses:
             for fixture in fixtures:
@@ -1124,6 +1177,10 @@ def run_guidance(
                     effort=effort,
                     ignore_user_config=True,
                 )
+                checked_output_count += 1
+                sentinel_observed = harness_result_contains_marker(harness_result, marker)
+                if sentinel_observed:
+                    host_boundary["marker_observed"] = True
                 unavailable_reason = harness_unavailable_reason(harness_result)
                 if unavailable_reason:
                     results.append(
@@ -1133,6 +1190,7 @@ def run_guidance(
                             "harness": harness,
                             "status": "harness-unavailable",
                             "unavailable_reason": unavailable_reason,
+                            "host_boundary_sentinel_observed": sentinel_observed,
                             "harness_result": harness_result,
                         }
                     )
@@ -1144,6 +1202,7 @@ def run_guidance(
                             "category": fixture["category"],
                             "harness": harness,
                             "status": "harness-error",
+                            "host_boundary_sentinel_observed": sentinel_observed,
                             "harness_result": harness_result,
                         }
                     )
@@ -1153,10 +1212,12 @@ def run_guidance(
                     "category": fixture["category"],
                     "harness": harness,
                     "status": "pending-judge",
+                    "host_boundary_sentinel_observed": sentinel_observed,
                     "harness_result": harness_result,
                 }
                 results.append(result)
                 pending_by_harness.setdefault(harness, []).append((fixture, result))
+        host_boundary["checked_output_count"] = checked_output_count
 
         batch_id = 0
         for harness, pending in pending_by_harness.items():
@@ -1239,7 +1300,7 @@ def run_guidance(
                             "verdict": judge["verdict"],
                         }
                     )
-    return results, judge_batches, hut_workspace
+    return results, judge_batches, hut_workspace, host_boundary
 
 
 def effective_judge_batch_size(judge_batch_size: int, item_count: int) -> int:
@@ -1287,6 +1348,7 @@ def build_summary(
     judge_effort: str | None,
     fixture_scope: dict[str, Any] | None = None,
     judge_protocol: dict[str, Any] | None = None,
+    host_boundary: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     total = len(results)
     verdicts = [result.get("judge", {}).get("verdict") for result in results if result.get("status") == "graded"]
@@ -1324,8 +1386,9 @@ def build_summary(
         "judge_harness": judge_harness,
         "judge_model": requested_or_default(judge_model),
         "judge_effort": requested_or_default(judge_effort),
+        "host_boundary_sentinel_observed": bool(host_boundary and host_boundary.get("marker_observed") is True),
     }
-    reasons = status_ineligible_reasons(mode, summary, git_state, fixture_scope, judge_protocol)
+    reasons = status_ineligible_reasons(mode, summary, git_state, fixture_scope, judge_protocol, host_boundary)
     summary["status_eligible"] = not reasons
     summary["status_ineligible_reasons"] = reasons
     return summary
@@ -1337,6 +1400,7 @@ def status_ineligible_reasons(
     git_state: dict[str, Any],
     fixture_scope: dict[str, Any] | None = None,
     judge_protocol: dict[str, Any] | None = None,
+    host_boundary: dict[str, Any] | None = None,
 ) -> list[str]:
     reasons: list[str] = []
     if mode != "run":
@@ -1355,6 +1419,8 @@ def status_ineligible_reasons(
         and judge_protocol.get("judge_batch_size") == judge_protocol.get("default_judge_batch_size")
     ):
         reasons.append("non_canonical_judge_protocol")
+    if host_boundary is not None and host_boundary.get("marker_observed") is True:
+        reasons.append(HUT_HOST_BOUNDARY_SENTINEL_REASON)
     if summary.get("needs_user_judgment", 0):
         reasons.append("needs_user_judgment")
     if summary.get("harness_unavailable", 0):
@@ -1402,6 +1468,7 @@ def build_report(
     generated_at = utc_now().isoformat()
     judge_batches: list[dict[str, Any]] = []
     hut_workspace = hut_workspace_metadata()
+    host_boundary = host_boundary_sentinel_metadata(observed=None)
     fixture_scope = fixture_run_metadata(root, fixtures_path, default_fixtures_path, selected_fixture_ids, fixtures)
     judge_protocol = judge_protocol_metadata(
         root,
@@ -1427,7 +1494,7 @@ def build_report(
         )
     else:
         runner = run_guidance_fn or run_guidance
-        results, judge_batches, hut_workspace = runner(
+        run_output = runner(
             root,
             fixtures,
             harnesses,
@@ -1441,6 +1508,11 @@ def build_report(
             judge_model=judge_model,
             judge_effort=judge_effort,
         )
+        if len(run_output) == 3:
+            results, judge_batches, hut_workspace = run_output
+            host_boundary = host_boundary_sentinel_metadata(observed=None)
+        else:
+            results, judge_batches, hut_workspace, host_boundary = run_output
     summary = build_summary(
         mode,
         results,
@@ -1452,6 +1524,7 @@ def build_report(
         judge_effort,
         fixture_scope=fixture_scope,
         judge_protocol=judge_protocol,
+        host_boundary=host_boundary,
     )
     return {
         "benchmark": "guidance",
@@ -1466,6 +1539,7 @@ def build_report(
         "judge_batch_size": judge_batch_size,
         "judge_protocol": judge_protocol,
         "hut_workspace": hut_workspace,
+        "host_boundary": host_boundary,
         "judge_batches": judge_batches,
         "results": results,
     }
@@ -1514,6 +1588,8 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"Judge prompt uses default: `{render_bool(judge_protocol.get('uses_default_judge_prompt_path'))}`",
         f"Judge batch size: `{judge_protocol.get('judge_batch_size', 'unknown')}`",
         f"HUT workspace: {report.get('hut_workspace', {}).get('mode', 'unknown')}",
+        f"Host-boundary sentinel observed: `{render_bool(report.get('host_boundary', {}).get('marker_observed'))}`",
+        f"Host-boundary sentinel proves isolation: `{render_bool(report.get('host_boundary', {}).get('proves_isolation'))}`",
         f"Fixture source: `{fixtures.get('path', 'unknown')}`",
         f"Fixture count: `{fixtures.get('count', 'unknown')}`",
         f"Fixture uses default path: `{render_bool(fixtures.get('uses_default_path'))}`",
@@ -2070,7 +2146,7 @@ def run_self_test(root: Path, fixtures_path: Path, judge_prompt_path: Path, judg
         2,
     )
 
-    def fake_run_guidance(*_: Any, **__: Any) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
+    def fake_run_guidance(*_: Any, **__: Any) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any], dict[str, Any]]:
         return [
             {
                 "fixture_id": "fixture-a",
@@ -2086,7 +2162,10 @@ def run_self_test(root: Path, fixtures_path: Path, judge_prompt_path: Path, judg
                 "judge_batch_id": 4,
                 "judge": {**valid_judge, "fixture_id": "fixture-b"},
             },
-        ], [fake_batch], hut_workspace_metadata(copied_file_count=10, excluded_file_count=3)
+        ], [fake_batch], hut_workspace_metadata(copied_file_count=10, excluded_file_count=3), host_boundary_sentinel_metadata(
+            observed=False,
+            checked_output_count=2,
+        )
 
     fake_report = build_report(
         root,
@@ -2115,6 +2194,8 @@ def run_self_test(root: Path, fixtures_path: Path, judge_prompt_path: Path, judg
     if (
         saved_report.get("judge_batches") != [fake_batch]
         or saved_report.get("hut_workspace", {}).get("mode") != "external_project_with_sanitized_agentos"
+        or saved_report.get("host_boundary", {}).get("marker_observed") is not False
+        or saved_report.get("host_boundary", {}).get("proves_isolation") is not False
         or "status_eligible_scope" in saved_report.get("fixtures", {})
         or "Canonical fixture scope" in saved_markdown
         or "## Judge Batches" not in saved_markdown
@@ -2123,6 +2204,7 @@ def run_self_test(root: Path, fixtures_path: Path, judge_prompt_path: Path, judg
         print(json.dumps({
             "judge_batches": saved_report.get("judge_batches"),
             "fixtures": saved_report.get("fixtures"),
+            "host_boundary": saved_report.get("host_boundary"),
             "has_old_markdown_label": "Canonical fixture scope" in saved_markdown,
         }, indent=2))
         return 1
@@ -2274,10 +2356,37 @@ def run_self_test(root: Path, fixtures_path: Path, judge_prompt_path: Path, judg
         None,
         fixture_scope=canonical_fixture_scope,
         judge_protocol=canonical_judge_protocol,
+        host_boundary=host_boundary_sentinel_metadata(observed=False, checked_output_count=2),
     )
     if not stale_summary["status_eligible"]:
         print("SELF-TEST FAIL: fixture_stale made an otherwise clean run ineligible.")
         print(json.dumps(stale_summary, indent=2))
+        return 1
+
+    sentinel_summary = build_summary(
+        "run",
+        stale_allowed,
+        clean_git,
+        None,
+        None,
+        "codex",
+        None,
+        None,
+        fixture_scope=canonical_fixture_scope,
+        judge_protocol=canonical_judge_protocol,
+        host_boundary=host_boundary_sentinel_metadata(observed=True, checked_output_count=2),
+    )
+    if sentinel_summary["status_eligible"] or HUT_HOST_BOUNDARY_SENTINEL_REASON not in sentinel_summary["status_ineligible_reasons"]:
+        print("SELF-TEST FAIL: observed host-boundary sentinel was status eligible.")
+        print(json.dumps(sentinel_summary, indent=2))
+        return 1
+
+    sentinel_marker = "AGENTOS_GUIDANCE_HOST_BOUNDARY_SENTINEL_self_test"
+    if not harness_result_contains_marker({"raw_response": "", "stdout": sentinel_marker, "stderr": ""}, sentinel_marker):
+        print("SELF-TEST FAIL: host-boundary sentinel marker was not detected in HUT output.")
+        return 1
+    if harness_result_contains_marker({"raw_response": "", "stdout": "", "stderr": ""}, sentinel_marker):
+        print("SELF-TEST FAIL: host-boundary sentinel marker false-positive detection.")
         return 1
 
     subset_fixture_scope = fixture_run_metadata(root, fixtures_path, fixtures_path, {first["id"]}, [first])

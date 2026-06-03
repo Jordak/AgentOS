@@ -8,6 +8,8 @@ The suite asks the harness under test a direct task, captures its normal prose a
 
 Harness-under-test calls run from a temporary external project that contains a harness-specific local adapter. For Codex, that adapter is `AGENTS.md`. The adapter points at a sanitized temporary AgentOS copy built from tracked/index-defined file contents. The copy excludes `.git/**`, `personal/**`, and `os/verification/**` so benchmark fixtures, saved reports, answer keys, and Personal Overlay state are unavailable at runtime. Untracked local files, unstaged tracked-file edits, and symlinks are not copied into the sanitized AgentOS copy.
 
+Real runs also create a non-private host-boundary sentinel outside the temporary external project and sanitized AgentOS copy. The sentinel is a passive contamination tripwire: if its random marker appears in captured HUT output, the run is status-ineligible. A non-observed sentinel does not prove full host filesystem isolation; it only means this tripwire did not fire.
+
 Guidance owns the maintained source-boundary and answer-key guardrails for harness behavior. Fixture `source_paths` must point at tracked UTF-8 files that are available to the sanitized harness workspace, not at `personal/**`, `os/verification/**`, fixture files, schemas, judge prompts, reports, or other answer-key material. The judge treats reliance on benchmark fixtures, saved reports, answer keys, or private Personal Overlay files as a failure.
 
 The suite intentionally validates the portable project-local adapter path, not the user's installed global adapter. Installed global adapter verification is tracked separately in [#83](https://github.com/Jordak/AgentOS/issues/83).
@@ -117,7 +119,7 @@ python3 os/verification/guidance/scripts/benchmark_guidance.py --no-dry-run --ha
 
 Saved reports expose a manifest-resolvable `summary` object and raw fixture provenance metadata. `behavioral_total` counts only `pass` and `fail`. Freshness checks derive the status-counting total from `behavioral_total + fixture_stale`; reports do not store a separate derived total. `fixture_stale` is reported separately and does not make the run ineligible. `needs_user_judgment` makes the run ineligible.
 
-`summary.status_eligible` includes fixture-scope and judge-protocol checks: status-eligible Guidance reports must use the default canonical fixture file, the full default fixture set, no `--fixture-id` subset, default judge prompt, default judge schema, and default judge batch size. Alternate fixture files, selected fixture subsets, alternate judge assets, and non-default judge batch sizes are diagnostic runs.
+`summary.status_eligible` includes fixture-scope, judge-protocol, and host-boundary tripwire checks: status-eligible Guidance reports must use the default canonical fixture file, the full default fixture set, no `--fixture-id` subset, default judge prompt, default judge schema, default judge batch size, and no observed host-boundary sentinel marker. Alternate fixture files, selected fixture subsets, alternate judge assets, non-default judge batch sizes, and observed host-boundary sentinel markers are diagnostic runs.
 
 Example:
 
@@ -135,4 +137,4 @@ Example:
 }
 ```
 
-Saved reports also include Git metadata so refresh workflows can reject dry-run, dirty-worktree, non-main, non-remote-fresh, or unresolved diagnostic evidence.
+Saved reports also include Git metadata and host-boundary tripwire metadata so refresh workflows can reject dry-run, dirty-worktree, non-main, non-remote-fresh, host-contaminated, or unresolved diagnostic evidence.
