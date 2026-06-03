@@ -23,9 +23,9 @@ Do not use `stale` as a Core status. Staleness is relative to the current checko
 
 ### Codex
 
-- Status: `passing`
-- Reviewed Core revision: `d277d122dd043f63deb490b96394422a40de0798`
-- Last reviewed evidence: `2026-06-02 08:48 PDT`
-- Evidence scope: `guidance Codex harness; 14 default guidance fixtures; gpt-5.5 low; judge gpt-5.5 low`
-- Summary: Codex produced judged responses for all 14 default Guidance scenarios and passed every behavioral check. The covered scenarios include GitHub CLI sandbox auth, implementation readiness, artifact format routing, Personal Overlay discovery, generated preference propagation, public project issue routing, programming CLI contracts, Markdown style, portability, review workflows, weekly-review storage, and skill-contract upgrade routing.
-- Caveats: No behavioral failures, fixture-stale cases, or needs-user-judgment cases were reported. This status uses a full default, status-eligible run from clean remote-fresh `main`; diagnostic non-default fixture or judge-protocol runs remain useful for investigation but are not status evidence.
+- Status: `attention needed`
+- Reviewed Core revision: `a7b5d1003dcd38b6ca7ebc54567099d6d0316ed1`
+- Last reviewed evidence: `2026-06-03 13:12 PDT`
+- Evidence scope: `guidance Codex harness; 15 default guidance fixtures; gpt-5.5 low; judge gpt-5.5 low`
+- Summary: Codex produced judged responses for all 15 default Guidance scenarios and passed 13 behavioral checks. The passing scenarios include GitHub CLI sandbox auth, implementation readiness, mapped-project branch discipline, artifact format routing, generated preference propagation, public project issue routing, programming CLI contracts, Markdown style, portability, review workflows, and skill-contract upgrade routing. The failing scenarios involve Personal Overlay discovery and weekly-review private-report routing answers that appeared to rely on private Personal Overlay state.
+- Caveats: No fixture-stale cases, needs-user-judgment cases, harness-unavailable cases, judge-unavailable cases, or judge-invalid cases were reported. The host-boundary sentinel was not observed, which satisfies the contamination tripwire for this status run but does not prove full host filesystem isolation. This status uses a full default, status-eligible run from clean remote-fresh `main`; diagnostic non-default fixture or judge-protocol runs remain useful for investigation but are not status evidence.
