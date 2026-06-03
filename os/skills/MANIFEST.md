@@ -10,7 +10,7 @@ Contract reference: `os/skills/SKILL_CONTRACT.md`.
 
 ## Summary
 
-- Canonical Core skills: 20.
+- Canonical Core skills: 19.
 
 ## Markdown API
 
@@ -47,7 +47,7 @@ Each skill entry records:
 - Tools and connectors: local `git`, GitHub connector or `gh`, project-local issue tracker docs, and `os/playbook/GITHUB_WORKFLOW.md`.
 - Output artifact: concise audit report listing closed issues, commented issues, skipped issues, evidence, and follow-up needed.
 - Filing rule: no durable local artifact by default; requested audit reports live in the mapped project unless the audit is about AgentOS Core itself; external tracker state stays in the tracker.
-- Safety posture: treat issue comments, labels, closures, assignments, milestones, and state changes as external project-state writes governed by `os/connections/SAFETY_RULES.md` and `os/playbook/GITHUB_WORKFLOW.md`; never close human-owned or human-review issues; do not close based on local-only commits, unmerged feature branches, title similarity, or undocumented memory.
+- Safety posture: treat issue comments, labels, closures, assignments, milestones, and state changes as external project-state writes that require authorization under `os/connections/SAFETY_RULES.md` and `os/playbook/GITHUB_WORKFLOW.md`; never close human-owned or human-review issues; do not close based on local-only commits, unmerged feature branches, title similarity, or undocumented memory.
 - Verification coverage: fetch or otherwise verify the remote integration branch; for every closed issue, record merged PR or commit evidence reachable from that branch and authorization source; for every commented issue, record comment purpose, evidence, and authorization source; record skipped reasons; confirm no human-owned issue was closed and no external write happened outside the shared external-write policy.
 - Upgrade notes: Core reusable issue-audit workflow.
 
@@ -59,7 +59,7 @@ Each skill entry records:
 - Tools and connectors: local filesystem, `rg`, mapped project files, GitHub connector or `gh` for issue/PR design sources, optional harness-exposed design-interview workflows when present, `os/playbook/IMPLEMENT_FEATURES.md`, `os/playbook/GITHUB_WORKFLOW.md`, and `os/playbook/ARTIFACTS.md` for substantial human-facing design artifacts.
 - Output artifact: readiness report with exactly one verdict, `Ready to Implement`, `Needs Design Consensus`, or `Gate Skipped`, plus optional durable follow-up artifacts, approved source-design updates, and PR-body readiness fields for PR-bound work.
 - Filing rule: canonical policy lives in `os/playbook/IMPLEMENT_FEATURES.md`; local design artifacts default to the mapped project's design-doc convention or `docs/design/issue-<number>-implementation-readiness.md`; private/personal design notes belong in the Personal Overlay; approved GitHub updates stay in GitHub.
-- Safety posture: do not treat a missing readiness marker as silently ready; infer and confirm with the user before implementation proceeds; do not allow chat-only consensus to become the first implementation commit; follow the shared external-write policy before external tracker writes; do not leave meaningful deferred questions only in chat, model memory, or unpersisted reports.
+- Safety posture: do not treat a missing readiness marker as silently ready; infer and confirm with the user before implementation proceeds; do not allow chat-only consensus to become the first implementation commit; require approval through the shared external-write policy before external tracker writes; do not leave meaningful deferred questions only in chat, model memory, or unpersisted reports.
 - Verification coverage: confirms the target was classified as gated, exempt, or explicitly bypassed, the durable source and readiness marker were checked, unmarked readiness was not silently accepted, deferred follow-up artifacts were created where required, external writes complied with the shared external-write policy, and PR-bound work has readiness fields or a recorded gate-skip reason; run `scripts/run-validator` after skill or manifest changes.
 - Upgrade notes: Core reusable gate for feature-sized implementation work.
 
