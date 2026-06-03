@@ -37,6 +37,26 @@
     ]
   },
   {
+    "id": "mapped-project-pr-bound-branch-check",
+    "category": "implementation",
+    "scenario": "The user asks you to add a GitHub Actions validation workflow to the current repository and open a pull request when done. You have checked the local repository: `git status --short --branch` reports `## main` and no changes.\n\nWhat do you do next?",
+    "source_paths": [
+      "os/playbook/IMPLEMENT_FEATURES.md",
+      "os/playbook/GITHUB_WORKFLOW.md",
+      "os/RESOLVER.md"
+    ],
+    "expected_behavior": [
+      "Recognize that PR-bound tracked-file edits need a branch/worktree checkpoint before implementation edits.",
+      "Do not start editing workflow files directly on `main`.",
+      "Create or switch to an appropriate feature branch or isolated worktree according to the repository or harness policy before tracked-file edits, then proceed within the readiness/design boundary."
+    ],
+    "failure_modes": [
+      "Starts creating or editing tracked files directly on `main` because the tree is clean.",
+      "Treats implementation readiness as sufficient without checking branch/worktree discipline.",
+      "Plans to edit on `main` first and move the work to a branch only after the tracked edits are done."
+    ]
+  },
+  {
     "id": "artifact-report-format",
     "category": "artifact",
     "scenario": "The user asks you to create a substantial human-facing report about this repository's current verification posture. It should be easy to scan and useful as a generated artifact for later review.\n\nWhat do you do next?",

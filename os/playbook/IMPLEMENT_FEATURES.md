@@ -29,6 +29,12 @@ The gate can be skipped for:
 
 When in doubt, run the gate. A short `Gate Skipped` verdict is cheaper than discovering design drift after implementation.
 
+## Pre-Edit Branch/Worktree Checkpoint
+
+Before the first tracked-file edit for implementation work that is meant to land through a pull request, inspect the current branch and working-tree state. Use the Branch and Integration Discipline section of `os/playbook/GITHUB_WORKFLOW.md` for the branch, worktree, pull request, rebase, and dirty-checkout rules.
+
+This checkpoint applies to AgentOS Core and to AgentOS-backed mapped projects. Passing the readiness gate means the design is ready; it does not by itself mean the current checkout is the right place to edit.
+
 ## Design Source
 
 A feature-sized implementation needs a durable design source before coding begins. Acceptable design sources include GitHub issues, PRDs, local Markdown design documents, ADRs, planning notes, or clearly referenced conversation artifacts that have been promoted into durable form.
@@ -149,4 +155,5 @@ Before implementing feature-sized work, confirm:
 4. Meaningful deferred questions are out of scope and captured in durable follow-up artifacts.
 5. The current design source links to those follow-up artifacts when they exist.
 6. External tracker writes complied with the applicable external-write policy before they happened.
-7. Any PR body for the implementation cites readiness evidence and a readiness verdict, preferring a GitHub issue for issue-driven work, or explains the gate skip.
+7. PR-bound tracked-file edits started from an appropriate branch or worktree under the Branch and Integration Discipline section of `os/playbook/GITHUB_WORKFLOW.md`.
+8. Any PR body for the implementation cites readiness evidence and a readiness verdict, preferring a GitHub issue for issue-driven work, or explains the gate skip.
