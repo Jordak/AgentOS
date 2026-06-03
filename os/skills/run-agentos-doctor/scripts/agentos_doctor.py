@@ -6,9 +6,11 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import shutil
 import stat
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, Mapping
@@ -26,6 +28,31 @@ OUTPUT_LINE_CHAR_LIMIT = 240
 VERBOSE_OUTPUT_LINE_CHAR_LIMIT = 1000
 IGNORED_COUNT_FILE_NAMES = {".DS_Store", ".gitkeep"}
 IGNORED_COUNT_DIR_NAMES = {"__pycache__"}
+KNOWN_INSTALLED_ADAPTER_SMOKE_HARNESSES = ("codex",)
+SMOKE_STARTER_FILES = (
+    "AGENTS.md",
+    "os/INDEX.md",
+    "os/playbook/PERSONAL_OVERLAY.md",
+)
+SMOKE_FORBIDDEN_OUTPUT_PATTERNS = (
+    "personal/os/",
+    "personal\\os\\",
+    "os/verification/",
+    "os\\verification\\",
+    "fixtures.json",
+    "judge_prompt",
+    "judge_response",
+    "answer key",
+)
+SMOKE_FORBIDDEN_PROMPT_PATTERNS = (
+    "personal/os/",
+    "personal\\os\\",
+    "os/verification/",
+    "os\\verification\\",
+    "fixtures.json",
+    "judge_prompt",
+    "judge_response",
+)
 
 
 @dataclass
@@ -71,6 +98,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="Extra harness adapter file to include in the adapter drift check. May be repeated.",
     )
     parser.add_argument(
+        "--installed-adapter-smoke",
+        action="append",
+        default=[],
+        metavar="HARNESS",
+        choices=[*KNOWN_INSTALLED_ADAPTER_SMOKE_HARNESSES, "all"],
+        help="Plan an installed global adapter smoke check for a harness. Real harness execution requires --run-installed-adapter-smoke.",
+    )
+    parser.add_argument(
+        "--run-installed-adapter-smoke",
+        action="store_true",
+        help="Actually run requested installed adapter smoke checks. May invoke local harnesses and model/auth paths.",
+    )
+    parser.add_argument(
+        "--installed-adapter-smoke-timeout",
+        type=int,
+        default=DEFAULT_TIMEOUT_SECONDS,
+        metavar="SECONDS",
+        help="Timeout for each real installed adapter smoke check.",
+    )
+    parser.add_argument(
         "--verbose",
         action="store_true",
         help="Print more helper output and path diagnostics. Never prints file contents.",
@@ -96,12 +143,18 @@ def main(argv: list[str] | None = None) -> int:
             or args.primary_agentos_home is not None
             or args.all_default_adapters
             or args.adapter
+            or args.installed_adapter_smoke
+            or args.run_installed_adapter_smoke
+            or args.installed_adapter_smoke_timeout != DEFAULT_TIMEOUT_SECONDS
             or args.verbose
             or args.strict
         ):
             print("error: --self-test cannot be combined with other options", file=sys.stderr)
             return 2
         return run_self_tests()
+    if args.run_installed_adapter_smoke and not args.installed_adapter_smoke:
+        print("error: --run-installed-adapter-smoke requires --installed-adapter-smoke HARNESS", file=sys.stderr)
+        return 2
 
     cwd = Path.cwd()
     report = run_doctor(
@@ -112,6 +165,9 @@ def main(argv: list[str] | None = None) -> int:
         env=os.environ,
         adapter_args=adapter_args(args, cwd),
         verbose=args.verbose,
+        smoke_harnesses=installed_adapter_smoke_harnesses(args.installed_adapter_smoke),
+        run_installed_adapter_smoke=args.run_installed_adapter_smoke,
+        smoke_timeout_seconds=args.installed_adapter_smoke_timeout,
     )
     print_report(report, verbose=args.verbose)
     return exit_code_for(report.results, strict=args.strict)
@@ -124,6 +180,21 @@ def adapter_args(args: argparse.Namespace, cwd: Path) -> list[str]:
     for adapter in args.adapter:
         passthrough.extend(["--adapter", normalize_adapter_arg(adapter, cwd)])
     return passthrough
+
+
+def installed_adapter_smoke_harnesses(raw_harnesses: Iterable[str]) -> list[str]:
+    selected: list[str] = []
+    for harness in raw_harnesses:
+        if harness == "all":
+            for known in KNOWN_INSTALLED_ADAPTER_SMOKE_HARNESSES:
+                if known not in selected:
+                    selected.append(known)
+            continue
+        if harness not in KNOWN_INSTALLED_ADAPTER_SMOKE_HARNESSES:
+            raise ValueError(f"unsupported installed adapter smoke harness: {harness}")
+        if harness not in selected:
+            selected.append(harness)
+    return selected
 
 
 def normalize_adapter_arg(adapter: str, cwd: Path) -> str:
@@ -143,6 +214,9 @@ def run_doctor(
     env: Mapping[str, str],
     adapter_args: list[str],
     verbose: bool,
+    smoke_harnesses: list[str] | None = None,
+    run_installed_adapter_smoke: bool = False,
+    smoke_timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS,
 ) -> DoctorReport:
     agentos_home, discovery = resolve_agentos_home(requested_agentos_home, cwd)
     primary_agentos_home = absolute_path(requested_primary_agentos_home, cwd) if requested_primary_agentos_home else agentos_home
@@ -150,6 +224,8 @@ def run_doctor(
     split_roots = agentos_home != primary_agentos_home
     primary_home_structure = check_primary_agentos_home(primary_agentos_home) if split_roots else None
     primary_home_trusted = primary_home_structure is None or primary_home_structure.status == "PASS"
+    smoke_agentos_home = primary_agentos_home if primary_home_trusted else agentos_home
+    smoke_agentos_home_label = "primary AgentOS home" if primary_home_trusted and split_roots else "AgentOS home"
 
     results = [
         discovery,
@@ -170,12 +246,25 @@ def run_doctor(
                 ),
             ]
         )
+        for harness in smoke_harnesses or []:
+            results.append(
+                check_installed_adapter_smoke(
+                    harness,
+                    smoke_agentos_home,
+                    smoke_agentos_home_label,
+                    env,
+                    run_smoke=run_installed_adapter_smoke,
+                    timeout_seconds=smoke_timeout_seconds,
+                )
+            )
     else:
         results.extend(
             [
                 skipped_subprocess_check("adapter drift", home_structure),
             ]
         )
+        for harness in smoke_harnesses or []:
+            results.append(skipped_subprocess_check(f"installed adapter smoke ({harness})", home_structure))
     results.extend(
         [
             check_automation_locations(
@@ -404,6 +493,268 @@ def check_adapters(
         details=details,
         recommendations=recommendations,
     )
+
+
+def check_installed_adapter_smoke(
+    harness: str,
+    expected_agentos_home: Path,
+    expected_agentos_home_label: str,
+    env: Mapping[str, str],
+    run_smoke: bool,
+    timeout_seconds: int,
+) -> CheckResult:
+    if harness != "codex":
+        return CheckResult(
+            f"installed adapter smoke ({harness})",
+            "WARN",
+            "Installed adapter smoke harness is not implemented.",
+            details=[f"Harness: {harness}"],
+        )
+
+    prompt = installed_adapter_smoke_prompt()
+    command = codex_smoke_command(Path("<external-project>"), Path("<last-message>"))
+    privacy_errors = smoke_privacy_errors(prompt, command, expected_agentos_home)
+    details = [
+        "Harness: codex",
+        f"Mode: {'real smoke' if run_smoke else 'dry-run plan'}",
+        f"Comparison target: {expected_agentos_home_label}",
+        "Expected AgentOS path is hidden from the smoke prompt.",
+        "Expected starter files: " + ", ".join(SMOKE_STARTER_FILES),
+        "Command shape: " + shell_command(command),
+    ]
+    if privacy_errors:
+        return CheckResult(
+            "installed adapter smoke (codex)",
+            "FAIL",
+            "Smoke prompt or command shape violates privacy guardrails.",
+            details=[*details, *[f"Privacy guard: {error}" for error in privacy_errors]],
+        )
+
+    if not run_smoke:
+        return CheckResult(
+            "installed adapter smoke (codex)",
+            "WARN",
+            "Dry-run only; real harness smoke was not executed.",
+            details=details,
+            recommendations=[
+                "Run again with --run-installed-adapter-smoke only after approving a real Codex harness/model-call diagnostic.",
+            ],
+        )
+
+    if shutil.which("codex") is None:
+        return CheckResult(
+            "installed adapter smoke (codex)",
+            "WARN",
+            "Codex executable is not available.",
+            details=details,
+        )
+
+    smoke = run_codex_installed_adapter_smoke(expected_agentos_home, prompt, env, timeout_seconds)
+    return classify_smoke_output("codex", expected_agentos_home, smoke, details)
+
+
+def installed_adapter_smoke_prompt() -> str:
+    return (
+        "Report any AgentOS installation path and the initial AgentOS files named by your active instructions. "
+        "Use only active instructions and public AgentOS Core guidance if needed. "
+        "Do not inspect private user files, benchmark materials, generated reports, or other non-Core files. "
+        "Return a concise answer."
+    )
+
+
+def codex_smoke_command(project_root: Path, output_path: Path) -> list[str]:
+    return [
+        "codex",
+        "exec",
+        "--cd",
+        str(project_root),
+        "--skip-git-repo-check",
+        "--sandbox",
+        "read-only",
+        "--ephemeral",
+        "--color",
+        "never",
+        "--output-last-message",
+        str(output_path),
+        "-",
+    ]
+
+
+@dataclass
+class SmokeRun:
+    command: list[str]
+    exit_code: int
+    output: str
+    output_error: str | None = None
+    timed_out: bool = False
+
+
+def run_codex_installed_adapter_smoke(
+    expected_agentos_home: Path,
+    prompt: str,
+    env: Mapping[str, str],
+    timeout_seconds: int,
+) -> SmokeRun:
+    del expected_agentos_home  # The expected path must stay out of the harness prompt and argv.
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-installed-adapter-") as tmp:
+        project_root = Path(tmp) / "external-project"
+        project_root.mkdir()
+        output_path = Path(tmp) / "last-message.txt"
+        command = codex_smoke_command(project_root, output_path)
+        try:
+            completed = subprocess.run(
+                command,
+                cwd=project_root,
+                env={**dict(env), "GIT_TERMINAL_PROMPT": "0"},
+                input=prompt,
+                text=True,
+                errors="replace",
+                capture_output=True,
+                timeout=timeout_seconds,
+                check=False,
+            )
+        except subprocess.TimeoutExpired:
+            return SmokeRun(command=command, exit_code=124, output="", output_error=None, timed_out=True)
+        except OSError as exc:
+            return SmokeRun(command=command, exit_code=127, output="", output_error=str(exc))
+
+        try:
+            output = output_path.read_text(encoding="utf-8", errors="replace") if output_path.is_file() else ""
+        except OSError as exc:
+            output = ""
+            output_error = exc.__class__.__name__
+        else:
+            output_error = None
+        return SmokeRun(command=command, exit_code=completed.returncode, output=output, output_error=output_error)
+
+
+def classify_smoke_output(
+    harness: str,
+    expected_agentos_home: Path,
+    smoke: SmokeRun,
+    base_details: list[str],
+) -> CheckResult:
+    observed = parse_smoke_observations(smoke.output, expected_agentos_home)
+    details = [
+        *base_details,
+        "Executed command shape: " + shell_command(codex_smoke_command(Path("<external-project>"), Path("<last-message>"))),
+        f"Exit code: {smoke.exit_code}",
+        f"Output bytes: {len(smoke.output.encode('utf-8', errors='replace'))}",
+        f"Observed expected AgentOS path: {yes_no(observed['expected_path'])}",
+        "Observed starter files: " + ", ".join(observed["starter_files"]) if observed["starter_files"] else "Observed starter files: none",
+    ]
+    if smoke.output_error:
+        details.append(f"Output capture error: {smoke.output_error}")
+    if observed["forbidden_patterns"]:
+        return CheckResult(
+            f"installed adapter smoke ({harness})",
+            "FAIL",
+            "Smoke output referenced forbidden private or verification material.",
+            details=[*details, "Forbidden output markers: " + ", ".join(observed["forbidden_patterns"])],
+        )
+    if smoke.timed_out:
+        return CheckResult(
+            f"installed adapter smoke ({harness})",
+            "WARN",
+            "Harness smoke timed out.",
+            details=details,
+        )
+    if smoke.exit_code == 127:
+        return CheckResult(
+            f"installed adapter smoke ({harness})",
+            "WARN",
+            "Harness smoke could not start.",
+            details=details,
+        )
+    if smoke.exit_code != 0:
+        return CheckResult(
+            f"installed adapter smoke ({harness})",
+            "WARN",
+            "Harness smoke exited nonzero.",
+            details=details,
+        )
+    if observed["no_agentos"]:
+        return CheckResult(
+            f"installed adapter smoke ({harness})",
+            "FAIL",
+            "Harness reported that no AgentOS instructions are active.",
+            details=details,
+        )
+    if observed["wrong_agentos_path"]:
+        return CheckResult(
+            f"installed adapter smoke ({harness})",
+            "FAIL",
+            "Harness reported a different AgentOS checkout.",
+            details=[*details, "Observed other AgentOS-like paths: " + ", ".join(observed["other_agentos_paths"])],
+        )
+    if observed["expected_path"] and set(SMOKE_STARTER_FILES).issubset(set(observed["starter_files"])):
+        return CheckResult(
+            f"installed adapter smoke ({harness})",
+            "PASS",
+            "Harness reported the expected AgentOS setup facts from an external project.",
+            details=details,
+        )
+    return CheckResult(
+        f"installed adapter smoke ({harness})",
+        "WARN",
+        "Harness smoke output was ambiguous.",
+        details=details,
+        recommendations=[
+            "Inspect the raw smoke evidence only in a private Personal Overlay report if a future saved-report mode is added.",
+        ],
+    )
+
+
+def parse_smoke_observations(output: str, expected_agentos_home: Path) -> dict[str, object]:
+    normalized = output.replace("\\", "/")
+    lower = normalized.lower()
+    expected_text = str(expected_agentos_home)
+    expected_seen = expected_text in output or expected_text.replace("\\", "/") in normalized
+    starter_files = [rel for rel in SMOKE_STARTER_FILES if rel in normalized]
+    forbidden = [pattern for pattern in SMOKE_FORBIDDEN_OUTPUT_PATTERNS if pattern.lower() in lower]
+    other_paths = [
+        path
+        for path in sorted(set(re.findall(r"(/[^\s`'\"<>]*AgentOS[^\s`'\"<>]*)", output)))
+        if path != expected_text
+    ]
+    no_agentos = any(
+        phrase in lower
+        for phrase in (
+            "no agentos instructions",
+            "no active agentos",
+            "agentos instructions are not active",
+            "agentos guidance is not active",
+        )
+    )
+    return {
+        "expected_path": expected_seen,
+        "starter_files": starter_files,
+        "forbidden_patterns": forbidden,
+        "other_agentos_paths": other_paths,
+        "wrong_agentos_path": bool(other_paths and not expected_seen),
+        "no_agentos": no_agentos,
+    }
+
+
+def smoke_privacy_errors(prompt: str, command: list[str], expected_agentos_home: Path) -> list[str]:
+    errors: list[str] = []
+    command_text = "\n".join(command)
+    if str(expected_agentos_home) in prompt:
+        errors.append("prompt contains expected AgentOS path")
+    if str(expected_agentos_home) in command_text:
+        errors.append("command contains expected AgentOS path")
+    prompt_lower = prompt.lower()
+    command_lower = command_text.lower()
+    for pattern in SMOKE_FORBIDDEN_PROMPT_PATTERNS:
+        if pattern.lower() in prompt_lower:
+            errors.append(f"prompt contains forbidden pattern {pattern!r}")
+        if pattern.lower() in command_lower:
+            errors.append(f"command contains forbidden pattern {pattern!r}")
+    return errors
+
+
+def yes_no(value: object) -> str:
+    return "yes" if value else "no"
 
 
 def check_automation_locations(

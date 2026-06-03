@@ -42,6 +42,12 @@ def run_self_tests() -> int:
         test_invalid_primary_home_makes_personal_evidence_unknown,
         test_strict_warn_exit_code,
         test_adapter_home_notation_is_preserved,
+        test_installed_adapter_smoke_dry_run_is_opt_in_and_private,
+        test_installed_adapter_smoke_split_root_targets_primary,
+        test_installed_adapter_smoke_privacy_guard_rejects_leaky_prompt,
+        test_installed_adapter_smoke_passes_on_expected_setup_facts,
+        test_installed_adapter_smoke_fails_on_forbidden_output,
+        test_installed_adapter_smoke_fails_on_wrong_agentos_path,
     ]
     for test in tests:
         try:
@@ -423,6 +429,114 @@ def test_adapter_home_notation_is_preserved() -> None:
         adapter_args(args, Path("/tmp")) == ["--adapter", "<home>", "--adapter", "<home>/AGENTS.md"],
         "<home> notation should pass through",
     )
+
+
+def test_installed_adapter_smoke_dry_run_is_opt_in_and_private() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        make_fake_agentos(root)
+        result = check_installed_adapter_smoke(
+            "codex",
+            root,
+            "AgentOS home",
+            minimal_env(Path(tmp) / "home"),
+            run_smoke=False,
+            timeout_seconds=DEFAULT_TIMEOUT_SECONDS,
+        )
+        rendered = "\n".join(result.details + result.recommendations)
+        _case.assertTrue(result.status == "WARN", "dry-run smoke should warn that no real harness ran")
+        _case.assertTrue("dry-run plan" in rendered, "dry-run mode should be explicit")
+        _case.assertTrue(str(root) not in installed_adapter_smoke_prompt(), "prompt must not contain expected AgentOS path")
+        _case.assertTrue(str(root) not in rendered, "dry-run report should not reveal expected path")
+        _case.assertTrue("personal/os/" not in installed_adapter_smoke_prompt(), "prompt should avoid private path literals")
+        _case.assertTrue("os/verification/" not in installed_adapter_smoke_prompt(), "prompt should avoid verification path literals")
+
+
+def test_installed_adapter_smoke_split_root_targets_primary() -> None:
+    with tempfile.TemporaryDirectory(prefix="agentos-doctor-self-test-") as tmp:
+        audit_root = Path(tmp) / "audit-AgentOS"
+        primary_root = Path(tmp) / "primary-AgentOS"
+        make_fake_agentos(audit_root)
+        make_fake_agentos(primary_root)
+        report = run_doctor(
+            requested_agentos_home=audit_root,
+            requested_primary_agentos_home=primary_root,
+            cwd=audit_root,
+            process_home=Path(tmp) / "home",
+            env=minimal_env(Path(tmp) / "home"),
+            adapter_args=[],
+            verbose=True,
+            smoke_harnesses=["codex"],
+            run_installed_adapter_smoke=False,
+            smoke_timeout_seconds=DEFAULT_TIMEOUT_SECONDS,
+        )
+        rendered = render_report_for_test(report, verbose=True)
+        smoke_rendered = "\n".join(result_named(report, "installed adapter smoke (codex)").details)
+        _case.assertTrue("Comparison target: primary AgentOS home" in rendered, "split-root smoke should compare against the primary checkout")
+        _case.assertTrue(str(primary_root) not in smoke_rendered, "dry-run smoke should not reveal the primary expected path")
+
+
+def test_installed_adapter_smoke_privacy_guard_rejects_leaky_prompt() -> None:
+    root = Path("/example/AgentOS")
+    errors = smoke_privacy_errors(
+        f"Expected AgentOS is {root}; inspect personal/os/identity/USER.md",
+        ["codex", "exec", "-"],
+        root,
+    )
+    _case.assertTrue(any("expected AgentOS path" in error for error in errors), "expected path leak should be rejected")
+    _case.assertTrue(any("personal/os/" in error for error in errors), "private path literal should be rejected")
+
+
+def test_installed_adapter_smoke_passes_on_expected_setup_facts() -> None:
+    root = Path("/example/AgentOS")
+    output = (
+        "AgentOS installation path: /example/AgentOS\n"
+        "Initial files: AGENTS.md, os/INDEX.md, os/playbook/PERSONAL_OVERLAY.md\n"
+    )
+    result = classify_smoke_output(
+        "codex",
+        root,
+        SmokeRun(command=["codex"], exit_code=0, output=output),
+        ["Harness: codex"],
+    )
+    rendered = "\n".join(result.details)
+    _case.assertTrue(result.status == "PASS", "expected setup facts should pass")
+    _case.assertTrue(output not in rendered, "raw smoke output should not be printed")
+    _case.assertTrue("Observed expected AgentOS path: yes" in rendered, "parsed expected path should be reported")
+
+
+def test_installed_adapter_smoke_fails_on_forbidden_output() -> None:
+    root = Path("/example/AgentOS")
+    output = (
+        "AgentOS installation path: /example/AgentOS\n"
+        "Initial files: AGENTS.md, os/INDEX.md, os/playbook/PERSONAL_OVERLAY.md\n"
+        "I also inspected personal/os/identity/USER.md\n"
+    )
+    result = classify_smoke_output(
+        "codex",
+        root,
+        SmokeRun(command=["codex"], exit_code=0, output=output),
+        ["Harness: codex"],
+    )
+    rendered = "\n".join(result.details)
+    _case.assertTrue(result.status == "FAIL", "forbidden private output should fail")
+    _case.assertTrue("personal/os/" in rendered, "forbidden marker family should be reported")
+    _case.assertTrue(output not in rendered, "raw forbidden output should not be printed")
+
+
+def test_installed_adapter_smoke_fails_on_wrong_agentos_path() -> None:
+    root = Path("/example/AgentOS")
+    output = (
+        "AgentOS installation path: /example/OtherAgentOS\n"
+        "Initial files: AGENTS.md, os/INDEX.md, os/playbook/PERSONAL_OVERLAY.md\n"
+    )
+    result = classify_smoke_output(
+        "codex",
+        root,
+        SmokeRun(command=["codex"], exit_code=0, output=output),
+        ["Harness: codex"],
+    )
+    _case.assertTrue(result.status == "FAIL", "wrong AgentOS path should fail")
 
 
 def make_fake_agentos(root: Path) -> None:
