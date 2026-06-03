@@ -37,6 +37,16 @@ Saved `run.json` reports intended for `refresh-benchmark-status` must include cu
 
 The default validator enforces the mechanical CLI surface and deterministic self-tests. It intentionally does not run real harnesses, inspect saved report directories, simulate missing dependencies, or parse raw benchmark reports.
 
+## Installed Adapter Diagnostics
+
+Installed global adapter verification is setup-health diagnosis, not Core benchmark posture. Use Run AgentOS Doctor for optional installed-adapter smoke checks, starting with Codex:
+
+```bash
+python3 os/skills/run-agentos-doctor/scripts/agentos_doctor.py --installed-adapter-smoke codex
+```
+
+Real smoke runs require explicit approval or explicit flags because they may invoke local harnesses, auth/model paths, and model calls. They remain diagnostic-only until a separate design makes them harness-portable enough for status eligibility. Do not add raw smoke evidence, transcripts, prompts, local harness output, or current-machine adapter state to Core benchmark status.
+
 ## Commit And Tree Scans
 
 For shell-backed publication safety scans, run:

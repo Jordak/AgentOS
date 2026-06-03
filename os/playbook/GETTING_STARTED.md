@@ -79,11 +79,25 @@ Use the Run AgentOS Doctor skill when the user wants a read-only setup health ch
 python3 os/skills/run-agentos-doctor/scripts/agentos_doctor.py
 ```
 
-The helper script discovers `$root` from the current directory, or accepts `--agentos-home <root>`. It reports the resolved AgentOS home, checks adapter drift through `scripts/install_global_agent_instructions.py --check`, and reports automation registry/file locations and counts only. It prints bounded facts and helper output only; it must not audit Core skill exposure, parse this Markdown for starter paths, print Personal Overlay file contents, or classify automation lifecycle state.
+The helper script discovers `$root` from the current directory, or accepts `--agentos-home <root>`. It reports the resolved AgentOS home, checks adapter drift through `scripts/install_global_agent_instructions.py --check`, and reports automation registry/file locations and counts only. It prints bounded facts and helper output only; it must not audit Core skill exposure, parse this Markdown for starter paths, print Personal Overlay file contents, classify automation lifecycle state, or run real installed-adapter smoke checks unless explicitly requested.
 
 If the installer or adapter check used `--all-default-adapters` or any custom `--adapter <path>` flags, repeat those exact flags when using Run AgentOS Doctor or the helper script so the read-only adapter drift result covers the same harness files.
 
 If the command is running from an isolated feature worktree, pass `--primary-agentos-home <primary-agentos-home>` so Personal Overlay automation location counts refer to the canonical checkout. The helper still runs read-only checks only and suppresses feature-worktree write commands when the audit root and primary checkout differ; starter-file interpretation, Core skill exposure diagnosis, adapter writes, Core skill exposure changes, Personal Overlay edits, and automation changes require the Run AgentOS Doctor skill and explicit approval.
+
+When the user wants to verify that a real installed global adapter works from an external project, use Doctor's optional installed-adapter smoke diagnostic. The default smoke mode is a dry-run plan:
+
+```bash
+python3 os/skills/run-agentos-doctor/scripts/agentos_doctor.py --installed-adapter-smoke codex
+```
+
+Run the real smoke only after explicit approval, because it may invoke the local harness, auth/model paths, and model calls:
+
+```bash
+python3 os/skills/run-agentos-doctor/scripts/agentos_doctor.py --installed-adapter-smoke codex --run-installed-adapter-smoke
+```
+
+The installed-adapter smoke check is diagnostic-only. It should not be added to benchmark status or Guidance evidence, and raw smoke evidence belongs in the Personal Overlay if it is saved at all.
 
 Run AgentOS Doctor is not the installer and not the skill exposure applier:
 
@@ -115,6 +129,7 @@ Expose-skills covers Core manifest skills only. It does not discover or expose P
 Offer to set up recurring checks when the harness supports automations:
 
 - Adapter drift: confirm global instruction adapters still point at the intended AgentOS checkout.
+- Installed adapter smoke: optionally confirm the real global adapter makes AgentOS setup facts visible from an external project.
 - Repository updates: check whether the public AgentOS repository has changed and summarize what the user may want to pull.
 - Weekly AgentOS review: inspect stale state, missing templates, useful memories, and automation health.
 
