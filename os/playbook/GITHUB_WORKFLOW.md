@@ -6,6 +6,8 @@ Use this file when drafting GitHub issues, PRDs, pull requests, pull request des
 
 Also use this file when another workflow produces a report, candidate list, branch, or implementation slice and the next user request asks to draft, open, create, or retry a pull request. The earlier workflow supplies context; this workflow owns GitHub routing, branch/PR discipline, and GitHub CLI authentication handling.
 
+Use the branch/worktree checkpoint in this file before the first tracked-file edit when AgentOS Core or an AgentOS-backed mapped project change is meant to land through a pull request.
+
 ## Workflow Skill Routing
 
 When the active agent harness exposes these skills or equivalent workflows, prefer the narrowest one that matches the job:
@@ -67,13 +69,15 @@ Concrete example: in Codex Desktop, an unelevated `gh auth status` can report an
 
 When implementation work is meant to land in a repository, the durable artifact is integrated code, not a local commit or unmerged branch.
 
-- Treat `main` as protected. Do not commit or push AgentOS Core or publishable support-file changes directly to `main`.
-- Make AgentOS Core or publishable support-file changes on a feature branch in an isolated worktree, open a pull request, wait for required validators, and squash merge the PR through GitHub.
-- Use the harness-provided worktree when one exists. Otherwise create an external Git worktree under `$CODEX_HOME/worktrees/`, not inside the AgentOS repository.
+- Before tracked-file edits, inspect the current branch and working-tree state, for example with `git status --short --branch`.
+- Treat `main` as protected for PR-bound work. Do not start tracked-file edits directly on `main` when the change is meant to land through a pull request.
+- Use the harness-provided worktree and feature branch when they exist. Otherwise create or switch to a feature branch or isolated worktree according to the repository's local policy before tracked-file edits.
+- If the checkout is already dirty on `main`, stop before adding more edits. Preserve existing changes, identify whether they are yours, and move only the owned or approved work to the proper feature branch or worktree.
+- For AgentOS Core or publishable support-file changes, use an isolated feature-branch worktree, open a pull request, wait for required validators, and squash merge the PR through GitHub.
 - If the work is on a pushed feature branch and is meant to land, open a pull request. Do not treat a pushed branch as the final artifact unless the user explicitly asked only for a branch.
 - When updating a feature branch with newer integration-branch changes, prefer rebasing the feature branch onto `main` and force-pushing with lease when the branch is yours to rewrite.
 - Do not merge `main` into a feature branch. The PR branch hygiene check rejects merge commits in PR branches.
-- Use `scripts/agent-push` for feature-branch pushes. Use `scripts/agent-push --force-with-lease` only after rebasing the current non-main branch.
+- For AgentOS public repository persistence, use `scripts/agent-push` for feature-branch pushes. Use `scripts/agent-push --force-with-lease` only after rebasing the current non-main branch.
 
 If `main` was accidentally merged into a feature branch, recover by backing up and rebasing:
 
