@@ -69,10 +69,10 @@ Each skill entry records:
 - Contract status: full.
 - Mutability: mixed: read-only when inspecting benchmark status and local evidence; local-write when updating `os/verification/BENCHMARK_STATUS.md` from eligible evidence after the user requested or approved the refresh; no external-write behavior.
 - Tools and connectors: local filesystem, local `git`, `os/verification/BENCHMARKS.json`, `os/verification/BENCHMARK_STATUS.md`, local Personal Overlay benchmark reports, and `os/playbook/PERSONAL_OVERLAY.md`.
-- Output artifact: an updated or proposed Core benchmark status snapshot plus a concise refresh report naming eligible evidence, ineligible evidence, stale entries, and unchanged entries.
+- Output artifact: an updated or proposed Core benchmark status snapshot plus a concise refresh report naming eligible evidence, ineligible evidence, stale entries, public-safe non-passing details, and unchanged entries.
 - Filing rule: Core status lives in `os/verification/BENCHMARK_STATUS.md`; raw reports and run histories stay in the Personal Overlay report directories configured by `os/verification/BENCHMARKS.json`; deterministic refresh-helper design is deferred to GitHub Issue #30.
-- Safety posture: do not copy raw reports, run JSON, transcripts, stdout, stderr, local paths, prompts, session details, account details, private diagnostics, or private evidence into Core; require clean, fresh `main` evidence before marking entries `passing`; ask before caveated or ambiguous updates.
-- Verification coverage: confirm benchmark manifest and status file were read, local report paths were resolved through the Personal Overlay rule, used reports had current-schema Git metadata, status labels are allowed, no raw/private evidence was copied into Core, and `scripts/run-validator` passes after skill or status changes.
+- Safety posture: do not copy raw reports, run JSON, transcripts, stdout, stderr, local paths, prompts, session details, account details, private diagnostics, private evidence, or verbatim judge rationales into Core; require clean, fresh `main` evidence before marking entries `passing`; ask before caveated or ambiguous updates.
+- Verification coverage: confirm benchmark manifest and status file were read, local report paths were resolved through the Personal Overlay rule, used reports had current-schema Git metadata, each non-passing status-counting result has a public-safe detail row or an explicit unchanged-entry reason, status labels are allowed, no raw/private evidence was copied into Core, and `scripts/run-validator` passes after skill or status changes.
 - Upgrade notes: Core workflow for maintaining the public-safe benchmark snapshot without introducing Core benchmark history.
 
 ### `run-benchmarks`

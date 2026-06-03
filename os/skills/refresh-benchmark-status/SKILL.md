@@ -24,7 +24,7 @@ Inputs:
 Output artifact:
 
 - An updated or proposed update to `os/verification/BENCHMARK_STATUS.md`.
-- A concise refresh report naming eligible evidence, ineligible evidence, stale status entries, and any entries left unchanged.
+- A concise refresh report naming eligible evidence, ineligible evidence, stale status entries, every public-safe non-passing detail included in Core status, and any entries left unchanged.
 
 Mutability:
 
@@ -43,6 +43,7 @@ Tools and connectors:
 Safety:
 
 - Do not copy raw benchmark reports, `run.json` bodies, transcripts, stdout, stderr, local paths, prompts, session details, account details, private diagnostics, or private evidence into Core.
+- Do not copy judge rationales verbatim into Core. Translate non-passing results into short public-safe diagnostic summaries and next steps.
 - Do not compare private raw evidence against curated Core prose. Compare only structured provenance fields such as report mode, suite sections, reviewed Core revision, Git metadata, and evidence timestamp.
 - Do not mutate Core status from missing, stale, incompatible, dirty-worktree, non-main, or non-fresh-main evidence by default.
 - Do not mark a status as `passing` unless eligible evidence was produced from clean, remote-fresh `main` at a committed AgentOS revision.
@@ -86,6 +87,23 @@ Safety:
    - `not run`;
    - `unknown`.
 
+   For eligible evidence with any non-passing status-counting result, include a `#### Non-Passing Details` section in the matching status entry. The section should use a compact Markdown table with these columns:
+   - `Fixture`: the fixture or scenario identifier, or `n/a` when the evidence is suite-level rather than fixture-level;
+   - `Category`: the public-safe benchmark category or suite area;
+   - `Result`: one of `Behavioral failure`, `Fixture stale`, `Needs user judgment`, `Harness unavailable`, `Harness error`, `Judge unavailable`, `Judge error`, `Judge invalid`, or another concise public-safe result class present in the structured evidence;
+   - `Public-safe diagnosis`: a curated explanation of what went wrong, stated without raw transcript text, stdout, stderr, prompts, local paths, private facts, or private diagnostics;
+   - `Suggested next step`: the next investigation or repair action a maintainer can take without needing raw evidence in Core.
+
+   Include one row for every behavioral failure, fixture-stale result, needs-user-judgment result, harness unavailable/error result, and judge unavailable/error/invalid result that affects the reviewed status evidence. It is acceptable to omit the section when the entry is `passing` and there are no non-passing details. When the only issue is suite-level ambiguity or malformed metadata, use `n/a` for the fixture and make the diagnosis explain the suite-level blocker.
+
+   For Guidance reports, derive rows from structured result fields where possible:
+   - behavioral failures from graded results whose verdict is not `pass`;
+   - fixture-stale rows from graded results marked stale;
+   - needs-user-judgment rows from results requiring unresolved judgment;
+   - harness or judge availability/error rows from result status and summary counts.
+
+   Fixture identifiers, categories, verdict classes, staleness labels, and availability/error classes are public-safe structured provenance. Judge rationales, HUT answers, prompts, command shapes, stdout, stderr, local paths, and raw report excerpts are not public-safe Core content.
+
 6. Update or report.
    Update `os/verification/BENCHMARK_STATUS.md` only when the user requested the refresh and evidence is eligible, or after the user approves a proposed update. If evidence is missing, stale, incompatible, dirty, not from fresh `main`, or otherwise ineligible, leave Core unchanged and explain what to rerun.
 
@@ -107,10 +125,12 @@ Do not use `stale` as a Core status. Report staleness in the refresh report beca
 
 ## Quality Bar
 
-- Every proposed Core status entry uses only public-safe fields: `Status`, `Reviewed Core revision`, `Last reviewed evidence`, `Evidence scope`, `Summary`, and `Caveats`.
+- Every proposed Core status entry uses only public-safe fields: `Status`, `Reviewed Core revision`, `Last reviewed evidence`, `Evidence scope`, `Summary`, `Caveats`, and optional `Non-Passing Details`.
+- Every non-passing status-counting result in eligible evidence is represented in `Non-Passing Details` unless the entry is left unchanged with an explicit reason.
 - Evidence eligibility is checked before any `passing` or `attention needed` update.
 - Missing or incompatible evidence prompts a rerun instead of a Core mutation.
 - Summaries describe what kinds of tasks are affected without copying raw evidence.
+- Non-passing detail rows are diagnostic enough to guide investigation without opening the raw report first.
 - The workflow leaves unrelated status entries unchanged.
 
 ## Verification
@@ -121,5 +141,6 @@ Before finishing:
 2. Confirm local report paths were resolved through the Personal Overlay rule.
 3. Confirm each used report had current-schema Git metadata.
 4. Confirm no raw report body, run JSON, transcript, stdout, stderr, local path, prompt, session detail, or private diagnostic was copied into Core.
-5. Confirm status labels are limited to `passing`, `attention needed`, `not run`, and `unknown`.
-6. Run `scripts/run-validator` after skill or status-file changes.
+5. Confirm each non-passing status-counting result in eligible evidence has a public-safe detail row or that the status entry was intentionally left unchanged.
+6. Confirm status labels are limited to `passing`, `attention needed`, `not run`, and `unknown`.
+7. Run `scripts/run-validator` after skill or status-file changes.
