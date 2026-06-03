@@ -27,6 +27,7 @@ Use `os/skills/` for reusable workflows: repeatable procedures that an agent can
 - Manifest format: Core and Personal Overlay skill manifests use Markdown in v1. Treat ``### `skill-name` `` headings and exact, case-sensitive `- Field name: value` labels as the stable manifest API for validators and exposure helpers.
 - Skill vs installed adapter: edit canonical files first, then use `expose-skills` to update current-machine Core skill adapters when needed. Existing same-name Core skill directories require explicit backup-backed replacement. Canonical public skills live in Core; canonical private skills can live in the Personal Overlay.
 - Canonical private skill vs private draft: a Personal Overlay skill is a maintained canonical private skill only when `personal/os/skills/MANIFEST.md` has an entry for it with `Lifecycle status: maintained`; directory-only private skills are drafts or ad hoc local files.
+- Private skill promotion vs ordinary skillification: use `promote-private-skill-to-core` when the candidate starts from a Personal Overlay skill or private config and must be sanitized into Core safely; use `skillify-agentos` for general repeated-work skill creation.
 
 ## Update Rules
 
@@ -35,6 +36,7 @@ Use `os/skills/` for reusable workflows: repeatable procedures that an agent can
 - Keep skill files portable and harness-neutral unless the file is explicitly an adapter.
 - Put private user-specific skills under `personal/os/skills/<skill-name>/SKILL.md` when the skill itself depends on private identity, tools, paths, agents, or account state. Use `personal/os/skills/<core-skill>/CONFIG.md` for private inputs to a reusable Core skill.
 - For maintained private skills or important Core skill private config overlays, create or update ignored `personal/os/skills/MANIFEST.md` from `os/skills/PERSONAL_OVERLAY_MANIFEST.template.md` when the user asks or the current task explicitly maintains, imports, promotes, or governance-reviews a private skill.
+- Use `os/skills/promote-private-skill-to-core/SKILL.md` before turning a private skill into a Core skill. Promotion must prove reusable value, map private versus Core-safe behavior, preserve private behavior through config or a private thin adapter, and run privacy validation before Core publication.
 - Record lifecycle status, contract status, mutability, tools/connectors, safety posture, output artifact, filing rule, verification coverage, provenance, and private config status.
 - Reference `personal/os/context/SOURCE_MAP.md` for nontrivial private source routes and `personal/os/connections/CONNECTIONS.md` for connector/account permissions; do not duplicate full source-map or connection inventories in the skills manifest.
 - Keep long-form manifest fields as readable Markdown prose. Consider a structured sidecar only when multiple scripts need typed data, cross-field validation, generated machine output, or query/sort/merge behavior.
