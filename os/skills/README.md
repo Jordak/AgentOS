@@ -24,6 +24,7 @@ Use `os/skills/` for reusable workflows: repeatable procedures that an agent can
 - Skill vs agent: use a skill for a callable repeated workflow; use an agent for a durable role with its own job, inputs, outputs, cadence, reports, and history.
 - Skill vs playbook: use a skill when the workflow is invoked as a capability; use the playbook for cross-cutting AgentOS operating policy.
 - Skill vs manifest: the manifest tracks maintenance facts. It is not the invocation surface and should not duplicate harness-provided descriptions.
+- Manifest format: Core and Personal Overlay skill manifests use Markdown in v1. Treat ``### `skill-name` `` headings and exact, case-sensitive `- Field name: value` labels as the stable manifest API for validators and exposure helpers.
 - Skill vs installed adapter: edit canonical files first, then use `expose-skills` to update current-machine Core skill adapters when needed. Existing same-name Core skill directories require explicit backup-backed replacement. Canonical public skills live in Core; canonical private skills can live in the Personal Overlay.
 - Canonical private skill vs private draft: a Personal Overlay skill is a maintained canonical private skill only when `personal/os/skills/MANIFEST.md` has an entry for it with `Lifecycle status: maintained`; directory-only private skills are drafts or ad hoc local files.
 
@@ -36,6 +37,7 @@ Use `os/skills/` for reusable workflows: repeatable procedures that an agent can
 - For maintained private skills or important Core skill private config overlays, create or update ignored `personal/os/skills/MANIFEST.md` from `os/skills/PERSONAL_OVERLAY_MANIFEST.template.md` when the user asks or the current task explicitly maintains, imports, promotes, or governance-reviews a private skill.
 - Record lifecycle status, contract status, mutability, tools/connectors, safety posture, output artifact, filing rule, verification coverage, provenance, and private config status.
 - Reference `personal/os/context/SOURCE_MAP.md` for nontrivial private source routes and `personal/os/connections/CONNECTIONS.md` for connector/account permissions; do not duplicate full source-map or connection inventories in the skills manifest.
+- Keep long-form manifest fields as readable Markdown prose. Consider a structured sidecar only when multiple scripts need typed data, cross-field validation, generated machine output, or query/sort/merge behavior.
 - Prefer upgrading skills during real repeated work over speculative rewrites.
 
 ## Provenance

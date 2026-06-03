@@ -165,6 +165,17 @@ except RuntimeError as error:
 CODE_SPAN_RE = re.compile(r"`([^`]+)`")
 SKILL_HEADING_RE = re.compile(r"^### `([^`]+)`\s*$", re.MULTILINE)
 SKILL_FRONTMATTER_KEY_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*$")
+REQUIRED_SKILL_MANIFEST_FIELDS = (
+    "Canonical source",
+    "Contract status",
+    "Mutability",
+    "Tools and connectors",
+    "Output artifact",
+    "Filing rule",
+    "Safety posture",
+    "Verification coverage",
+    "Upgrade notes",
+)
 PRIVATE_LOCAL_PATH_RE = r"[^\n`]+"
 PRIVATE_TOKEN_RE = r"[^\s`'\"<>)\]}]+"
 POSIX_ROOT = "/"
@@ -1022,7 +1033,20 @@ class AgentOSValidator:
         if not manifest:
             return
 
-        entries = self.skill_manifest_entries(manifest)
+        self.check_skill_manifest_headings(manifest, manifest_path, check)
+        entry_sections = self.skill_manifest_entry_sections(manifest)
+        entries: dict[str, str] = {}
+        seen_entry_names: set[str] = set()
+        for skill_name, section, line_no in entry_sections:
+            if skill_name in seen_entry_names:
+                self.add_error(
+                    check,
+                    f"{self.display_path(manifest_path)}:{line_no}",
+                    f"duplicate manifest entry for canonical skill {skill_name!r}",
+                )
+                continue
+            seen_entry_names.add(skill_name)
+            entries[skill_name] = section
         expected = self.discover_canonical_skills()
 
         for forbidden in [
@@ -1050,6 +1074,14 @@ class AgentOSValidator:
             canonical = self.extract_field(section, "Canonical source")
             contract = self.extract_field(section, "Contract status")
 
+            for field_name in REQUIRED_SKILL_MANIFEST_FIELDS:
+                if self.skill_manifest_field_count(section, field_name) > 1:
+                    self.add_error(
+                        check,
+                        manifest_path,
+                        f"{skill_name}: duplicate {field_name}",
+                    )
+
             for field_name, value in {
                 "Canonical source": canonical,
                 "Contract status": contract,
@@ -1073,25 +1105,56 @@ class AgentOSValidator:
                 )
                 if not canonical_path:
                     continue
-                if not canonical_path.exists():
+                source_problem = self.no_follow_path_problem(
+                    canonical_path,
+                    expected_kind="file",
+                    allow_missing=False,
+                )
+                if source_problem:
                     self.add_error(
                         check,
                         manifest_path,
-                        f"{skill_name}: canonical source does not exist: {canonical}",
+                        f"{skill_name}: canonical source is missing or unsafe: {canonical} ({source_problem})",
                     )
                 elif contract == "full":
                     self.check_full_skill_contract(skill_name, canonical_path, check)
 
         self.checked.append(check)
 
-    def skill_manifest_entries(self, manifest: str) -> dict[str, str]:
+    def check_skill_manifest_headings(self, manifest: str, manifest_path: Path, check: str) -> None:
+        for match in re.finditer(r"^###\s+(.+?)\s*$", manifest, re.MULTILINE):
+            line = match.group(0)
+            if SKILL_HEADING_RE.fullmatch(line):
+                continue
+            self.add_error(
+                check,
+                f"{self.display_path(manifest_path)}:{self.line_number_for_offset(manifest, match.start())}",
+                "manifest skill heading must use exact shape: ### `skill-name`",
+            )
+
+    def line_number_for_offset(self, text: str, offset: int) -> int:
+        return text.count("\n", 0, offset) + 1
+
+    def skill_manifest_entry_sections(self, manifest: str) -> list[tuple[str, str, int]]:
         matches = list(SKILL_HEADING_RE.finditer(manifest))
-        entries: dict[str, str] = {}
+        entries: list[tuple[str, str, int]] = []
         for index, match in enumerate(matches):
             start = match.end()
             end = matches[index + 1].start() if index + 1 < len(matches) else len(manifest)
-            entries[match.group(1)] = manifest[start:end]
+            entries.append(
+                (match.group(1), manifest[start:end], self.line_number_for_offset(manifest, match.start()))
+            )
         return entries
+
+    def skill_manifest_entries(self, manifest: str) -> dict[str, str]:
+        entries: dict[str, str] = {}
+        for skill_name, section, _line_no in self.skill_manifest_entry_sections(manifest):
+            entries[skill_name] = section
+        return entries
+
+    def skill_manifest_field_count(self, section: str, field_name: str) -> int:
+        pattern = re.compile(rf"^- {re.escape(field_name)}:\s*.*$", re.MULTILINE)
+        return len(pattern.findall(section))
 
     def discover_canonical_skills(self) -> dict[str, Path]:
         skills_dir = self.root / "os/skills"
@@ -2212,6 +2275,86 @@ def run_self_test() -> int:
             and "Canonical source must be root-relative" in error.message
             for error in canonical_escape_validator.errors
         )
+        malformed_manifest_root = root / "_malformed_manifest_fixture"
+        (malformed_manifest_root / "os/skills").mkdir(parents=True)
+        (malformed_manifest_root / "personal").mkdir()
+        for skill_name in ("duplicate", "malformed-heading", "directory-source"):
+            skill_file = malformed_manifest_root / "os/skills" / skill_name / "SKILL.md"
+            skill_file.parent.mkdir(parents=True)
+            skill_file.write_text(
+                f"---\nname: {skill_name}\ndescription: Fixture skill.\n---\n\n# Fixture\n",
+                encoding="utf-8",
+            )
+        (malformed_manifest_root / "os/skills/MANIFEST.md").write_text(
+            "# Skills\n\n"
+            "### `duplicate`\n\n"
+            "- Canonical source: `os/skills/duplicate/SKILL.md`\n"
+            "- Contract status: partial\n"
+            "- Mutability: read-only\n"
+            "- Mutability: mixed\n"
+            "- Tools and connectors: none\n"
+            "- Output artifact: none\n"
+            "- Filing rule: none\n"
+            "- Safety posture: safe\n"
+            "- Verification coverage: none\n"
+            "- Upgrade notes: none\n\n"
+            "### `duplicate`\n\n"
+            "- Canonical source: `os/skills/duplicate/SKILL.md`\n"
+            "- Contract status: partial\n"
+            "- Mutability: read-only\n"
+            "- Tools and connectors: none\n"
+            "- Output artifact: none\n"
+            "- Filing rule: none\n"
+            "- Safety posture: safe\n"
+            "- Verification coverage: none\n"
+            "- Upgrade notes: none\n\n"
+            "### malformed-heading\n\n"
+            "- Canonical source: `os/skills/malformed-heading/SKILL.md`\n"
+            "- Contract status: partial\n"
+            "- Mutability: read-only\n"
+            "- Tools and connectors: none\n"
+            "- Output artifact: none\n"
+            "- Filing rule: none\n"
+            "- Safety posture: safe\n"
+            "- Verification coverage: none\n"
+            "- Upgrade notes: none\n\n"
+            "### `directory-source`\n\n"
+            "- Canonical source: `os/skills/directory-source`\n"
+            "- Contract status: partial\n"
+            "- Mutability: read-only\n"
+            "- Tools and connectors: none\n"
+            "- Output artifact: none\n"
+            "- Filing rule: none\n"
+            "- Safety posture: safe\n"
+            "- Verification coverage: none\n"
+            "- Upgrade notes: none\n",
+            encoding="utf-8",
+        )
+        malformed_manifest_validator = AgentOSValidator(malformed_manifest_root)
+        malformed_manifest_validator.check_skills_manifest_consistency()
+        malformed_heading_rejected = any(
+            error.check == "skills manifest consistency"
+            and "manifest skill heading must use exact shape" in error.message
+            for error in malformed_manifest_validator.errors
+        )
+        duplicate_manifest_entry_rejected = any(
+            error.check == "skills manifest consistency"
+            and "duplicate manifest entry for canonical skill 'duplicate'" in error.message
+            for error in malformed_manifest_validator.errors
+        )
+        duplicate_manifest_field_rejected = any(
+            error.check == "skills manifest consistency"
+            and error.path == "os/skills/MANIFEST.md"
+            and "duplicate Mutability" in error.message
+            for error in malformed_manifest_validator.errors
+        )
+        nonfile_manifest_source_rejected = any(
+            error.check == "skills manifest consistency"
+            and error.path == "os/skills/MANIFEST.md"
+            and "canonical source is missing or unsafe" in error.message
+            and "not a regular file" in error.message
+            for error in malformed_manifest_validator.errors
+        )
         skill_frontmatter_root = root / "_skill_frontmatter_fixture"
         missing_frontmatter = skill_frontmatter_root / "os/skills/missing-frontmatter/SKILL.md"
         missing_frontmatter.parent.mkdir(parents=True)
@@ -2505,6 +2648,10 @@ def run_self_test() -> int:
             and built_in_marker_redacted
             and missing_skeleton_rejected
             and canonical_escape_rejected
+            and malformed_heading_rejected
+            and duplicate_manifest_entry_rejected
+            and duplicate_manifest_field_rejected
+            and nonfile_manifest_source_rejected
             and skill_frontmatter_missing_rejected
             and skill_frontmatter_name_rejected
             and skill_frontmatter_colon_rejected
@@ -2542,6 +2689,8 @@ def run_self_test() -> int:
             for error in broad_gitkeep_validator.errors:
                 print(f"EXPECTED {error.format()}")
             for error in canonical_escape_validator.errors:
+                print(f"EXPECTED {error.format()}")
+            for error in malformed_manifest_validator.errors:
                 print(f"EXPECTED {error.format()}")
             for error in skill_frontmatter_validator.errors:
                 print(f"EXPECTED {error.format()}")
