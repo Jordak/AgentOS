@@ -1,0 +1,112 @@
+name: Guidance Benchmark Trial
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  guidance:
+    name: Run Guidance benchmark trial
+    if: github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    environment: guidance-benchmark-trial
+
+    env:
+      CODEX_HOME: ${{ runner.temp }}/codex-home
+      GUIDANCE_RUN_JSON: ${{ runner.temp }}/guidance-run.json
+      GUIDANCE_REFRESH_JSON: ${{ runner.temp }}/guidance-refresh.json
+
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prepare remote-fresh main branch
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --prune origin "+refs/heads/main:refs/remotes/origin/main"
+          git switch -C main origin/main
+          git branch --set-upstream-to=origin/main main
+          git status --short --branch
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.x"
+
+      - name: Check model-call secret
+        env:
+          CODEX_OPENAI_API_KEY: ${{ secrets.CODEX_OPENAI_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$CODEX_OPENAI_API_KEY" ]; then
+            echo "::error title=Missing CODEX_OPENAI_API_KEY::Configure CODEX_OPENAI_API_KEY in the guidance-benchmark-trial environment before running this workflow."
+            exit 1
+          fi
+
+      - name: Start Codex proxy
+        # openai/codex-action v1, resolved 2026-06-04.
+        uses: openai/codex-action@a26d2d4d8b78a694338b8e3715c3630254340b2c
+        with:
+          openai-api-key: ${{ secrets.CODEX_OPENAI_API_KEY }}
+          codex-home: ${{ env.CODEX_HOME }}
+          safety-strategy: drop-sudo
+
+      - name: Run Guidance benchmark
+        env:
+          CODEX_HOME: ${{ env.CODEX_HOME }}
+        run: |
+          set -euo pipefail
+          python3 os/verification/guidance/scripts/benchmark_guidance.py \
+            --no-dry-run \
+            --harness codex \
+            --judge-harness codex \
+            --model gpt-5.5 \
+            --effort low \
+            --judge-model gpt-5.5 \
+            --judge-effort low \
+            --check-remote-main \
+            --quiet \
+            --output "$GUIDANCE_RUN_JSON"
+
+      - name: Generate public-safe refresh candidate
+        id: refresh
+        run: |
+          set +e
+          python3 os/verification/scripts/refresh_benchmark_status.py \
+            --report "$GUIDANCE_RUN_JSON" \
+            > "$GUIDANCE_REFRESH_JSON"
+          refresh_status=$?
+          set -e
+          echo "refresh_status=$refresh_status" >> "$GITHUB_OUTPUT"
+
+      - name: Write public-safe step summary
+        if: always()
+        run: |
+          set -euo pipefail
+          if [ -s "$GUIDANCE_REFRESH_JSON" ]; then
+            python3 os/verification/scripts/render_benchmark_step_summary.py "$GUIDANCE_REFRESH_JSON" >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "## Guidance Benchmark Trial"
+              echo
+              echo "No public-safe refresh summary was generated. Inspect the failed workflow step logs."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Enforce refresh candidate result
+        if: steps.refresh.outputs.refresh_status != '' && steps.refresh.outputs.refresh_status != '0'
+        env:
+          REFRESH_STATUS: ${{ steps.refresh.outputs.refresh_status }}
+        run: |
+          echo "::error title=No fresh public-safe Guidance candidate::refresh-benchmark-status helper exited with status ${REFRESH_STATUS}."
+          exit "$REFRESH_STATUS"
+
+      - name: Clean up temporary benchmark JSON
+        if: always()
+        run: |
+          rm -f "$GUIDANCE_RUN_JSON" "$GUIDANCE_REFRESH_JSON"
