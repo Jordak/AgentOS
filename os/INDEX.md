@@ -46,7 +46,7 @@ When updating AgentOS, prefer adding facts to the narrowest file:
 - Personal overlay load and migration rule -> `os/playbook/PERSONAL_OVERLAY.md`
 - Guided first-pass setup -> `os/playbook/GETTING_STARTED.md`
 - Public repository publication workflow -> `os/playbook/PUBLICATION.md`
-- GitHub branch, worktree, pull request, and merge workflow -> `os/playbook/GITHUB_WORKFLOW.md`
+- GitHub CLI authentication, branch, worktree, pull request, and merge workflow -> `os/playbook/GITHUB_WORKFLOW.md`
 - Feature implementation readiness and no-first-commit design gate -> `os/playbook/IMPLEMENT_FEATURES.md`
 - Lookup, routing, authority, safety, and filing tie-breakers -> `os/RESOLVER.md`
 

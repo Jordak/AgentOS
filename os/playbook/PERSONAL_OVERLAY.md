@@ -19,11 +19,17 @@ If both roots contain guidance for the same topic, the Personal Overlay may add 
 
 The Personal Overlay is intentionally ignored local state. Do not treat ignore-aware or git-aware discovery as evidence that Personal Overlay files are absent.
 
+Discovery guidance describes the check to perform when the task actually needs private facts and private-state inspection is approved. When the user is asking a procedural question about whether a discovery result proves absence, answer the rule and name the direct check that would be needed; do not inspect private files merely to answer the procedure question.
+
 Absence must be proven with a direct filesystem read or listing of the canonical Personal Overlay root that does not apply git ignore rules. If discovery returns only tracked skeleton files such as `.gitkeep`, treat the result as inconclusive until a direct filesystem check has also found no matching private files.
 
 Use any direct filesystem mechanism available in the current environment. Examples include reading a known expected path directly, using a filesystem API that recursively lists regular files under `personal/os/`, POSIX `find personal/os -type f`, PowerShell `Get-ChildItem -Path personal/os -File -Recurse -Force`, or ignore-including search flags such as `rg --files -uuu personal/os/` when ripgrep is installed.
 
 Do not use default ignore-aware searches, IDE indexes, Git file APIs, or MCP/resource indexes as absence evidence unless they are known to include ignored files.
+
+Do not claim that private Personal Overlay files or findings exist merely because the canonical overlay location exists, because a public skeleton exists, or because a workflow would normally inspect private state. Until approved direct discovery has inspected the canonical Personal Overlay root, task-relevant private state is unknown. Say what still needs to be checked, or ask for access/path clarification when the task depends on those private facts.
+
+Direct discovery of private state is approved only when the current task actually requires private facts and the user, local adapter, or harness has explicitly assigned an appropriate private root for that private-state work. An installed AgentOS path, global adapter, primary checkout path, or Core guidance path is not approval by itself to inspect `personal/os/`. In sanitized, public-clone, read-only, or procedure-answer contexts, do not probe machine-local fallback paths, host-primary checkouts, prior private reports, or other private overlay files just to prove that private state exists. State the direct check that would be needed instead.
 
 ## Canonical Local Overlay
 

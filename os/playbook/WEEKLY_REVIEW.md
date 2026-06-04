@@ -14,11 +14,11 @@ Review whether AgentOS state is current, useful, and safely filed.
 - `os/INDEX.md`
 - `os/RESOLVER.md`
 - `os/playbook/AGENTOS_PLAYBOOK.md`
-- Matching Personal Overlay files when present
+- Matching Personal Overlay files when present and approved for inspection
 
 ## Procedure
 
-1. Inspect current Core and Personal Overlay state.
+1. Inspect current Core state and matching Personal Overlay state when it is present and approved for inspection. If private state is unavailable or has not been inspected, treat private findings as unknown and note the gap instead of inferring them from Core, skeleton directories, or the expected report destination.
 2. Run relevant local validators.
 3. Run the global-instructions drift check:
 
@@ -39,6 +39,8 @@ Review whether AgentOS state is current, useful, and safely filed.
 7. Classify generated durable-state recommendations by inbox: GitHub issue or mapped-project tracker for public-safe actionable project work; `personal/os/memory/propagation-review/QUEUE.md` for private, tentative, connector-derived, personal, cross-project, or pre-issue proposals; direct edit only for exact approved changes.
 8. Ask the user to approve any durable state changes or external actions. Inline approval can approve exact requested edits or specific queue entries, but vague generated yes/no prompts are not durable decision records by themselves.
 
+In sanitized, read-only, or otherwise non-writable contexts, a weekly-review draft may summarize only inspected Core-safe evidence and should mark private-review sections as not inspected or unknown. Do not read or cite prior private reports, private automations, temporary harness paths, temporary overlay roots, local scratch report paths, excluded directories, environment-specific workspace details, or expected Personal Overlay destinations as evidence that the private review actually ran.
+
 ## Retrospective Checklist
 
 Check whether the OS is still serving the user:
@@ -55,5 +57,6 @@ Check whether the OS is still serving the user:
 ## Safety
 
 - Do not inspect external accounts unless the user explicitly asks.
+- Do not claim specific private findings unless the review actually inspected the approved private source that supports them.
 - Do not perform external writes, delete files, or change automation state without approval.
 - Treat generated durable state changes as proposals until they are filed in the right inbox, approved when needed, and applied.

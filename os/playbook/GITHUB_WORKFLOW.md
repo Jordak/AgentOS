@@ -58,10 +58,13 @@ Some agent harnesses run shell commands in a sandbox that cannot read the system
 When an authenticated `gh` command is needed and sandboxed `gh auth status` reports an invalid token:
 
 - Do not immediately ask the user to reauthenticate.
-- First retry the exact auth check or GitHub CLI command with the harness's approved elevation path so `gh` can access the system keyring.
+- Make the immediate next step a retry of the exact auth check or needed GitHub CLI command with the harness's approved elevation path so `gh` can access the system keyring. Do not substitute environment diagnosis, connector fallback, or general troubleshooting for this keyring-capable retry.
 - Treat the credential as actually broken only if the elevated `gh auth status -h github.com` also fails.
-- Never use `gh auth status --show-token`, `gh auth token`, or other token-printing commands unless the user explicitly asks and the risk is necessary.
+- Do not inspect token-valued environment variables as the first response to this mismatch. If environment-variable diagnosis is still needed after the elevated keyring-capable retry, check only variable presence or names and do not print values.
+- Never use or suggest `gh auth status --show-token`, `gh auth token`, `env | rg TOKEN`, or other token-printing commands unless the user explicitly asks and the risk is necessary.
 - Prefer GitHub connector reads when they are sufficient, but use elevated `gh` for CLI-only actions such as PR creation when connector permissions are read-only.
+
+Response shape for this mismatch: identify likely sandbox/keyring isolation, retry through the approved elevated path, and wait for that result before any other diagnosis. A response that mentions token-printing commands or makes environment inspection the first step is wrong for this case.
 
 Concrete example: in Codex Desktop, an unelevated `gh auth status` can report an invalid token while elevated `gh auth status -h github.com` succeeds with a keyring-backed token. The correct repair is to rerun the needed `gh` operation with keyring access, not to send the user through a redundant `gh auth login` flow.
 
