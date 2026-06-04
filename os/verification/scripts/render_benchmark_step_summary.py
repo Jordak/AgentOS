@@ -92,6 +92,7 @@ def render_scope(scope: dict[str, Any]) -> list[str]:
         "#### Evidence Scope",
         "",
         f"- Harnesses: `{comma_list(scope.get('harnesses'))}`",
+        f"- HUT user config: `{as_bool_text(scope.get('harness_user_config_allowed_for_hut'))}`",
         f"- Model: `{as_text(scope.get('model'))}`",
         f"- Effort: `{as_text(scope.get('effort'))}`",
         f"- Judge harness: `{as_text(scope.get('judge_harness'))}`",

@@ -103,6 +103,7 @@ jobs:
             --effort low \
             --judge-model gpt-5.5 \
             --judge-effort low \
+            --allow-harness-user-config \
             --check-remote-main \
             --quiet \
             --output "$GUIDANCE_RUN_JSON"

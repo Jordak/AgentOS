@@ -1079,6 +1079,7 @@ def planned_results(
     effort: str | None = None,
     judge_model: str | None = None,
     judge_effort: str | None = None,
+    allow_harness_user_config: bool = False,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     results: list[dict[str, Any]] = []
     judge_batches: list[dict[str, Any]] = []
@@ -1101,7 +1102,7 @@ def planned_results(
                             harness_output,
                             model=model,
                             effort=effort,
-                            ignore_user_config=True,
+                            ignore_user_config=not allow_harness_user_config,
                         )
                     ),
                     "harness_adapter": HARNESS_ADAPTER_FILENAMES[harness],
@@ -1154,6 +1155,7 @@ def run_guidance(
     effort: str | None = None,
     judge_model: str | None = None,
     judge_effort: str | None = None,
+    allow_harness_user_config: bool = False,
     progress: Any = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any], dict[str, Any]]:
     results: list[dict[str, Any]] = []
@@ -1199,7 +1201,7 @@ def run_guidance(
                     timeout_seconds,
                     model=model,
                     effort=effort,
-                    ignore_user_config=True,
+                    ignore_user_config=not allow_harness_user_config,
                 )
                 checked_output_count += 1
                 sentinel_observed = harness_result_contains_marker(harness_result, marker)
@@ -1544,6 +1546,7 @@ def build_report(
     effort: str | None = None,
     judge_model: str | None = None,
     judge_effort: str | None = None,
+    allow_harness_user_config: bool = False,
     check_remote_main: bool = False,
     run_guidance_fn: Any = None,
     progress: Any = None,
@@ -1576,6 +1579,7 @@ def build_report(
             effort=effort,
             judge_model=judge_model,
             judge_effort=judge_effort,
+            allow_harness_user_config=allow_harness_user_config,
         )
     else:
         runner = run_guidance_fn or run_guidance
@@ -1592,6 +1596,7 @@ def build_report(
             effort=effort,
             judge_model=judge_model,
             judge_effort=judge_effort,
+            allow_harness_user_config=allow_harness_user_config,
             progress=progress,
         )
         if len(run_output) == 3:
@@ -1625,6 +1630,10 @@ def build_report(
         "judge_batch_size": judge_batch_size,
         "judge_protocol": judge_protocol,
         "hut_workspace": hut_workspace,
+        "harness_user_config": {
+            "allowed_for_hut": allow_harness_user_config,
+            "judge_uses_user_config": True,
+        },
         "host_boundary": host_boundary,
         "judge_batches": judge_batches,
         "results": results,
@@ -2196,6 +2205,25 @@ def run_self_test(root: Path, fixtures_path: Path, judge_prompt_path: Path, judg
         print("SELF-TEST FAIL: planned HUT command did not use the external project adapter path.")
         print(json.dumps(planned[0], indent=2))
         return 1
+    planned_user_config, user_config_judge_batches = planned_results(
+        root,
+        fixtures[:2],
+        ["codex"],
+        "codex",
+        Path("os/verification/guidance/judge_response.schema.json"),
+        judge_prompt_template,
+        0,
+        allow_harness_user_config=True,
+    )
+    if (
+        len(planned_user_config) != 2
+        or "--ignore-user-config" in planned_user_config[0]["harness_command_shape"]
+        or str(HUT_PROJECT_PLACEHOLDER) not in planned_user_config[0]["harness_command_shape"]
+        or "--ignore-user-config" in user_config_judge_batches[0]["judge_command_shape"]
+    ):
+        print("SELF-TEST FAIL: allowed HUT user config did not stay scoped to harness-under-test calls.")
+        print(json.dumps({"planned": planned_user_config, "judge_batches": user_config_judge_batches}, indent=2))
+        return 1
     if (
         "--ignore-user-config" in judge_batches[0]["judge_command_shape"]
         or str(HUT_PROJECT_PLACEHOLDER) in judge_batches[0]["judge_command_shape"]
@@ -2629,6 +2657,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--timeout-seconds", type=int, default=600)
     parser.add_argument("--model", help="Optional model override passed through to the harness under test.")
     parser.add_argument("--effort", help="Optional reasoning effort override passed through to the harness under test.")
+    parser.add_argument(
+        "--allow-harness-user-config",
+        action="store_true",
+        help=(
+            "Allow HUT Codex calls to read CODEX_HOME/config.toml. Intended for controlled CI proxy "
+            "configuration; default HUT calls ignore user config."
+        ),
+    )
     parser.add_argument("--judge-model", help="Optional model override passed through to the judge harness.")
     parser.add_argument("--judge-effort", help="Optional reasoning effort override passed through to the judge harness.")
     parser.add_argument(
@@ -2734,6 +2770,7 @@ def main(argv: list[str] | None = None) -> int:
         effort=args.effort,
         judge_model=args.judge_model,
         judge_effort=args.judge_effort,
+        allow_harness_user_config=args.allow_harness_user_config,
         check_remote_main=args.check_remote_main,
         progress=stderr_progress if not dry_run and not args.quiet else None,
     )
