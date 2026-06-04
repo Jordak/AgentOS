@@ -60,7 +60,37 @@ jobs:
           codex-home: ${{ runner.temp }}/codex-home
           safety-strategy: drop-sudo
 
+      - name: Run Codex preflight
+        id: codex_preflight
+        run: |
+          set -uo pipefail
+          preflight_stdout="${RUNNER_TEMP}/guidance-codex-preflight.stdout"
+          preflight_stderr="${RUNNER_TEMP}/guidance-codex-preflight.stderr"
+          preflight_message="${RUNNER_TEMP}/guidance-codex-preflight-message.txt"
+          set +e
+          timeout 120s codex exec \
+            --cd "$GITHUB_WORKSPACE" \
+            --skip-git-repo-check \
+            --sandbox read-only \
+            --ephemeral \
+            --color never \
+            --output-last-message "$preflight_message" \
+            --model gpt-5.5 \
+            --config 'model_reasoning_effort="low"' \
+            "Reply with exactly OK." \
+            > "$preflight_stdout" \
+            2> "$preflight_stderr"
+          preflight_status=$?
+          set -e
+          python3 os/verification/scripts/classify_codex_preflight.py \
+            --exit-code "$preflight_status" \
+            --stdout "$preflight_stdout" \
+            --stderr "$preflight_stderr" \
+            --raw-response "$preflight_message" \
+            --github-output "$GITHUB_OUTPUT"
+
       - name: Run Guidance benchmark
+        if: steps.codex_preflight.outputs.preflight_status == '0'
         id: benchmark
         run: |
           set -uo pipefail
@@ -100,17 +130,32 @@ jobs:
       - name: Write public-safe step summary
         if: always()
         env:
+          PREFLIGHT_STATUS: ${{ steps.codex_preflight.outputs.preflight_status }}
+          PREFLIGHT_DIAGNOSIS: ${{ steps.codex_preflight.outputs.preflight_diagnosis }}
+          PREFLIGHT_RESPONSE_STATUS: ${{ steps.codex_preflight.outputs.preflight_response_status }}
           BENCHMARK_STATUS: ${{ steps.benchmark.outputs.benchmark_status }}
           REFRESH_STATUS: ${{ steps.refresh.outputs.refresh_status }}
         run: |
           set -euo pipefail
+          {
+            echo "## Codex Preflight"
+            echo
+            echo "- Exit status: \`${PREFLIGHT_STATUS:-unknown}\`"
+            echo "- Public diagnosis: \`${PREFLIGHT_DIAGNOSIS:-unknown}\`"
+            echo "- Response status: \`${PREFLIGHT_RESPONSE_STATUS:-unknown}\`"
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
           if [ -s "$GUIDANCE_REFRESH_JSON" ]; then
             python3 os/verification/scripts/render_benchmark_step_summary.py "$GUIDANCE_REFRESH_JSON" >> "$GITHUB_STEP_SUMMARY"
           else
             {
               echo "## Guidance Benchmark Trial"
               echo
-              echo "No public-safe refresh summary was generated. Inspect the failed workflow step logs."
+              if [ "${PREFLIGHT_STATUS:-}" != "0" ]; then
+                echo "The full benchmark was skipped because the Codex preflight did not pass."
+              else
+                echo "No public-safe refresh summary was generated. Inspect the failed workflow step logs."
+              fi
             } >> "$GITHUB_STEP_SUMMARY"
           fi
           {
@@ -121,8 +166,17 @@ jobs:
             echo "- Refresh helper exit status: \`${REFRESH_STATUS:-unknown}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Enforce Codex preflight result
+        if: steps.codex_preflight.outputs.preflight_status != '' && steps.codex_preflight.outputs.preflight_status != '0'
+        env:
+          PREFLIGHT_STATUS: ${{ steps.codex_preflight.outputs.preflight_status }}
+          PREFLIGHT_DIAGNOSIS: ${{ steps.codex_preflight.outputs.preflight_diagnosis }}
+        run: |
+          echo "::error title=Codex preflight failed::codex exec smoke test exited with status ${PREFLIGHT_STATUS}; public diagnosis: ${PREFLIGHT_DIAGNOSIS:-unknown}."
+          exit "$PREFLIGHT_STATUS"
+
       - name: Enforce benchmark result
-        if: steps.benchmark.outputs.benchmark_status != '' && steps.benchmark.outputs.benchmark_status != '0'
+        if: steps.codex_preflight.outputs.preflight_status == '0' && steps.benchmark.outputs.benchmark_status != '' && steps.benchmark.outputs.benchmark_status != '0'
         env:
           BENCHMARK_STATUS: ${{ steps.benchmark.outputs.benchmark_status }}
         run: |
@@ -140,4 +194,7 @@ jobs:
       - name: Clean up temporary benchmark JSON
         if: always()
         run: |
-          rm -f "$GUIDANCE_RUN_JSON" "$GUIDANCE_REFRESH_JSON"
+          rm -f "$GUIDANCE_RUN_JSON" "$GUIDANCE_REFRESH_JSON" \
+            "${RUNNER_TEMP}/guidance-codex-preflight.stdout" \
+            "${RUNNER_TEMP}/guidance-codex-preflight.stderr" \
+            "${RUNNER_TEMP}/guidance-codex-preflight-message.txt"
