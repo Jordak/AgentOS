@@ -13,11 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     environment: guidance-benchmark-trial
 
-    env:
-      CODEX_HOME: ${{ runner.temp }}/codex-home
-      GUIDANCE_RUN_JSON: ${{ runner.temp }}/guidance-run.json
-      GUIDANCE_REFRESH_JSON: ${{ runner.temp }}/guidance-refresh.json
-
     steps:
       - name: Check out main
         uses: actions/checkout@v6
@@ -32,6 +27,15 @@ jobs:
           git switch -C main origin/main
           git branch --set-upstream-to=origin/main main
           git status --short --branch
+
+      - name: Configure benchmark temp paths
+        run: |
+          set -euo pipefail
+          {
+            echo "CODEX_HOME=${RUNNER_TEMP}/codex-home"
+            echo "GUIDANCE_RUN_JSON=${RUNNER_TEMP}/guidance-run.json"
+            echo "GUIDANCE_REFRESH_JSON=${RUNNER_TEMP}/guidance-refresh.json"
+          } >> "$GITHUB_ENV"
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -53,12 +57,10 @@ jobs:
         uses: openai/codex-action@a26d2d4d8b78a694338b8e3715c3630254340b2c
         with:
           openai-api-key: ${{ secrets.CODEX_OPENAI_API_KEY }}
-          codex-home: ${{ env.CODEX_HOME }}
+          codex-home: ${{ runner.temp }}/codex-home
           safety-strategy: drop-sudo
 
       - name: Run Guidance benchmark
-        env:
-          CODEX_HOME: ${{ env.CODEX_HOME }}
         run: |
           set -euo pipefail
           python3 os/verification/guidance/scripts/benchmark_guidance.py \
