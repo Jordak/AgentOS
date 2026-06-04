@@ -34,6 +34,7 @@ Tools and connectors:
 - Local `git`, filesystem reads, and configured benchmark scripts.
 - `os/verification/BENCHMARKS.json`.
 - `os/skills/refresh-benchmark-status/SKILL.md` for status interpretation and updates.
+- `os/verification/scripts/refresh_benchmark_status.py` through `refresh-benchmark-status` for deterministic status candidate facts after saved runs.
 - `os/playbook/PERSONAL_OVERLAY.md` for report location boundaries.
 
 Safety:
@@ -78,7 +79,7 @@ Safety:
 - Raw reports and run histories stay in the canonical or user-assigned Personal Overlay report directories configured by `os/verification/BENCHMARKS.json`.
 - Core benchmark status lives only in `os/verification/BENCHMARK_STATUS.md` and is changed only through `refresh-benchmark-status`.
 - Benchmark CLI standardization is deferred to GitHub Issue #33.
-- Deterministic refresh-helper work is deferred to GitHub Issue #30.
+- Deterministic status-refresh candidate generation lives in `os/verification/scripts/refresh_benchmark_status.py` and is used through `refresh-benchmark-status`.
 
 ## Quality Bar
 
@@ -100,3 +101,4 @@ Before finishing:
 6. Confirm the configured harness choices were reported per script before any `--harness all` run.
 7. Confirm raw report content was not copied into Core.
 8. Confirm `refresh-benchmark-status` ran or was followed in proposal/report mode, or that a blocked/declined refresh was labeled incomplete with the next action.
+9. After helper changes, run `python3 os/verification/scripts/refresh_benchmark_status.py --self-test`.

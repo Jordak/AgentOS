@@ -36,6 +36,7 @@ Tools and connectors:
 
 - Local filesystem reads for Core files and Personal Overlay benchmark reports.
 - Local `git` for branch, commit, upstream, remote `origin/main`, and dirty-state checks.
+- `os/verification/scripts/refresh_benchmark_status.py` for deterministic evidence discovery, eligibility checks, freshness comparison, public-safe fact extraction, and private result locators.
 - `os/verification/BENCHMARKS.json` for benchmark suite configuration.
 - `os/playbook/PERSONAL_OVERLAY.md` for resolving local Personal Overlay report locations from a feature worktree.
 - No external connectors are needed. Use saved remote-freshness metadata from benchmark reports rather than making network calls unless the user asks to rerun benchmarks.
@@ -57,12 +58,25 @@ Safety:
 
    Treat only manifest entries with `weekly_review.check_freshness: true` as current status-refresh freshness targets. Entries with `check_freshness: false` are diagnostic or historical suites; they can remain runnable, but missing or stale evidence from those suites must not block a benchmark status refresh. Reducing a legacy suite's status-refresh surface is different from deleting or disabling that suite.
 
-2. Find local evidence.
+2. Generate deterministic candidate facts.
+   Run `python3 os/verification/scripts/refresh_benchmark_status.py`, passing `--personal-root <canonical AgentOS checkout>` when working from a feature worktree whose ignored `personal/os/` skeleton is not authoritative. Use `--report <path>` only when the user asks whether one explicit saved report counts.
+
+   The helper is read-only and JSON-only. It never writes `os/verification/BENCHMARK_STATUS.md`, never emits Markdown patches, and never returns raw HUT output, judge rationales, prompts, stdout, stderr, transcripts, raw report bodies, local absolute paths, or private diagnostics in `public_safe`.
+
+   Treat the helper's `public_safe` object as deterministic evidence facts. Treat `private_locators` as non-Core-safe pointers for targeted private inspection only; do not copy them into Core.
+
+   Helper exit codes distinguish outcomes:
+   - `0`: candidate generated for all current status-refresh targets.
+   - `1`: no eligible or fresh-enough evidence found, or evidence is older than current status.
+   - `2`: invalid manifest/config/schema/unsupported target.
+   - `3`: public-safe output invariant failed.
+
+3. Find local evidence manually when needed.
    For each current status-refresh freshness target, inspect saved `run.json` files under the configured report directory and `run_glob`. Consider only current-schema reports that include Git state metadata.
 
    If eligible evidence is missing and the user asks to rerun benchmarks, run them from a clean `main` checkout with `--check-remote-main` and `--save-report`. Ordinary local, dry-run, transcript, or diagnostic reports may avoid remote network checks; those reports remain ineligible when remote freshness is unknown.
 
-3. Check evidence eligibility.
+4. Check evidence eligibility.
    Evidence is eligible only when the report mode and suite section represent status-counting benchmark evidence for the target status entry, and its Git metadata shows:
    - branch `main`;
    - upstream `origin/main`;
@@ -77,10 +91,10 @@ Safety:
 
    Freshness thresholds use status-counting totals, not only behavioral pass/fail totals. For Guidance, derive the status-counting total from `behavioral_total + fixture_stale`; do not rely on a saved derived total in the report.
 
-4. Compare provenance.
+5. Compare provenance.
    Compare eligible evidence to the matching status entry by `Reviewed Core revision` and `Last reviewed evidence`, not by prose. A later local run against an older commit does not refresh current Core status.
 
-5. Summarize public-safe posture.
+6. Summarize public-safe posture.
    Produce only the minimum public-safe summary needed to explain what kinds of benchmark tasks are passing, failing, unavailable, or unknown. Use the allowed status labels:
    - `passing`;
    - `attention needed`;
@@ -104,7 +118,7 @@ Safety:
 
    Fixture identifiers, categories, verdict classes, staleness labels, and availability/error classes are public-safe structured provenance. Judge rationales, HUT answers, prompts, command shapes, stdout, stderr, local paths, and raw report excerpts are not public-safe Core content.
 
-6. Update or report.
+7. Update or report.
    Update `os/verification/BENCHMARK_STATUS.md` only when the user requested the refresh and evidence is eligible, or after the user approves a proposed update. If evidence is missing, stale, incompatible, dirty, not from fresh `main`, or otherwise ineligible, leave Core unchanged and explain what to rerun.
 
 ## Status Rules
@@ -120,7 +134,7 @@ Do not use `stale` as a Core status. Report staleness in the refresh report beca
 
 - Core benchmark status lives only in `os/verification/BENCHMARK_STATUS.md`.
 - Raw reports and run histories stay in the Personal Overlay report directories configured by `os/verification/BENCHMARKS.json`.
-- Deterministic refresh-helper design is deferred to GitHub Issue #30. Do not add a parser/updater script as part of this skill.
+- Deterministic refresh-helper behavior lives in `os/verification/scripts/refresh_benchmark_status.py`. The helper emits JSON candidate facts and private locators only; it is not a Core status writer.
 - Do not create append-only Core benchmark history.
 
 ## Quality Bar
@@ -139,8 +153,10 @@ Before finishing:
 
 1. Confirm `os/verification/BENCHMARKS.json` and `os/verification/BENCHMARK_STATUS.md` were read.
 2. Confirm local report paths were resolved through the Personal Overlay rule.
-3. Confirm each used report had current-schema Git metadata.
-4. Confirm no raw report body, run JSON, transcript, stdout, stderr, local path, prompt, session detail, or private diagnostic was copied into Core.
-5. Confirm each non-passing status-counting result in eligible evidence has a public-safe detail row or that the status entry was intentionally left unchanged.
-6. Confirm status labels are limited to `passing`, `attention needed`, `not run`, and `unknown`.
-7. Run `scripts/run-validator` after skill or status-file changes.
+3. Confirm `os/verification/scripts/refresh_benchmark_status.py` ran or explain why manual inspection was needed instead.
+4. Confirm each used report had current-schema Git metadata.
+5. Confirm no raw report body, run JSON, transcript, stdout, stderr, local path, prompt, session detail, or private diagnostic was copied into Core.
+6. Confirm each non-passing status-counting result in eligible evidence has a public-safe detail row or that the status entry was intentionally left unchanged.
+7. Confirm status labels are limited to `passing`, `attention needed`, `not run`, and `unknown`.
+8. Run `python3 os/verification/scripts/refresh_benchmark_status.py --self-test` after helper changes.
+9. Run `scripts/run-validator` after helper, skill, or status-file changes.
