@@ -103,6 +103,8 @@ Run Codex as the harness under test and save a diagnostic report:
 python3 os/verification/guidance/scripts/benchmark_guidance.py --no-dry-run --harness codex --save-report
 ```
 
+Use `--quiet` for log-sensitive runs such as public GitHub Actions trials. Quiet mode still writes requested `--save-report` or `--output` artifacts, and still prints errors, but suppresses the rendered benchmark report, progress lines, and generated local report paths from stdout/stderr.
+
 Use `--judge-prompt <path>` or `--judge-schema <path>` to test alternate judge assets. The prompt must contain the documented placeholder tokens from `judge_prompt.md`. Alternate judge assets are diagnostic and make the run status-ineligible.
 
 Use `--judge-batch-size 1` to debug one judge call per successful HUT answer. The default `--judge-batch-size 0` batches all successful HUT answers for each harness into one judge call. Non-default judge batch sizes are diagnostic and make the run status-ineligible.
@@ -114,6 +116,8 @@ Status-eligible runs require a clean, remote-fresh `main` checkout and:
 ```bash
 python3 os/verification/guidance/scripts/benchmark_guidance.py --no-dry-run --harness codex --save-report --check-remote-main
 ```
+
+For a log-sensitive status-eligible trial, add `--quiet` and route status interpretation through `os/skills/refresh-benchmark-status/SKILL.md` rather than copying report contents into workflow logs.
 
 ## Status Summary
 

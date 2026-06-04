@@ -2648,6 +2648,11 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Preview fixture, harness, and judge commands without invoking model-call harnesses. Default unless --no-dry-run is set.",
     )
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Suppress rendered report, progress, and report-path output. Errors and self-test output still print.",
+    )
     parser.add_argument("--self-test", action="store_true", help="Run deterministic Guidance self-tests.")
     args = parser.parse_args(argv)
 
@@ -2730,11 +2735,11 @@ def main(argv: list[str] | None = None) -> int:
         judge_model=args.judge_model,
         judge_effort=args.judge_effort,
         check_remote_main=args.check_remote_main,
-        progress=stderr_progress if not dry_run else None,
+        progress=stderr_progress if not dry_run and not args.quiet else None,
     )
 
     markdown = render_markdown(report)
-    if not dry_run:
+    if not dry_run and not args.quiet:
         summary = report["summary"]
         stderr_progress(
             "run complete "
@@ -2743,14 +2748,17 @@ def main(argv: list[str] | None = None) -> int:
             f"behavioral_fail={summary.get('behavioral_fail', 0)}, "
             f"status_eligible={render_bool(summary.get('status_eligible'))})"
         )
-    print(markdown, end="")
+    if not args.quiet:
+        print(markdown, end="")
     if args.save_report:
         report_dir = default_report_dir(root)
         write_saved_report(report_dir, report, markdown)
-        print(f"Report written to {report_dir}", file=sys.stderr)
+        if not args.quiet:
+            print(f"Report written to {report_dir}", file=sys.stderr)
     if output_path:
         write_report(output_path, report, markdown)
-        print(f"Report written to {output_path}", file=sys.stderr)
+        if not args.quiet:
+            print(f"Report written to {output_path}", file=sys.stderr)
     return report_exit_code(report)
 
 
