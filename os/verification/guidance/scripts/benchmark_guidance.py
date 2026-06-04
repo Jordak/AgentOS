@@ -70,6 +70,10 @@ HARNESS_ADAPTER_FILENAMES = {
 }
 
 
+def stderr_progress(message: str) -> None:
+    print(f"Guidance progress: {message}", file=sys.stderr, flush=True)
+
+
 def default_root() -> Path:
     return Path(__file__).resolve().parents[4]
 
@@ -1150,24 +1154,44 @@ def run_guidance(
     effort: str | None = None,
     judge_model: str | None = None,
     judge_effort: str | None = None,
+    progress: Any = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any], dict[str, Any]]:
     results: list[dict[str, Any]] = []
     judge_batches: list[dict[str, Any]] = []
     pending_by_harness: dict[str, list[tuple[dict[str, Any], dict[str, Any]]]] = {}
     host_boundary = host_boundary_sentinel_metadata(observed=False)
+    total_harness_calls = len(harnesses) * len(fixtures)
+    completed_harness_calls = 0
 
     with tempfile.TemporaryDirectory(prefix="agentos-guidance-hut-") as workspace_parent, tempfile.TemporaryDirectory(
         prefix="agentos-guidance-host-boundary-"
     ) as sentinel_parent:
         project_root = Path(workspace_parent) / "external-project"
         agentos_root = Path(workspace_parent) / "agentos"
+        if progress:
+            progress(
+                "preparing HUT workspace "
+                f"(harnesses={', '.join(harnesses)}, fixtures={len(fixtures)})"
+            )
         _sentinel_path, marker, host_boundary = create_host_boundary_sentinel(Path(sentinel_parent))
         hut_workspace = prepare_hut_project(root, project_root, agentos_root, harnesses)
+        if progress:
+            progress(
+                "HUT workspace ready "
+                f"(copied={hut_workspace.get('copied_file_count', 'unknown')}, "
+                f"excluded={hut_workspace.get('excluded_file_count', 'unknown')})"
+            )
         checked_output_count = 0
 
         for harness in harnesses:
             for fixture in fixtures:
                 harness_prompt = build_harness_prompt(fixture)
+                if progress:
+                    progress(
+                        "starting harness "
+                        f"{harness} fixture {fixture['id']} "
+                        f"({completed_harness_calls + 1}/{total_harness_calls})"
+                    )
                 harness_result = run_harness_call(
                     harness,
                     project_root,
@@ -1183,6 +1207,13 @@ def run_guidance(
                     host_boundary["marker_observed"] = True
                 unavailable_reason = harness_unavailable_reason(harness_result)
                 if unavailable_reason:
+                    completed_harness_calls += 1
+                    if progress:
+                        progress(
+                            "finished harness "
+                            f"{harness} fixture {fixture['id']} "
+                            f"status=harness-unavailable ({completed_harness_calls}/{total_harness_calls})"
+                        )
                     results.append(
                         {
                             "fixture_id": fixture["id"],
@@ -1196,6 +1227,13 @@ def run_guidance(
                     )
                     continue
                 if int(harness_result.get("exit_code", 0) or 0) != 0:
+                    completed_harness_calls += 1
+                    if progress:
+                        progress(
+                            "finished harness "
+                            f"{harness} fixture {fixture['id']} "
+                            f"status=harness-error ({completed_harness_calls}/{total_harness_calls})"
+                        )
                     results.append(
                         {
                             "fixture_id": fixture["id"],
@@ -1217,6 +1255,13 @@ def run_guidance(
                 }
                 results.append(result)
                 pending_by_harness.setdefault(harness, []).append((fixture, result))
+                completed_harness_calls += 1
+                if progress:
+                    progress(
+                        "finished harness "
+                        f"{harness} fixture {fixture['id']} "
+                        f"status=pending-judge ({completed_harness_calls}/{total_harness_calls})"
+                    )
         host_boundary["checked_output_count"] = checked_output_count
 
         batch_id = 0
@@ -1225,6 +1270,11 @@ def run_guidance(
             for pending_batch in chunks(pending, batch_size):
                 batch_id += 1
                 expected_ids = [fixture["id"] for fixture, _ in pending_batch]
+                if progress:
+                    progress(
+                        "starting judge batch "
+                        f"{batch_id} harness={harness} fixtures={len(expected_ids)}"
+                    )
                 judge_cases = [
                     build_judge_case(root, fixture, harness, result["harness_result"].get("raw_response", ""))
                     for fixture, result in pending_batch
@@ -1241,6 +1291,11 @@ def run_guidance(
                 )
                 judge_unavailable = harness_unavailable_reason(judge_result)
                 if judge_unavailable:
+                    if progress:
+                        progress(
+                            "finished judge batch "
+                            f"{batch_id} harness={harness} status=judge-unavailable results=0"
+                        )
                     judge_batches.append(
                         judge_batch_record(batch_id, harness, expected_ids, judge_harness, judge_result, "judge-unavailable", 0)
                     )
@@ -1254,6 +1309,11 @@ def run_guidance(
                         )
                     continue
                 if int(judge_result.get("exit_code", 0) or 0) != 0:
+                    if progress:
+                        progress(
+                            "finished judge batch "
+                            f"{batch_id} harness={harness} status=judge-error results=0"
+                        )
                     judge_batches.append(
                         judge_batch_record(batch_id, harness, expected_ids, judge_harness, judge_result, "judge-error", 0)
                     )
@@ -1272,6 +1332,11 @@ def run_guidance(
                     batch_record = judge_batch_record(batch_id, harness, expected_ids, judge_harness, judge_result, "judge-invalid", 0)
                     batch_record["judge_errors"] = judge_errors
                     judge_batches.append(batch_record)
+                    if progress:
+                        progress(
+                            "finished judge batch "
+                            f"{batch_id} harness={harness} status=judge-invalid results=0"
+                        )
                     for _, result in pending_batch:
                         result.update(
                             {
@@ -1299,6 +1364,25 @@ def run_guidance(
                             "judge": judge,
                             "verdict": judge["verdict"],
                         }
+                    )
+                if progress:
+                    verdict_counts = {
+                        verdict: sum(
+                            1
+                            for _, result in pending_batch
+                            if result.get("verdict") == verdict
+                        )
+                        for verdict in sorted(VERDICTS)
+                    }
+                    verdict_summary = ", ".join(
+                        f"{verdict}={count}"
+                        for verdict, count in verdict_counts.items()
+                        if count
+                    ) or "none"
+                    progress(
+                        "finished judge batch "
+                        f"{batch_id} harness={harness} status=graded "
+                        f"results={len(pending_batch)} verdicts={verdict_summary}"
                     )
     return results, judge_batches, hut_workspace, host_boundary
 
@@ -1462,6 +1546,7 @@ def build_report(
     judge_effort: str | None = None,
     check_remote_main: bool = False,
     run_guidance_fn: Any = None,
+    progress: Any = None,
 ) -> dict[str, Any]:
     mode = "dry-run" if dry_run else "run"
     git_state = collect_git_state(root, check_remote=check_remote_main)
@@ -1507,6 +1592,7 @@ def build_report(
             effort=effort,
             judge_model=judge_model,
             judge_effort=judge_effort,
+            progress=progress,
         )
         if len(run_output) == 3:
             results, judge_batches, hut_workspace = run_output
@@ -2146,7 +2232,12 @@ def run_self_test(root: Path, fixtures_path: Path, judge_prompt_path: Path, judg
         2,
     )
 
-    def fake_run_guidance(*_: Any, **__: Any) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any], dict[str, Any]]:
+    progress_messages: list[str] = []
+
+    def fake_run_guidance(*_: Any, **kwargs: Any) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any], dict[str, Any]]:
+        progress = kwargs.get("progress")
+        if progress:
+            progress("self-test real-run progress")
         return [
             {
                 "fixture_id": "fixture-a",
@@ -2184,6 +2275,7 @@ def run_self_test(root: Path, fixtures_path: Path, judge_prompt_path: Path, judg
         0,
         60,
         run_guidance_fn=fake_run_guidance,
+        progress=progress_messages.append,
     )
     fake_markdown = render_markdown(fake_report)
     with tempfile.TemporaryDirectory(prefix="agentos-guidance-report-self-test-") as tmp:
@@ -2207,6 +2299,10 @@ def run_self_test(root: Path, fixtures_path: Path, judge_prompt_path: Path, judg
             "host_boundary": saved_report.get("host_boundary"),
             "has_old_markdown_label": "Canonical fixture scope" in saved_markdown,
         }, indent=2))
+        return 1
+    if progress_messages != ["self-test real-run progress"]:
+        print("SELF-TEST FAIL: real-run progress callback was not threaded through build_report.")
+        print(json.dumps(progress_messages, indent=2))
         return 1
 
     timeout_result = timeout_harness_result(
@@ -2634,9 +2730,19 @@ def main(argv: list[str] | None = None) -> int:
         judge_model=args.judge_model,
         judge_effort=args.judge_effort,
         check_remote_main=args.check_remote_main,
+        progress=stderr_progress if not dry_run else None,
     )
 
     markdown = render_markdown(report)
+    if not dry_run:
+        summary = report["summary"]
+        stderr_progress(
+            "run complete "
+            f"(total={summary.get('total', 0)}, "
+            f"behavioral_pass={summary.get('behavioral_pass', 0)}, "
+            f"behavioral_fail={summary.get('behavioral_fail', 0)}, "
+            f"status_eligible={render_bool(summary.get('status_eligible'))})"
+        )
     print(markdown, end="")
     if args.save_report:
         report_dir = default_report_dir(root)
