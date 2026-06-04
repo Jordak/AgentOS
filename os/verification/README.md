@@ -33,6 +33,7 @@ Required behavior:
 - `--save-report` writes both `report.md` and `run.json` to one timestamped directory under the manifest `reports_dir`; `--no-save-report` must be available for boolean-option symmetry.
 - `--check-remote-main` records remote `origin/main` freshness metadata for status-eligible evidence. If remote freshness cannot be proven, the saved evidence remains ineligible for Core benchmark status updates.
 - Harness-capable scripts expose `--harness`, `--dry-run`, `--no-dry-run`, `--model`, and `--effort`. Dry-run mode is the safe default for external or model-call harness work; `--no-dry-run` is the explicit real-run mode.
+- Scripts that may emit rendered reports, progress lines, generated paths, raw evidence, or other non-Core-safe run details should expose `--quiet` for log-sensitive CI. Quiet mode should preserve requested report/output writes and error output while suppressing ordinary stdout/stderr chatter.
 - Unsupported harness names fail as usage or configuration errors. Supported harnesses with missing local dependencies should be represented as unavailable harness evidence, not as behavioral benchmark failures.
 
 Saved `run.json` reports intended for `refresh-benchmark-status` must include current-schema Git metadata, a manifest-resolvable summary object, behavior totals, unavailable harness counts when applicable, and mode metadata sufficient to reject dry-run, transcript, saved-response, stale, dirty-worktree, non-main, or non-remote-fresh evidence.
