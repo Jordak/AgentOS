@@ -61,8 +61,10 @@ jobs:
           safety-strategy: drop-sudo
 
       - name: Run Guidance benchmark
+        id: benchmark
         run: |
-          set -euo pipefail
+          set -uo pipefail
+          set +e
           python3 os/verification/guidance/scripts/benchmark_guidance.py \
             --no-dry-run \
             --harness codex \
@@ -74,20 +76,32 @@ jobs:
             --check-remote-main \
             --quiet \
             --output "$GUIDANCE_RUN_JSON"
+          benchmark_status=$?
+          set -e
+          echo "benchmark_status=$benchmark_status" >> "$GITHUB_OUTPUT"
 
       - name: Generate public-safe refresh candidate
+        if: always()
         id: refresh
         run: |
+          set -uo pipefail
           set +e
-          python3 os/verification/scripts/refresh_benchmark_status.py \
-            --report "$GUIDANCE_RUN_JSON" \
-            > "$GUIDANCE_REFRESH_JSON"
-          refresh_status=$?
+          if [ -s "$GUIDANCE_RUN_JSON" ]; then
+            python3 os/verification/scripts/refresh_benchmark_status.py \
+              --report "$GUIDANCE_RUN_JSON" \
+              > "$GUIDANCE_REFRESH_JSON"
+            refresh_status=$?
+          else
+            refresh_status=1
+          fi
           set -e
           echo "refresh_status=$refresh_status" >> "$GITHUB_OUTPUT"
 
       - name: Write public-safe step summary
         if: always()
+        env:
+          BENCHMARK_STATUS: ${{ steps.benchmark.outputs.benchmark_status }}
+          REFRESH_STATUS: ${{ steps.refresh.outputs.refresh_status }}
         run: |
           set -euo pipefail
           if [ -s "$GUIDANCE_REFRESH_JSON" ]; then
@@ -99,9 +113,24 @@ jobs:
               echo "No public-safe refresh summary was generated. Inspect the failed workflow step logs."
             } >> "$GITHUB_STEP_SUMMARY"
           fi
+          {
+            echo
+            echo "### Workflow Outcome"
+            echo
+            echo "- Benchmark exit status: \`${BENCHMARK_STATUS:-unknown}\`"
+            echo "- Refresh helper exit status: \`${REFRESH_STATUS:-unknown}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Enforce benchmark result
+        if: steps.benchmark.outputs.benchmark_status != '' && steps.benchmark.outputs.benchmark_status != '0'
+        env:
+          BENCHMARK_STATUS: ${{ steps.benchmark.outputs.benchmark_status }}
+        run: |
+          echo "::error title=Guidance benchmark reported attention needed::benchmark_guidance.py exited with status ${BENCHMARK_STATUS}. See the public-safe step summary for structured details."
+          exit "$BENCHMARK_STATUS"
 
       - name: Enforce refresh candidate result
-        if: steps.refresh.outputs.refresh_status != '' && steps.refresh.outputs.refresh_status != '0'
+        if: steps.benchmark.outputs.benchmark_status == '0' && steps.refresh.outputs.refresh_status != '' && steps.refresh.outputs.refresh_status != '0'
         env:
           REFRESH_STATUS: ${{ steps.refresh.outputs.refresh_status }}
         run: |
