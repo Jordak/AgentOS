@@ -20,6 +20,8 @@ Core benchmark posture lives in `os/verification/BENCHMARK_STATUS.md`. That file
 
 Raw benchmark reports and run histories belong outside Core, usually under the Personal Overlay report directories configured in `os/verification/BENCHMARKS.json`. Use `os/skills/refresh-benchmark-status/SKILL.md` to refresh the Core snapshot from eligible local evidence without copying private or raw run details into Core.
 
+`os/verification/scripts/refresh_benchmark_status.py` is the deterministic helper for status refreshes. It emits JSON-only candidate facts, separates public-safe fields from non-Core-safe private locators, and never writes `os/verification/BENCHMARK_STATUS.md`.
+
 ## Benchmark Script CLI Contract
 
 Every benchmark script listed in `os/verification/BENCHMARKS.json` must expose a small common CLI surface so `run-benchmarks` can inspect and run scripts from the manifest without benchmark-specific command knowledge.
