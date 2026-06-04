@@ -119,6 +119,8 @@ python3 os/verification/guidance/scripts/benchmark_guidance.py --no-dry-run --ha
 
 For a log-sensitive status-eligible trial, add `--quiet` and route status interpretation through `os/skills/refresh-benchmark-status/SKILL.md` rather than copying report contents into workflow logs.
 
+When running through the repository's manual GitHub Actions trial, add `--allow-harness-user-config` so the Codex harness-under-test can read the controlled temporary `CODEX_HOME/config.toml` written by `openai/codex-action` for its Responses API proxy. Keep the default local behavior unchanged: HUT Codex calls ignore user config unless this flag is explicitly present.
+
 ## Status Summary
 
 Saved reports expose a manifest-resolvable `summary` object and raw fixture provenance metadata. `behavioral_total` counts only `pass` and `fail`. Freshness checks derive the status-counting total from `behavioral_total + fixture_stale`; reports do not store a separate derived total. `fixture_stale` is reported separately and does not make the run ineligible. `needs_user_judgment` makes the run ineligible.

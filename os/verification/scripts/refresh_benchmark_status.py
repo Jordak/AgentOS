@@ -689,6 +689,7 @@ def evidence_scope(report: GuidanceReport) -> dict[str, Any]:
     fixtures = report.data.get("fixtures", {})
     judge_protocol = report.data.get("judge_protocol", {})
     host_boundary = report.data.get("host_boundary", {})
+    harness_user_config = report.data.get("harness_user_config", {})
     if not isinstance(summary, dict):
         summary = {}
     if not isinstance(fixtures, dict):
@@ -697,8 +698,13 @@ def evidence_scope(report: GuidanceReport) -> dict[str, Any]:
         judge_protocol = {}
     if not isinstance(host_boundary, dict):
         host_boundary = {}
+    if not isinstance(harness_user_config, dict):
+        harness_user_config = {}
     return {
         "harnesses": safe_string_list(report.data.get("harnesses"), "harnesses"),
+        "harness_user_config_allowed_for_hut": safe_optional_bool(
+            harness_user_config.get("allowed_for_hut"), "harness_user_config_allowed_for_hut"
+        ),
         "model": safe_label(summary.get("model", "harness-default"), "model"),
         "effort": safe_label(summary.get("effort", "harness-default"), "effort"),
         "judge_harness": safe_slug(summary.get("judge_harness", "codex"), "judge_harness"),
