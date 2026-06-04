@@ -16,6 +16,7 @@ Use this file as the canonical rendering template for `review-pass` Review Packe
 - Avoid long inline code spans for shell commands, regexes, or searches. If the text includes backslashes, bracket escapes, pipes, or enough length to wrap awkwardly, summarize it in prose or use a fenced code block.
 - Do not include opaque reviewer handle values in the packet. Report only handle availability.
 - Fixed prior issue families do not appear under `## Issue Families`; summarize them in `## Verification Results`.
+- Within each issue family, render `Recommended disposition`, `Failure mode`, and `Suggested fix shape` as the first three fields.
 - If chat output is a summary because the packet is too large, `## Temporary Packet Artifact` must name the temporary Markdown file that contains the complete packet.
 
 ## Severity
@@ -56,12 +57,12 @@ Continuity handle availability: <private handoff available | unavailable | not a
 ### IF1. Severity: P1 - **Family title**
 
 **Recommended disposition:** <likely accept | likely decline | needs user/design judgment>
+**Failure mode:** <generalized invariant or risk>
+**Suggested fix shape:** <family-level fix, simplification, scope reduction, or none>
 **Found by:** `<reviewer-finding-id>`, `<reviewer-finding-id>`
 **Evidence:** <file:line, diff hunk, command output, source link, or reviewer-cited evidence>
-**Failure mode:** <generalized invariant or risk>
 **Representative findings:** <concrete reviewer observations that exemplify this family>
 **Related occurrences or sibling search:** <siblings found, search performed, or recommended search>
-**Suggested fix shape:** <family-level fix, simplification, scope reduction, or none>
 **Validation signal:** <test, command, inspection, or proof that would close it>
 
 ## Verification Results
@@ -191,12 +192,12 @@ Reviewed the current diff against `origin/main`, the prior packet, issue #77, `D
 ### IF1. Severity: P1 - **Template rules are not referenced from the recovery prompt**
 
 **Recommended disposition:** likely accept
+**Failure mode:** Recovery after compaction can reconstruct packet rendering from stale inline schema instead of reopening the canonical template.
+**Suggested fix shape:** Update recovery guidance to reopen `review-packet-template.md` before returning a packet.
 **Found by:** `P2-R1-F1`, `P2-R2-F1`
 **Evidence:** `os/skills/review-pass/references/reviewer-prompts.md:194`
-**Failure mode:** Recovery after compaction can reconstruct packet rendering from stale inline schema instead of reopening the canonical template.
 **Representative findings:** `P2-R1-F1` observed the recovery prompt only reopens `reviewer-prompts.md`; `P2-R2-F1` found the same missing template reference in the final recovery instruction.
 **Related occurrences or sibling search:** Search for stale inline packet-schema ownership across `os/skills`.
-**Suggested fix shape:** Update recovery guidance to reopen `review-packet-template.md` before returning a packet.
 **Validation signal:** A targeted search confirms packet-template ownership is explicit and stale inline packet-schema ownership references are gone.
 
 ## Verification Results
