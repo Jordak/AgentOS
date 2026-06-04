@@ -10,6 +10,8 @@ Keep the AgentOS control plane in Markdown. Use static HTML as the canonical pre
 
 Generated artifacts default to the Personal Overlay. Reports, briefs, histories, queues, run logs, and substantial generated outputs derived from a real user, private project, connector, account, or live agent belong under `personal/os/` unless the user explicitly asks for a sanitized Core example.
 
+When the user asks for a substantial human-facing report about a repository's live state, make both decisions together: prefer a local static HTML report, and route the generated live output to the Personal Overlay by default rather than Core.
+
 The control plane includes:
 
 - instructions and tool adapters;

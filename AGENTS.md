@@ -33,7 +33,7 @@ Before answering questions about Codex, ChatGPT, OpenAI APIs, Cursor, Claude Cod
 - When running from a feature worktree, do not assume ignored `personal/os/` files exist there. For Personal Overlay reads or approved writes, use the canonical primary AgentOS checkout's `personal/os/` unless the user explicitly assigns a different private overlay workspace.
 - For AgentOS public repository persistence, use `scripts/agent-push` instead of raw `git push` when that helper is available. If the helper is missing or unsuitable, pause and ask before pushing.
 - Prefer plain Markdown for the AgentOS control plane so it can move between tools.
-- Prefer static HTML for substantial human-facing reports, reviews, plans, explainers, and briefs. Use `os/playbook/ARTIFACTS.md` for output-format decisions.
+- Prefer static HTML for substantial human-facing reports, reviews, plans, explainers, and briefs. Use `os/playbook/ARTIFACTS.md` for output-format and generated-artifact destination decisions.
 - Keep global identity and preferences separate from project-specific instructions.
 - Preserve user agency around credentials, account actions, external posts, and write-access connections.
 - When a template asks for personal knowledge that is missing, create a clearly marked placeholder and a short question list.
