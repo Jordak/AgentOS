@@ -116,18 +116,19 @@ def render_non_passing(rows: list[Any]) -> list[str]:
         "",
         "#### Non-Passing Structured Details",
         "",
-        "| Fixture | Category | Result | Status | Verdict | Source alignment | Staleness | Sentinel observed |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| Fixture | Category | Result | Status | Public diagnosis | Verdict | Source alignment | Staleness | Sentinel observed |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for row in rows:
         if not isinstance(row, dict):
             continue
         lines.append(
-            "| {fixture} | {category} | {result} | {status} | {verdict} | {source} | {staleness} | {sentinel} |".format(
+            "| {fixture} | {category} | {result} | {status} | {diagnosis} | {verdict} | {source} | {staleness} | {sentinel} |".format(
                 fixture=f"`{as_text(row.get('fixture'))}`",
                 category=as_text(row.get("category")),
                 result=as_text(row.get("result")),
                 status=as_text(row.get("status")),
+                diagnosis=as_text(row.get("public_safe_diagnosis"), "n/a"),
                 verdict=as_text(row.get("verdict"), "n/a"),
                 source=as_text(row.get("source_alignment"), "n/a"),
                 staleness=as_text(row.get("staleness"), "n/a"),
@@ -162,6 +163,15 @@ def render_target(target: dict[str, Any]) -> list[str]:
                     f"- Latest report status-counting total: `{as_text(latest.get('status_counting_total'))}`",
                 ]
             )
+            counts = latest.get("counts")
+            if isinstance(counts, dict):
+                lines.extend(render_counts(counts))
+            scope = latest.get("evidence_scope")
+            if isinstance(scope, dict):
+                lines.extend(render_scope(scope))
+            details = latest.get("non_passing_details")
+            if isinstance(details, list):
+                lines.extend(render_non_passing(details))
         return lines
 
     lines.extend(
@@ -263,6 +273,7 @@ def run_self_test() -> int:
                             "category": "review",
                             "result": "Behavioral failure",
                             "status": "graded",
+                            "public_safe_diagnosis": "n/a",
                             "verdict": "fail",
                             "source_alignment": "wrong",
                             "staleness": "current",
@@ -292,6 +303,7 @@ def run_self_test() -> int:
         "Candidate available: `yes`",
         "Candidate status: `attention needed`",
         "| Behavioral pass | 7 |",
+        "Public diagnosis",
         "`weekly-review-private-report`",
         "Host-boundary sentinel observed: `no`",
     ]
@@ -316,13 +328,65 @@ def run_self_test() -> int:
                     "current_status": "attention needed",
                     "report_count": 1,
                     "eligible_report_count": 0,
+                    "latest_report": {
+                        "generated_at": "2026-06-04T21:08:46+00:00",
+                        "status_eligible": False,
+                        "status_ineligible_reasons": ["harness_error", "no_behavioral_or_stale_results"],
+                        "status_counting_total": 0,
+                        "counts": {
+                            "total": 8,
+                            "behavioral_pass": 0,
+                            "behavioral_fail": 0,
+                            "fixture_stale": 0,
+                            "needs_user_judgment": 0,
+                            "harness_unavailable": 0,
+                            "harness_error": 8,
+                            "judge_unavailable": 0,
+                            "judge_error": 0,
+                            "judge_invalid": 0,
+                        },
+                        "evidence_scope": {
+                            "harnesses": ["codex"],
+                            "model": "gpt-5.5",
+                            "effort": "low",
+                            "judge_harness": "codex",
+                            "judge_model": "gpt-5.5",
+                            "judge_effort": "low",
+                            "fixture_count": 8,
+                            "uses_default_fixture_path": True,
+                            "uses_full_default_fixture_set": True,
+                            "selected_fixture_subset": False,
+                            "uses_default_judge_schema_path": True,
+                            "uses_default_judge_prompt_path": True,
+                            "judge_batch_size": 0,
+                            "host_boundary_sentinel_observed": False,
+                            "host_boundary_sentinel_proves_isolation": False,
+                        },
+                        "non_passing_details": [
+                            {
+                                "fixture": "weekly-review-private-report",
+                                "category": "review",
+                                "result": "Harness error",
+                                "status": "harness-error",
+                                "public_safe_diagnosis": "api_auth_or_model_access",
+                                "host_boundary_sentinel_observed": False,
+                            }
+                        ],
+                    },
                 }
             ]
         }
     }
     unavailable_rendered = render_summary(unavailable)
-    if "Candidate unavailable reason: `no_eligible_status_counting_report`" not in unavailable_rendered:
-        print("SELF-TEST FAIL: unavailable candidate reason missing")
+    unavailable_expected = [
+        "Candidate unavailable reason: `no_eligible_status_counting_report`",
+        "| Harness error | 8 |",
+        "api_auth_or_model_access",
+    ]
+    missing_unavailable = [fragment for fragment in unavailable_expected if fragment not in unavailable_rendered]
+    if missing_unavailable:
+        print("SELF-TEST FAIL: unavailable candidate details missing")
+        print(json.dumps(missing_unavailable, indent=2))
         return 1
     for bad in ({}, {"public_safe": {}}, {"public_safe": {"targets": [None]}}):
         try:
