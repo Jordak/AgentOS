@@ -35,6 +35,16 @@ GUIDANCE_RESULT_STATUSES = {
 GUIDANCE_VERDICTS = {"pass", "fail", "fixture_stale", "needs_user_judgment"}
 SOURCE_ALIGNMENTS = {"aligned", "partial", "missing", "wrong", "not_applicable"}
 STALENESS_VALUES = {"current", "stale", "uncertain"}
+PUBLIC_DIAGNOSTIC_CLASSES = {
+    "api_auth_or_model_access",
+    "api_rate_limit_or_quota",
+    "codex_sandbox_or_permission",
+    "codex_timeout",
+    "codex_empty_response",
+    "codex_process_start_error",
+    "codex_cli_error",
+    "unknown_harness_error",
+}
 SAFE_SLUG = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 SAFE_LABEL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ./_-]*$")
 COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -422,6 +432,9 @@ def guidance_non_passing_details(report: GuidanceReport, private_report_path: st
             "host_boundary_sentinel_observed": safe_optional_bool(host_observed, "host_boundary_sentinel_observed"),
             "requires_curated_fields": ["public_safe_diagnosis", "suggested_next_step"],
         }
+        diagnostic = public_harness_diagnostic(result)
+        if diagnostic:
+            row["public_safe_diagnosis"] = safe_public_diagnostic(diagnostic, "public_safe_diagnosis")
         public_rows.append(row)
         private_rows.append(
             {
@@ -432,6 +445,50 @@ def guidance_non_passing_details(report: GuidanceReport, private_report_path: st
             }
         )
     return public_rows, private_rows
+
+
+def public_harness_diagnostic(result: dict[str, Any]) -> str | None:
+    status = result.get("status")
+    harness_result = result.get("harness_result")
+    if not isinstance(harness_result, dict):
+        return None
+    if status == "harness-unavailable":
+        return "codex_process_start_error"
+    if status not in {"harness-error", "judge-error", "judge-unavailable"}:
+        return None
+    exit_code = int_field(harness_result, "exit_code")
+    combined = "\n".join(
+        str(harness_result.get(field, ""))
+        for field in ("stderr", "stdout", "raw_response")
+    ).lower()
+    if exit_code == 124 or "timed out after" in combined or "timeout" in combined:
+        return "codex_timeout"
+    if exit_code == 126 or "failed to start" in combined:
+        return "codex_process_start_error"
+    if any(pattern in combined for pattern in ("401", "unauthorized", "invalid api key", "authentication")):
+        return "api_auth_or_model_access"
+    if any(pattern in combined for pattern in ("model_not_found", "model not found", "does not have access", "unsupported model")):
+        return "api_auth_or_model_access"
+    if any(pattern in combined for pattern in ("429", "rate limit", "quota", "insufficient_quota", "too many requests")):
+        return "api_rate_limit_or_quota"
+    if any(
+        pattern in combined
+        for pattern in (
+            "bubblewrap",
+            "bwrap",
+            "operation not permitted",
+            "permission denied",
+            "sandbox",
+            "landlock",
+            "seccomp",
+        )
+    ):
+        return "codex_sandbox_or_permission"
+    if not combined.strip():
+        return "codex_empty_response"
+    if status == "harness-error":
+        return "codex_cli_error"
+    return "unknown_harness_error"
 
 
 def safe_slug(value: Any, field: str) -> str:
@@ -479,6 +536,12 @@ def safe_optional_bool(value: Any, field: str) -> bool | None:
         return None
     if type(value) is not bool:
         raise PublicSafeOutputError(f"{field} is not a boolean: {value!r}")
+    return value
+
+
+def safe_public_diagnostic(value: Any, field: str) -> str:
+    if not isinstance(value, str) or value not in PUBLIC_DIAGNOSTIC_CLASSES:
+        raise PublicSafeOutputError(f"{field} is not an allowed public diagnostic: {value!r}")
     return value
 
 
@@ -540,11 +603,17 @@ def target_candidate(
         public["candidate_unavailable_reason"] = "no_eligible_status_counting_report"
         if reports:
             latest = reports[0]
+            latest_summary = nested_get(latest.data, target.summary_path) or {}
+            private_report = root_relative(personal_root, latest.path)
+            rows, _private_rows = guidance_non_passing_details(latest, private_report)
             public["latest_report"] = {
                 "generated_at": latest.generated_raw,
                 "status_eligible": latest.status_eligible,
                 "status_ineligible_reasons": list(latest.ineligible_reasons),
                 "status_counting_total": latest.status_counting_total,
+                "counts": guidance_counts(latest, latest_summary),
+                "evidence_scope": evidence_scope(latest),
+                "non_passing_details": rows,
             }
         validate_no_private_markers(public)
         return public, private, False
@@ -577,19 +646,7 @@ def target_candidate(
             "evidence_age_days": round(days_old, 3),
             "max_age_days": target.max_age_days,
             "status_counting_total": selected.status_counting_total,
-            "counts": {
-                "total": safe_nonnegative(int_field(summary, "total") or 0, "total"),
-                "behavioral_total": safe_nonnegative(selected.behavioral_total, "behavioral_total"),
-                "behavioral_pass": safe_nonnegative(selected.behavioral_pass, "behavioral_pass"),
-                "behavioral_fail": safe_nonnegative(selected.behavioral_fail, "behavioral_fail"),
-                "fixture_stale": safe_nonnegative(selected.fixture_stale, "fixture_stale"),
-                "needs_user_judgment": safe_nonnegative(int_field(summary, "needs_user_judgment") or 0, "needs_user_judgment"),
-                "harness_unavailable": safe_nonnegative(int_field(summary, "harness_unavailable") or 0, "harness_unavailable"),
-                "harness_error": safe_nonnegative(int_field(summary, "harness_error") or 0, "harness_error"),
-                "judge_unavailable": safe_nonnegative(int_field(summary, "judge_unavailable") or 0, "judge_unavailable"),
-                "judge_error": safe_nonnegative(int_field(summary, "judge_error") or 0, "judge_error"),
-                "judge_invalid": safe_nonnegative(int_field(summary, "judge_invalid") or 0, "judge_invalid"),
-            },
+            "counts": guidance_counts(selected, summary),
             "evidence_scope": evidence_scope(selected),
             "non_passing_details": rows,
         }
@@ -609,6 +666,22 @@ def target_candidate(
     )
     validate_no_private_markers(public)
     return public, private, fresh_enough
+
+
+def guidance_counts(report: GuidanceReport, summary: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "total": safe_nonnegative(int_field(summary, "total") or 0, "total"),
+        "behavioral_total": safe_nonnegative(report.behavioral_total, "behavioral_total"),
+        "behavioral_pass": safe_nonnegative(report.behavioral_pass, "behavioral_pass"),
+        "behavioral_fail": safe_nonnegative(report.behavioral_fail, "behavioral_fail"),
+        "fixture_stale": safe_nonnegative(report.fixture_stale, "fixture_stale"),
+        "needs_user_judgment": safe_nonnegative(int_field(summary, "needs_user_judgment") or 0, "needs_user_judgment"),
+        "harness_unavailable": safe_nonnegative(int_field(summary, "harness_unavailable") or 0, "harness_unavailable"),
+        "harness_error": safe_nonnegative(int_field(summary, "harness_error") or 0, "harness_error"),
+        "judge_unavailable": safe_nonnegative(int_field(summary, "judge_unavailable") or 0, "judge_unavailable"),
+        "judge_error": safe_nonnegative(int_field(summary, "judge_error") or 0, "judge_error"),
+        "judge_invalid": safe_nonnegative(int_field(summary, "judge_invalid") or 0, "judge_invalid"),
+    }
 
 
 def evidence_scope(report: GuidanceReport) -> dict[str, Any]:
@@ -794,6 +867,62 @@ def run_self_test() -> int:
             if explicit_fresh or explicit_output["public_safe"]["targets"][0]["candidate_available"]:
                 print("SELF-TEST FAIL: explicit dry-run report was accepted")
                 return 1
+
+            harness_error_dir = reports / "guidance-harness-error"
+            harness_error_dir.mkdir()
+            harness_error_report = fake_guidance_report(commit="d" * 40)
+            harness_error_report["summary"] = {
+                **harness_error_report["summary"],
+                "behavioral_total": 0,
+                "behavioral_pass": 0,
+                "behavioral_fail": 0,
+                "harness_error": 8,
+                "status_eligible": False,
+                "status_ineligible_reasons": ["harness_error", "no_behavioral_or_stale_results"],
+            }
+            harness_error_report["results"] = [
+                {
+                    "fixture_id": "weekly-review-private-report",
+                    "category": "review",
+                    "status": "harness-error",
+                    "host_boundary_sentinel_observed": False,
+                    "harness_result": {
+                        "exit_code": 1,
+                        "stdout": "/" + "Users" + "/private should stay private",
+                        "stderr": "model_not_found private detail should stay private",
+                        "raw_response": "private raw failure",
+                    },
+                }
+            ]
+            (harness_error_dir / "run.json").write_text(json.dumps(harness_error_report), encoding="utf-8")
+            diagnostic_output, diagnostic_fresh = build_candidate(
+                root,
+                root / "os/verification/BENCHMARKS.json",
+                root / "os/verification/BENCHMARK_STATUS.md",
+                root,
+                explicit_report=harness_error_dir / "run.json",
+                now=now,
+            )
+            diagnostic_target = diagnostic_output["public_safe"]["targets"][0]
+            diagnostic_text = json.dumps(diagnostic_output["public_safe"])
+            if diagnostic_fresh or diagnostic_target["candidate_available"]:
+                print("SELF-TEST FAIL: explicit harness-error report was accepted")
+                return 1
+            latest = diagnostic_target.get("latest_report", {})
+            details = latest.get("non_passing_details", []) if isinstance(latest, dict) else []
+            if (
+                not isinstance(latest, dict)
+                or latest.get("counts", {}).get("harness_error") != 8
+                or not details
+                or details[0].get("public_safe_diagnosis") != "api_auth_or_model_access"
+            ):
+                print("SELF-TEST FAIL: public-safe harness diagnostic was not emitted")
+                print(json.dumps(diagnostic_target, indent=2))
+                return 1
+            for marker in PRIVATE_MARKERS + ("private detail", "private raw failure"):
+                if marker in diagnostic_text:
+                    print(f"SELF-TEST FAIL: private harness detail leaked into public_safe: {marker}")
+                    return 1
 
             bad_report = fake_guidance_report(commit="c" * 40)
             bad_report["results"][0]["fixture_id"] = "/" + "Users" + "/private"
