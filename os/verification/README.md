@@ -22,6 +22,8 @@ Raw benchmark reports and run histories belong outside Core, usually under the P
 
 `os/verification/scripts/refresh_benchmark_status.py` is the deterministic helper for status refreshes. It emits JSON-only candidate facts, separates public-safe fields from non-Core-safe private locators, and never writes `os/verification/BENCHMARK_STATUS.md`.
 
+`os/verification/scripts/apply_benchmark_status_candidate.py` is the explicit write-side helper for approved refreshes. It consumes only the `public_safe.targets` candidate facts and updates the Core status snapshot without reading private locators.
+
 ## Benchmark Script CLI Contract
 
 Every benchmark script listed in `os/verification/BENCHMARKS.json` must expose a small common CLI surface so `run-benchmarks` can inspect and run scripts from the manifest without benchmark-specific command knowledge.

@@ -119,6 +119,9 @@ jobs:
       - name: Run benchmark step summary renderer self-test
         run: python3 os/verification/scripts/render_benchmark_step_summary.py --self-test
 
+      - name: Run benchmark status applicator self-test
+        run: python3 os/verification/scripts/apply_benchmark_status_candidate.py --self-test
+
       - name: Run Codex preflight classifier self-test
         run: python3 os/verification/scripts/classify_codex_preflight.py --self-test
 
