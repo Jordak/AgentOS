@@ -15,6 +15,17 @@ from typing import Any
 DEFAULT_STATUS = Path("os/verification/BENCHMARK_STATUS.md")
 COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 STATUS_LABELS = {"passing", "attention needed", "not run", "unknown"}
+WRITABLE_STATUS_LABELS = {"passing", "attention needed"}
+STATUS_BLOCKER_COUNT_FIELDS = (
+    "behavioral_fail",
+    "fixture_stale",
+    "needs_user_judgment",
+    "harness_unavailable",
+    "harness_error",
+    "judge_unavailable",
+    "judge_error",
+    "judge_invalid",
+)
 PRIVATE_MARKERS = (
     "/" + "Users" + "/",
     "\\Users\\",
@@ -126,6 +137,13 @@ def require_list(value: Any, field: str) -> list[Any]:
     return value
 
 
+def require_bool_value(value: Any, field: str, expected: bool) -> None:
+    actual = require_bool(value, field)
+    if actual is not expected:
+        expected_text = "true" if expected else "false"
+        raise StatusApplyError(f"{field} must be {expected_text}")
+
+
 def markdown_cell(value: Any) -> str:
     text = optional_text(value, "n/a")
     return text.replace("|", "\\|").replace("\n", " ")
@@ -186,6 +204,72 @@ def nonzero_count_parts(counts: dict[str, Any]) -> list[str]:
         if value:
             parts.append(f"{value} {label}")
     return parts
+
+
+def status_blocker_count(counts: dict[str, Any]) -> int:
+    return sum(
+        require_int(counts.get(field, 0), f"counts.{field}")
+        for field in STATUS_BLOCKER_COUNT_FIELDS
+    )
+
+
+def validate_counts_for_write(target: dict[str, Any]) -> None:
+    status = require_status(target.get("candidate_status"), "candidate_status")
+    if status not in WRITABLE_STATUS_LABELS:
+        raise StatusApplyError(f"candidate_status is not writable: {status}")
+    counts = require_mapping(target.get("counts"), "counts")
+    behavioral_total = require_int(counts.get("behavioral_total", 0), "counts.behavioral_total")
+    behavioral_pass = require_int(counts.get("behavioral_pass", 0), "counts.behavioral_pass")
+    behavioral_fail = require_int(counts.get("behavioral_fail", 0), "counts.behavioral_fail")
+    fixture_stale = require_int(counts.get("fixture_stale", 0), "counts.fixture_stale")
+    if behavioral_pass + behavioral_fail != behavioral_total:
+        raise StatusApplyError("behavioral_pass + behavioral_fail must equal behavioral_total")
+    status_counting_total = require_int(target.get("status_counting_total"), "status_counting_total")
+    if status_counting_total != behavioral_total + fixture_stale:
+        raise StatusApplyError("status_counting_total must equal behavioral_total + fixture_stale")
+    details = require_list(target.get("non_passing_details", []), "non_passing_details")
+    blockers = status_blocker_count(counts)
+    if status == "passing":
+        if blockers:
+            raise StatusApplyError("passing candidates must not contain status-counting blockers")
+        if details:
+            raise StatusApplyError("passing candidates must not contain non-passing details")
+    elif status == "attention needed" and blockers == 0 and not details:
+        raise StatusApplyError("attention-needed candidates must contain a blocker count or non-passing details")
+
+
+def validate_scope_for_write(target: dict[str, Any]) -> None:
+    scope = require_mapping(target.get("evidence_scope"), "evidence_scope")
+    require_bool_value(scope.get("uses_default_fixture_path"), "evidence_scope.uses_default_fixture_path", True)
+    require_bool_value(scope.get("uses_full_default_fixture_set"), "evidence_scope.uses_full_default_fixture_set", True)
+    require_bool_value(scope.get("selected_fixture_subset"), "evidence_scope.selected_fixture_subset", False)
+    require_bool_value(
+        scope.get("uses_default_judge_schema_path"),
+        "evidence_scope.uses_default_judge_schema_path",
+        True,
+    )
+    require_bool_value(
+        scope.get("uses_default_judge_prompt_path"),
+        "evidence_scope.uses_default_judge_prompt_path",
+        True,
+    )
+    require_bool_value(
+        scope.get("host_boundary_sentinel_observed"),
+        "evidence_scope.host_boundary_sentinel_observed",
+        False,
+    )
+    judge_batch_size = require_int(scope.get("judge_batch_size"), "evidence_scope.judge_batch_size")
+    default_judge_batch_size = require_int(
+        scope.get("default_judge_batch_size"),
+        "evidence_scope.default_judge_batch_size",
+    )
+    if judge_batch_size != default_judge_batch_size:
+        raise StatusApplyError("evidence_scope.judge_batch_size must equal default_judge_batch_size")
+
+
+def validate_target_for_write(target: dict[str, Any]) -> None:
+    validate_counts_for_write(target)
+    validate_scope_for_write(target)
 
 
 def summary_text(target: dict[str, Any]) -> str:
@@ -308,6 +392,7 @@ def render_guidance_codex_section(target: dict[str, Any]) -> str:
         raise StatusApplyError("only the guidance benchmark target is supported")
     if require_bool(target.get("candidate_available"), "candidate_available") is not True:
         raise StatusApplyError("candidate is not available")
+    validate_target_for_write(target)
     status = require_status(target.get("candidate_status"), "candidate_status")
     revision = require_commit(target.get("reviewed_core_revision"), "reviewed_core_revision")
     evidence = require_text(target.get("last_reviewed_evidence"), "last_reviewed_evidence")
@@ -400,6 +485,7 @@ def fake_target(status: str = "passing", details: list[dict[str, Any]] | None = 
         "candidate_status": status,
         "reviewed_core_revision": "a" * 40,
         "last_reviewed_evidence": "2026-06-05T14:35:42.577146+00:00",
+        "status_counting_total": 15,
         "counts": {
             "total": 15,
             "behavioral_total": 15,
@@ -513,6 +599,38 @@ def run_self_test() -> int:
             {"public_safe": {"targets": [None]}},
             fake_candidate(unavailable),
         ]
+        bad_count_total = fake_target()
+        bad_count_total["counts"]["behavioral_pass"] = 14
+        malformed_cases.append(fake_candidate(bad_count_total))
+
+        bad_status_counting_total = fake_target()
+        bad_status_counting_total["status_counting_total"] = 14
+        malformed_cases.append(fake_candidate(bad_status_counting_total))
+
+        passing_with_details = fake_target(
+            details=[
+                {
+                    "fixture": "weekly-review-private-report",
+                    "category": "Review",
+                    "result": "Behavioral failure",
+                }
+            ]
+        )
+        malformed_cases.append(fake_candidate(passing_with_details))
+
+        attention_without_signal = fake_target("attention needed")
+        attention_without_signal["counts"]["behavioral_pass"] = 15
+        attention_without_signal["counts"]["behavioral_fail"] = 0
+        malformed_cases.append(fake_candidate(attention_without_signal))
+
+        noncanonical_scope = fake_target()
+        noncanonical_scope["evidence_scope"]["selected_fixture_subset"] = True
+        malformed_cases.append(fake_candidate(noncanonical_scope))
+
+        nondefault_judge_batch = fake_target()
+        nondefault_judge_batch["evidence_scope"]["judge_batch_size"] = 1
+        malformed_cases.append(fake_candidate(nondefault_judge_batch))
+
         for case in malformed_cases:
             try:
                 apply_candidate(case, fake_status())
