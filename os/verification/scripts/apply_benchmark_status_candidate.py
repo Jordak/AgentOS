@@ -461,20 +461,42 @@ def validate_no_private_markers(text: str) -> None:
             raise StatusApplyError(f"private marker leaked into status output: {marker}")
 
 
-def apply_candidate(helper_output: dict[str, Any], status_text: str) -> str:
+def single_public_target(helper_output: dict[str, Any]) -> dict[str, Any]:
     targets = public_targets(helper_output)
     if len(targets) != 1:
         raise StatusApplyError("expected exactly one public-safe benchmark target")
-    replacement = render_guidance_codex_section(targets[0])
+    return targets[0]
+
+
+def validate_expected_revision(target: dict[str, Any], expected_revision: str | None) -> None:
+    if expected_revision is None:
+        return
+    expected = require_commit(expected_revision, "expected_revision")
+    reviewed = require_commit(target.get("reviewed_core_revision"), "reviewed_core_revision")
+    if reviewed != expected:
+        raise StatusApplyError(
+            "candidate reviewed_core_revision does not match writer checkout: "
+            f"{reviewed} != {expected}"
+        )
+
+
+def apply_candidate(
+    helper_output: dict[str, Any],
+    status_text: str,
+    expected_revision: str | None = None,
+) -> str:
+    target = single_public_target(helper_output)
+    validate_expected_revision(target, expected_revision)
+    replacement = render_guidance_codex_section(target)
     validate_no_private_markers(replacement)
     updated = replace_guidance_codex(status_text, replacement)
     return updated
 
 
-def write_status_from_candidate(input_path: Path, status_path: Path) -> bool:
+def write_status_from_candidate(input_path: Path, status_path: Path, expected_revision: str | None = None) -> bool:
     helper_output = read_json(input_path)
     original = status_path.read_text(encoding="utf-8")
-    updated = apply_candidate(helper_output, original)
+    updated = apply_candidate(helper_output, original, expected_revision=expected_revision)
     if updated == original:
         return False
     status_path.write_text(updated, encoding="utf-8")
@@ -589,6 +611,13 @@ def run_self_test() -> int:
             if marker in passing:
                 print(f"SELF-TEST FAIL: private locator marker leaked from ignored locators: {marker}")
                 return 1
+        try:
+            apply_candidate(fake_candidate(fake_target()), fake_status(), expected_revision="b" * 40)
+        except StatusApplyError:
+            pass
+        else:
+            print("SELF-TEST FAIL: mismatched expected revision was accepted")
+            return 1
 
         detail = {
             "fixture": "weekly-review-private-report",
@@ -688,10 +717,10 @@ def run_self_test() -> int:
             candidate_path = root / "candidate.json"
             status_path.write_text(fake_status(), encoding="utf-8")
             candidate_path.write_text(json.dumps(fake_candidate(fake_target())), encoding="utf-8")
-            if not write_status_from_candidate(candidate_path, status_path):
+            if not write_status_from_candidate(candidate_path, status_path, expected_revision="a" * 40):
                 print("SELF-TEST FAIL: file apply did not report a change")
                 return 1
-            if write_status_from_candidate(candidate_path, status_path):
+            if write_status_from_candidate(candidate_path, status_path, expected_revision="a" * 40):
                 print("SELF-TEST FAIL: idempotent file apply reported a second change")
                 return 1
     except StatusApplyError as error:
@@ -706,6 +735,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("input", type=Path, nargs="?", help="JSON output from refresh_benchmark_status.py.")
     parser.add_argument("--root", type=Path, default=default_root(), help="AgentOS checkout root.")
     parser.add_argument("--status", type=Path, default=DEFAULT_STATUS)
+    parser.add_argument(
+        "--expected-revision",
+        help="Reject candidates whose reviewed_core_revision does not match this checkout revision.",
+    )
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args(argv)
 
@@ -718,7 +751,7 @@ def main(argv: list[str] | None = None) -> int:
     input_path = resolve_path(root, args.input).resolve()
     status_path = resolve_path(root, args.status).resolve()
     try:
-        changed = write_status_from_candidate(input_path, status_path)
+        changed = write_status_from_candidate(input_path, status_path, expected_revision=args.expected_revision)
     except (OSError, StatusApplyError) as error:
         print(f"ERROR benchmark status apply failed: {error}", file=sys.stderr)
         return 2

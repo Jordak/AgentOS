@@ -280,7 +280,10 @@ jobs:
         id: apply_status
         run: |
           set -euo pipefail
-          python3 os/verification/scripts/apply_benchmark_status_candidate.py "$GUIDANCE_PUBLIC_REFRESH_JSON"
+          writer_revision="$(git rev-parse HEAD)"
+          python3 os/verification/scripts/apply_benchmark_status_candidate.py \
+            "$GUIDANCE_PUBLIC_REFRESH_JSON" \
+            --expected-revision "$writer_revision"
           if git diff --quiet --exit-code -- os/verification/BENCHMARK_STATUS.md; then
             echo "status_changed=false" >> "$GITHUB_OUTPUT"
           else
