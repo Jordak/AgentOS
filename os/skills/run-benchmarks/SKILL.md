@@ -35,6 +35,7 @@ Tools and connectors:
 - `os/verification/BENCHMARKS.json`.
 - `os/skills/refresh-benchmark-status/SKILL.md` for status interpretation and updates.
 - `os/verification/scripts/refresh_benchmark_status.py` through `refresh-benchmark-status` for deterministic status candidate facts after saved runs.
+- `os/verification/scripts/apply_benchmark_status_candidate.py` through `refresh-benchmark-status` for approved Core status writes from public-safe candidate facts.
 - `os/playbook/PERSONAL_OVERLAY.md` for report location boundaries.
 
 Safety:
@@ -43,7 +44,7 @@ Safety:
 - Run current status-refresh targets from a clean, remote-fresh git checkout when the suite depends on Git metadata or the Git index. Guidance status-eligible runs use the runner's internal HUT sanitization and host-boundary sentinel tripwire and are not raw-export-compatible.
 - Run diagnostic external/model-call harnesses from a sanitized Core-only checkout or export when the suite supports that shape, not from a primary checkout that has a live Personal Overlay nearby, unless the user explicitly accepts that risk for a diagnostic run.
 - Do not copy raw reports, `run.json` bodies, transcripts, stdout, stderr, local paths, prompts, session details, account details, private diagnostics, or private evidence into Core.
-- Do not update `os/verification/BENCHMARK_STATUS.md` directly; route all status interpretation and edits through `refresh-benchmark-status`.
+- Do not update `os/verification/BENCHMARK_STATUS.md` directly; route status interpretation through `refresh-benchmark-status` and approved status-file writes through that workflow's public-safe applicator.
 - If the checkout is not clean, current `main`, do not produce status-eligible evidence. Offer diagnostic/non-eligible runs only when useful and clearly label them.
 
 ## Workflow Phases
@@ -78,9 +79,9 @@ Safety:
 ## Filing Rules
 
 - Raw reports and run histories stay in the canonical or user-assigned Personal Overlay report directories configured by `os/verification/BENCHMARKS.json`.
-- Core benchmark status lives only in `os/verification/BENCHMARK_STATUS.md` and is changed only through `refresh-benchmark-status`.
+- Core benchmark status lives only in `os/verification/BENCHMARK_STATUS.md` and is changed only through `refresh-benchmark-status` using its approved public-safe write-side applicator.
 - Benchmark CLI standardization is deferred to GitHub Issue #33.
-- Deterministic status-refresh candidate generation lives in `os/verification/scripts/refresh_benchmark_status.py` and is used through `refresh-benchmark-status`.
+- Deterministic status-refresh candidate generation lives in `os/verification/scripts/refresh_benchmark_status.py`; approved status-file application lives in `os/verification/scripts/apply_benchmark_status_candidate.py`; both are used through `refresh-benchmark-status`.
 
 ## Quality Bar
 
@@ -102,4 +103,5 @@ Before finishing:
 6. Confirm the configured harness choices were reported per script before any `--harness all` run.
 7. Confirm raw report content was not copied into Core.
 8. Confirm `refresh-benchmark-status` ran or was followed in proposal/report mode, or that a blocked/declined refresh was labeled incomplete with the next action.
-9. After helper changes, run `python3 os/verification/scripts/refresh_benchmark_status.py --self-test`.
+9. After refresh-helper changes, run `python3 os/verification/scripts/refresh_benchmark_status.py --self-test`.
+10. After status-applicator changes, run `python3 os/verification/scripts/apply_benchmark_status_candidate.py --self-test`.

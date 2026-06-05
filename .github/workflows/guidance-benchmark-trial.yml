@@ -4,8 +4,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   guidance:
@@ -13,6 +12,11 @@ jobs:
     if: github.ref_name == 'main'
     runs-on: ubuntu-latest
     environment: guidance-benchmark-trial
+    permissions:
+      contents: read
+    outputs:
+      refresh_status: ${{ steps.refresh.outputs.refresh_status }}
+      public_refresh_candidate: ${{ steps.public_refresh.outputs.public_refresh_candidate }}
 
     steps:
       - name: Check out main
@@ -168,12 +172,115 @@ jobs:
             echo "- Refresh helper exit status: \`${REFRESH_STATUS:-unknown}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Apply benchmark status refresh
+      - name: Prepare public-safe status handoff
         if: steps.refresh.outputs.refresh_status == '0'
+        id: public_refresh
+        run: |
+          set -euo pipefail
+          python3 - "$GUIDANCE_REFRESH_JSON" "$GITHUB_OUTPUT" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          source = Path(sys.argv[1])
+          output = Path(sys.argv[2])
+          data = json.loads(source.read_text(encoding="utf-8"))
+          public_safe = data.get("public_safe")
+          if not isinstance(public_safe, dict):
+              raise SystemExit("refresh candidate is missing public_safe")
+          compact = json.dumps(
+              {
+                  "version": data.get("version"),
+                  "generated_at": data.get("generated_at"),
+                  "public_safe": public_safe,
+              },
+              separators=(",", ":"),
+              sort_keys=True,
+          )
+          with output.open("a", encoding="utf-8") as handle:
+              print("public_refresh_candidate<<AGENTOS_PUBLIC_REFRESH", file=handle)
+              print(compact, file=handle)
+              print("AGENTOS_PUBLIC_REFRESH", file=handle)
+          PY
+
+      - name: Enforce Codex preflight result
+        if: steps.codex_preflight.outputs.preflight_status != '' && steps.codex_preflight.outputs.preflight_status != '0'
+        env:
+          PREFLIGHT_STATUS: ${{ steps.codex_preflight.outputs.preflight_status }}
+          PREFLIGHT_DIAGNOSIS: ${{ steps.codex_preflight.outputs.preflight_diagnosis }}
+        run: |
+          echo "::error title=Codex preflight failed::codex exec smoke test exited with status ${PREFLIGHT_STATUS}; public diagnosis: ${PREFLIGHT_DIAGNOSIS:-unknown}."
+          exit "$PREFLIGHT_STATUS"
+
+      - name: Enforce benchmark result
+        if: steps.codex_preflight.outputs.preflight_status == '0' && steps.benchmark.outputs.benchmark_status != '' && steps.benchmark.outputs.benchmark_status != '0'
+        env:
+          BENCHMARK_STATUS: ${{ steps.benchmark.outputs.benchmark_status }}
+        run: |
+          echo "::error title=Guidance benchmark reported attention needed::benchmark_guidance.py exited with status ${BENCHMARK_STATUS}. See the public-safe step summary for structured details."
+          exit "$BENCHMARK_STATUS"
+
+      - name: Enforce refresh candidate result
+        if: steps.benchmark.outputs.benchmark_status == '0' && steps.refresh.outputs.refresh_status != '' && steps.refresh.outputs.refresh_status != '0'
+        env:
+          REFRESH_STATUS: ${{ steps.refresh.outputs.refresh_status }}
+        run: |
+          echo "::error title=No fresh public-safe Guidance candidate::refresh-benchmark-status helper exited with status ${REFRESH_STATUS}."
+          exit "$REFRESH_STATUS"
+
+      - name: Clean up temporary benchmark JSON
+        if: always()
+        run: |
+          rm -f "$GUIDANCE_RUN_JSON" "$GUIDANCE_REFRESH_JSON" \
+            "${RUNNER_TEMP}/guidance-codex-preflight.stdout" \
+            "${RUNNER_TEMP}/guidance-codex-preflight.stderr" \
+            "${RUNNER_TEMP}/guidance-codex-preflight-message.txt"
+
+  status-pr:
+    name: Open Guidance benchmark status PR
+    needs: guidance
+    if: needs.guidance.outputs.refresh_status == '0' && needs.guidance.outputs.public_refresh_candidate != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prepare remote-fresh main branch
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --prune origin "+refs/heads/main:refs/remotes/origin/main"
+          git switch -C main origin/main
+          git branch --set-upstream-to=origin/main main
+
+      - name: Configure status temp path
+        run: |
+          set -euo pipefail
+          echo "GUIDANCE_PUBLIC_REFRESH_JSON=${RUNNER_TEMP}/guidance-public-refresh.json" >> "$GITHUB_ENV"
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.x"
+
+      - name: Restore public-safe status candidate
+        env:
+          PUBLIC_REFRESH_CANDIDATE: ${{ needs.guidance.outputs.public_refresh_candidate }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$PUBLIC_REFRESH_CANDIDATE" > "$GUIDANCE_PUBLIC_REFRESH_JSON"
+
+      - name: Apply benchmark status refresh
         id: apply_status
         run: |
           set -euo pipefail
-          python3 os/verification/scripts/apply_benchmark_status_candidate.py "$GUIDANCE_REFRESH_JSON"
+          python3 os/verification/scripts/apply_benchmark_status_candidate.py "$GUIDANCE_PUBLIC_REFRESH_JSON"
           if git diff --quiet --exit-code -- os/verification/BENCHMARK_STATUS.md; then
             echo "status_changed=false" >> "$GITHUB_OUTPUT"
           else
@@ -220,35 +327,7 @@ jobs:
             --title "Refresh Guidance benchmark status" \
             --body-file "$pr_body"
 
-      - name: Enforce Codex preflight result
-        if: steps.codex_preflight.outputs.preflight_status != '' && steps.codex_preflight.outputs.preflight_status != '0'
-        env:
-          PREFLIGHT_STATUS: ${{ steps.codex_preflight.outputs.preflight_status }}
-          PREFLIGHT_DIAGNOSIS: ${{ steps.codex_preflight.outputs.preflight_diagnosis }}
-        run: |
-          echo "::error title=Codex preflight failed::codex exec smoke test exited with status ${PREFLIGHT_STATUS}; public diagnosis: ${PREFLIGHT_DIAGNOSIS:-unknown}."
-          exit "$PREFLIGHT_STATUS"
-
-      - name: Enforce benchmark result
-        if: steps.codex_preflight.outputs.preflight_status == '0' && steps.benchmark.outputs.benchmark_status != '' && steps.benchmark.outputs.benchmark_status != '0'
-        env:
-          BENCHMARK_STATUS: ${{ steps.benchmark.outputs.benchmark_status }}
-        run: |
-          echo "::error title=Guidance benchmark reported attention needed::benchmark_guidance.py exited with status ${BENCHMARK_STATUS}. See the public-safe step summary for structured details."
-          exit "$BENCHMARK_STATUS"
-
-      - name: Enforce refresh candidate result
-        if: steps.benchmark.outputs.benchmark_status == '0' && steps.refresh.outputs.refresh_status != '' && steps.refresh.outputs.refresh_status != '0'
-        env:
-          REFRESH_STATUS: ${{ steps.refresh.outputs.refresh_status }}
-        run: |
-          echo "::error title=No fresh public-safe Guidance candidate::refresh-benchmark-status helper exited with status ${REFRESH_STATUS}."
-          exit "$REFRESH_STATUS"
-
-      - name: Clean up temporary benchmark JSON
+      - name: Clean up public-safe status candidate
         if: always()
         run: |
-          rm -f "$GUIDANCE_RUN_JSON" "$GUIDANCE_REFRESH_JSON" \
-            "${RUNNER_TEMP}/guidance-codex-preflight.stdout" \
-            "${RUNNER_TEMP}/guidance-codex-preflight.stderr" \
-            "${RUNNER_TEMP}/guidance-codex-preflight-message.txt"
+          rm -f "$GUIDANCE_PUBLIC_REFRESH_JSON"

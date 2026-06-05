@@ -24,6 +24,8 @@ Add a checked-in status applicator helper that consumes the existing refresh can
 
 Update the manual workflow to run the applicator after the refresh candidate is generated successfully. If the status file changes, the workflow should commit the change to a generated branch and open a pull request. The workflow should not push directly to `main`.
 
+Keep the model-backed benchmark job read-only. Pass only compact `public_safe` candidate facts to a separate writer job that owns `contents: write` and `pull-requests: write`.
+
 Generated PR content should stay public-safe and point back to the workflow run and step summary rather than embedding raw benchmark evidence.
 
 When the PR is created with the repository `GITHUB_TOKEN`, GitHub may place the follow-on pull request workflow runs into an approval-required state. That is acceptable for v2 because the benchmark run and the status update remain manually reviewed.
@@ -47,7 +49,7 @@ Scheduling the workflow would make freshness automatic, but the current model-ba
 ## Acceptance Criteria
 
 - The workflow remains `workflow_dispatch` only with zero custom inputs and keeps the `main` guard.
-- The workflow requests narrow write permissions needed to push an update branch and open a PR.
+- The workflow requests narrow write permissions only on the writer job needed to push an update branch and open a PR.
 - The workflow still runs the existing hard-coded Guidance benchmark configuration.
 - A checked-in helper updates `os/verification/BENCHMARK_STATUS.md` from `public_safe.targets` in the refresh candidate.
 - The helper ignores `private_locators` and rejects missing, malformed, or unavailable candidates.

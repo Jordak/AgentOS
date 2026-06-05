@@ -37,6 +37,7 @@ Tools and connectors:
 - Local filesystem reads for Core files and Personal Overlay benchmark reports.
 - Local `git` for branch, commit, upstream, remote `origin/main`, and dirty-state checks.
 - `os/verification/scripts/refresh_benchmark_status.py` for deterministic evidence discovery, eligibility checks, freshness comparison, public-safe fact extraction, and private result locators.
+- `os/verification/scripts/apply_benchmark_status_candidate.py` for approved write-side application of public-safe candidate facts to `os/verification/BENCHMARK_STATUS.md`.
 - `os/verification/BENCHMARKS.json` for benchmark suite configuration.
 - `os/playbook/PERSONAL_OVERLAY.md` for resolving local Personal Overlay report locations from a feature worktree.
 - No external connectors are needed. Use saved remote-freshness metadata from benchmark reports rather than making network calls unless the user asks to rerun benchmarks.
@@ -119,7 +120,7 @@ Safety:
    Fixture identifiers, categories, verdict classes, staleness labels, and availability/error classes are public-safe structured provenance. Judge rationales, HUT answers, prompts, command shapes, stdout, stderr, local paths, and raw report excerpts are not public-safe Core content.
 
 7. Update or report.
-   Update `os/verification/BENCHMARK_STATUS.md` only when the user requested the refresh and evidence is eligible, or after the user approves a proposed update. If evidence is missing, stale, incompatible, dirty, not from fresh `main`, or otherwise ineligible, leave Core unchanged and explain what to rerun.
+   Update `os/verification/BENCHMARK_STATUS.md` only when the user requested the refresh and evidence is eligible, or after the user approves a proposed update. Apply approved updates through `python3 os/verification/scripts/apply_benchmark_status_candidate.py <refresh-json>` so the write path consumes only `public_safe.targets` and keeps `private_locators` out of Core. If evidence is missing, stale, incompatible, dirty, not from fresh `main`, or otherwise ineligible, leave Core unchanged and explain what to rerun.
 
 ## Status Rules
 
@@ -135,6 +136,7 @@ Do not use `stale` as a Core status. Report staleness in the refresh report beca
 - Core benchmark status lives only in `os/verification/BENCHMARK_STATUS.md`.
 - Raw reports and run histories stay in the Personal Overlay report directories configured by `os/verification/BENCHMARKS.json`.
 - Deterministic refresh-helper behavior lives in `os/verification/scripts/refresh_benchmark_status.py`. The helper emits JSON candidate facts and private locators only; it is not a Core status writer.
+- Approved Core status writes use `os/verification/scripts/apply_benchmark_status_candidate.py`, which consumes only public-safe candidate facts and must not read or render private locators.
 - Do not create append-only Core benchmark history.
 
 ## Quality Bar
@@ -146,6 +148,7 @@ Do not use `stale` as a Core status. Report staleness in the refresh report beca
 - Summaries describe what kinds of tasks are affected without copying raw evidence.
 - Non-passing detail rows are diagnostic enough to guide investigation without opening the raw report first.
 - The workflow leaves unrelated status entries unchanged.
+- Approved status-file writes are applied through the write-side applicator, not by hand-editing raw reports or private locators into Core.
 
 ## Verification
 
@@ -158,5 +161,6 @@ Before finishing:
 5. Confirm no raw report body, run JSON, transcript, stdout, stderr, local path, prompt, session detail, or private diagnostic was copied into Core.
 6. Confirm each non-passing status-counting result in eligible evidence has a public-safe detail row or that the status entry was intentionally left unchanged.
 7. Confirm status labels are limited to `passing`, `attention needed`, `not run`, and `unknown`.
-8. Run `python3 os/verification/scripts/refresh_benchmark_status.py --self-test` after helper changes.
-9. Run `scripts/run-validator` after helper, skill, or status-file changes.
+8. Run `python3 os/verification/scripts/refresh_benchmark_status.py --self-test` after refresh-helper changes.
+9. Run `python3 os/verification/scripts/apply_benchmark_status_candidate.py --self-test` after status-applicator changes.
+10. Run `scripts/run-validator` after helper, skill, or status-file changes.
