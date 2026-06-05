@@ -16,15 +16,15 @@ DEFAULT_STATUS = Path("os/verification/BENCHMARK_STATUS.md")
 COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 STATUS_LABELS = {"passing", "attention needed", "not run", "unknown"}
 WRITABLE_STATUS_LABELS = {"passing", "attention needed"}
-STATUS_BLOCKER_COUNT_FIELDS = (
-    "behavioral_fail",
-    "fixture_stale",
-    "needs_user_judgment",
-    "harness_unavailable",
-    "harness_error",
-    "judge_unavailable",
-    "judge_error",
-    "judge_invalid",
+STATUS_BLOCKER_RESULTS = (
+    ("behavioral_fail", "Behavioral failure"),
+    ("fixture_stale", "Fixture stale"),
+    ("needs_user_judgment", "Needs user judgment"),
+    ("harness_unavailable", "Harness unavailable"),
+    ("harness_error", "Harness error"),
+    ("judge_unavailable", "Judge unavailable"),
+    ("judge_error", "Judge error"),
+    ("judge_invalid", "Judge invalid"),
 )
 PRIVATE_MARKERS = (
     "/" + "Users" + "/",
@@ -209,8 +209,27 @@ def nonzero_count_parts(counts: dict[str, Any]) -> list[str]:
 def status_blocker_count(counts: dict[str, Any]) -> int:
     return sum(
         require_int(counts.get(field, 0), f"counts.{field}")
-        for field in STATUS_BLOCKER_COUNT_FIELDS
+        for field, _result in STATUS_BLOCKER_RESULTS
     )
+
+
+def validate_non_passing_detail_coverage(counts: dict[str, Any], rows: list[Any]) -> None:
+    expected_results = {result for _field, result in STATUS_BLOCKER_RESULTS}
+    actual_by_result = {result: 0 for result in expected_results}
+    for index, row in enumerate(rows):
+        if not isinstance(row, dict):
+            raise StatusApplyError("non_passing_details rows must be objects")
+        result = require_text(row.get("result"), f"non_passing_details[{index}].result")
+        if result not in actual_by_result:
+            raise StatusApplyError(f"non_passing_details[{index}].result has unsupported result: {result}")
+        actual_by_result[result] += 1
+    for field, result in STATUS_BLOCKER_RESULTS:
+        expected = require_int(counts.get(field, 0), f"counts.{field}")
+        actual = actual_by_result[result]
+        if actual != expected:
+            raise StatusApplyError(
+                f"non_passing_details must contain {expected} {result} row(s); found {actual}"
+            )
 
 
 def validate_counts_for_write(target: dict[str, Any]) -> None:
@@ -236,6 +255,8 @@ def validate_counts_for_write(target: dict[str, Any]) -> None:
             raise StatusApplyError("passing candidates must not contain non-passing details")
     elif status == "attention needed" and blockers == 0 and not details:
         raise StatusApplyError("attention-needed candidates must contain a blocker count or non-passing details")
+    elif status == "attention needed":
+        validate_non_passing_detail_coverage(counts, details)
 
 
 def validate_scope_for_write(target: dict[str, Any]) -> None:
@@ -627,6 +648,21 @@ def run_self_test() -> int:
         attention_without_signal["counts"]["behavioral_pass"] = 15
         attention_without_signal["counts"]["behavioral_fail"] = 0
         malformed_cases.append(fake_candidate(attention_without_signal))
+
+        attention_without_details = fake_target("attention needed")
+        malformed_cases.append(fake_candidate(attention_without_details))
+
+        attention_wrong_detail_class = fake_target(
+            "attention needed",
+            [
+                {
+                    "fixture": "weekly-review-private-report",
+                    "category": "Review",
+                    "result": "Fixture stale",
+                }
+            ],
+        )
+        malformed_cases.append(fake_candidate(attention_wrong_detail_class))
 
         noncanonical_scope = fake_target()
         noncanonical_scope["evidence_scope"]["selected_fixture_subset"] = True

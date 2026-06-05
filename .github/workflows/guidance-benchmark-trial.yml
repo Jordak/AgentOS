@@ -213,11 +213,11 @@ jobs:
           exit "$PREFLIGHT_STATUS"
 
       - name: Enforce benchmark result
-        if: steps.codex_preflight.outputs.preflight_status == '0' && steps.benchmark.outputs.benchmark_status != '' && steps.benchmark.outputs.benchmark_status != '0'
+        if: steps.codex_preflight.outputs.preflight_status == '0' && steps.benchmark.outputs.benchmark_status != '' && steps.benchmark.outputs.benchmark_status != '0' && steps.refresh.outputs.refresh_status != '0'
         env:
           BENCHMARK_STATUS: ${{ steps.benchmark.outputs.benchmark_status }}
         run: |
-          echo "::error title=Guidance benchmark reported attention needed::benchmark_guidance.py exited with status ${BENCHMARK_STATUS}. See the public-safe step summary for structured details."
+          echo "::error title=Guidance benchmark did not produce a fresh public-safe candidate::benchmark_guidance.py exited with status ${BENCHMARK_STATUS}. See the public-safe step summary for structured details."
           exit "$BENCHMARK_STATUS"
 
       - name: Enforce refresh candidate result
@@ -239,7 +239,7 @@ jobs:
   status-pr:
     name: Open Guidance benchmark status PR
     needs: guidance
-    if: needs.guidance.outputs.refresh_status == '0' && needs.guidance.outputs.public_refresh_candidate != ''
+    if: ${{ always() && github.ref_name == 'main' && needs.guidance.outputs.refresh_status == '0' && needs.guidance.outputs.public_refresh_candidate != '' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
