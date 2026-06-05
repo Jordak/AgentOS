@@ -345,6 +345,9 @@ def diagnosis_for(row: dict[str, Any]) -> str:
 
 
 def next_step_for(row: dict[str, Any]) -> str:
+    suggested = row.get("suggested_next_step")
+    if isinstance(suggested, str) and suggested:
+        return suggested
     result = optional_text(row.get("result"), "")
     if result == "Behavioral failure":
         return "Review the fixture expectation and Guidance source for this scenario, then rerun the status benchmark."
@@ -575,14 +578,16 @@ def run_self_test() -> int:
             "source_alignment": "wrong",
             "staleness": "current",
             "host_boundary_sentinel_observed": False,
+            "public_safe_diagnosis": "investigation_needed",
+            "suggested_next_step": "Investigation needed.",
         }
         failing = apply_candidate(fake_candidate(fake_target("attention needed", [detail])), fake_status())
         failing_fragments = [
             "- Status: `attention needed`",
             "#### Non-Passing Details",
             "`weekly-review-private-report`",
-            "Behavioral failure reported with status `graded`",
-            "Review the fixture expectation",
+            "Public diagnostic classifier: `investigation_needed`.",
+            "Investigation needed.",
         ]
         missing_failing = [fragment for fragment in failing_fragments if fragment not in failing]
         if missing_failing:

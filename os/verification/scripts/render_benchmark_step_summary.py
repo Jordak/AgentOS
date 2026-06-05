@@ -117,19 +117,20 @@ def render_non_passing(rows: list[Any]) -> list[str]:
         "",
         "#### Non-Passing Structured Details",
         "",
-        "| Fixture | Category | Result | Status | Public diagnosis | Verdict | Source alignment | Staleness | Sentinel observed |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| Fixture | Category | Result | Status | Public diagnosis | Suggested next step | Verdict | Source alignment | Staleness | Sentinel observed |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for row in rows:
         if not isinstance(row, dict):
             continue
         lines.append(
-            "| {fixture} | {category} | {result} | {status} | {diagnosis} | {verdict} | {source} | {staleness} | {sentinel} |".format(
+            "| {fixture} | {category} | {result} | {status} | {diagnosis} | {step} | {verdict} | {source} | {staleness} | {sentinel} |".format(
                 fixture=f"`{as_text(row.get('fixture'))}`",
                 category=as_text(row.get("category")),
                 result=as_text(row.get("result")),
                 status=as_text(row.get("status")),
                 diagnosis=as_text(row.get("public_safe_diagnosis"), "n/a"),
+                step=as_text(row.get("suggested_next_step"), "n/a"),
                 verdict=as_text(row.get("verdict"), "n/a"),
                 source=as_text(row.get("source_alignment"), "n/a"),
                 staleness=as_text(row.get("staleness"), "n/a"),
@@ -274,7 +275,8 @@ def run_self_test() -> int:
                             "category": "review",
                             "result": "Behavioral failure",
                             "status": "graded",
-                            "public_safe_diagnosis": "n/a",
+                            "public_safe_diagnosis": "investigation_needed",
+                            "suggested_next_step": "Investigation needed.",
                             "verdict": "fail",
                             "source_alignment": "wrong",
                             "staleness": "current",
@@ -305,6 +307,8 @@ def run_self_test() -> int:
         "Candidate status: `attention needed`",
         "| Behavioral pass | 7 |",
         "Public diagnosis",
+        "Suggested next step",
+        "Investigation needed.",
         "`weekly-review-private-report`",
         "Host-boundary sentinel observed: `no`",
     ]
@@ -370,6 +374,7 @@ def run_self_test() -> int:
                                 "result": "Harness error",
                                 "status": "harness-error",
                                 "public_safe_diagnosis": "api_auth_or_model_access",
+                                "suggested_next_step": "Investigation needed.",
                                 "host_boundary_sentinel_observed": False,
                             }
                         ],
@@ -383,6 +388,7 @@ def run_self_test() -> int:
         "Candidate unavailable reason: `no_eligible_status_counting_report`",
         "| Harness error | 8 |",
         "api_auth_or_model_access",
+        "Investigation needed.",
     ]
     missing_unavailable = [fragment for fragment in unavailable_expected if fragment not in unavailable_rendered]
     if missing_unavailable:

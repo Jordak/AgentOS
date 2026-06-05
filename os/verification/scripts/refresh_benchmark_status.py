@@ -43,8 +43,11 @@ PUBLIC_DIAGNOSTIC_CLASSES = {
     "codex_empty_response",
     "codex_process_start_error",
     "codex_cli_error",
+    "investigation_needed",
     "unknown_harness_error",
 }
+DEFAULT_PUBLIC_SAFE_DIAGNOSIS = "investigation_needed"
+DEFAULT_SUGGESTED_NEXT_STEP = "Investigation needed."
 SAFE_SLUG = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 SAFE_LABEL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ./_-]*$")
 COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -430,11 +433,15 @@ def guidance_non_passing_details(report: GuidanceReport, private_report_path: st
             "source_alignment": safe_optional_enum(source_alignment, SOURCE_ALIGNMENTS, "source_alignment"),
             "staleness": safe_optional_enum(staleness, STALENESS_VALUES, "staleness"),
             "host_boundary_sentinel_observed": safe_optional_bool(host_observed, "host_boundary_sentinel_observed"),
-            "requires_curated_fields": ["public_safe_diagnosis", "suggested_next_step"],
+            "public_safe_diagnosis": safe_public_diagnostic(
+                public_harness_diagnostic(result) or DEFAULT_PUBLIC_SAFE_DIAGNOSIS,
+                "public_safe_diagnosis",
+            ),
+            "suggested_next_step": safe_public_next_step(
+                DEFAULT_SUGGESTED_NEXT_STEP,
+                "suggested_next_step",
+            ),
         }
-        diagnostic = public_harness_diagnostic(result)
-        if diagnostic:
-            row["public_safe_diagnosis"] = safe_public_diagnostic(diagnostic, "public_safe_diagnosis")
         public_rows.append(row)
         private_rows.append(
             {
@@ -543,6 +550,10 @@ def safe_public_diagnostic(value: Any, field: str) -> str:
     if not isinstance(value, str) or value not in PUBLIC_DIAGNOSTIC_CLASSES:
         raise PublicSafeOutputError(f"{field} is not an allowed public diagnostic: {value!r}")
     return value
+
+
+def safe_public_next_step(value: Any, field: str) -> str:
+    return safe_label(value, field)
 
 
 def safe_commit(value: str, field: str) -> str:
@@ -852,6 +863,13 @@ def run_self_test() -> int:
             if target["non_passing_details"][0]["fixture"] != "weekly-review-private-report":
                 print("SELF-TEST FAIL: non-passing detail fixture missing")
                 return 1
+            if (
+                target["non_passing_details"][0].get("public_safe_diagnosis") != "investigation_needed"
+                or target["non_passing_details"][0].get("suggested_next_step") != "Investigation needed."
+            ):
+                print("SELF-TEST FAIL: default public-safe curated fields were not emitted")
+                print(json.dumps(target["non_passing_details"][0], indent=2))
+                return 1
             private = output["private_locators"]["targets"][0]
             if private["source_report"]["core_safe"] is not False:
                 print("SELF-TEST FAIL: private source report was not marked non-Core-safe")
@@ -921,6 +939,7 @@ def run_self_test() -> int:
                 or latest.get("counts", {}).get("harness_error") != 8
                 or not details
                 or details[0].get("public_safe_diagnosis") != "api_auth_or_model_access"
+                or details[0].get("suggested_next_step") != "Investigation needed."
             ):
                 print("SELF-TEST FAIL: public-safe harness diagnostic was not emitted")
                 print(json.dumps(diagnostic_target, indent=2))
