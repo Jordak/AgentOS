@@ -1,6 +1,6 @@
 ---
 name: review-loop
-description: Orchestrate iterative code-review loops for a PR, branch, commit range, or patch by delegating fresh and verification panel passes to review-pass, adjudicating issue families, applying and pushing accepted fixes, posting consolidated Agent Review comments, producing a temporary HTML report, and marking a PR ready for human review. Use when the user asks for an automated review loop, fresh-context PR review/fix panel, repeated agent review/fix cycle, reviewer subagent loop, "Agent Review" PR comments, or to review a PR or commit until clean.
+description: Orchestrate iterative code-review loops for a PR, branch, commit range, or patch by delegating fresh and verification panel passes to review-pass, conservatively adjudicating issue families, applying and pushing accepted fixes, posting consolidated Agent Review comments, producing a temporary HTML report, and marking a PR ready for human review. Use when the user asks for an automated review loop, fresh-context PR review/fix panel, repeated agent review/fix cycle, reviewer subagent loop, "Agent Review" PR comments, or to review a PR or commit until clean.
 ---
 
 # Review Loop
@@ -78,6 +78,35 @@ Verification should preserve source-reviewer continuity without making the user 
 - Record the continuity mode and source aliases in the ledger and final report so later agents can distinguish same-reviewer verification from packet/finding-source fallback without exposing handles.
 - Treat continuity as a verification-quality preference, not as permission for reviewers to keep state open, mutate files, or post PR comments. `review-pass` still owns prompt assembly, reviewer lifecycle, collection, closure, and packet normalization for the current pass.
 
+## Conservative Autopilot
+
+Run the parent loop in conservative autopilot by default unless the user asks for manual adjudication or a more aggressive refactor. Conservative autopilot answers the user's implicit question: what does the agent need the user to know exactly, and what can it confidently do without the user?
+
+Classify every issue family after each packet:
+
+- `auto-fix`: evidenced by the packet or repository inspection, in scope for the original brief, localized or family-local, consistent with existing project patterns, supported by a clear validation signal, and unlikely to add meaningful concepts, ownership surfaces, or long-term maintenance burden.
+- `auto-decline`: incorrect, duplicate, speculative, stylistic without project support, out of scope, P3 polish, lower value than the churn, or fixable only by adding machinery the original brief did not require.
+- `ask-user`: changes product behavior, expands scope, changes workflow semantics, adds or changes a reusable contract, introduces new abstractions, parser/schema/grammar semantics, lifecycle behavior, synchronization logic, permission boundaries, publication rules, or triggers the Design Escape Hatch.
+
+Do not ask the user to adjudicate `auto-fix` or `auto-decline` families one by one. Record the decision and rationale in the ledger, PR comment or chat summary, and final report. Ask only for `ask-user` families or when repository evidence cannot settle the decision.
+
+Before editing an accepted family, apply the complexity governor and record the chosen smallest closing move:
+
+1. Delete, simplify, narrow, split, or scope-reduce the problematic shape.
+2. Use an existing helper, contract, module, documented pattern, or validation point.
+3. Tighten the current code or prose locally.
+4. Add narrow validation or tests around existing behavior.
+5. Add a new abstraction, schema, parser, lifecycle rule, synchronization mechanism, or reusable contract only when the original brief already required it or a P0/P1 risk cannot be closed without it.
+
+Treat new concepts as guilty until proven necessary. If the proposed fix increases the concept count, creates another durable surface, or makes future agents understand more rules than before, reclassify it as `ask-user` unless the need is forced by the original brief or by high-severity evidence.
+
+When pausing for the user, use a lazy-human brief instead of dumping raw issue-family adjudication:
+
+1. what the user needs to decide exactly;
+2. what the loop can confidently do without the user;
+3. what the loop is declining to avoid complexity;
+4. the recommended default.
+
 ## Efficiency Controls
 
 - Use a moderate, balanced, or medium effort level for the orchestrator by default when the harness exposes reasoning-effort controls. Reserve high or extra-high effort for `review-pass` reviewer quality, genuinely ambiguous adjudication, and hard design tradeoffs.
@@ -89,6 +118,7 @@ Verification should preserve source-reviewer continuity without making the user 
 - Trigger a checkpoint after roughly 60-90 minutes, after two fresh panel cycles, after eight fix commits, when a fixed family is rediscovered, or when the loop appears to be finding diminishing returns.
 - At a checkpoint, summarize elapsed time if known, panel cycles, fix commits, accepted and declined issue families, remaining risk, current confidence, cost/effort posture, and the next planned review step. Continue by default unless the user set a budget cap, the next step expands scope, the loop appears to be thrashing, or the checkpoint raises a design-escape-hatch concern.
 - The parent agent may always pause and ask the user for judgment when user input would improve the outcome, even if the workflow would otherwise allow the loop to continue. Prefer reaching out early when a design choice, scope boundary, product behavior, or implementation shape seems uncertain.
+- When complexity creep is a known risk, ask `review-pass` for simplicity or `code-judo` attention in the pass request. Prefer concrete deletion or scope-reduction findings over broad architecture work unless the target's risk really requires a heavier structural lens.
 
 ## Design Escape Hatch
 
@@ -143,7 +173,7 @@ Use the matrix to update affected contract surfaces in one pass. Check the ownin
    - Establish the baseline intent summary described in the Design Escape Hatch section. Keep it in the loop ledger so later packets can be compared against the original brief and allowed alternatives.
 
 2. Set the loop ledger:
-   - Track each pass cycle, pass mode, reviewer continuity mode, opaque handle availability, review packet path or chat status, reviewer aliases when supplied by `review-pass`, raw reviewer findings or crosswalk summaries, normalized family IDs, accepted/declined decisions, fix commits, validation results, consolidated comment URL or chat status, and pass closure status.
+   - Track each pass cycle, pass mode, reviewer continuity mode, opaque handle availability, review packet path or chat status, reviewer aliases when supplied by `review-pass`, raw reviewer findings or crosswalk summaries, normalized family IDs, autopilot classification (`auto-fix`, `auto-decline`, or `ask-user`), accepted/declined decisions, complexity posture, chosen smallest closing move, fix commits, validation results, consolidated comment URL or chat status, and pass closure status.
    - Normalize families into stable ledger IDs such as `C1-IF3` and preserve source reviewer finding IDs from `review-pass`.
    - If compaction or interruption loses details, rebuild the ledger from consolidated "Agent Review" comments, commit history, local validation output, and saved or pasted review packets.
    - Prefer one consolidated "Agent Review" comment per panel pass for PR targets. For non-PR targets, keep packet output in chat and the final report.
@@ -151,24 +181,27 @@ Use the matrix to update affected contract surfaces in one pass. Check the ownin
 3. Run a fresh review pass:
    - Reopen `review-pass` and request a `fresh` pass with the target, base/head or commit range, baseline intent, reporting mode, and any risk-based reviewer count or lens hints.
    - Ask `review-pass` to compare the implementation shape against the durable design source and flag first-commit design drift before the loop starts treating symptoms as isolated bugs.
+   - When the user or prior loop history points at over-complexity, ask for simplicity or `code-judo` attention so reviewers surface smaller shapes that preserve behavior while deleting moving parts.
    - Wait for the packet before adjudicating.
 
 4. Adjudicate and consolidate packet findings:
    - Read each packet family as a claim, not an instruction.
    - Deduplicate with existing ledger families while preserving which pass and reviewers found them.
+   - Apply Conservative Autopilot before asking the user for issue-family decisions. Classify every family as `auto-fix`, `auto-decline`, or `ask-user`.
    - For every accepted family, record the generalized rule, representative examples, sibling-search strategy, expected fix shape, and validation signal that would prove the family is closed.
    - If an accepted family changes a reusable workflow contract, create a Contract Surface Matrix before editing so all affected surfaces are patched together.
    - Compare accepted issue families against the baseline intent summary. If a family mostly exists because the implementation chose a heavier design than the brief required, trigger the Design Escape Hatch before implementing another fix.
-   - Accept issue families that identify real correctness, safety, regression, maintainability, test, or UX risks.
-   - Decline issue families that are incorrect, out of scope, stylistic without project support, duplicates, or lower-value than the churn they would create. Record a short rationale.
-   - Ask the user when the decision changes product behavior, expands scope, cannot be resolved from repository context, or when user judgment would be useful for a design-escape-hatch call.
+   - Accept `auto-fix` issue families that identify real correctness, safety, regression, maintainability, test, or UX risks and can be closed with the complexity governor.
+   - Decline `auto-decline` issue families that are incorrect, out of scope, stylistic without project support, duplicates, or lower-value than the churn they would create. Record a short rationale.
+   - Ask the user only for `ask-user` families, unresolved evidence disputes, product/scope changes, or design-escape-hatch calls. Use the lazy-human brief format from Conservative Autopilot.
    - For PR targets, read `references/agent-review-comment.md` and post one consolidated "Agent Review" comment for the panel pass when there are accepted issue families or useful declined issue-family rationale. Do not have reviewers post separate PR comments.
 
 5. Fix accepted issue families:
    - Implement fixes in the parent workspace, preserving unrelated user changes.
    - Sweep for sibling occurrences in the same issue family before committing, using repository search, tests, fixtures, or small scripts when useful.
    - Use any Contract Surface Matrix created during adjudication to patch every affected surface before verification, not just the representative line.
-   - Before adding new schema, grammar, parser, lifecycle, synchronization, or publication semantics to satisfy a finding, check whether the Design Escape Hatch should fire.
+   - Before editing, choose the smallest closing move from the complexity governor and record the expected complexity delta. Prefer deletion, simplification, scope reduction, or an existing project pattern over new machinery.
+   - Before adding new schema, grammar, parser, lifecycle, synchronization, publication semantics, durable contract surfaces, or named abstractions to satisfy a finding, recheck whether the family should be `ask-user` or whether the Design Escape Hatch should fire.
    - Run the smallest trustworthy validation for the touched surface, broadening when shared behavior or user-facing workflows are affected.
    - Commit accepted fixes with an agent-prefixed subject, such as `#<agent-name> fix review finding about retries`. Use the active agent or harness name, for example `codex`, `claude`, or `gemini`; do not hard-code one agent name into the skill.
    - Push fixes to the target PR branch for PR targets. Otherwise leave local changes and report the needed external action.
@@ -213,9 +246,11 @@ Call narrower playbooks for their owned surfaces: GitHub workflow policy for PR 
 - Every fresh or verification panel pass is delegated to `review-pass` or its canonical fallback files.
 - The orchestrator owns one durable ledger and posts at most one consolidated "Agent Review" comment per panel pass.
 - Findings are generalized into issue families where possible, and accepted families are swept before verification.
+- Every issue family has an autopilot classification, rationale, and either a smallest closing move, decline reason, or lazy-human brief.
+- Accepted fixes use the complexity governor and prefer deletion, simplification, scope reduction, or existing patterns over new machinery.
 - Repeated findings in the same issue family trigger a design-escape-hatch check rather than automatic patch accumulation.
 - Accepted semantic contract changes use a Contract Surface Matrix, or explicitly skip it because the fix is local and non-contractual.
-- The parent agent reaches out to the user whenever user judgment would help decide scope, design direction, or whether to keep investing in the loop.
+- The parent agent reaches out to the user whenever user judgment would help decide scope, design direction, or whether to keep investing in the loop, and uses the lazy-human brief format when it pauses.
 - Accepted issue families have concrete fix commits or local changes, plus validation evidence.
 - Declined issue families have short rationales and are not silently dropped.
 - Verification passes prefer same-source reviewer continuity when safely available, record opaque handle availability and any packet/finding-source fallback, check prior fixes, and reread the full current diff.
@@ -241,18 +276,21 @@ Before finishing:
 4. Confirm every design-escape-hatch trigger was either surfaced to the user, explicitly declined with rationale, or found not applicable.
 5. Confirm every fresh and verification pass used `review-pass` or its canonical fallback files.
 6. Confirm the final fresh `review-pass` packet had no likely accepted issue families on its initial pass.
-7. Confirm every accepted issue family has a fix, a scope/design change, or an explicit unresolved-risk note.
-8. Confirm every declined issue family has a rationale.
-9. Confirm accepted issue families were swept for sibling occurrences before verification.
-10. Confirm accepted semantic contract changes used a Contract Surface Matrix, or record why the matrix was skipped.
-11. Confirm review-pass requests used the current fresh or verification templates, including reporting mode, read-only rule, no-reviewer-PR-comment rule, dirty-validation rule, issue-family sweep instruction, design-escape-hatch instruction, full-reread instruction, provisional-ID rule, and clean response sentinel.
-12. If a deep-review lens was assigned, confirm `review-pass` supplied the deep-review lens instructions and no full standalone `thermo-nuclear-review` workflow was run inside `review-loop`.
-13. If a structural-depth lens was assigned, confirm `review-pass` supplied the structural-depth lens instructions and no full standalone `improve-codebase-architecture` or `thermo-nuclear-code-quality-review` workflow was run inside `review-loop`.
-14. Confirm explicit `review-pass` panel requests were treated as permission for read-only reviewer subagents when the harness supported them, or record why `review-pass` used fallback.
-15. Confirm verification continuity mode and opaque handle availability were recorded for verification passes without exposing handle values.
-16. Confirm soft budget checkpoints were surfaced when checkpoint triggers occurred.
-17. Confirm validation commands and results are captured.
-18. Confirm fix commits use the active agent-name prefix.
-19. Confirm the temporary HTML report exists, follows `references/report-guidance.md`, hyperlinks commit hashes to GitHub commits when possible, and is linked in the orchestrator's chat as a clickable absolute-path `.html` Markdown link.
-20. Confirm consolidated "Agent Review" comments followed `references/agent-review-comment.md` when posted.
-21. Confirm no merges, issue closures, label creation, permission changes, non-target-branch pushes, or other out-of-loop external writes happened without current user authorization.
+7. Confirm every issue family was classified as `auto-fix`, `auto-decline`, or `ask-user`, with rationale.
+8. Confirm every accepted issue family has a fix, a scope/design change, or an explicit unresolved-risk note.
+9. Confirm every accepted fix recorded the smallest closing move from the complexity governor, or recorded why new machinery was necessary.
+10. Confirm every declined issue family has a rationale, including complexity/churn rationale when relevant.
+11. Confirm every user pause used the lazy-human brief format, or record why no pause happened.
+12. Confirm accepted issue families were swept for sibling occurrences before verification.
+13. Confirm accepted semantic contract changes used a Contract Surface Matrix, or record why the matrix was skipped.
+14. Confirm review-pass requests used the current fresh or verification templates, including reporting mode, read-only rule, no-reviewer-PR-comment rule, dirty-validation rule, issue-family sweep instruction, design-escape-hatch instruction, full-reread instruction, provisional-ID rule, and clean response sentinel.
+15. If a deep-review lens was assigned, confirm `review-pass` supplied the deep-review lens instructions and no full standalone `thermo-nuclear-review` workflow was run inside `review-loop`.
+16. If a structural-depth lens was assigned, confirm `review-pass` supplied the structural-depth lens instructions and no full standalone `improve-codebase-architecture` or `thermo-nuclear-code-quality-review` workflow was run inside `review-loop`.
+17. Confirm explicit `review-pass` panel requests were treated as permission for read-only reviewer subagents when the harness supported them, or record why `review-pass` used fallback.
+18. Confirm verification continuity mode and opaque handle availability were recorded for verification passes without exposing handle values.
+19. Confirm soft budget checkpoints were surfaced when checkpoint triggers occurred.
+20. Confirm validation commands and results are captured.
+21. Confirm fix commits use the active agent-name prefix.
+22. Confirm the temporary HTML report exists, follows `references/report-guidance.md`, hyperlinks commit hashes to GitHub commits when possible, and is linked in the orchestrator's chat as a clickable absolute-path `.html` Markdown link.
+23. Confirm consolidated "Agent Review" comments followed `references/agent-review-comment.md` when posted.
+24. Confirm no merges, issue closures, label creation, permission changes, non-target-branch pushes, or other out-of-loop external writes happened without current user authorization.
