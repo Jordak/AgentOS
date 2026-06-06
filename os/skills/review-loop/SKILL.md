@@ -85,7 +85,7 @@ Run the parent loop in conservative autopilot by default unless the user asks fo
 Classify every issue family after each packet. Apply precedence in this order: `ask-user`, `auto-fix`, then `auto-decline`. If a family could match `ask-user` and another bucket, `ask-user` wins unless the original brief already authorized the needed durable machinery or a clearly evidenced P0/P1 risk requires a bounded local fix.
 
 - `auto-fix`: evidenced by the packet or repository inspection, in scope for the original brief, localized or family-local, consistent with existing project patterns, supported by a clear validation signal, and unlikely to add meaningful concepts, ownership surfaces, or long-term maintenance burden.
-- `auto-decline`: after `ask-user` and `auto-fix` have been ruled out, incorrect, duplicate, speculative, stylistic without project support, out of scope, P3 polish, lower value than the churn, or dependent on machinery the original brief did not require.
+- `auto-decline`: after `ask-user` and `auto-fix` have been ruled out, incorrect, duplicate, speculative, stylistic without project support, out of scope, P3 polish, or lower value than the churn.
 - `ask-user`: changes product behavior, expands scope, changes workflow semantics, adds or changes a reusable contract, introduces new abstractions, parser/schema/grammar semantics, lifecycle behavior, synchronization logic, permission boundaries, publication rules, or triggers the Design Escape Hatch.
 
 Do not ask the user to adjudicate `auto-fix` or `auto-decline` families one by one. Record the decision and rationale in the ledger, PR comment or chat summary, and final report. Ask only for `ask-user` families or when repository evidence cannot settle the decision.
@@ -98,7 +98,7 @@ Before editing an accepted family, apply the complexity governor and record the 
 4. Add narrow validation or tests around existing behavior.
 5. Add a new abstraction, schema, parser, lifecycle rule, synchronization mechanism, or reusable contract only when the original brief already required it or a P0/P1 risk cannot be closed without it.
 
-Treat new concepts as guilty until proven necessary. If the proposed fix increases the concept count, creates another durable surface, or makes future agents understand more rules than before, reclassify it as `ask-user` unless the need is forced by the original brief or by high-severity evidence.
+Treat new concepts as guilty until proven necessary. If the proposed fix increases the concept count, creates another durable surface, or makes future agents understand more rules than before, reclassify it as `ask-user` unless the need is forced by the original brief or by clearly evidenced P0/P1 risk.
 
 When pausing for the user, use a lazy-human brief instead of dumping raw issue-family adjudication:
 
