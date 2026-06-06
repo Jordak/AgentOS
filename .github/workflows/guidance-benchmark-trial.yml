@@ -241,6 +241,7 @@ jobs:
     needs: guidance
     if: ${{ always() && github.ref_name == 'main' && needs.guidance.outputs.refresh_status == '0' && needs.guidance.outputs.public_refresh_candidate != '' }}
     runs-on: ubuntu-latest
+    environment: guidance-benchmark-trial
     permissions:
       contents: write
       pull-requests: write

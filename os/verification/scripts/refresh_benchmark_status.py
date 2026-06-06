@@ -49,6 +49,11 @@ SAFE_SLUG = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 SAFE_LABEL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ./_-]*$")
 SAFE_PUBLIC_TEXT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 `.,;:/'_-]*$")
 COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
+REJECTED_FRESHNESS_CLASSES = {
+    "evidence_stale_by_age",
+    "older_than_status",
+    "evidence_for_non_current_head",
+}
 PRIVATE_MARKERS = (
     "/" + "Users" + "/",
     "\\Users\\",
@@ -697,11 +702,11 @@ def target_candidate(
         freshness_classes.append("evidence_stale_by_age")
     if status_entry.reviewed_core_revision and selected.commit == status_entry.reviewed_core_revision:
         freshness_classes.append("same_as_status")
-    elif status_entry.last_reviewed_at and selected.generated_at < status_entry.last_reviewed_at:
+    if status_entry.last_reviewed_at and selected.generated_at < status_entry.last_reviewed_at:
         freshness_classes.append("older_than_status")
     elif status_entry.last_reviewed_at and selected.generated_at > status_entry.last_reviewed_at:
         freshness_classes.append("newer_than_status")
-    elif status_entry.reviewed_core_revision:
+    elif status_entry.reviewed_core_revision and selected.commit != status_entry.reviewed_core_revision:
         freshness_classes.append("newer_than_status")
 
     head = current_head(root)
@@ -734,10 +739,7 @@ def target_candidate(
             "non_passing_results": private_rows,
         }
     )
-    fresh_enough = (
-        days_old <= target.max_age_days
-        and "older_than_status" not in freshness_classes
-    )
+    fresh_enough = not any(freshness_class in REJECTED_FRESHNESS_CLASSES for freshness_class in freshness_classes)
     validate_no_private_markers(public)
     return public, private, fresh_enough
 
@@ -889,13 +891,17 @@ def run_self_test() -> int:
                 ),
                 encoding="utf-8",
             )
-            (root / "os/verification/BENCHMARK_STATUS.md").write_text(
+            status_path = root / "os/verification/BENCHMARK_STATUS.md"
+            original_status_text = (
                 "# AgentOS Benchmark Status\n\n"
                 "## Guidance\n\n"
                 "### Codex\n\n"
                 "- Status: `attention needed`\n"
                 "- Reviewed Core revision: `1111111111111111111111111111111111111111`\n"
-                "- Last reviewed evidence: `2026-06-03 13:12 PDT`\n",
+                "- Last reviewed evidence: `2026-06-03 13:12 PDT`\n"
+            )
+            status_path.write_text(
+                original_status_text,
                 encoding="utf-8",
             )
             run_dir = reports / "guidance-eligible"
@@ -942,6 +948,34 @@ def run_self_test() -> int:
             if private["source_report"]["core_safe"] is not False:
                 print("SELF-TEST FAIL: private source report was not marked non-Core-safe")
                 return 1
+
+            status_path.write_text(
+                "# AgentOS Benchmark Status\n\n"
+                "## Guidance\n\n"
+                "### Codex\n\n"
+                "- Status: `attention needed`\n"
+                "- Reviewed Core revision: `" + commit + "`\n"
+                "- Last reviewed evidence: `2026-06-03T20:45:00+00:00`\n",
+                encoding="utf-8",
+            )
+            same_revision_older_output, same_revision_older_fresh = build_candidate(
+                root,
+                root / "os/verification/BENCHMARKS.json",
+                status_path,
+                root,
+                explicit_report=run_dir / "run.json",
+                now=now,
+            )
+            same_revision_older_target = same_revision_older_output["public_safe"]["targets"][0]
+            if (
+                same_revision_older_fresh
+                or "same_as_status" not in same_revision_older_target["freshness_classes"]
+                or "older_than_status" not in same_revision_older_target["freshness_classes"]
+            ):
+                print("SELF-TEST FAIL: same-revision older evidence was treated as fresh")
+                print(json.dumps(same_revision_older_target, indent=2))
+                return 1
+            status_path.write_text(original_status_text, encoding="utf-8")
 
             dry_dir = reports / "guidance-dry"
             dry_dir.mkdir()
@@ -1017,6 +1051,55 @@ def run_self_test() -> int:
                 if marker in diagnostic_text:
                     print(f"SELF-TEST FAIL: private harness detail leaked into public_safe: {marker}")
                     return 1
+
+            git_init = subprocess.run(
+                ["git", "-C", str(root), "init"],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            git_commit = subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(root),
+                    "-c",
+                    "user.name=AgentOS",
+                    "-c",
+                    "user.email=agentos",
+                    "commit",
+                    "--allow-empty",
+                    "-m",
+                    "self-test",
+                ],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            if git_init.returncode != 0 or git_commit.returncode != 0:
+                print("SELF-TEST FAIL: could not create non-current-head fixture")
+                print(git_init.stderr)
+                print(git_commit.stderr)
+                return 1
+            non_current_dir = reports / "guidance-non-current-head"
+            non_current_dir.mkdir()
+            non_current_report = fake_guidance_report(commit="e" * 40)
+            (non_current_dir / "run.json").write_text(json.dumps(non_current_report), encoding="utf-8")
+            non_current_output, non_current_fresh = build_candidate(
+                root,
+                root / "os/verification/BENCHMARKS.json",
+                status_path,
+                root,
+                explicit_report=non_current_dir / "run.json",
+                now=now,
+            )
+            non_current_target = non_current_output["public_safe"]["targets"][0]
+            if non_current_fresh or "evidence_for_non_current_head" not in non_current_target["freshness_classes"]:
+                print("SELF-TEST FAIL: non-current-head evidence was treated as fresh")
+                print(json.dumps(non_current_target, indent=2))
+                return 1
 
             bad_report = fake_guidance_report(commit="c" * 40)
             bad_report["results"][0]["fixture_id"] = "/" + "Users" + "/private"

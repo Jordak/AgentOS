@@ -305,6 +305,13 @@ def validate_counts_for_write(target: dict[str, Any]) -> None:
     if status not in WRITABLE_STATUS_LABELS:
         raise StatusApplyError(f"candidate_status is not writable: {status}")
     counts = require_mapping(target.get("counts"), "counts")
+    scope = require_mapping(target.get("evidence_scope"), "evidence_scope")
+    fixture_count = require_int(scope.get("fixture_count"), "evidence_scope.fixture_count")
+    if fixture_count <= 0:
+        raise StatusApplyError("evidence_scope.fixture_count must be positive")
+    counts_total = require_int(counts.get("total", 0), "counts.total")
+    if counts_total != fixture_count:
+        raise StatusApplyError("counts.total must equal evidence_scope.fixture_count")
     behavioral_total = require_int(counts.get("behavioral_total", 0), "counts.behavioral_total")
     behavioral_pass = require_int(counts.get("behavioral_pass", 0), "counts.behavioral_pass")
     behavioral_fail = require_int(counts.get("behavioral_fail", 0), "counts.behavioral_fail")
@@ -314,6 +321,8 @@ def validate_counts_for_write(target: dict[str, Any]) -> None:
     status_counting_total = require_int(target.get("status_counting_total"), "status_counting_total")
     if status_counting_total != behavioral_total + fixture_stale:
         raise StatusApplyError("status_counting_total must equal behavioral_total + fixture_stale")
+    if status_counting_total != fixture_count:
+        raise StatusApplyError("status_counting_total must equal evidence_scope.fixture_count")
     for field, result in INELIGIBLE_STATUS_RESULTS:
         value = require_int(counts.get(field, 0), f"counts.{field}")
         if value:
@@ -756,6 +765,24 @@ def run_self_test() -> int:
         bad_status_counting_total = fake_target()
         bad_status_counting_total["status_counting_total"] = 14
         malformed_cases.append(fake_candidate(bad_status_counting_total))
+
+        zero_count_passing = fake_target()
+        zero_count_passing["counts"]["total"] = 0
+        zero_count_passing["counts"]["behavioral_total"] = 0
+        zero_count_passing["counts"]["behavioral_pass"] = 0
+        zero_count_passing["status_counting_total"] = 0
+        malformed_cases.append(fake_candidate(zero_count_passing))
+
+        partial_count_passing = fake_target()
+        partial_count_passing["counts"]["total"] = 1
+        partial_count_passing["counts"]["behavioral_total"] = 1
+        partial_count_passing["counts"]["behavioral_pass"] = 1
+        partial_count_passing["status_counting_total"] = 1
+        malformed_cases.append(fake_candidate(partial_count_passing))
+
+        mismatched_counts_total = fake_target()
+        mismatched_counts_total["counts"]["total"] = 14
+        malformed_cases.append(fake_candidate(mismatched_counts_total))
 
         passing_with_details = fake_target(
             details=[
