@@ -371,8 +371,9 @@ class StructuralValidator(ValidatorDelegate):
                 ("environment: guidance-benchmark-trial", "status-pr protected environment"),
                 ("permissions:", "status-pr job permissions"),
                 ("contents: read", "status-pr read-only contents permission"),
-                ("secrets.AGENTOS_STATUS_PR_TOKEN", "dedicated status PR token"),
-                ("STATUS_PR_TOKEN", "status PR token environment"),
+                ("GH_TOKEN: ${{ secrets.AGENTOS_STATUS_PR_TOKEN }}", "dedicated gh token binding"),
+                ("STATUS_PR_TOKEN: ${{ secrets.AGENTOS_STATUS_PR_TOKEN }}", "dedicated push token binding"),
+                ("x-access-token:${STATUS_PR_TOKEN}", "dedicated push token use"),
                 ("github.ref_name == 'main'", "main guard"),
                 ("needs.guidance.outputs.refresh_status == '0'", "refresh success guard"),
                 ("needs.guidance.outputs.public_refresh_candidate != ''", "nonempty public candidate guard"),
@@ -381,6 +382,10 @@ class StructuralValidator(ValidatorDelegate):
                     self.add_error(check, workflow_path, f"status-pr job missing {label}")
             if re.search(r"(?m)^\s+(contents|pull-requests|issues): write\s*$", status_pr_job):
                 self.add_error(check, workflow_path, "status-pr job must keep repository GITHUB_TOKEN read-only")
+            if re.search(r"(?m)^\s+GH_TOKEN:\s*\$\{\{\s*github\.token\s*\}\}\s*$", status_pr_job):
+                self.add_error(check, workflow_path, "status-pr job must not bind GH_TOKEN to github.token")
+            if "x-access-token:${GITHUB_TOKEN}" in status_pr_job:
+                self.add_error(check, workflow_path, "status-pr job must not push with GITHUB_TOKEN")
 
         for forbidden, message in [
             ("actions/upload-artifact", "must not upload benchmark artifacts"),
@@ -862,7 +867,13 @@ def run_self_test(harness) -> None:
         "    if: ${{ github.ref_name == 'main' }}\n"
         "    permissions:\n"
         "      contents: write\n"
-        "      pull-requests: write\n",
+        "      pull-requests: write\n"
+        "    steps:\n"
+        "      - run: echo ${{ secrets.AGENTOS_STATUS_PR_TOKEN }}\n"
+        "      - env:\n"
+        "          GH_TOKEN: ${{ github.token }}\n"
+        "          STATUS_PR_TOKEN: ${{ secrets.AGENTOS_STATUS_PR_TOKEN }}\n"
+        "        run: git push \"https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git\" HEAD:refs/heads/status\n",
         encoding="utf-8",
     )
 
@@ -913,8 +924,11 @@ def run_self_test(harness) -> None:
         and any("must not push generated status updates directly to main" in error.message for error in validator.errors)
         and any("guidance job must not grant write permissions" in error.message for error in validator.errors)
         and any("status-pr job missing status-pr protected environment" in error.message for error in validator.errors)
-        and any("status-pr job missing dedicated status PR token" in error.message for error in validator.errors)
+        and any("status-pr job missing dedicated gh token binding" in error.message for error in validator.errors)
+        and any("status-pr job missing dedicated push token use" in error.message for error in validator.errors)
         and any("status-pr job must keep repository GITHUB_TOKEN read-only" in error.message for error in validator.errors)
+        and any("status-pr job must not bind GH_TOKEN to github.token" in error.message for error in validator.errors)
+        and any("status-pr job must not push with GITHUB_TOKEN" in error.message for error in validator.errors)
         and any("must keep repository GITHUB_TOKEN permissions read-only" in error.message for error in validator.errors),
     )
     harness.expect(
