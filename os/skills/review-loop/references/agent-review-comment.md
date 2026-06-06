@@ -18,10 +18,14 @@ Issue families:
    Related occurrences or sweep: <siblings found, search performed, or why none expected>
    Why it matters: <risk>
    Decision: <accepted | declined | fixed | unresolved>
+   Autopilot classification: <auto-fix | auto-decline | ask-user>
+   Autopilot rationale: <why the parent agent fixed, declined, or paused>
+   Complexity posture: <reduced | neutral | increased with rationale | not applicable>
+   Smallest closing move or lazy-human decision: <governor step used, fix commit, or user decision needed>
    Suggested fix or fix commit: <concrete fix or commit SHA>
 
 Declined issue families:
-- [<issue-family-id>] <short rationale; include reviewer finding IDs only as provenance when useful>
+- [<issue-family-id>] <short rationale; include autopilot classification and reviewer finding IDs only as provenance when useful>
 
 Validation notes:
 - <commands run or inspection limits>

@@ -60,7 +60,7 @@ After any pause, interruption, resume, unusually long loop, or suspected compact
 ## Review-Pass Invocation Guard
 
 - Reopen `os/skills/review-pass/SKILL.md`, `os/skills/review-pass/references/reviewer-prompts.md`, and `os/skills/review-pass/references/review-packet-template.md` before every fresh and verification pass. If the harness cannot discover `review-pass` by name, read those canonical files directly and follow them as the fallback.
-- Fill the pass request explicitly: target, repository, base, head or current head, mode, baseline intent, reviewer count or risk posture, optional lens overrides, custom lens notes, prior packet, reviewer finding IDs, issue-family IDs, fix commits, accepted fixes, declined rationales, consolidated comment URL, validation results, and reporting mode.
+- Fill the pass request explicitly: target, repository, base, head or current head, mode, baseline intent, reviewer count or risk posture, optional lens overrides, custom lens notes, prior packet, reviewer finding IDs, issue-family IDs, autopilot classifications and rationales, complexity posture, smallest closing moves or lazy-human decisions, fix commits, accepted fixes, declined rationales, consolidated comment URL, validation results, and reporting mode.
 - Preserve `review-pass` template rules about read-only review, no reviewer PR comments, issue-family sweeps, design-escape-hatch concerns, full-diff rereads, provisional IDs, and the clean response sentinel.
 - When the harness supports reviewer subagents, request a real multi-reviewer `review-pass` panel. Do not fall back to a single-agent review merely because the user did not separately say "subagents"; the loop's explicit `review-pass` panel request carries that authorization.
 - Treat the review packet as advisory. The parent owns final accept/decline decisions and records the durable ledger.
@@ -72,7 +72,7 @@ After any pause, interruption, resume, unusually long loop, or suspected compact
 Verification should preserve source-reviewer continuity without making the user manage live reviewer state.
 
 - When the harness can safely resume the same source reviewers, request that `review-pass` use same-source reviewer continuity and provide the source reviewer aliases, source reviewer handles, relevant reviewer finding IDs, and issue-family IDs.
-- When same-source resumption is unavailable, unsafe, or lost after compaction, request packet/finding-source fallback: provide the prior packet, source reviewer aliases, source reviewer finding IDs, fix commits, declined rationales, and validation results to fresh verification reviewers.
+- When same-source resumption is unavailable, unsafe, or lost after compaction, request packet/finding-source fallback: provide the prior packet, source reviewer aliases, source reviewer finding IDs, autopilot classifications and rationales, complexity posture, smallest closing moves or lazy-human decisions, fix commits, declined rationales, and validation results to fresh verification reviewers.
 - Get opaque source reviewer handles from the caller-private continuity handoff returned by `review-pass` when the harness provides one. If the handoff is unavailable, record that limitation and use packet/finding-source fallback.
 - Keep opaque source reviewer handles in the loop ledger or orchestration request only; do not put them in reviewer prompts, PR comments, public reports, or human-facing packets. If debugging requires handle-level detail, keep that detail in private orchestration diagnostics outside review packets, reviewer prompts, PR comments, public reports, and other human-facing artifacts.
 - Record the continuity mode and source aliases in the ledger and final report so later agents can distinguish same-reviewer verification from packet/finding-source fallback without exposing handles.
@@ -82,10 +82,10 @@ Verification should preserve source-reviewer continuity without making the user 
 
 Run the parent loop in conservative autopilot by default unless the user asks for manual adjudication or a more aggressive refactor. Conservative autopilot answers the user's implicit question: what does the agent need the user to know exactly, and what can it confidently do without the user?
 
-Classify every issue family after each packet:
+Classify every issue family after each packet. Apply precedence in this order: `ask-user`, `auto-fix`, then `auto-decline`. If a family could match `ask-user` and another bucket, `ask-user` wins unless the original brief already authorized the needed durable machinery or a clearly evidenced P0/P1 risk requires a bounded local fix.
 
 - `auto-fix`: evidenced by the packet or repository inspection, in scope for the original brief, localized or family-local, consistent with existing project patterns, supported by a clear validation signal, and unlikely to add meaningful concepts, ownership surfaces, or long-term maintenance burden.
-- `auto-decline`: incorrect, duplicate, speculative, stylistic without project support, out of scope, P3 polish, lower value than the churn, or fixable only by adding machinery the original brief did not require.
+- `auto-decline`: after `ask-user` and `auto-fix` have been ruled out, incorrect, duplicate, speculative, stylistic without project support, out of scope, P3 polish, lower value than the churn, or dependent on machinery the original brief did not require.
 - `ask-user`: changes product behavior, expands scope, changes workflow semantics, adds or changes a reusable contract, introduces new abstractions, parser/schema/grammar semantics, lifecycle behavior, synchronization logic, permission boundaries, publication rules, or triggers the Design Escape Hatch.
 
 Do not ask the user to adjudicate `auto-fix` or `auto-decline` families one by one. Record the decision and rationale in the ledger, PR comment or chat summary, and final report. Ask only for `ask-user` families or when repository evidence cannot settle the decision.
@@ -175,7 +175,7 @@ Use the matrix to update affected contract surfaces in one pass. Check the ownin
 2. Set the loop ledger:
    - Track each pass cycle, pass mode, reviewer continuity mode, opaque handle availability, review packet path or chat status, reviewer aliases when supplied by `review-pass`, raw reviewer findings or crosswalk summaries, normalized family IDs, autopilot classification (`auto-fix`, `auto-decline`, or `ask-user`), accepted/declined decisions, complexity posture, chosen smallest closing move, fix commits, validation results, consolidated comment URL or chat status, and pass closure status.
    - Normalize families into stable ledger IDs such as `C1-IF3` and preserve source reviewer finding IDs from `review-pass`.
-   - If compaction or interruption loses details, rebuild the ledger from consolidated "Agent Review" comments, commit history, local validation output, and saved or pasted review packets.
+   - If compaction or interruption loses details, rebuild the ledger from consolidated "Agent Review" comments, commit history, local validation output, and saved or pasted review packets. Recover autopilot classifications, rationales, complexity posture, and smallest closing moves from the newest durable source that contains them.
    - Prefer one consolidated "Agent Review" comment per panel pass for PR targets. For non-PR targets, keep packet output in chat and the final report.
 
 3. Run a fresh review pass:
@@ -209,8 +209,8 @@ Use the matrix to update affected contract surfaces in one pass. Check the ownin
 6. Run a verification review pass:
    - Reopen `review-pass` and request `verification` mode.
    - Prefer same-source reviewer continuity when the harness can safely resume source reviewers; otherwise use packet/finding-source fallback.
-   - Provide only the needed reviewer continuity preference, source reviewer aliases or handles, prior packet, reviewer finding IDs, issue-family IDs, fix commits, accepted fixes, declined rationales, validation results, and consolidated comment URL.
-   - Ask `review-pass` to verify prior issue families, reassess declined issue families against the rationale, and reread the full current diff for missed or newly introduced issues.
+   - Provide only the needed reviewer continuity preference, source reviewer aliases or handles, prior packet, reviewer finding IDs, issue-family IDs, autopilot classifications and rationales, complexity posture, smallest closing moves or lazy-human decisions, fix commits, accepted fixes, declined rationales, validation results, and consolidated comment URL.
+   - Ask `review-pass` to verify prior issue families, reassess declined issue families against the rationale, check whether accepted fixes honored the recorded complexity posture and smallest closing move, and reread the full current diff for missed or newly introduced issues.
    - Record whether the verification pass used same-source reviewer continuity or packet/finding-source fallback, and whether opaque handles were available through the private handoff.
    - If the verification packet contains likely accepted or unresolved issue families, adjudicate them, fix accepted families, and request another verification pass.
    - If a verification packet challenges a declined rationale, reassess once from repository evidence; ask the user if the dispute changes product behavior, scope, or remains genuinely ambiguous.
@@ -283,14 +283,15 @@ Before finishing:
 11. Confirm every user pause used the lazy-human brief format, or record why no pause happened.
 12. Confirm accepted issue families were swept for sibling occurrences before verification.
 13. Confirm accepted semantic contract changes used a Contract Surface Matrix, or record why the matrix was skipped.
-14. Confirm review-pass requests used the current fresh or verification templates, including reporting mode, read-only rule, no-reviewer-PR-comment rule, dirty-validation rule, issue-family sweep instruction, design-escape-hatch instruction, full-reread instruction, provisional-ID rule, and clean response sentinel.
-15. If a deep-review lens was assigned, confirm `review-pass` supplied the deep-review lens instructions and no full standalone `thermo-nuclear-review` workflow was run inside `review-loop`.
-16. If a structural-depth lens was assigned, confirm `review-pass` supplied the structural-depth lens instructions and no full standalone `improve-codebase-architecture` or `thermo-nuclear-code-quality-review` workflow was run inside `review-loop`.
-17. Confirm explicit `review-pass` panel requests were treated as permission for read-only reviewer subagents when the harness supported them, or record why `review-pass` used fallback.
-18. Confirm verification continuity mode and opaque handle availability were recorded for verification passes without exposing handle values.
-19. Confirm soft budget checkpoints were surfaced when checkpoint triggers occurred.
-20. Confirm validation commands and results are captured.
-21. Confirm fix commits use the active agent-name prefix.
-22. Confirm the temporary HTML report exists, follows `references/report-guidance.md`, hyperlinks commit hashes to GitHub commits when possible, and is linked in the orchestrator's chat as a clickable absolute-path `.html` Markdown link.
-23. Confirm consolidated "Agent Review" comments followed `references/agent-review-comment.md` when posted.
-24. Confirm no merges, issue closures, label creation, permission changes, non-target-branch pushes, or other out-of-loop external writes happened without current user authorization.
+14. Confirm verification review-pass requests included autopilot classifications and rationales, complexity posture, smallest closing moves or lazy-human decisions, accepted fixes, declined rationales, and validation results when applicable.
+15. Confirm review-pass requests used the current fresh or verification templates, including reporting mode, read-only rule, no-reviewer-PR-comment rule, dirty-validation rule, issue-family sweep instruction, design-escape-hatch instruction, full-reread instruction, provisional-ID rule, and clean response sentinel.
+16. If a deep-review lens was assigned, confirm `review-pass` supplied the deep-review lens instructions and no full standalone `thermo-nuclear-review` workflow was run inside `review-loop`.
+17. If a structural-depth lens was assigned, confirm `review-pass` supplied the structural-depth lens instructions and no full standalone `improve-codebase-architecture` or `thermo-nuclear-code-quality-review` workflow was run inside `review-loop`.
+18. Confirm explicit `review-pass` panel requests were treated as permission for read-only reviewer subagents when the harness supported them, or record why `review-pass` used fallback.
+19. Confirm verification continuity mode and opaque handle availability were recorded for verification passes without exposing handle values.
+20. Confirm soft budget checkpoints were surfaced when checkpoint triggers occurred.
+21. Confirm validation commands and results are captured.
+22. Confirm fix commits use the active agent-name prefix.
+23. Confirm the temporary HTML report exists, follows `references/report-guidance.md`, hyperlinks commit hashes to GitHub commits when possible, and is linked in the orchestrator's chat as a clickable absolute-path `.html` Markdown link.
+24. Confirm consolidated "Agent Review" comments followed `references/agent-review-comment.md` when posted.
+25. Confirm no merges, issue closures, label creation, permission changes, non-target-branch pushes, or other out-of-loop external writes happened without current user authorization.
