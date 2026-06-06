@@ -7,7 +7,7 @@ description: Orchestrate iterative code-review loops for a PR, branch, commit ra
 
 ## Goal
 
-Drive a code change through independent review-panel cycles until accepted issue families are fixed or explicitly resolved, then a newly requested fresh `review-pass` panel has no likely accepted issue families on its initial pass. The parent agent owns the ledger, adjudication, fixes, commits, pushes, PR comments, ready marker, and final report. `review-pass` owns the read-only reviewer-panel mechanics for each fresh or verification pass.
+Drive a code change through independent review-panel cycles until every `auto-fix` issue family is fixed or explicitly resolved, every `ask-user` blocker has a user decision or unresolved-risk note, and a newly requested fresh `review-pass` panel has no unresolved `auto-fix` or `ask-user` blockers after parent adjudication. The parent agent owns the ledger, adjudication, fixes, commits, pushes, PR comments, ready marker, and final report. `review-pass` owns the read-only reviewer-panel mechanics for each fresh or verification pass.
 
 Read `os/skills/review-pass/SKILL.md`, `os/skills/review-pass/references/reviewer-prompts.md`, and `os/skills/review-pass/references/review-packet-template.md` immediately before every fresh or verification panel pass. Read `references/agent-review-comment.md` before posting consolidated "Agent Review" PR comments. Read `references/report-guidance.md` before creating the final HTML report.
 
@@ -28,7 +28,7 @@ Output artifact:
 
 Mutability:
 
-- Mixed. The loop reads code and PR metadata, may edit local project files to fix accepted issue families, may create agent-labeled commits, may push to the target PR branch, may post consolidated "Agent Review" comments on the target PR, may apply the repository's established ready-for-human marker, and may write a temporary local HTML report.
+- Mixed. The loop reads code and PR metadata, may edit local project files to fix `auto-fix` issue families, may create agent-labeled commits, may push to the target PR branch, may post consolidated "Agent Review" comments on the target PR, may apply the repository's established ready-for-human marker, and may write a temporary local HTML report.
 - Reviewer-panel passes delegated to `review-pass` remain read-only.
 
 Tools and connectors:
@@ -60,7 +60,9 @@ After any pause, interruption, resume, unusually long loop, or suspected compact
 ## Review-Pass Invocation Guard
 
 - Reopen `os/skills/review-pass/SKILL.md`, `os/skills/review-pass/references/reviewer-prompts.md`, and `os/skills/review-pass/references/review-packet-template.md` before every fresh and verification pass. If the harness cannot discover `review-pass` by name, read those canonical files directly and follow them as the fallback.
-- Fill the pass request explicitly: target, repository, base, head or current head, mode, baseline intent, reviewer count or risk posture, optional lens overrides, custom lens notes, prior packet, reviewer finding IDs, issue-family IDs, autopilot classifications and rationales, complexity posture, smallest closing moves or lazy-human decisions, fix commits, accepted fixes, declined rationales, consolidated comment URL, validation results, and reporting mode.
+- Fill every pass request explicitly with the common fields: target, repository, base, head or current head, mode, baseline intent, reviewer count or risk posture, optional lens overrides, custom lens notes, and reporting mode.
+- For `fresh` passes, keep reviewer context clean: do not include prior packets, parent analysis, autopilot classifications, complexity posture, lazy-human decisions, fix commits, accepted fixes, declined rationales, consolidated comment URLs, or validation results unless they are part of the baseline intent itself.
+- For `verification` passes, include only the needed prior packet, reviewer finding IDs, issue-family IDs, autopilot classifications and rationales, complexity posture, smallest closing moves or lazy-human decisions, fix commits, accepted fixes, declined rationales, consolidated comment URL, and validation results.
 - Preserve `review-pass` template rules about read-only review, no reviewer PR comments, issue-family sweeps, design-escape-hatch concerns, full-diff rereads, provisional IDs, and the clean response sentinel.
 - When the harness supports reviewer subagents, request a real multi-reviewer `review-pass` panel. Do not fall back to a single-agent review merely because the user did not separately say "subagents"; the loop's explicit `review-pass` panel request carries that authorization.
 - Treat the review packet as advisory. The parent owns final accept/decline decisions and records the durable ledger.
@@ -82,15 +84,15 @@ Verification should preserve source-reviewer continuity without making the user 
 
 Run the parent loop in conservative autopilot by default unless the user asks for manual adjudication or a more aggressive refactor. Conservative autopilot answers the user's implicit question: what does the agent need the user to know exactly, and what can it confidently do without the user?
 
-Classify every issue family after each packet. Apply precedence in this order: `ask-user`, `auto-fix`, then `auto-decline`. If a family could match `ask-user` and another bucket, `ask-user` wins unless the original brief already authorized the needed durable machinery or a clearly evidenced P0/P1 risk requires a bounded local fix.
+Classify every issue family after each packet. Resolve bucket overlap by evidence, scope, and expected churn rather than by the most interruptive label: clearly incorrect, duplicate, speculative, stylistic, out-of-scope, or low-value scope-expanding suggestions are `auto-decline`; evidenced in-scope findings with a small safe fix are `auto-fix`; evidenced in-scope findings that require product, scope, reusable-contract, or design-escape-hatch judgment are `ask-user`.
 
 - `auto-fix`: evidenced by the packet or repository inspection, in scope for the original brief, localized or family-local, consistent with existing project patterns, supported by a clear validation signal, and unlikely to add meaningful concepts, ownership surfaces, or long-term maintenance burden.
-- `auto-decline`: after `ask-user` and `auto-fix` have been ruled out, incorrect, duplicate, speculative, stylistic without project support, out of scope, P3 polish, or lower value than the churn.
-- `ask-user`: changes product behavior, expands scope, changes workflow semantics, adds or changes a reusable contract, introduces new abstractions, parser/schema/grammar semantics, lifecycle behavior, synchronization logic, permission boundaries, publication rules, or triggers the Design Escape Hatch.
+- `auto-decline`: incorrect, duplicate, speculative, stylistic without project support, clearly out of scope, a low-value scope expansion, P3 polish, or lower value than the churn.
+- `ask-user`: an evidenced in-scope finding whose fix changes product behavior, changes scope, changes workflow semantics, adds or changes a reusable contract, introduces new abstractions, parser/schema/grammar semantics, lifecycle behavior, synchronization logic, permission boundaries, publication rules, or triggers the Design Escape Hatch.
 
 Do not ask the user to adjudicate `auto-fix` or `auto-decline` families one by one. Record the decision and rationale in the ledger, PR comment or chat summary, and final report. Ask only for `ask-user` families or when repository evidence cannot settle the decision.
 
-Before editing an accepted family, apply the complexity governor and record the chosen smallest closing move:
+Before editing an `auto-fix` family, apply the complexity governor and record the chosen smallest closing move:
 
 1. Delete, simplify, narrow, split, or scope-reduce the problematic shape.
 2. Use an existing helper, contract, module, documented pattern, or validation point.
@@ -98,7 +100,7 @@ Before editing an accepted family, apply the complexity governor and record the 
 4. Add narrow validation or tests around existing behavior.
 5. Add a new abstraction, schema, parser, lifecycle rule, synchronization mechanism, or reusable contract only when the original brief already required it or a P0/P1 risk cannot be closed without it.
 
-Treat new concepts as guilty until proven necessary. If the proposed fix increases the concept count, creates another durable surface, or makes future agents understand more rules than before, reclassify it as `ask-user` unless the need is forced by the original brief or by clearly evidenced P0/P1 risk.
+Treat new concepts as guilty until proven necessary. If the proposed fix increases the concept count, creates another durable surface, or makes future agents understand more rules than before, reclassify it as `ask-user` when the finding is evidenced and in scope; otherwise classify it as `auto-decline` when it is clearly out of scope or lower value than the churn. Keep it as `auto-fix` only when the need is forced by the original brief or by clearly evidenced P0/P1 risk.
 
 When pausing for the user, use a lazy-human brief instead of dumping raw issue-family adjudication:
 
@@ -173,9 +175,9 @@ Use the matrix to update affected contract surfaces in one pass. Check the ownin
    - Establish the baseline intent summary described in the Design Escape Hatch section. Keep it in the loop ledger so later packets can be compared against the original brief and allowed alternatives.
 
 2. Set the loop ledger:
-   - Track each pass cycle, pass mode, reviewer continuity mode, opaque handle availability, review packet path or chat status, reviewer aliases when supplied by `review-pass`, raw reviewer findings or crosswalk summaries, normalized family IDs, autopilot classification (`auto-fix`, `auto-decline`, or `ask-user`), accepted/declined decisions, complexity posture, chosen smallest closing move, fix commits, validation results, consolidated comment URL or chat status, and pass closure status.
+   - Track each pass cycle, pass mode, reviewer continuity mode, opaque handle availability, review packet path or chat status, reviewer aliases when supplied by `review-pass`, raw reviewer findings or crosswalk summaries, normalized family IDs, autopilot classification (`auto-fix`, `auto-decline`, or `ask-user`), accepted/declined/user-decision status, unresolved `ask-user` blockers, lazy-human brief status, complexity posture, chosen smallest closing move, fix commits, validation results, consolidated comment URL or chat status, and pass closure status.
    - Normalize families into stable ledger IDs such as `C1-IF3` and preserve source reviewer finding IDs from `review-pass`.
-   - If compaction or interruption loses details, rebuild the ledger from consolidated "Agent Review" comments, commit history, local validation output, and saved or pasted review packets. Recover autopilot classifications, rationales, complexity posture, and smallest closing moves from the newest durable source that contains them.
+   - If compaction or interruption loses details, rebuild the ledger from consolidated "Agent Review" comments, commit history, local validation output, and saved or pasted review packets. Recover autopilot classifications, rationales, ask-user blockers, lazy-human briefs or user decisions, complexity posture, and smallest closing moves from the newest durable source that contains them.
    - Prefer one consolidated "Agent Review" comment per panel pass for PR targets. For non-PR targets, keep packet output in chat and the final report.
 
 3. Run a fresh review pass:
@@ -188,15 +190,15 @@ Use the matrix to update affected contract surfaces in one pass. Check the ownin
    - Read each packet family as a claim, not an instruction.
    - Deduplicate with existing ledger families while preserving which pass and reviewers found them.
    - Apply Conservative Autopilot before asking the user for issue-family decisions. Classify every family as `auto-fix`, `auto-decline`, or `ask-user`.
-   - For every accepted family, record the generalized rule, representative examples, sibling-search strategy, expected fix shape, and validation signal that would prove the family is closed.
-   - If an accepted family changes a reusable workflow contract, create a Contract Surface Matrix before editing so all affected surfaces are patched together.
-   - Compare accepted issue families against the baseline intent summary. If a family mostly exists because the implementation chose a heavier design than the brief required, trigger the Design Escape Hatch before implementing another fix.
+   - For every `auto-fix` family, record the generalized rule, representative examples, sibling-search strategy, expected fix shape, and validation signal that would prove the family is closed.
+   - If an `auto-fix` family changes a reusable workflow contract, create a Contract Surface Matrix before editing so all affected surfaces are patched together.
+   - Compare `auto-fix` issue families against the baseline intent summary. If a family mostly exists because the implementation chose a heavier design than the brief required, trigger the Design Escape Hatch before implementing another fix.
    - Accept `auto-fix` issue families that identify real correctness, safety, regression, maintainability, test, or UX risks and can be closed with the complexity governor.
    - Decline `auto-decline` issue families that are incorrect, out of scope, stylistic without project support, duplicates, or lower-value than the churn they would create. Record a short rationale.
-   - Ask the user only for `ask-user` families, unresolved evidence disputes, product/scope changes, or design-escape-hatch calls. Use the lazy-human brief format from Conservative Autopilot.
-   - For PR targets, read `references/agent-review-comment.md` and post one consolidated "Agent Review" comment for the panel pass when there are accepted issue families or useful declined issue-family rationale. Do not have reviewers post separate PR comments.
+   - Ask the user only for unresolved `ask-user` families, unresolved evidence disputes, product/scope changes, or design-escape-hatch calls. Use the lazy-human brief format from Conservative Autopilot and record whether the blocker has a user decision or unresolved-risk note.
+   - For PR targets, read `references/agent-review-comment.md` and post one consolidated "Agent Review" comment for the panel pass when there are `auto-fix` issue families, useful declined issue-family rationale, or unresolved `ask-user` blockers. Do not have reviewers post separate PR comments.
 
-5. Fix accepted issue families:
+5. Fix `auto-fix` issue families:
    - Implement fixes in the parent workspace, preserving unrelated user changes.
    - Sweep for sibling occurrences in the same issue family before committing, using repository search, tests, fixtures, or small scripts when useful.
    - Use any Contract Surface Matrix created during adjudication to patch every affected surface before verification, not just the representative line.
@@ -212,15 +214,16 @@ Use the matrix to update affected contract surfaces in one pass. Check the ownin
    - Provide only the needed reviewer continuity preference, source reviewer aliases or handles, prior packet, reviewer finding IDs, issue-family IDs, autopilot classifications and rationales, complexity posture, smallest closing moves or lazy-human decisions, fix commits, accepted fixes, declined rationales, validation results, and consolidated comment URL.
    - Ask `review-pass` to verify prior issue families, reassess declined issue families against the rationale, check whether accepted fixes honored the recorded complexity posture and smallest closing move, and reread the full current diff for missed or newly introduced issues.
    - Record whether the verification pass used same-source reviewer continuity or packet/finding-source fallback, and whether opaque handles were available through the private handoff.
-   - If the verification packet contains likely accepted or unresolved issue families, adjudicate them, fix accepted families, and request another verification pass.
+   - If the verification packet contains remaining or new issue families, adjudicate them before deciding whether the loop is still blocked; fix `auto-fix` families, record or reassess `auto-decline` rationales, and pause for unresolved `ask-user` blockers.
    - If a verification packet challenges a declined rationale, reassess once from repository evidence; ask the user if the dispute changes product behavior, scope, or remains genuinely ambiguous.
-   - Continue until verification packets report no likely accepted issue families and no unresolved design-judgment blockers for the active family set.
+   - Continue until the active family set has no unresolved `auto-fix` or `ask-user` blockers after Conservative Autopilot adjudication. Remaining reviewer concerns may be terminal only when recorded as `auto-decline` with rationale and any residual risk.
    - Pause for the user if the loop stops making progress, the same disputed finding repeats after a clear rationale, or more than five fix/verification rounds occur in one panel cycle without convergence.
 
 7. Confirm with a new fresh pass:
    - After the active family set is clean, request a new `fresh` pass from `review-pass` with clean context sized to the current PR scope.
-   - If the new fresh packet has no likely accepted issue families and no design-judgment blockers on its initial pass, the loop is complete.
-   - If the new fresh packet has accepted issue families, run the fix and verification workflow again, then spawn another fresh pass.
+   - Adjudicate the new fresh packet without leaking prior parent analysis into the reviewer prompt.
+   - If the new fresh packet leaves no unresolved `auto-fix` or `ask-user` blockers after Conservative Autopilot adjudication, the loop is complete.
+   - If the new fresh packet has `auto-fix` families, run the fix and verification workflow again, then spawn another fresh pass. If it has unresolved `ask-user` blockers, pause with a lazy-human brief.
    - Run a soft budget checkpoint before another fresh pass when a checkpoint trigger is met.
    - Pause for the user if more than five fresh pass cycles find accepted issues, because the PR likely needs a larger design pass or narrower scope. Also pause earlier when the Design Escape Hatch triggers.
 
@@ -246,15 +249,15 @@ Call narrower playbooks for their owned surfaces: GitHub workflow policy for PR 
 - Every fresh or verification panel pass is delegated to `review-pass` or its canonical fallback files.
 - The orchestrator owns one durable ledger and posts at most one consolidated "Agent Review" comment per panel pass.
 - Findings are generalized into issue families where possible, and accepted families are swept before verification.
-- Every issue family has an autopilot classification, rationale, and either a smallest closing move, decline reason, or lazy-human brief.
-- Accepted fixes use the complexity governor and prefer deletion, simplification, scope reduction, or existing patterns over new machinery.
+- Every issue family has an autopilot classification, rationale, and either a smallest closing move, decline reason, lazy-human brief, user decision, or unresolved-risk note.
+- `auto-fix` fixes use the complexity governor and prefer deletion, simplification, scope reduction, or existing patterns over new machinery.
 - Repeated findings in the same issue family trigger a design-escape-hatch check rather than automatic patch accumulation.
 - Accepted semantic contract changes use a Contract Surface Matrix, or explicitly skip it because the fix is local and non-contractual.
-- The parent agent reaches out to the user whenever user judgment would help decide scope, design direction, or whether to keep investing in the loop, and uses the lazy-human brief format when it pauses.
-- Accepted issue families have concrete fix commits or local changes, plus validation evidence.
+- The parent agent reaches out to the user whenever unresolved `ask-user` judgment blocks convergence, and uses the lazy-human brief format when it pauses.
+- `auto-fix` issue families have concrete fix commits or local changes, plus validation evidence.
 - Declined issue families have short rationales and are not silently dropped.
 - Verification passes prefer same-source reviewer continuity when safely available, record opaque handle availability and any packet/finding-source fallback, check prior fixes, and reread the full current diff.
-- The final state is supported by a fresh `review-pass` packet with no likely accepted issue families on its initial pass.
+- The final state is supported by a fresh `review-pass` packet whose families leave no unresolved `auto-fix` or `ask-user` blockers after parent adjudication.
 - The final HTML report follows `references/report-guidance.md` and can be reconstructed from consolidated PR comments, review packets, and commits.
 - PR-scoped comments and commits are factual and clearly labeled as agent-generated review work.
 
@@ -275,14 +278,14 @@ Before finishing:
 3. Confirm feature-sized review targets had a durable `Ready to Implement` design source or an explicit `Gate Skipped` bypass before reviewers were spawned.
 4. Confirm every design-escape-hatch trigger was either surfaced to the user, explicitly declined with rationale, or found not applicable.
 5. Confirm every fresh and verification pass used `review-pass` or its canonical fallback files.
-6. Confirm the final fresh `review-pass` packet had no likely accepted issue families on its initial pass.
+6. Confirm the final fresh `review-pass` packet left no unresolved `auto-fix` or `ask-user` blockers after parent adjudication.
 7. Confirm every issue family was classified as `auto-fix`, `auto-decline`, or `ask-user`, with rationale.
-8. Confirm every accepted issue family has a fix, a scope/design change, or an explicit unresolved-risk note.
+8. Confirm every `auto-fix` issue family has a fix, a scope/design change, or an explicit unresolved-risk note.
 9. Confirm every accepted fix recorded the smallest closing move from the complexity governor, or recorded why new machinery was necessary.
 10. Confirm every declined issue family has a rationale, including complexity/churn rationale when relevant.
-11. Confirm every user pause used the lazy-human brief format, or record why no pause happened.
-12. Confirm accepted issue families were swept for sibling occurrences before verification.
-13. Confirm accepted semantic contract changes used a Contract Surface Matrix, or record why the matrix was skipped.
+11. Confirm every unresolved `ask-user` blocker has a lazy-human brief plus a user decision or explicit unresolved-risk note, or record why no pause happened.
+12. Confirm `auto-fix` issue families were swept for sibling occurrences before verification.
+13. Confirm `auto-fix` semantic contract changes used a Contract Surface Matrix, or record why the matrix was skipped.
 14. Confirm verification review-pass requests included autopilot classifications and rationales, complexity posture, smallest closing moves or lazy-human decisions, accepted fixes, declined rationales, and validation results when applicable.
 15. Confirm review-pass requests used the current fresh or verification templates, including reporting mode, read-only rule, no-reviewer-PR-comment rule, dirty-validation rule, issue-family sweep instruction, design-escape-hatch instruction, full-reread instruction, provisional-ID rule, and clean response sentinel.
 16. If a deep-review lens was assigned, confirm `review-pass` supplied the deep-review lens instructions and no full standalone `thermo-nuclear-review` workflow was run inside `review-loop`.

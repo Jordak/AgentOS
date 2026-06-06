@@ -239,14 +239,22 @@
           "contains": [
             "candidate Reviewer Finding",
             "normalize it into an Issue Family",
-            "preserve source reviewer finding IDs"
+            "preserve source reviewer finding IDs",
+            "auto-fix",
+            "auto-decline",
+            "ask-user",
+            "complexity governor",
+            "lazy-human brief",
+            "no unresolved `auto-fix` or `ask-user` blockers"
           ]
         },
         {
           "path": "os/skills/review-loop/references/agent-review-comment.md",
           "contains": [
             "Issue families",
-            "reviewer finding IDs only as provenance"
+            "reviewer finding IDs only as provenance",
+            "Autopilot classification",
+            "Unresolved ask-user blockers"
           ]
         }
       ]

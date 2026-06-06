@@ -238,12 +238,17 @@
     "expected_behavior": [
       "Normalize candidate Reviewer Findings into Issue Families before accept, decline, fix, report, and verification decisions.",
       "Use reviewer finding IDs as provenance for where the family came from rather than as the primary decision unit.",
-      "Sweep sibling occurrences and fix the whole accepted issue family before requesting verification."
+      "Classify each issue family as auto-fix, auto-decline, or ask-user before fixing or asking the user.",
+      "Use the complexity governor and record the smallest closing move for accepted auto-fix families.",
+      "Sweep sibling occurrences and fix the whole accepted issue family before requesting verification.",
+      "Use a lazy-human brief only for unresolved ask-user blockers, and finish only when no unresolved auto-fix or ask-user blockers remain after parent adjudication."
     ],
     "failure_modes": [
       "Treats reviewer finding IDs as the primary accepted-work units.",
       "Fixes only one representative finding without considering sibling occurrences in the same issue family.",
-      "Drops reviewer finding provenance entirely when consolidating into issue families."
+      "Drops reviewer finding provenance entirely when consolidating into issue families.",
+      "Treats raw review-pass likely-accept labels as terminal without autopilot classification.",
+      "Asks the user to adjudicate auto-decline findings one by one instead of recording the rationale."
     ]
   },
   {

@@ -17,7 +17,7 @@ Issue families:
    Issue family: <generalized failure mode or invariant>
    Related occurrences or sweep: <siblings found, search performed, or why none expected>
    Why it matters: <risk>
-   Decision: <accepted | declined | fixed | unresolved>
+   Decision: <accepted | declined | fixed | needs user | unresolved>
    Autopilot classification: <auto-fix | auto-decline | ask-user>
    Autopilot rationale: <why the parent agent fixed, declined, or paused>
    Complexity posture: <reduced | neutral | increased with rationale | not applicable>
@@ -27,8 +27,11 @@ Issue families:
 Declined issue families:
 - [<issue-family-id>] <short rationale; include autopilot classification and reviewer finding IDs only as provenance when useful>
 
+Unresolved ask-user blockers:
+- [<issue-family-id>] <lazy-human brief summary, user decision needed, or unresolved-risk note>
+
 Validation notes:
 - <commands run or inspection limits>
 ```
 
-If a pass has no accepted issue families, do not post a clean-pass comment unless the parent explicitly wants a final readiness comment.
+If a pass has no `auto-fix` issue families, no useful declined issue-family rationale, and no unresolved `ask-user` blockers, do not post a clean-pass comment unless the parent explicitly wants a final readiness comment.
