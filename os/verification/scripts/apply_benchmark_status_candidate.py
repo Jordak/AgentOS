@@ -149,14 +149,6 @@ def markdown_cell(value: Any) -> str:
     return text.replace("|", "\\|").replace("\n", " ")
 
 
-def bool_word(value: Any) -> str:
-    if value is True:
-        return "yes"
-    if value is False:
-        return "no"
-    return "unknown"
-
-
 def title_text(value: str) -> str:
     return value.replace("-", " ").title()
 
@@ -350,37 +342,17 @@ def caveats_text(target: dict[str, Any]) -> str:
 
 
 def diagnosis_for(row: dict[str, Any]) -> str:
-    public_diagnostic = row.get("public_safe_diagnosis")
-    if isinstance(public_diagnostic, str) and public_diagnostic:
-        return f"Public diagnostic classifier: `{public_diagnostic}`."
-    result = require_text(row.get("result"), "non_passing_details.result")
-    status = optional_text(row.get("status"), "unknown")
-    verdict = optional_text(row.get("verdict"), "n/a")
-    source = optional_text(row.get("source_alignment"), "n/a")
-    staleness = optional_text(row.get("staleness"), "n/a")
-    sentinel = bool_word(row.get("host_boundary_sentinel_observed"))
-    return (
-        f"{result} reported with status `{status}`, verdict `{verdict}`, source alignment `{source}`, "
-        f"staleness `{staleness}`, and host-boundary sentinel observed `{sentinel}`."
+    return require_text(
+        row.get("public_safe_diagnosis"),
+        "non_passing_details.public_safe_diagnosis",
     )
 
 
 def next_step_for(row: dict[str, Any]) -> str:
-    suggested = row.get("suggested_next_step")
-    if isinstance(suggested, str) and suggested:
-        return suggested
-    result = optional_text(row.get("result"), "")
-    if result == "Behavioral failure":
-        return "Review the fixture expectation and Guidance source for this scenario, then rerun the status benchmark."
-    if result == "Fixture stale":
-        return "Refresh the fixture expectation against the current Guidance source, then rerun the status benchmark."
-    if result == "Needs user judgment":
-        return "Resolve the required user judgment before treating this evidence as status-refreshable."
-    if result.startswith("Harness"):
-        return "Check the public harness diagnostic and rerun after fixing the workflow or model-call environment."
-    if result.startswith("Judge"):
-        return "Check the public judge diagnostic and rerun after fixing the judge configuration or model-call environment."
-    return "Inspect the structured public-safe result class and rerun after repair."
+    return require_text(
+        row.get("suggested_next_step"),
+        "non_passing_details.suggested_next_step",
+    )
 
 
 def render_non_passing_details(rows: list[Any]) -> list[str]:
@@ -628,16 +600,21 @@ def run_self_test() -> int:
             "source_alignment": "wrong",
             "staleness": "current",
             "host_boundary_sentinel_observed": False,
-            "public_safe_diagnosis": "investigation_needed",
-            "suggested_next_step": "Investigation needed.",
+            "public_safe_diagnosis": (
+                "Behavioral failure reported with status `graded`, verdict `fail`, source alignment `wrong`, "
+                "staleness `current`, and host-boundary sentinel observed `no`."
+            ),
+            "suggested_next_step": (
+                "Review the fixture expectation and Guidance source for this scenario, then rerun the status benchmark."
+            ),
         }
         failing = apply_candidate(fake_candidate(fake_target("attention needed", [detail])), fake_status())
         failing_fragments = [
             "- Status: `attention needed`",
             "#### Non-Passing Details",
             "`weekly-review-private-report`",
-            "Public diagnostic classifier: `investigation_needed`.",
-            "Investigation needed.",
+            "Behavioral failure reported with status `graded`",
+            "Review the fixture expectation",
         ]
         missing_failing = [fragment for fragment in failing_fragments if fragment not in failing]
         if missing_failing:
