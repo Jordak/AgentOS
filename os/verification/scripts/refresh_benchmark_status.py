@@ -47,7 +47,13 @@ PUBLIC_DIAGNOSTIC_CLASSES = {
 }
 SAFE_SLUG = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 SAFE_LABEL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ./_-]*$")
+SAFE_PUBLIC_TEXT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 `.,;:/'_-]*$")
 COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
+REJECTED_FRESHNESS_CLASSES = {
+    "evidence_stale_by_age",
+    "older_than_status",
+    "evidence_for_non_current_head",
+}
 PRIVATE_MARKERS = (
     "/" + "Users" + "/",
     "\\Users\\",
@@ -430,11 +436,9 @@ def guidance_non_passing_details(report: GuidanceReport, private_report_path: st
             "source_alignment": safe_optional_enum(source_alignment, SOURCE_ALIGNMENTS, "source_alignment"),
             "staleness": safe_optional_enum(staleness, STALENESS_VALUES, "staleness"),
             "host_boundary_sentinel_observed": safe_optional_bool(host_observed, "host_boundary_sentinel_observed"),
-            "requires_curated_fields": ["public_safe_diagnosis", "suggested_next_step"],
         }
-        diagnostic = public_harness_diagnostic(result)
-        if diagnostic:
-            row["public_safe_diagnosis"] = safe_public_diagnostic(diagnostic, "public_safe_diagnosis")
+        row["public_safe_diagnosis"] = diagnosis_text_for(row, public_harness_diagnostic(result))
+        row["suggested_next_step"] = next_step_text_for(row)
         public_rows.append(row)
         private_rows.append(
             {
@@ -491,6 +495,74 @@ def public_harness_diagnostic(result: dict[str, Any]) -> str | None:
     return "unknown_harness_error"
 
 
+def public_bool_word(value: Any) -> str:
+    if value is True:
+        return "yes"
+    if value is False:
+        return "no"
+    return "unknown"
+
+
+def public_row_text(row: dict[str, Any], field: str, default: str) -> str:
+    value = row.get(field)
+    if isinstance(value, str) and value:
+        return value
+    return default
+
+
+def diagnosis_text_for(row: dict[str, Any], diagnostic: str | None) -> str:
+    if diagnostic:
+        public_diagnostic = safe_public_diagnostic(diagnostic, "public_safe_diagnostic_class")
+        return safe_public_text(
+            f"Public diagnostic classifier: `{public_diagnostic}`.",
+            "public_safe_diagnosis",
+        )
+    result = public_row_text(row, "result", "Unknown result")
+    status = public_row_text(row, "status", "unknown")
+    verdict = public_row_text(row, "verdict", "n/a")
+    source = public_row_text(row, "source_alignment", "n/a")
+    staleness = public_row_text(row, "staleness", "n/a")
+    sentinel = public_bool_word(row.get("host_boundary_sentinel_observed"))
+    return safe_public_text(
+        f"{result} reported with status `{status}`, verdict `{verdict}`, source alignment `{source}`, "
+        f"staleness `{staleness}`, and host-boundary sentinel observed `{sentinel}`.",
+        "public_safe_diagnosis",
+    )
+
+
+def next_step_text_for(row: dict[str, Any]) -> str:
+    result = public_row_text(row, "result", "")
+    if result == "Behavioral failure":
+        return safe_public_text(
+            "Review the fixture expectation and Guidance source for this scenario, then rerun the status benchmark.",
+            "suggested_next_step",
+        )
+    if result == "Fixture stale":
+        return safe_public_text(
+            "Refresh the fixture expectation against the current Guidance source, then rerun the status benchmark.",
+            "suggested_next_step",
+        )
+    if result == "Needs user judgment":
+        return safe_public_text(
+            "Resolve the required user judgment before treating this evidence as status-refreshable.",
+            "suggested_next_step",
+        )
+    if result.startswith("Harness"):
+        return safe_public_text(
+            "Check the public harness diagnostic and rerun after fixing the workflow or model-call environment.",
+            "suggested_next_step",
+        )
+    if result.startswith("Judge"):
+        return safe_public_text(
+            "Check the public judge diagnostic and rerun after fixing the judge configuration or model-call environment.",
+            "suggested_next_step",
+        )
+    return safe_public_text(
+        "Inspect the structured public-safe result class and rerun after repair.",
+        "suggested_next_step",
+    )
+
+
 def safe_slug(value: Any, field: str) -> str:
     if not isinstance(value, str) or not SAFE_SLUG.fullmatch(value):
         raise PublicSafeOutputError(f"{field} is not a safe slug: {value!r}")
@@ -542,6 +614,13 @@ def safe_optional_bool(value: Any, field: str) -> bool | None:
 def safe_public_diagnostic(value: Any, field: str) -> str:
     if not isinstance(value, str) or value not in PUBLIC_DIAGNOSTIC_CLASSES:
         raise PublicSafeOutputError(f"{field} is not an allowed public diagnostic: {value!r}")
+    return value
+
+
+def safe_public_text(value: Any, field: str) -> str:
+    if not isinstance(value, str) or not value or not SAFE_PUBLIC_TEXT.fullmatch(value):
+        raise PublicSafeOutputError(f"{field} is not safe public text: {value!r}")
+    validate_no_private_markers(value, field)
     return value
 
 
@@ -623,11 +702,11 @@ def target_candidate(
         freshness_classes.append("evidence_stale_by_age")
     if status_entry.reviewed_core_revision and selected.commit == status_entry.reviewed_core_revision:
         freshness_classes.append("same_as_status")
-    elif status_entry.last_reviewed_at and selected.generated_at < status_entry.last_reviewed_at:
+    if status_entry.last_reviewed_at and selected.generated_at < status_entry.last_reviewed_at:
         freshness_classes.append("older_than_status")
     elif status_entry.last_reviewed_at and selected.generated_at > status_entry.last_reviewed_at:
         freshness_classes.append("newer_than_status")
-    elif status_entry.reviewed_core_revision:
+    elif status_entry.reviewed_core_revision and selected.commit != status_entry.reviewed_core_revision:
         freshness_classes.append("newer_than_status")
 
     head = current_head(root)
@@ -660,10 +739,7 @@ def target_candidate(
             "non_passing_results": private_rows,
         }
     )
-    fresh_enough = (
-        days_old <= target.max_age_days
-        and "older_than_status" not in freshness_classes
-    )
+    fresh_enough = not any(freshness_class in REJECTED_FRESHNESS_CLASSES for freshness_class in freshness_classes)
     validate_no_private_markers(public)
     return public, private, fresh_enough
 
@@ -815,13 +891,17 @@ def run_self_test() -> int:
                 ),
                 encoding="utf-8",
             )
-            (root / "os/verification/BENCHMARK_STATUS.md").write_text(
+            status_path = root / "os/verification/BENCHMARK_STATUS.md"
+            original_status_text = (
                 "# AgentOS Benchmark Status\n\n"
                 "## Guidance\n\n"
                 "### Codex\n\n"
                 "- Status: `attention needed`\n"
                 "- Reviewed Core revision: `1111111111111111111111111111111111111111`\n"
-                "- Last reviewed evidence: `2026-06-03 13:12 PDT`\n",
+                "- Last reviewed evidence: `2026-06-03 13:12 PDT`\n"
+            )
+            status_path.write_text(
+                original_status_text,
                 encoding="utf-8",
             )
             run_dir = reports / "guidance-eligible"
@@ -852,10 +932,50 @@ def run_self_test() -> int:
             if target["non_passing_details"][0]["fixture"] != "weekly-review-private-report":
                 print("SELF-TEST FAIL: non-passing detail fixture missing")
                 return 1
+            if (
+                target["non_passing_details"][0].get("public_safe_diagnosis")
+                != (
+                    "Behavioral failure reported with status `graded`, verdict `fail`, source alignment `wrong`, "
+                    "staleness `current`, and host-boundary sentinel observed `no`."
+                )
+                or target["non_passing_details"][0].get("suggested_next_step")
+                != "Review the fixture expectation and Guidance source for this scenario, then rerun the status benchmark."
+            ):
+                print("SELF-TEST FAIL: default public-safe curated fields were not emitted")
+                print(json.dumps(target["non_passing_details"][0], indent=2))
+                return 1
             private = output["private_locators"]["targets"][0]
             if private["source_report"]["core_safe"] is not False:
                 print("SELF-TEST FAIL: private source report was not marked non-Core-safe")
                 return 1
+
+            status_path.write_text(
+                "# AgentOS Benchmark Status\n\n"
+                "## Guidance\n\n"
+                "### Codex\n\n"
+                "- Status: `attention needed`\n"
+                "- Reviewed Core revision: `" + commit + "`\n"
+                "- Last reviewed evidence: `2026-06-03T20:45:00+00:00`\n",
+                encoding="utf-8",
+            )
+            same_revision_older_output, same_revision_older_fresh = build_candidate(
+                root,
+                root / "os/verification/BENCHMARKS.json",
+                status_path,
+                root,
+                explicit_report=run_dir / "run.json",
+                now=now,
+            )
+            same_revision_older_target = same_revision_older_output["public_safe"]["targets"][0]
+            if (
+                same_revision_older_fresh
+                or "same_as_status" not in same_revision_older_target["freshness_classes"]
+                or "older_than_status" not in same_revision_older_target["freshness_classes"]
+            ):
+                print("SELF-TEST FAIL: same-revision older evidence was treated as fresh")
+                print(json.dumps(same_revision_older_target, indent=2))
+                return 1
+            status_path.write_text(original_status_text, encoding="utf-8")
 
             dry_dir = reports / "guidance-dry"
             dry_dir.mkdir()
@@ -920,7 +1040,9 @@ def run_self_test() -> int:
                 not isinstance(latest, dict)
                 or latest.get("counts", {}).get("harness_error") != 8
                 or not details
-                or details[0].get("public_safe_diagnosis") != "api_auth_or_model_access"
+                or details[0].get("public_safe_diagnosis") != "Public diagnostic classifier: `api_auth_or_model_access`."
+                or details[0].get("suggested_next_step")
+                != "Check the public harness diagnostic and rerun after fixing the workflow or model-call environment."
             ):
                 print("SELF-TEST FAIL: public-safe harness diagnostic was not emitted")
                 print(json.dumps(diagnostic_target, indent=2))
@@ -929,6 +1051,55 @@ def run_self_test() -> int:
                 if marker in diagnostic_text:
                     print(f"SELF-TEST FAIL: private harness detail leaked into public_safe: {marker}")
                     return 1
+
+            git_init = subprocess.run(
+                ["git", "-C", str(root), "init"],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            git_commit = subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(root),
+                    "-c",
+                    "user.name=AgentOS",
+                    "-c",
+                    "user.email=agentos",
+                    "commit",
+                    "--allow-empty",
+                    "-m",
+                    "self-test",
+                ],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            if git_init.returncode != 0 or git_commit.returncode != 0:
+                print("SELF-TEST FAIL: could not create non-current-head fixture")
+                print(git_init.stderr)
+                print(git_commit.stderr)
+                return 1
+            non_current_dir = reports / "guidance-non-current-head"
+            non_current_dir.mkdir()
+            non_current_report = fake_guidance_report(commit="e" * 40)
+            (non_current_dir / "run.json").write_text(json.dumps(non_current_report), encoding="utf-8")
+            non_current_output, non_current_fresh = build_candidate(
+                root,
+                root / "os/verification/BENCHMARKS.json",
+                status_path,
+                root,
+                explicit_report=non_current_dir / "run.json",
+                now=now,
+            )
+            non_current_target = non_current_output["public_safe"]["targets"][0]
+            if non_current_fresh or "evidence_for_non_current_head" not in non_current_target["freshness_classes"]:
+                print("SELF-TEST FAIL: non-current-head evidence was treated as fresh")
+                print(json.dumps(non_current_target, indent=2))
+                return 1
 
             bad_report = fake_guidance_report(commit="c" * 40)
             bad_report["results"][0]["fixture_id"] = "/" + "Users" + "/private"

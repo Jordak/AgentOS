@@ -12,6 +12,11 @@ jobs:
     if: github.ref_name == 'main'
     runs-on: ubuntu-latest
     environment: guidance-benchmark-trial
+    permissions:
+      contents: read
+    outputs:
+      refresh_status: ${{ steps.refresh.outputs.refresh_status }}
+      public_refresh_candidate: ${{ steps.public_refresh.outputs.public_refresh_candidate }}
 
     steps:
       - name: Check out main
@@ -167,6 +172,37 @@ jobs:
             echo "- Refresh helper exit status: \`${REFRESH_STATUS:-unknown}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Prepare public-safe status handoff
+        if: steps.refresh.outputs.refresh_status == '0'
+        id: public_refresh
+        run: |
+          set -euo pipefail
+          python3 - "$GUIDANCE_REFRESH_JSON" "$GITHUB_OUTPUT" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          source = Path(sys.argv[1])
+          output = Path(sys.argv[2])
+          data = json.loads(source.read_text(encoding="utf-8"))
+          public_safe = data.get("public_safe")
+          if not isinstance(public_safe, dict):
+              raise SystemExit("refresh candidate is missing public_safe")
+          compact = json.dumps(
+              {
+                  "version": data.get("version"),
+                  "generated_at": data.get("generated_at"),
+                  "public_safe": public_safe,
+              },
+              separators=(",", ":"),
+              sort_keys=True,
+          )
+          with output.open("a", encoding="utf-8") as handle:
+              print("public_refresh_candidate<<AGENTOS_PUBLIC_REFRESH", file=handle)
+              print(compact, file=handle)
+              print("AGENTOS_PUBLIC_REFRESH", file=handle)
+          PY
+
       - name: Enforce Codex preflight result
         if: steps.codex_preflight.outputs.preflight_status != '' && steps.codex_preflight.outputs.preflight_status != '0'
         env:
@@ -177,11 +213,11 @@ jobs:
           exit "$PREFLIGHT_STATUS"
 
       - name: Enforce benchmark result
-        if: steps.codex_preflight.outputs.preflight_status == '0' && steps.benchmark.outputs.benchmark_status != '' && steps.benchmark.outputs.benchmark_status != '0'
+        if: steps.codex_preflight.outputs.preflight_status == '0' && steps.benchmark.outputs.benchmark_status != '' && steps.benchmark.outputs.benchmark_status != '0' && steps.refresh.outputs.refresh_status != '0'
         env:
           BENCHMARK_STATUS: ${{ steps.benchmark.outputs.benchmark_status }}
         run: |
-          echo "::error title=Guidance benchmark reported attention needed::benchmark_guidance.py exited with status ${BENCHMARK_STATUS}. See the public-safe step summary for structured details."
+          echo "::error title=Guidance benchmark did not produce a fresh public-safe candidate::benchmark_guidance.py exited with status ${BENCHMARK_STATUS}. See the public-safe step summary for structured details."
           exit "$BENCHMARK_STATUS"
 
       - name: Enforce refresh candidate result
@@ -199,3 +235,106 @@ jobs:
             "${RUNNER_TEMP}/guidance-codex-preflight.stdout" \
             "${RUNNER_TEMP}/guidance-codex-preflight.stderr" \
             "${RUNNER_TEMP}/guidance-codex-preflight-message.txt"
+
+  status-pr:
+    name: Open Guidance benchmark status PR
+    needs: guidance
+    if: ${{ always() && github.ref_name == 'main' && needs.guidance.outputs.refresh_status == '0' && needs.guidance.outputs.public_refresh_candidate != '' }}
+    runs-on: ubuntu-latest
+    environment: guidance-benchmark-trial
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prepare remote-fresh main branch
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --prune origin "+refs/heads/main:refs/remotes/origin/main"
+          git switch -C main origin/main
+          git branch --set-upstream-to=origin/main main
+
+      - name: Configure status temp path
+        run: |
+          set -euo pipefail
+          echo "GUIDANCE_PUBLIC_REFRESH_JSON=${RUNNER_TEMP}/guidance-public-refresh.json" >> "$GITHUB_ENV"
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.x"
+
+      - name: Restore public-safe status candidate
+        env:
+          PUBLIC_REFRESH_CANDIDATE: ${{ needs.guidance.outputs.public_refresh_candidate }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$PUBLIC_REFRESH_CANDIDATE" > "$GUIDANCE_PUBLIC_REFRESH_JSON"
+
+      - name: Apply benchmark status refresh
+        id: apply_status
+        run: |
+          set -euo pipefail
+          writer_revision="$(git rev-parse HEAD)"
+          python3 os/verification/scripts/apply_benchmark_status_candidate.py \
+            "$GUIDANCE_PUBLIC_REFRESH_JSON" \
+            --expected-revision "$writer_revision"
+          if git diff --quiet --exit-code -- os/verification/BENCHMARK_STATUS.md; then
+            echo "status_changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "status_changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open benchmark status pull request
+        if: steps.apply_status.outputs.status_changed == 'true'
+        id: status_pr
+        env:
+          GH_TOKEN: ${{ secrets.AGENTOS_STATUS_PR_TOKEN }}
+          STATUS_PR_TOKEN: ${{ secrets.AGENTOS_STATUS_PR_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          if [ -z "$STATUS_PR_TOKEN" ]; then
+            echo "::error title=Missing AGENTOS_STATUS_PR_TOKEN::Configure AGENTOS_STATUS_PR_TOKEN in the guidance-benchmark-trial environment before running the status PR writer."
+            exit 1
+          fi
+          status_branch="codex/guidance-benchmark-status-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -C "$status_branch"
+          git add os/verification/BENCHMARK_STATUS.md
+          git commit -m "Refresh Guidance benchmark status"
+          git push "https://x-access-token:${STATUS_PR_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/${status_branch}"
+
+          pr_body="${RUNNER_TEMP}/guidance-benchmark-status-pr.md"
+          {
+            echo "## Summary"
+            echo
+            echo "- Previously, the manual Guidance benchmark workflow rendered a public-safe summary without persisting the Core freshness snapshot."
+            echo "- This PR updates \`os/verification/BENCHMARK_STATUS.md\` from the public-safe refresh candidate generated by a manual workflow run."
+            echo "- Validation should run through the normal pull_request workflow for this generated branch."
+            echo
+            echo "Readiness evidence: Gate skipped - generated benchmark status snapshot from manual workflow run ${RUN_URL}"
+            echo "Readiness verdict: Gate Skipped"
+            echo
+            echo "## Validation"
+            echo
+            echo "- Manual Guidance benchmark workflow run: ${RUN_URL}"
+            echo "- Public-safe refresh candidate applied to \`os/verification/BENCHMARK_STATUS.md\`"
+          } > "$pr_body"
+
+          gh pr create \
+            --base main \
+            --head "$status_branch" \
+            --title "Refresh Guidance benchmark status" \
+            --body-file "$pr_body"
+
+      - name: Clean up public-safe status candidate
+        if: always()
+        run: |
+          rm -f "$GUIDANCE_PUBLIC_REFRESH_JSON"

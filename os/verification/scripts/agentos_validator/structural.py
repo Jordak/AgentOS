@@ -18,6 +18,7 @@ class StructuralValidator(ValidatorDelegate):
         self.check_automation_registry_completeness()
         self.check_resolver_reachability()
         self.check_pr_readiness_tripwire()
+        self.check_guidance_benchmark_trial_workflow()
         self.check_source_routing_fixtures()
         self.check_benchmark_manifest()
 
@@ -277,6 +278,126 @@ class StructuralValidator(ValidatorDelegate):
                 "Gate Skipped",
             ]:
                 self.require_contains(workflow, needle, check, workflow_path)
+
+        self.checked.append(check)
+
+    def workflow_top_level_block(self, workflow: str, key: str) -> str | None:
+        match = re.search(rf"(?m)^{re.escape(key)}:\s*$", workflow)
+        if not match:
+            return None
+        start = match.end()
+        next_match = re.search(r"(?m)^[A-Za-z_][A-Za-z0-9_-]*:\s*$", workflow[start:])
+        end = start + next_match.start() if next_match else len(workflow)
+        return workflow[start:end]
+
+    def workflow_job_block(self, workflow: str, job_name: str) -> str | None:
+        jobs = self.workflow_top_level_block(workflow, "jobs")
+        if jobs is None:
+            return None
+        match = re.search(rf"(?m)^  {re.escape(job_name)}:\s*$", jobs)
+        if not match:
+            return None
+        start = match.end()
+        next_match = re.search(r"(?m)^  [A-Za-z0-9_-]+:\s*$", jobs[start:])
+        end = start + next_match.start() if next_match else len(jobs)
+        return jobs[start:end]
+
+    def check_guidance_benchmark_trial_workflow(self) -> None:
+        check = "Guidance benchmark workflow contract"
+        workflow_path = self.root / ".github/workflows/guidance-benchmark-trial.yml"
+        workflow = self.read_text(workflow_path, check)
+        if not workflow:
+            return
+
+        for needle, label in [
+            ("workflow_dispatch:", "manual dispatch trigger"),
+            ("if: github.ref_name == 'main'", "main-branch job guard"),
+            ("environment: guidance-benchmark-trial", "protected environment"),
+            ("contents: read", "read-only default contents permission"),
+            (
+                "openai/codex-action@a26d2d4d8b78a694338b8e3715c3630254340b2c",
+                "pinned Codex action",
+            ),
+            ("--harness codex", "single codex harness"),
+            ("--model gpt-5.5", "single benchmark model"),
+            ("--effort low", "single benchmark effort"),
+            ("--judge-harness codex", "single judge harness"),
+            ("--judge-model gpt-5.5", "single judge model"),
+            ("--judge-effort low", "single judge effort"),
+            ("--quiet", "quiet benchmark mode"),
+            ('--output "$GUIDANCE_RUN_JSON"', "workflow-owned benchmark output path"),
+            ("status-pr:", "status pull request job"),
+            ("apply_benchmark_status_candidate.py", "status applicator"),
+            ("--expected-revision", "applicator revision guard"),
+            ("secrets.AGENTOS_STATUS_PR_TOKEN", "dedicated status PR token"),
+            ("gh pr create", "generated status pull request"),
+        ]:
+            self.require_contains(workflow, needle, check, workflow_path, label)
+
+        if re.search(r"(?m)^\s+(push|pull_request|schedule):\s*$", workflow):
+            self.add_error(check, workflow_path, "must stay manual-only; do not add push, pull_request, or schedule triggers")
+        if re.search(r"(?m)^\s+inputs:\s*$", workflow):
+            self.add_error(check, workflow_path, "must not define custom workflow_dispatch inputs")
+
+        top_permissions = self.workflow_top_level_block(workflow, "permissions")
+        if top_permissions is None:
+            self.add_error(check, workflow_path, "must define top-level read-only permissions")
+        else:
+            if "  contents: read" not in top_permissions:
+                self.add_error(check, workflow_path, "top-level permissions must include contents: read")
+            if re.search(r"(?m)^  (contents|pull-requests|issues): write\s*$", top_permissions):
+                self.add_error(check, workflow_path, "top-level permissions must not grant write access")
+
+        guidance_job = self.workflow_job_block(workflow, "guidance")
+        if guidance_job is None:
+            self.add_error(check, workflow_path, "guidance job is missing")
+        else:
+            for needle, label in [
+                ("environment: guidance-benchmark-trial", "guidance protected environment"),
+                ("permissions:", "guidance job permissions"),
+                ("contents: read", "guidance read-only contents permission"),
+            ]:
+                if needle not in guidance_job:
+                    self.add_error(check, workflow_path, f"guidance job missing {label}")
+            if re.search(r"(?m)^\s+(contents|pull-requests|issues): write\s*$", guidance_job):
+                self.add_error(check, workflow_path, "guidance job must not grant write permissions")
+
+        status_pr_job = self.workflow_job_block(workflow, "status-pr")
+        if status_pr_job is None:
+            self.add_error(check, workflow_path, "status-pr job is missing")
+        else:
+            for needle, label in [
+                ("needs: guidance", "guidance dependency"),
+                ("environment: guidance-benchmark-trial", "status-pr protected environment"),
+                ("permissions:", "status-pr job permissions"),
+                ("contents: read", "status-pr read-only contents permission"),
+                ("GH_TOKEN: ${{ secrets.AGENTOS_STATUS_PR_TOKEN }}", "dedicated gh token binding"),
+                ("STATUS_PR_TOKEN: ${{ secrets.AGENTOS_STATUS_PR_TOKEN }}", "dedicated push token binding"),
+                ("x-access-token:${STATUS_PR_TOKEN}", "dedicated push token use"),
+                ("github.ref_name == 'main'", "main guard"),
+                ("needs.guidance.outputs.refresh_status == '0'", "refresh success guard"),
+                ("needs.guidance.outputs.public_refresh_candidate != ''", "nonempty public candidate guard"),
+            ]:
+                if needle not in status_pr_job:
+                    self.add_error(check, workflow_path, f"status-pr job missing {label}")
+            if re.search(r"(?m)^\s+(contents|pull-requests|issues): write\s*$", status_pr_job):
+                self.add_error(check, workflow_path, "status-pr job must keep repository GITHUB_TOKEN read-only")
+            if re.search(r"(?m)^\s+GH_TOKEN:\s*\$\{\{\s*github\.token\s*\}\}\s*$", status_pr_job):
+                self.add_error(check, workflow_path, "status-pr job must not bind GH_TOKEN to github.token")
+            if "x-access-token:${GITHUB_TOKEN}" in status_pr_job:
+                self.add_error(check, workflow_path, "status-pr job must not push with GITHUB_TOKEN")
+
+        for forbidden, message in [
+            ("actions/upload-artifact", "must not upload benchmark artifacts"),
+            ("--harness all", "must not allow all harnesses in the v1 workflow"),
+            ("HEAD:refs/heads/main", "must not push generated status updates directly to main"),
+            ("issues: write", "must not grant issue write permission"),
+        ]:
+            if forbidden in workflow:
+                self.add_error(check, workflow_path, message)
+
+        if re.search(r"(?m)^\s+(contents|pull-requests|issues): write\s*$", workflow):
+            self.add_error(check, workflow_path, "must keep repository GITHUB_TOKEN permissions read-only")
 
         self.checked.append(check)
 
@@ -721,12 +842,47 @@ def run_self_test(harness) -> None:
     workflow = root / ".github/workflows/agentos-validation.yml"
     workflow.parent.mkdir(parents=True)
     workflow.write_text("name: fixture\n", encoding="utf-8")
+    guidance_workflow = root / ".github/workflows/guidance-benchmark-trial.yml"
+    guidance_workflow.write_text(
+        "name: bad guidance workflow\n"
+        "on:\n"
+        "  push:\n"
+        "  workflow_dispatch:\n"
+        "    inputs:\n"
+        "      model:\n"
+        "        required: false\n"
+        "permissions:\n"
+        "  contents: read\n"
+        "jobs:\n"
+        "  guidance:\n"
+        "    if: github.ref_name == 'main'\n"
+        "    permissions:\n"
+        "      contents: write\n"
+        "    steps:\n"
+        "      - uses: actions/upload-artifact@v4\n"
+        "      - run: python3 script --harness all\n"
+        "      - run: git push origin HEAD:refs/heads/main\n"
+        "  status-pr:\n"
+        "    needs: guidance\n"
+        "    if: ${{ github.ref_name == 'main' }}\n"
+        "    permissions:\n"
+        "      contents: write\n"
+        "      pull-requests: write\n"
+        "    steps:\n"
+        "      - run: echo ${{ secrets.AGENTOS_STATUS_PR_TOKEN }}\n"
+        "      - env:\n"
+        "          GH_TOKEN: ${{ github.token }}\n"
+        "          STATUS_PR_TOKEN: ${{ secrets.AGENTOS_STATUS_PR_TOKEN }}\n"
+        "        run: git push \"https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git\" HEAD:refs/heads/status\n",
+        encoding="utf-8",
+    )
 
     validator = harness.validator(root)
     validator.check_markdown_path_portability()
     validator.check_source_map_path_health()
     validator.check_benchmark_manifest()
     validator.check_pr_readiness_tripwire()
+    validator.check_guidance_benchmark_trial_workflow()
 
     ignored_root = harness.root / "structural_ignored_agent_fixture"
     (ignored_root / "os/agents/ignored-agent").mkdir(parents=True)
@@ -760,6 +916,20 @@ def run_self_test(harness) -> None:
         "structural catches PR readiness tripwire gaps",
         any(error.path == ".github/pull_request_template.md" for error in validator.errors)
         and any("Check PR design readiness fields" in error.message for error in validator.errors),
+    )
+    harness.expect(
+        "structural catches Guidance benchmark workflow contract drift",
+        any("must not define custom workflow_dispatch inputs" in error.message for error in validator.errors)
+        and any("must not upload benchmark artifacts" in error.message for error in validator.errors)
+        and any("must not push generated status updates directly to main" in error.message for error in validator.errors)
+        and any("guidance job must not grant write permissions" in error.message for error in validator.errors)
+        and any("status-pr job missing status-pr protected environment" in error.message for error in validator.errors)
+        and any("status-pr job missing dedicated gh token binding" in error.message for error in validator.errors)
+        and any("status-pr job missing dedicated push token use" in error.message for error in validator.errors)
+        and any("status-pr job must keep repository GITHUB_TOKEN read-only" in error.message for error in validator.errors)
+        and any("status-pr job must not bind GH_TOKEN to github.token" in error.message for error in validator.errors)
+        and any("status-pr job must not push with GITHUB_TOKEN" in error.message for error in validator.errors)
+        and any("must keep repository GITHUB_TOKEN permissions read-only" in error.message for error in validator.errors),
     )
     harness.expect(
         "structural ignores gitignored agent artifacts",
