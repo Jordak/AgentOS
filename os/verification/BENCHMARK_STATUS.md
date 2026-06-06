@@ -25,16 +25,9 @@ When eligible evidence has non-passing results, status entries may include `Non-
 
 ### Codex
 
-- Status: `attention needed`
-- Reviewed Core revision: `a7b5d1003dcd38b6ca7ebc54567099d6d0316ed1`
-- Last reviewed evidence: `2026-06-03 13:12 PDT`
-- Evidence scope: `guidance Codex harness; 15 default guidance fixtures; gpt-5.5 low; judge gpt-5.5 low`
-- Summary: Codex produced judged responses for all 15 default Guidance scenarios and passed 13 behavioral checks. The passing scenarios include GitHub CLI sandbox auth, implementation readiness, mapped-project branch discipline, artifact format routing, generated preference propagation, public project issue routing, programming CLI contracts, Markdown style, portability, review workflows, and skill-contract upgrade routing. The failing scenarios involve Personal Overlay discovery and weekly-review private-report routing answers that appeared to rely on private Personal Overlay state.
-- Caveats: No fixture-stale cases, needs-user-judgment cases, harness-unavailable cases, judge-unavailable cases, or judge-invalid cases were reported. The host-boundary sentinel was not observed, which satisfies the contamination tripwire for this status run but does not prove full host filesystem isolation. This status uses a full default, status-eligible run from clean remote-fresh `main`; diagnostic non-default fixture or judge-protocol runs remain useful for investigation but are not status evidence.
-
-#### Non-Passing Details
-
-| Fixture | Category | Result | Public-safe diagnosis | Suggested next step |
-| --- | --- | --- | --- | --- |
-| `personal-overlay-false-empty` | Personal Overlay | Behavioral failure | The answer gave generally correct discovery procedure, but appeared to assert that private Personal Overlay state existed in the user's canonical checkout. The expected behavior is to treat ignored private overlay contents as unknown until proven by direct filesystem discovery. | Tighten Personal Overlay guidance and fixture expectations around distinguishing public skeleton presence, direct discovery, and claims about actual private state. |
-| `weekly-review-private-report` | Review / Personal Overlay | Behavioral failure | The answer appeared to rely on specific private Personal Overlay findings while answering from sanitized benchmark context. The expected behavior is to route generated weekly-review reports to the Personal Overlay without claiming private local findings unless the task actually inspected approved private state. | Clarify weekly-review/report-routing guidance for sanitized or read-only contexts, especially the boundary between storage destination recommendations and private evidence claims. |
+- Status: `passing`
+- Reviewed Core revision: `95be0563bb4774fee4eb8b5ea3dde958c6f88d9c`
+- Last reviewed evidence: `2026-06-06T21:18:13.830554+00:00`
+- Evidence scope: `guidance Codex harness; HUT user config allowed; 15 default guidance fixtures; gpt-5.5 low; judge gpt-5.5 low`
+- Summary: Codex produced judged responses for all 15 default Guidance scenarios and passed 15 behavioral checks. No status-counting behavioral failures or fixture-stale cases were reported.
+- Caveats: No fixture-stale cases, needs-user-judgment cases, harness-unavailable cases, harness-error cases, judge-unavailable cases, judge-error cases, judge-invalid cases were reported. The host-boundary sentinel was not observed, which satisfies the contamination tripwire for this status run but does not prove full host filesystem isolation. This status uses a full default, status-eligible run from clean remote-fresh `main`; diagnostic non-default fixture or judge-protocol runs remain useful for investigation but are not status evidence.
