@@ -120,7 +120,7 @@ Safety:
    Fixture identifiers, categories, verdict classes, staleness labels, and availability/error classes are public-safe structured provenance. Judge rationales, HUT answers, prompts, command shapes, stdout, stderr, local paths, and raw report excerpts are not public-safe Core content.
 
 7. Update or report.
-   Update `os/verification/BENCHMARK_STATUS.md` only when the user requested the refresh and evidence is eligible, or after the user approves a proposed update. Apply approved updates through `python3 os/verification/scripts/apply_benchmark_status_candidate.py <refresh-json>` so the write path consumes only `public_safe.targets` and keeps `private_locators` out of Core. If evidence is missing, stale, incompatible, dirty, not from fresh `main`, or otherwise ineligible, leave Core unchanged and explain what to rerun.
+   Update `os/verification/BENCHMARK_STATUS.md` only when the user requested the refresh and evidence is eligible, or after the user approves a proposed update. Apply approved updates through `python3 os/verification/scripts/apply_benchmark_status_candidate.py <refresh-json> --expected-revision "$(git rev-parse HEAD)"` so the write path consumes only `public_safe.targets`, confirms the candidate matches the checkout revision, and keeps `private_locators` out of Core. If evidence is missing, stale, incompatible, dirty, not from fresh `main`, or otherwise ineligible, leave Core unchanged and explain what to rerun.
 
 ## Status Rules
 

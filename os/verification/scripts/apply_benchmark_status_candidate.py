@@ -14,11 +14,18 @@ from typing import Any
 
 DEFAULT_STATUS = Path("os/verification/BENCHMARK_STATUS.md")
 COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
+ISO_TIMESTAMP_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$")
+SAFE_SLUG = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+SAFE_LABEL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ./_-]*$")
+SAFE_PUBLIC_TEXT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 `.,;:/'_-]*$")
+SAFE_FRESHNESS_CLASS = re.compile(r"^[a-z][a-z_]*$")
 STATUS_LABELS = {"passing", "attention needed", "not run", "unknown"}
 WRITABLE_STATUS_LABELS = {"passing", "attention needed"}
-STATUS_BLOCKER_RESULTS = (
+WRITABLE_STATUS_BLOCKER_RESULTS = (
     ("behavioral_fail", "Behavioral failure"),
     ("fixture_stale", "Fixture stale"),
+)
+INELIGIBLE_STATUS_RESULTS = (
     ("needs_user_judgment", "Needs user judgment"),
     ("harness_unavailable", "Harness unavailable"),
     ("harness_error", "Harness error"),
@@ -26,6 +33,26 @@ STATUS_BLOCKER_RESULTS = (
     ("judge_error", "Judge error"),
     ("judge_invalid", "Judge invalid"),
 )
+GUIDANCE_RESULT_STATUSES = {"graded"}
+GUIDANCE_VERDICTS_BY_RESULT = {
+    "Behavioral failure": "fail",
+    "Fixture stale": "fixture_stale",
+}
+SOURCE_ALIGNMENTS = {"aligned", "partial", "missing", "wrong", "not_applicable"}
+STALENESS_VALUES = {"current", "stale", "uncertain"}
+ALLOWED_FRESHNESS_CLASSES = {
+    "status_missing",
+    "evidence_stale_by_age",
+    "same_as_status",
+    "older_than_status",
+    "newer_than_status",
+    "evidence_for_non_current_head",
+}
+REJECTED_FRESHNESS_CLASSES = {
+    "evidence_stale_by_age",
+    "older_than_status",
+    "evidence_for_non_current_head",
+}
 PRIVATE_MARKERS = (
     "/" + "Users" + "/",
     "\\Users\\",
@@ -125,6 +152,55 @@ def require_status(value: Any, field: str) -> str:
     return text
 
 
+def require_exact_text(value: Any, field: str, expected: str) -> str:
+    text = require_text(value, field)
+    if text != expected:
+        raise StatusApplyError(f"{field} must be {expected!r}")
+    return text
+
+
+def require_timestamp(value: Any, field: str) -> str:
+    text = require_text(value, field)
+    if not ISO_TIMESTAMP_RE.fullmatch(text):
+        raise StatusApplyError(f"{field} must be an ISO 8601 timestamp with timezone")
+    return text
+
+
+def require_safe_slug(value: Any, field: str) -> str:
+    text = require_text(value, field)
+    if not SAFE_SLUG.fullmatch(text):
+        raise StatusApplyError(f"{field} is not a safe slug")
+    return text
+
+
+def require_safe_label(value: Any, field: str) -> str:
+    text = require_text(value, field)
+    if not SAFE_LABEL.fullmatch(text):
+        raise StatusApplyError(f"{field} is not a safe label")
+    return text
+
+
+def require_public_text(value: Any, field: str) -> str:
+    text = require_text(value, field)
+    if not SAFE_PUBLIC_TEXT.fullmatch(text):
+        raise StatusApplyError(f"{field} is not safe public text")
+    validate_no_private_markers(text)
+    return text
+
+
+def require_enum(value: Any, allowed: set[str], field: str) -> str:
+    text = require_text(value, field)
+    if text not in allowed:
+        raise StatusApplyError(f"{field} is not allowed: {text}")
+    return text
+
+
+def require_optional_enum(value: Any, allowed: set[str], field: str) -> str | None:
+    if value is None:
+        return None
+    return require_enum(value, allowed, field)
+
+
 def require_mapping(value: Any, field: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise StatusApplyError(f"{field} must be an object")
@@ -154,27 +230,27 @@ def title_text(value: str) -> str:
 
 
 def harness_label(scope: dict[str, Any]) -> str:
-    harnesses = scope.get("harnesses")
-    if isinstance(harnesses, list) and harnesses:
-        return ", ".join(title_text(str(item)) for item in harnesses)
-    return title_text(optional_text(scope.get("judge_harness"), "unknown"))
+    harnesses = require_list(scope.get("harnesses"), "evidence_scope.harnesses")
+    if harnesses != ["codex"]:
+        raise StatusApplyError("evidence_scope.harnesses must be ['codex']")
+    return "Codex"
 
 
 def evidence_scope_text(target: dict[str, Any]) -> str:
     scope = require_mapping(target.get("evidence_scope"), "evidence_scope")
     fixture_count = require_int(scope.get("fixture_count"), "evidence_scope.fixture_count")
-    model = require_text(scope.get("model"), "evidence_scope.model")
-    effort = require_text(scope.get("effort"), "evidence_scope.effort")
-    judge_model = require_text(scope.get("judge_model"), "evidence_scope.judge_model")
-    judge_effort = require_text(scope.get("judge_effort"), "evidence_scope.judge_effort")
-    hut_config = scope.get("harness_user_config_allowed_for_hut")
-    hut_config_text = ""
-    if hut_config is True:
-        hut_config_text = "HUT user config allowed; "
-    elif hut_config is False:
-        hut_config_text = "HUT user config disabled; "
+    model = require_exact_text(scope.get("model"), "evidence_scope.model", "gpt-5.5")
+    effort = require_exact_text(scope.get("effort"), "evidence_scope.effort", "low")
+    judge_harness = require_exact_text(scope.get("judge_harness"), "evidence_scope.judge_harness", "codex")
+    judge_model = require_exact_text(scope.get("judge_model"), "evidence_scope.judge_model", "gpt-5.5")
+    judge_effort = require_exact_text(scope.get("judge_effort"), "evidence_scope.judge_effort", "low")
+    require_bool_value(
+        scope.get("harness_user_config_allowed_for_hut"),
+        "evidence_scope.harness_user_config_allowed_for_hut",
+        True,
+    )
     return (
-        f"guidance {harness_label(scope)} harness; {hut_config_text}"
+        f"guidance {harness_label(scope)} harness; HUT user config allowed; "
         f"{fixture_count} default guidance fixtures; {model} {effort}; judge {judge_model} {judge_effort}"
     )
 
@@ -198,15 +274,15 @@ def nonzero_count_parts(counts: dict[str, Any]) -> list[str]:
     return parts
 
 
-def status_blocker_count(counts: dict[str, Any]) -> int:
+def writable_status_blocker_count(counts: dict[str, Any]) -> int:
     return sum(
         require_int(counts.get(field, 0), f"counts.{field}")
-        for field, _result in STATUS_BLOCKER_RESULTS
+        for field, _result in WRITABLE_STATUS_BLOCKER_RESULTS
     )
 
 
 def validate_non_passing_detail_coverage(counts: dict[str, Any], rows: list[Any]) -> None:
-    expected_results = {result for _field, result in STATUS_BLOCKER_RESULTS}
+    expected_results = {result for _field, result in WRITABLE_STATUS_BLOCKER_RESULTS}
     actual_by_result = {result: 0 for result in expected_results}
     for index, row in enumerate(rows):
         if not isinstance(row, dict):
@@ -215,7 +291,7 @@ def validate_non_passing_detail_coverage(counts: dict[str, Any], rows: list[Any]
         if result not in actual_by_result:
             raise StatusApplyError(f"non_passing_details[{index}].result has unsupported result: {result}")
         actual_by_result[result] += 1
-    for field, result in STATUS_BLOCKER_RESULTS:
+    for field, result in WRITABLE_STATUS_BLOCKER_RESULTS:
         expected = require_int(counts.get(field, 0), f"counts.{field}")
         actual = actual_by_result[result]
         if actual != expected:
@@ -238,8 +314,12 @@ def validate_counts_for_write(target: dict[str, Any]) -> None:
     status_counting_total = require_int(target.get("status_counting_total"), "status_counting_total")
     if status_counting_total != behavioral_total + fixture_stale:
         raise StatusApplyError("status_counting_total must equal behavioral_total + fixture_stale")
+    for field, result in INELIGIBLE_STATUS_RESULTS:
+        value = require_int(counts.get(field, 0), f"counts.{field}")
+        if value:
+            raise StatusApplyError(f"{result} is not writable status evidence")
     details = require_list(target.get("non_passing_details", []), "non_passing_details")
-    blockers = status_blocker_count(counts)
+    blockers = writable_status_blocker_count(counts)
     if status == "passing":
         if blockers:
             raise StatusApplyError("passing candidates must not contain status-counting blockers")
@@ -278,9 +358,28 @@ def validate_scope_for_write(target: dict[str, Any]) -> None:
     )
     if judge_batch_size != default_judge_batch_size:
         raise StatusApplyError("evidence_scope.judge_batch_size must equal default_judge_batch_size")
+    if judge_batch_size != 0:
+        raise StatusApplyError("evidence_scope.judge_batch_size must be the default full batch")
+    require_bool_value(
+        scope.get("host_boundary_sentinel_proves_isolation"),
+        "evidence_scope.host_boundary_sentinel_proves_isolation",
+        False,
+    )
+
+
+def validate_freshness_for_write(target: dict[str, Any]) -> None:
+    classes = require_list(target.get("freshness_classes"), "freshness_classes")
+    for index, value in enumerate(classes):
+        if not isinstance(value, str) or not SAFE_FRESHNESS_CLASS.fullmatch(value):
+            raise StatusApplyError(f"freshness_classes[{index}] is not a safe class")
+        if value not in ALLOWED_FRESHNESS_CLASSES:
+            raise StatusApplyError(f"freshness_classes[{index}] is unsupported: {value}")
+        if value in REJECTED_FRESHNESS_CLASSES:
+            raise StatusApplyError(f"freshness class is not writable: {value}")
 
 
 def validate_target_for_write(target: dict[str, Any]) -> None:
+    validate_freshness_for_write(target)
     validate_counts_for_write(target)
     validate_scope_for_write(target)
 
@@ -342,14 +441,14 @@ def caveats_text(target: dict[str, Any]) -> str:
 
 
 def diagnosis_for(row: dict[str, Any]) -> str:
-    return require_text(
+    return require_public_text(
         row.get("public_safe_diagnosis"),
         "non_passing_details.public_safe_diagnosis",
     )
 
 
 def next_step_for(row: dict[str, Any]) -> str:
-    return require_text(
+    return require_public_text(
         row.get("suggested_next_step"),
         "non_passing_details.suggested_next_step",
     )
@@ -368,9 +467,28 @@ def render_non_passing_details(rows: list[Any]) -> list[str]:
     for row in rows:
         if not isinstance(row, dict):
             raise StatusApplyError("non_passing_details rows must be objects")
-        fixture = require_text(row.get("fixture"), "non_passing_details.fixture")
-        category = require_text(row.get("category"), "non_passing_details.category")
-        result = require_text(row.get("result"), "non_passing_details.result")
+        fixture = require_safe_slug(row.get("fixture"), "non_passing_details.fixture")
+        category = require_safe_label(row.get("category"), "non_passing_details.category")
+        result = require_enum(
+            row.get("result"),
+            set(GUIDANCE_VERDICTS_BY_RESULT),
+            "non_passing_details.result",
+        )
+        require_enum(row.get("status"), GUIDANCE_RESULT_STATUSES, "non_passing_details.status")
+        verdict = require_enum(
+            row.get("verdict"),
+            set(GUIDANCE_VERDICTS_BY_RESULT.values()),
+            "non_passing_details.verdict",
+        )
+        if verdict != GUIDANCE_VERDICTS_BY_RESULT[result]:
+            raise StatusApplyError("non_passing_details verdict does not match result")
+        require_optional_enum(
+            row.get("source_alignment"),
+            SOURCE_ALIGNMENTS,
+            "non_passing_details.source_alignment",
+        )
+        require_optional_enum(row.get("staleness"), STALENESS_VALUES, "non_passing_details.staleness")
+        require_bool(row.get("host_boundary_sentinel_observed"), "non_passing_details.host_boundary_sentinel_observed")
         lines.append(
             "| `{fixture}` | {category} | {result} | {diagnosis} | {next_step} |".format(
                 fixture=markdown_cell(fixture),
@@ -384,14 +502,13 @@ def render_non_passing_details(rows: list[Any]) -> list[str]:
 
 
 def render_guidance_codex_section(target: dict[str, Any]) -> str:
-    if require_text(target.get("benchmark"), "benchmark") != "guidance":
-        raise StatusApplyError("only the guidance benchmark target is supported")
+    require_exact_text(target.get("benchmark"), "benchmark", "guidance")
     if require_bool(target.get("candidate_available"), "candidate_available") is not True:
         raise StatusApplyError("candidate is not available")
     validate_target_for_write(target)
     status = require_status(target.get("candidate_status"), "candidate_status")
     revision = require_commit(target.get("reviewed_core_revision"), "reviewed_core_revision")
-    evidence = require_text(target.get("last_reviewed_evidence"), "last_reviewed_evidence")
+    evidence = require_timestamp(target.get("last_reviewed_evidence"), "last_reviewed_evidence")
     lines = [
         "### Codex",
         "",
@@ -500,6 +617,7 @@ def fake_target(status: str = "passing", details: list[dict[str, Any]] | None = 
     return {
         "benchmark": "guidance",
         "candidate_available": True,
+        "freshness_classes": ["newer_than_status"],
         "candidate_status": status,
         "reviewed_core_revision": "a" * 40,
         "last_reviewed_evidence": "2026-06-05T14:35:42.577146+00:00",
@@ -670,6 +788,45 @@ def run_self_test() -> int:
         )
         malformed_cases.append(fake_candidate(attention_wrong_detail_class))
 
+        attention_harness_error = fake_target("attention needed")
+        attention_harness_error["counts"]["behavioral_pass"] = 15
+        attention_harness_error["counts"]["behavioral_fail"] = 0
+        attention_harness_error["counts"]["harness_error"] = 1
+        attention_harness_error["non_passing_details"] = [
+            {
+                "fixture": "weekly-review-private-report",
+                "category": "Review",
+                "result": "Harness error",
+                "status": "harness-error",
+                "public_safe_diagnosis": "Public diagnostic classifier: `api_auth_or_model_access`.",
+                "suggested_next_step": (
+                    "Check the public harness diagnostic and rerun after fixing the workflow or model-call environment."
+                ),
+                "host_boundary_sentinel_observed": False,
+            }
+        ]
+        malformed_cases.append(fake_candidate(attention_harness_error))
+
+        stale_candidate = fake_target()
+        stale_candidate["freshness_classes"] = ["older_than_status"]
+        malformed_cases.append(fake_candidate(stale_candidate))
+
+        non_current_candidate = fake_target()
+        non_current_candidate["freshness_classes"] = ["evidence_for_non_current_head"]
+        malformed_cases.append(fake_candidate(non_current_candidate))
+
+        unsafe_evidence_text = fake_target()
+        unsafe_evidence_text["last_reviewed_evidence"] = "2026-06-05T14:35:42+00:00\nprivate note"
+        malformed_cases.append(fake_candidate(unsafe_evidence_text))
+
+        unsafe_scope_text = fake_target()
+        unsafe_scope_text["evidence_scope"]["model"] = "gpt-5.5 | raw"
+        malformed_cases.append(fake_candidate(unsafe_scope_text))
+
+        unsafe_detail_text = fake_target("attention needed", [dict(detail)])
+        unsafe_detail_text["non_passing_details"][0]["public_safe_diagnosis"] = "Behavioral failure | raw table break"
+        malformed_cases.append(fake_candidate(unsafe_detail_text))
+
         noncanonical_scope = fake_target()
         noncanonical_scope["evidence_scope"]["selected_fixture_subset"] = True
         malformed_cases.append(fake_candidate(noncanonical_scope))
@@ -711,7 +868,6 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Apply public-safe benchmark refresh candidates to BENCHMARK_STATUS.md.")
     parser.add_argument("input", type=Path, nargs="?", help="JSON output from refresh_benchmark_status.py.")
     parser.add_argument("--root", type=Path, default=default_root(), help="AgentOS checkout root.")
-    parser.add_argument("--status", type=Path, default=DEFAULT_STATUS)
     parser.add_argument(
         "--expected-revision",
         help="Reject candidates whose reviewed_core_revision does not match this checkout revision.",
@@ -724,9 +880,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.input is None:
         print("ERROR input path is required unless --self-test is used", file=sys.stderr)
         return 2
+    if args.expected_revision is None:
+        print("ERROR --expected-revision is required unless --self-test is used", file=sys.stderr)
+        return 2
     root = args.root.resolve()
     input_path = resolve_path(root, args.input).resolve()
-    status_path = resolve_path(root, args.status).resolve()
+    status_path = resolve_path(root, DEFAULT_STATUS).resolve()
     try:
         changed = write_status_from_candidate(input_path, status_path, expected_revision=args.expected_revision)
     except (OSError, StatusApplyError) as error:

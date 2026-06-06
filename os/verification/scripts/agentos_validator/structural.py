@@ -18,6 +18,7 @@ class StructuralValidator(ValidatorDelegate):
         self.check_automation_registry_completeness()
         self.check_resolver_reachability()
         self.check_pr_readiness_tripwire()
+        self.check_guidance_benchmark_trial_workflow()
         self.check_source_routing_fixtures()
         self.check_benchmark_manifest()
 
@@ -277,6 +278,58 @@ class StructuralValidator(ValidatorDelegate):
                 "Gate Skipped",
             ]:
                 self.require_contains(workflow, needle, check, workflow_path)
+
+        self.checked.append(check)
+
+    def check_guidance_benchmark_trial_workflow(self) -> None:
+        check = "Guidance benchmark workflow contract"
+        workflow_path = self.root / ".github/workflows/guidance-benchmark-trial.yml"
+        workflow = self.read_text(workflow_path, check)
+        if not workflow:
+            return
+
+        for needle, label in [
+            ("workflow_dispatch:", "manual dispatch trigger"),
+            ("if: github.ref_name == 'main'", "main-branch job guard"),
+            ("environment: guidance-benchmark-trial", "protected environment"),
+            ("contents: read", "read-only default contents permission"),
+            (
+                "openai/codex-action@a26d2d4d8b78a694338b8e3715c3630254340b2c",
+                "pinned Codex action",
+            ),
+            ("--harness codex", "single codex harness"),
+            ("--model gpt-5.5", "single benchmark model"),
+            ("--effort low", "single benchmark effort"),
+            ("--judge-harness codex", "single judge harness"),
+            ("--judge-model gpt-5.5", "single judge model"),
+            ("--judge-effort low", "single judge effort"),
+            ("--quiet", "quiet benchmark mode"),
+            ('--output "$GUIDANCE_RUN_JSON"', "workflow-owned benchmark output path"),
+            ("status-pr:", "status pull request job"),
+            ("apply_benchmark_status_candidate.py", "status applicator"),
+            ("--expected-revision", "applicator revision guard"),
+            ("gh pr create", "generated status pull request"),
+        ]:
+            self.require_contains(workflow, needle, check, workflow_path, label)
+
+        if re.search(r"(?m)^\s+(push|pull_request|schedule):\s*$", workflow):
+            self.add_error(check, workflow_path, "must stay manual-only; do not add push, pull_request, or schedule triggers")
+        if re.search(r"(?m)^\s+inputs:\s*$", workflow):
+            self.add_error(check, workflow_path, "must not define custom workflow_dispatch inputs")
+
+        for forbidden, message in [
+            ("actions/upload-artifact", "must not upload benchmark artifacts"),
+            ("--harness all", "must not allow all harnesses in the v1 workflow"),
+            ("HEAD:refs/heads/main", "must not push generated status updates directly to main"),
+            ("issues: write", "must not grant issue write permission"),
+        ]:
+            if forbidden in workflow:
+                self.add_error(check, workflow_path, message)
+
+        if workflow.count("contents: write") != 1:
+            self.add_error(check, workflow_path, "must keep contents: write confined to the status-pr job")
+        if workflow.count("pull-requests: write") != 1:
+            self.add_error(check, workflow_path, "must grant pull-requests: write exactly once for the status-pr job")
 
         self.checked.append(check)
 
@@ -721,12 +774,34 @@ def run_self_test(harness) -> None:
     workflow = root / ".github/workflows/agentos-validation.yml"
     workflow.parent.mkdir(parents=True)
     workflow.write_text("name: fixture\n", encoding="utf-8")
+    guidance_workflow = root / ".github/workflows/guidance-benchmark-trial.yml"
+    guidance_workflow.write_text(
+        "name: bad guidance workflow\n"
+        "on:\n"
+        "  push:\n"
+        "  workflow_dispatch:\n"
+        "    inputs:\n"
+        "      model:\n"
+        "        required: false\n"
+        "permissions:\n"
+        "  contents: write\n"
+        "  issues: write\n"
+        "jobs:\n"
+        "  guidance:\n"
+        "    if: github.ref_name == 'main'\n"
+        "    steps:\n"
+        "      - uses: actions/upload-artifact@v4\n"
+        "      - run: python3 script --harness all\n"
+        "      - run: git push origin HEAD:refs/heads/main\n",
+        encoding="utf-8",
+    )
 
     validator = harness.validator(root)
     validator.check_markdown_path_portability()
     validator.check_source_map_path_health()
     validator.check_benchmark_manifest()
     validator.check_pr_readiness_tripwire()
+    validator.check_guidance_benchmark_trial_workflow()
 
     ignored_root = harness.root / "structural_ignored_agent_fixture"
     (ignored_root / "os/agents/ignored-agent").mkdir(parents=True)
@@ -760,6 +835,13 @@ def run_self_test(harness) -> None:
         "structural catches PR readiness tripwire gaps",
         any(error.path == ".github/pull_request_template.md" for error in validator.errors)
         and any("Check PR design readiness fields" in error.message for error in validator.errors),
+    )
+    harness.expect(
+        "structural catches Guidance benchmark workflow contract drift",
+        any("must not define custom workflow_dispatch inputs" in error.message for error in validator.errors)
+        and any("must not upload benchmark artifacts" in error.message for error in validator.errors)
+        and any("must not push generated status updates directly to main" in error.message for error in validator.errors)
+        and any("must grant pull-requests: write exactly once" in error.message for error in validator.errors),
     )
     harness.expect(
         "structural ignores gitignored agent artifacts",
