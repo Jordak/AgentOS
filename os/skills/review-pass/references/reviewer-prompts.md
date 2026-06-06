@@ -24,7 +24,7 @@ Before sending a reviewer prompt, confirm it includes:
 - instruction to apply the Contract Surface Matrix guidance for skill, workflow, or reusable contract changes when provided;
 - instruction to report design-escape-hatch concerns when repeated findings suggest scope reduction, design clarification, or a different implementation shape;
 - instruction to compare implementation shape against the durable design source on fresh review when one is provided;
-- reviewer finding IDs, issue-family IDs, fix commits, accepted fixes, declined rationales, consolidated comment URL, and validation results in verification mode when applicable;
+- reviewer finding IDs, issue-family IDs, fix commits, accepted fixes, declined rationales, caller adjudication context such as autopilot classifications and rationales, complexity posture, smallest closing moves or lazy-human decisions, consolidated comment URL, and validation results in verification mode when applicable;
 - full-diff reread instruction;
 - provisional-ID instruction for new findings;
 - clean response sentinel: start the response with exactly `No new findings.` on its own first line.
@@ -113,6 +113,7 @@ Prior packet or issue families for you to verify: <reviewer finding IDs, issue-f
 Fix commits: <commit SHAs and one-line summaries>
 Accepted issue families fixed: <brief list>
 Declined issue families and rationale: <brief list>
+Caller adjudication context: <autopilot classifications and rationales, complexity posture, smallest closing moves, lazy-human decisions, or none>
 Consolidated Agent Review comment: <URL or none>
 Validation run by caller: <commands and results>
 Reporting mode: chat to review-pass orchestrator only
@@ -128,6 +129,7 @@ Tasks:
 - If same-source reviewer continuity is active, verify your own prior Reviewer Findings while still rereading the full current target. If packet/finding-source fallback is active, use the source reviewer aliases and reviewer finding IDs as the continuity trail without assuming access to the original reviewer context.
 - Verify whether the prior accepted issue families were actually fixed.
 - Check whether declined issue families remain worth escalating after reading the rationale.
+- When supplied, check whether the caller's adjudication context is still supported, including whether fixes honored the recorded complexity posture and smallest closing move.
 - Re-read the full current target against the base, not only the changed lines from the fix commit.
 - Look for issues missed last time and regressions introduced by the fix.
 - For each remaining or new issue, step back and identify the broader issue family. Look for sibling occurrences before reporting so the caller can fix the family, not one instance.
@@ -184,7 +186,7 @@ Do not reconstruct these prompts from memory. Each reviewer prompt must include:
 - the issue-family instruction: generalize each finding and look for related occurrences before reporting;
 - the Contract Surface Matrix guidance for skill, workflow, or reusable contract changes when applicable;
 - the design-escape-hatch instruction: call out when scope reduction, design clarification, or a different implementation shape may be better than another patch;
-- prior reviewer finding IDs, issue-family IDs, fixes, declined rationales, comments, and validation when it is a verification pass;
+- prior reviewer finding IDs, issue-family IDs, fixes, declined rationales, caller adjudication context, comments, and validation when it is a verification pass;
 - reviewer continuity preference plus source reviewer aliases and source reviewer finding IDs when applicable; source reviewer handles stay in the orchestration request when needed for resumption;
 - continuity handle availability when applicable, without exposing opaque handle values;
 - the full-diff reread instruction;
