@@ -16,7 +16,7 @@ The refresh helper is intentionally read-only. It emits deterministic public-saf
 
 Keep the workflow manual, but let an approved manual run persist the public-safe status refresh by opening a pull request that updates `os/verification/BENCHMARK_STATUS.md`.
 
-The workflow should request only the extra `GITHUB_TOKEN` permissions needed for that write path: repository contents write permission for the update branch and pull request write permission for the PR. It should not become scheduled or automatic.
+The workflow should keep the repository `GITHUB_TOKEN` read-only and use a protected-environment status PR token for the write path. That token should have only the repository permissions needed to push the update branch and open the pull request. The workflow should not become scheduled or automatic.
 
 ## Chosen Design
 
@@ -24,11 +24,11 @@ Add a checked-in status applicator helper that consumes the existing refresh can
 
 Update the manual workflow to run the applicator after the refresh candidate is generated successfully. If the status file changes, the workflow should commit the change to a generated branch and open a pull request. The workflow should not push directly to `main`.
 
-Keep the model-backed benchmark job read-only. Pass only compact `public_safe` candidate facts to a separate writer job that owns `contents: write` and `pull-requests: write`.
+Keep the model-backed benchmark job read-only. Pass only compact `public_safe` candidate facts to a separate writer job. The writer job still uses read-only repository `GITHUB_TOKEN` permissions, and uses the protected `AGENTOS_STATUS_PR_TOKEN` environment secret only for pushing the generated branch and opening the pull request.
 
 Generated PR content should stay public-safe and point back to the workflow run and step summary rather than embedding raw benchmark evidence.
 
-When the PR is created with the repository `GITHUB_TOKEN`, GitHub may place the follow-on pull request workflow runs into an approval-required state. That is acceptable for v2 because the benchmark run and the status update remain manually reviewed.
+The generated PR should use normal pull request validation. Because GitHub suppresses most workflow runs caused by the repository `GITHUB_TOKEN`, the generated branch push and PR creation use a dedicated protected-environment token instead.
 
 ## Alternatives Considered
 
@@ -49,13 +49,13 @@ Scheduling the workflow would make freshness automatic, but the current model-ba
 ## Acceptance Criteria
 
 - The workflow remains `workflow_dispatch` only with zero custom inputs and keeps the `main` guard.
-- The workflow requests narrow write permissions only on the writer job needed to push an update branch and open a PR.
+- The workflow keeps repository `GITHUB_TOKEN` permissions read-only and uses a protected-environment status PR token for the generated branch push and PR creation.
 - The workflow still runs the existing hard-coded Guidance benchmark configuration.
 - A checked-in helper updates `os/verification/BENCHMARK_STATUS.md` from `public_safe.targets` in the refresh candidate.
 - The helper ignores `private_locators` and rejects missing, malformed, or unavailable candidates.
 - The helper removes stale `Non-Passing Details` when the new candidate is passing.
 - The workflow opens a PR only when `BENCHMARK_STATUS.md` changes.
-- Workflow-created status PRs are expected to remain review-gated; maintainers may need to approve their follow-on CI runs.
+- Workflow-created status PRs are expected to run normal pull request validation and remain review-gated.
 - The workflow does not upload artifacts, push directly to `main`, close issues, comment on issues, or create PRs containing raw benchmark evidence.
 - Tests cover successful passing updates, non-passing detail rendering, malformed input rejection, unavailable candidate rejection, and private-locator non-leakage.
 

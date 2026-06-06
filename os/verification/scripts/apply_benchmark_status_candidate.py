@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 import sys
 import tempfile
@@ -130,6 +131,12 @@ def require_int(value: Any, field: str) -> int:
     if type(value) is not int or value < 0:
         raise StatusApplyError(f"{field} must be a nonnegative integer")
     return value
+
+
+def require_number(value: Any, field: str) -> float:
+    if type(value) not in {int, float} or not math.isfinite(value) or value < 0:
+        raise StatusApplyError(f"{field} must be a nonnegative number")
+    return float(value)
 
 
 def require_bool(value: Any, field: str) -> bool:
@@ -385,6 +392,12 @@ def validate_freshness_for_write(target: dict[str, Any]) -> None:
             raise StatusApplyError(f"freshness_classes[{index}] is unsupported: {value}")
         if value in REJECTED_FRESHNESS_CLASSES:
             raise StatusApplyError(f"freshness class is not writable: {value}")
+    evidence_age_days = require_number(target.get("evidence_age_days"), "evidence_age_days")
+    max_age_days = require_number(target.get("max_age_days"), "max_age_days")
+    if max_age_days <= 0:
+        raise StatusApplyError("max_age_days must be positive")
+    if evidence_age_days > max_age_days:
+        raise StatusApplyError("evidence_age_days must not exceed max_age_days")
 
 
 def validate_target_for_write(target: dict[str, Any]) -> None:
@@ -630,6 +643,8 @@ def fake_target(status: str = "passing", details: list[dict[str, Any]] | None = 
         "candidate_status": status,
         "reviewed_core_revision": "a" * 40,
         "last_reviewed_evidence": "2026-06-05T14:35:42.577146+00:00",
+        "evidence_age_days": 0.003,
+        "max_age_days": 14,
         "status_counting_total": 15,
         "counts": {
             "total": 15,
@@ -837,6 +852,10 @@ def run_self_test() -> int:
         stale_candidate = fake_target()
         stale_candidate["freshness_classes"] = ["older_than_status"]
         malformed_cases.append(fake_candidate(stale_candidate))
+
+        stale_age_without_class = fake_target()
+        stale_age_without_class["evidence_age_days"] = 15.001
+        malformed_cases.append(fake_candidate(stale_age_without_class))
 
         non_current_candidate = fake_target()
         non_current_candidate["freshness_classes"] = ["evidence_for_non_current_head"]
