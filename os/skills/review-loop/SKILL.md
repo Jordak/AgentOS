@@ -92,15 +92,15 @@ Classify every issue family after each packet. Resolve bucket overlap by evidenc
 
 Do not ask the user to adjudicate `auto-fix` or `auto-decline` families one by one. Record the decision and rationale in the ledger, PR comment or chat summary, and final report. Ask only for `ask-user` families or when repository evidence cannot settle the decision.
 
-Before editing an `auto-fix` family, apply the complexity governor and record the chosen smallest closing move:
+Before editing an `auto-fix` or `user-approved-fix` family, apply the complexity governor and record the chosen smallest closing move:
 
 1. Delete, simplify, narrow, split, or scope-reduce the problematic shape.
 2. Use an existing helper, contract, module, documented pattern, or validation point.
 3. Tighten the current code or prose locally.
 4. Add narrow validation or tests around existing behavior.
-5. Add a new abstraction, schema, parser, lifecycle rule, synchronization mechanism, or reusable contract only when the original brief already required it or a P0/P1 risk cannot be closed without it.
+5. Add or extend a new abstraction, schema, parser, lifecycle rule, synchronization mechanism, or reusable contract only when the durable brief already approved that exact mechanism or the user explicitly approves it as `user-approved-fix`.
 
-Treat new concepts as guilty until proven necessary. If the proposed fix increases the concept count, creates another durable surface, or makes future agents understand more rules than before, reclassify it as `ask-user` when the finding is evidenced and in scope; otherwise classify it as `auto-decline` when it is clearly out of scope or lower value than the churn. Keep it as `auto-fix` only when the need is forced by the original brief or by clearly evidenced P0/P1 risk.
+Treat new concepts as guilty until proven necessary. If the proposed fix increases the concept count, creates another durable surface, or makes future agents understand more rules than before, reclassify it as `ask-user` when the finding is evidenced and in scope; otherwise classify it as `auto-decline` when it is clearly out of scope or lower value than the churn. Keep it as `auto-fix` only when it uses or completes a mechanism the durable brief already approved without expanding that mechanism's semantics. P0/P1 severity can make the lazy-human recommendation urgent; it does not by itself bypass `ask-user`.
 
 When pausing for the user, use a lazy-human brief instead of dumping raw issue-family adjudication:
 
@@ -114,6 +114,8 @@ After the brief, record exactly one `ask-user` decision state:
 - `user-approved-fix`: the user wants the loop to make the change; route the family through the normal fix, validation, and verification path.
 - `user-declined/accepted-risk`: the user chooses not to fix or explicitly accepts the residual risk; record the rationale and include it in the final report.
 - `unresolved`: no user decision yet; this blocks ready marking and final convergence.
+
+Before yielding for an `ask-user` decision, make the unresolved blocker recoverable in the current reporting mode: record the issue-family ID, autopilot classification, lazy-human brief, exact decision needed, and decision state `unresolved` in the loop ledger and in either the consolidated Agent Review comment when a PR comment is appropriate and authorized, or the chat pause message when comments are not being posted. After the user answers, record `user-approved-fix` or `user-declined/accepted-risk` before continuing. If recovery cannot find a resolved decision, treat the family as `unresolved` and ask again.
 
 ## Efficiency Controls
 
@@ -183,7 +185,7 @@ Use the matrix to update affected contract surfaces in one pass. Check the ownin
 2. Set the loop ledger:
    - Track each pass cycle, pass mode, reviewer continuity mode, opaque handle availability, review packet path or chat status, reviewer aliases when supplied by `review-pass`, raw reviewer findings or crosswalk summaries, normalized family IDs, autopilot classification (`auto-fix`, `auto-decline`, or `ask-user`), accepted/declined/user-decision status, `ask-user` decision state, unresolved `ask-user` blockers, lazy-human brief status, complexity posture, chosen smallest closing move, fix commits, validation results, consolidated comment URL or chat status, and pass closure status.
    - Normalize families into stable ledger IDs such as `C1-IF3` and preserve source reviewer finding IDs from `review-pass`.
-   - If compaction or interruption loses details, rebuild the ledger from consolidated "Agent Review" comments, commit history, local validation output, and saved or pasted review packets. Recover autopilot classifications, rationales, ask-user decision states, lazy-human briefs or user decisions, complexity posture, and smallest closing moves from the newest durable source that contains them.
+   - If compaction or interruption loses details, rebuild the ledger from consolidated "Agent Review" comments, commit history, local validation output, and saved or pasted review packets. Recover autopilot classifications, rationales, ask-user decision states, lazy-human briefs or user decisions, complexity posture, and smallest closing moves from the newest durable source that contains them. If no durable source contains a resolved `ask-user` decision, recover the family as `unresolved` and ask again rather than inferring approval or accepted risk.
    - Prefer one consolidated "Agent Review" comment per panel pass for PR targets. For non-PR targets, keep packet output in chat and the final report.
 
 3. Run a fresh review pass:
@@ -201,15 +203,15 @@ Use the matrix to update affected contract surfaces in one pass. Check the ownin
    - Compare `auto-fix` and `user-approved-fix` issue families against the baseline intent summary. If a family mostly exists because the implementation chose a heavier design than the brief required, trigger the Design Escape Hatch before implementing another fix.
    - Accept `auto-fix` issue families that identify real correctness, safety, regression, maintainability, test, or UX risks and can be closed with the complexity governor.
    - Decline `auto-decline` issue families that are incorrect, out of scope, stylistic without project support, duplicates, or lower-value than the churn they would create. Record a short rationale.
-   - Ask the user only for unresolved `ask-user` families, unresolved evidence disputes, product/scope changes, or design-escape-hatch calls. Use the lazy-human brief format from Conservative Autopilot and record the resulting state as `user-approved-fix`, `user-declined/accepted-risk`, or `unresolved`. The `unresolved` state blocks ready marking and final convergence.
-   - For PR targets, read `references/agent-review-comment.md` and post one consolidated "Agent Review" comment for the panel pass when there are `auto-fix` issue families, resolved `ask-user` decisions, useful declined issue-family rationale, or unresolved `ask-user` blockers. Do not have reviewers post separate PR comments.
+   - Ask the user only for unresolved `ask-user` families, unresolved evidence disputes, product/scope changes, or design-escape-hatch calls. Use the lazy-human brief format from Conservative Autopilot, record the `unresolved` blocker before yielding, and record the resulting state as `user-approved-fix`, `user-declined/accepted-risk`, or `unresolved` before continuing. The `unresolved` state blocks ready marking and final convergence.
+   - For PR targets, read `references/agent-review-comment.md` and post one consolidated "Agent Review" comment for the panel pass when there are `auto-fix` issue families, resolved `ask-user` decisions, useful declined issue-family rationale, or unresolved `ask-user` blockers. Post before an `ask-user` pause when a PR comment is appropriate and authorized; otherwise include the same recoverable blocker fields in the chat pause message. Do not have reviewers post separate PR comments.
 
 5. Fix `auto-fix` and `user-approved-fix` issue families:
    - Implement fixes in the parent workspace, preserving unrelated user changes.
    - Sweep for sibling occurrences in the same issue family before committing, using repository search, tests, fixtures, or small scripts when useful.
    - Use any Contract Surface Matrix created during adjudication to patch every affected surface before verification, not just the representative line.
    - Before editing, choose the smallest closing move from the complexity governor and record the expected complexity delta. Prefer deletion, simplification, scope reduction, or an existing project pattern over new machinery.
-   - Before adding new schema, grammar, parser, lifecycle, synchronization, publication semantics, durable contract surfaces, or named abstractions to satisfy a finding, confirm the family is either an `auto-fix` allowed by the original brief or P0/P1 evidence, or a `user-approved-fix`. Otherwise recheck whether the family should be `ask-user` or whether the Design Escape Hatch should fire.
+   - Before adding new schema, grammar, parser, lifecycle, synchronization, publication semantics, durable contract surfaces, or named abstractions to satisfy a finding, confirm the durable brief already approved that exact mechanism or the family is a `user-approved-fix`. Otherwise recheck whether the family should be `ask-user` or whether the Design Escape Hatch should fire. P0/P1 evidence should shape the recommended default, not skip user judgment.
    - Run the smallest trustworthy validation for the touched surface, broadening when shared behavior or user-facing workflows are affected.
    - Commit those fixes with an agent-prefixed subject, such as `#<agent-name> fix review finding about retries`. Use the active agent or harness name, for example `codex`, `claude`, or `gemini`; do not hard-code one agent name into the skill.
    - Push fixes to the target PR branch for PR targets. Otherwise leave local changes and report the needed external action.
@@ -257,9 +259,11 @@ Call narrower playbooks for their owned surfaces: GitHub workflow policy for PR 
 - Findings are generalized into issue families where possible, and accepted families are swept before verification.
 - Every issue family has an autopilot classification, rationale, and either a smallest closing move, decline reason, lazy-human brief, explicit user decision, or unresolved blocking state.
 - `auto-fix` and `user-approved-fix` fixes use the complexity governor and prefer deletion, simplification, scope reduction, or existing patterns over new machinery.
+- `auto-fix` never adds new durable machinery unless the durable brief already approved that exact mechanism; otherwise the family is `ask-user` until it becomes `user-approved-fix`.
 - Repeated findings in the same issue family trigger a design-escape-hatch check rather than automatic patch accumulation.
 - `auto-fix` and `user-approved-fix` semantic contract changes use a Contract Surface Matrix, or explicitly skip it because the fix is local and non-contractual.
 - The parent agent reaches out to the user whenever unresolved `ask-user` judgment blocks convergence, and uses the lazy-human brief format when it pauses.
+- Unresolved `ask-user` blockers are recorded in the current reporting mode before the parent yields, so recovery can either find an explicit decision or ask again.
 - `auto-fix` and `user-approved-fix` issue families have concrete fix commits or local changes, plus validation evidence.
 - Declined issue families have short rationales and are not silently dropped.
 - Verification passes prefer same-source reviewer continuity when safely available, record opaque handle availability and any packet/finding-source fallback, check prior fixes, and reread the full current diff.
@@ -289,7 +293,7 @@ Before finishing:
 8. Confirm every `auto-fix` issue family has a fix or a scope/design change.
 9. Confirm every accepted fix recorded the smallest closing move from the complexity governor, or recorded why new machinery was necessary.
 10. Confirm every declined issue family has a rationale, including complexity/churn rationale when relevant.
-11. Confirm every unresolved `ask-user` blocker has a lazy-human brief and remains non-terminal, and every resolved `ask-user` family has either a verified `user-approved-fix` or an explicit `user-declined/accepted-risk` decision.
+11. Confirm every unresolved `ask-user` blocker has a recoverable lazy-human brief before yielding and remains non-terminal, and every resolved `ask-user` family has either a verified `user-approved-fix` or an explicit `user-declined/accepted-risk` decision.
 12. Confirm `auto-fix` and `user-approved-fix` issue families were swept for sibling occurrences before verification.
 13. Confirm `auto-fix` and `user-approved-fix` semantic contract changes used a Contract Surface Matrix, or record why the matrix was skipped.
 14. Confirm verification review-pass requests included autopilot classifications and rationales, complexity posture, smallest closing moves or lazy-human decisions, accepted fixes, declined rationales, and validation results when applicable.

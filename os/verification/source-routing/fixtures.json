@@ -247,6 +247,9 @@
             "lazy-human brief",
             "user-approved-fix",
             "user-declined/accepted-risk",
+            "durable brief already approved that exact mechanism",
+            "does not by itself bypass `ask-user`",
+            "make the unresolved blocker recoverable",
             "no unresolved `auto-fix` or `ask-user` blockers"
           ]
         },
@@ -259,6 +262,7 @@
             "Resolved ask-user decisions",
             "user-approved-fix",
             "user-declined/accepted-risk",
+            "decision state `unresolved`",
             "Unresolved ask-user blockers"
           ]
         },

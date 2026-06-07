@@ -31,7 +31,7 @@ Resolved ask-user decisions:
 - [<issue-family-id>] <user-approved-fix commit, or user-declined/accepted-risk rationale and residual risk>
 
 Unresolved ask-user blockers:
-- [<issue-family-id>] <lazy-human brief summary and exact user decision needed; non-ready until resolved>
+- [<issue-family-id>] <lazy-human brief summary, exact user decision needed, and decision state `unresolved`; non-ready until resolved>
 
 Validation notes:
 - <commands run or inspection limits>

@@ -26,7 +26,7 @@ For accepted fixes, the loop should apply a complexity governor before editing. 
 2. Use an existing helper, contract, module, or documented pattern.
 3. Tighten the current code or prose locally.
 4. Add narrow validation or tests around existing behavior.
-5. Add a new abstraction, schema, parser, lifecycle rule, synchronization mechanism, or reusable contract only when the original brief or a P0/P1 risk requires it.
+5. Add a new abstraction, schema, parser, lifecycle rule, synchronization mechanism, or reusable contract only when the durable brief already approved that exact mechanism or the user explicitly approves it as `user-approved-fix`. P0/P1 severity can make the recommended default urgent, but it does not bypass the `ask-user` boundary.
 
 When user judgment is required, the interruption should use a short lazy-human brief:
 
