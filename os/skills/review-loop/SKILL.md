@@ -1,6 +1,6 @@
 ---
 name: review-loop
-description: Orchestrate iterative code-review loops for a PR, branch, commit range, or patch by delegating fresh and verification panel passes to review-pass, conservatively adjudicating issue families, applying and pushing accepted fixes, posting consolidated Agent Review comments, producing a temporary HTML report, and marking a PR ready for human review. Use when the user asks for an automated review loop, fresh-context PR review/fix panel, repeated agent review/fix cycle, reviewer subagent loop, "Agent Review" PR comments, or to review a PR or commit until clean.
+description: Orchestrate iterative code-review loops for a PR, branch, commit range, or patch by delegating fresh and verification panel passes to review-pass, conservatively adjudicating issue families, applying and pushing `auto-fix` and `user-approved-fix` fixes, posting consolidated Agent Review comments, producing a temporary HTML report, and marking a PR ready for human review. Use when the user asks for an automated review loop, fresh-context PR review/fix panel, repeated agent review/fix cycle, reviewer subagent loop, "Agent Review" PR comments, or to review a PR or commit until clean.
 ---
 
 # Review Loop
@@ -211,7 +211,7 @@ Use the matrix to update affected contract surfaces in one pass. Check the ownin
    - Before editing, choose the smallest closing move from the complexity governor and record the expected complexity delta. Prefer deletion, simplification, scope reduction, or an existing project pattern over new machinery.
    - Before adding new schema, grammar, parser, lifecycle, synchronization, publication semantics, durable contract surfaces, or named abstractions to satisfy a finding, confirm the family is either an `auto-fix` allowed by the original brief or P0/P1 evidence, or a `user-approved-fix`. Otherwise recheck whether the family should be `ask-user` or whether the Design Escape Hatch should fire.
    - Run the smallest trustworthy validation for the touched surface, broadening when shared behavior or user-facing workflows are affected.
-   - Commit accepted fixes with an agent-prefixed subject, such as `#<agent-name> fix review finding about retries`. Use the active agent or harness name, for example `codex`, `claude`, or `gemini`; do not hard-code one agent name into the skill.
+   - Commit those fixes with an agent-prefixed subject, such as `#<agent-name> fix review finding about retries`. Use the active agent or harness name, for example `codex`, `claude`, or `gemini`; do not hard-code one agent name into the skill.
    - Push fixes to the target PR branch for PR targets. Otherwise leave local changes and report the needed external action.
 
 6. Run a verification review pass:

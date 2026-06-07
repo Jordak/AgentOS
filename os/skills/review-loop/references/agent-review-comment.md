@@ -17,7 +17,7 @@ Issue families:
    Issue family: <generalized failure mode or invariant>
    Related occurrences or sweep: <siblings found, search performed, or why none expected>
    Why it matters: <risk>
-   Decision: <accepted | declined | fixed | needs user | user-approved fix | user-declined accepted risk | unresolved>
+   Decision: <accepted | declined | fixed | ask-user | user-approved-fix | user-declined/accepted-risk | unresolved>
    Autopilot classification: <auto-fix | auto-decline | ask-user>
    Autopilot rationale: <why the parent agent fixed, declined, or paused>
    Complexity posture: <reduced | neutral | increased with rationale | not applicable>
@@ -28,7 +28,7 @@ Declined issue families:
 - [<issue-family-id>] <short rationale; include autopilot classification and reviewer finding IDs only as provenance when useful>
 
 Resolved ask-user decisions:
-- [<issue-family-id>] <user-approved fix commit, or user-declined/accepted-risk rationale and residual risk>
+- [<issue-family-id>] <user-approved-fix commit, or user-declined/accepted-risk rationale and residual risk>
 
 Unresolved ask-user blockers:
 - [<issue-family-id>] <lazy-human brief summary and exact user decision needed; non-ready until resolved>

@@ -257,8 +257,16 @@
             "reviewer finding IDs only as provenance",
             "Autopilot classification",
             "Resolved ask-user decisions",
-            "user-approved fix",
+            "user-approved-fix",
+            "user-declined/accepted-risk",
             "Unresolved ask-user blockers"
+          ]
+        },
+        {
+          "path": "os/skills/review-loop/agents/openai.yaml",
+          "contains": [
+            "commit and push only `auto-fix` and explicit `user-approved-fix` fixes",
+            "no unresolved `auto-fix` or `ask-user` blockers"
           ]
         }
       ]
