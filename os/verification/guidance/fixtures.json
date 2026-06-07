@@ -233,7 +233,8 @@
     "source_paths": [
       "os/skills/review-loop/SKILL.md",
       "os/skills/review-loop/references/agent-review-comment.md",
-      "os/skills/review-loop/references/report-guidance.md"
+      "os/skills/review-loop/references/report-guidance.md",
+      "os/skills/MANIFEST.md"
     ],
     "expected_behavior": [
       "Normalize candidate Reviewer Findings into Issue Families before accept, decline, fix, report, and verification decisions.",
@@ -243,7 +244,8 @@
       "Keep new durable machinery out of auto-fix unless the durable brief already approved the exact mechanism; P0/P1 severity informs the lazy-human recommendation instead of bypassing ask-user.",
       "Sweep sibling occurrences and fix the whole accepted issue family before requesting verification.",
       "Use a lazy-human brief only for unresolved ask-user blockers, route user-approved-fix ask-user decisions through fix and verification, and finish only when no unresolved auto-fix or ask-user blockers remain after parent adjudication.",
-      "Before yielding for an ask-user decision, record the unresolved blocker in the ledger and current reporting mode; after recovery, ask again when no resolved decision exists.",
+      "Before yielding for an ask-user decision, record the unresolved blocker in the ledger and current reporting mode; after recovery, use PR comments or chat pause/user-reply/conversation-summary sources, and ask again when no resolved decision exists.",
+      "Keep the manifest mutability and safety surface limited to auto-fix and explicit user-approved-fix writes, with ready marking blocked by unresolved auto-fix or ask-user blockers.",
       "Preserve resolved ask-user decisions in the consolidated comment or report trail instead of suppressing them as a clean pass."
     ],
     "failure_modes": [
@@ -256,6 +258,7 @@
       "Treats P0/P1 severity as authority to add new durable machinery through auto-fix.",
       "Treats an unresolved ask-user blocker as terminal without an explicit user-approved-fix or user-declined/accepted-risk decision.",
       "Yields for an ask-user decision before recording the unresolved blocker in the current reporting mode.",
+      "Leaves the manifest describing broad fix/push/ready authority after the skill narrows writes to auto-fix and user-approved-fix.",
       "Suppresses the consolidated comment or report trail for a resolved ask-user decision."
     ]
   },

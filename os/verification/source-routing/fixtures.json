@@ -250,6 +250,7 @@
             "durable brief already approved that exact mechanism",
             "does not by itself bypass `ask-user`",
             "make the unresolved blocker recoverable",
+            "chat pause messages, user replies, conversation summaries",
             "no unresolved `auto-fix` or `ask-user` blockers"
           ]
         },
