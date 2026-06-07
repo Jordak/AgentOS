@@ -239,14 +239,39 @@
           "contains": [
             "candidate Reviewer Finding",
             "normalize it into an Issue Family",
-            "preserve source reviewer finding IDs"
+            "preserve source reviewer finding IDs",
+            "auto-fix",
+            "auto-decline",
+            "ask-user",
+            "complexity governor",
+            "lazy-human brief",
+            "user-approved-fix",
+            "user-declined/accepted-risk",
+            "durable brief already approved that exact mechanism",
+            "does not by itself bypass `ask-user`",
+            "make the unresolved blocker recoverable",
+            "chat pause messages, user replies, conversation summaries",
+            "no unresolved `auto-fix` or `ask-user` blockers"
           ]
         },
         {
           "path": "os/skills/review-loop/references/agent-review-comment.md",
           "contains": [
             "Issue families",
-            "reviewer finding IDs only as provenance"
+            "reviewer finding IDs only as provenance",
+            "Autopilot classification",
+            "Resolved ask-user decisions",
+            "user-approved-fix",
+            "user-declined/accepted-risk",
+            "decision state `unresolved`",
+            "Unresolved ask-user blockers"
+          ]
+        },
+        {
+          "path": "os/skills/review-loop/agents/openai.yaml",
+          "contains": [
+            "commit and push only `auto-fix` and explicit `user-approved-fix` fixes",
+            "no unresolved `auto-fix` or `ask-user` blockers"
           ]
         }
       ]

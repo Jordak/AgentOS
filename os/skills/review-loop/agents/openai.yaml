@@ -1,4 +1,4 @@
 interface:
   display_name: "Review Loop"
   short_description: "Fresh-context PR review/fix loop"
-  default_prompt: "Use $review-loop to run an iterative fresh-context PR review/fix loop. This authorizes the orchestrator to post consolidated Agent Review comments, commit and push accepted fixes to this PR branch, produce a temporary HTML report, and mark the PR ready for human review when the loop is clean."
+  default_prompt: "Use $review-loop to run an iterative fresh-context PR review/fix loop. This authorizes the orchestrator to post consolidated Agent Review comments, commit and push only `auto-fix` and explicit `user-approved-fix` fixes to this PR branch, produce a temporary HTML report, and mark the PR ready for human review only when no unresolved `auto-fix` or `ask-user` blockers remain after parent adjudication."

@@ -20,6 +20,7 @@ Inputs:
 - Optional durable design source, issue, PR body, ADR, local design doc, or user-provided baseline intent.
 - Optional mode: `fresh` by default, or `verification` when checking prior issue families after fixes or adjudication.
 - Optional prior review packet, reviewer finding IDs, issue-family IDs, accepted fixes, declined rationales, fix commits, validation results, and consolidated comment URL for verification mode.
+- Optional caller adjudication context for verification mode, such as autopilot classifications and rationales, complexity posture, smallest closing moves, or lazy-human decisions.
 - Optional verification continuity preference, source reviewer aliases, opaque source reviewer handles, and source reviewer finding IDs when a caller wants same-reviewer verification and the harness can safely resume prior reviewers.
 - Optional reviewer count, lens plan, custom lens notes, and reporting constraints.
 - An explicit user request to run `review-pass`, run a review pass, use a reviewer panel, or perform equivalent read-only panel review counts as authorization to spawn or resume multiple read-only clean-context reviewers when the harness supports them. This authorization covers reviewer reads only, not target edits or external writes.
@@ -60,7 +61,7 @@ Safety:
 
 Use `fresh` mode for an independent pass over the current target. The panel gets only the target, repository, base/head or commit range, baseline intent, reviewer alias, optional lens, custom lens notes, and the current prompt template.
 
-Use `verification` mode after a caller has fixed, declined, or otherwise adjudicated prior issue families. The panel gets the target, current head, prior packet or relevant reviewer finding IDs and issue-family IDs, fix commits, accepted fixes, declined rationales, validation results, and any consolidated comment URL. Verification reviewers check the prior issue families and still reread the full current diff for missed or newly introduced issues.
+Use `verification` mode after a caller has fixed, declined, or otherwise adjudicated prior issue families. The panel gets the target, current head, prior packet or relevant reviewer finding IDs and issue-family IDs, fix commits, accepted fixes, declined rationales, optional caller adjudication context, validation results, and any consolidated comment URL. Verification reviewers check the prior issue families and still reread the full current diff for missed or newly introduced issues.
 
 Verification continuity is caller-directed. When a caller provides source reviewer handles and asks for same-reviewer continuity, prefer resuming those reviewers for the current verification pass if the harness can do so safely. If live resumption is unavailable or unsafe, fall back to fresh verification reviewers using the prior packet, source reviewer aliases, and source reviewer finding IDs as the continuity trail. Record the continuity mode and handle availability in the packet so callers such as `review-loop` can preserve it in their ledgers.
 
@@ -139,7 +140,7 @@ When applicable, read `references/lenses/contract-surface-matrix.md` and include
    - For each assigned named lens, read only the matching file under `references/lenses/` and include its prompt snippet or equivalent instructions in that reviewer's prompt.
    - When the target triggers the Contract Surface Matrix lens, read `references/lenses/contract-surface-matrix.md` and include its prompt snippet or equivalent instructions in every relevant reviewer prompt.
    - Fill the fresh or verification template explicitly for every reviewer.
-   - Include target, repository, base/head or current head, baseline intent, reviewer alias, lens, assigned lens guidance, Contract Surface Matrix guidance when applicable, custom lens notes, verification continuity when applicable, reporting mode, read-only rule, full-reread rule, issue-family rule, design-escape-hatch instruction, provisional-ID rule, and clean response sentinel.
+   - Include target, repository, base/head or current head, baseline intent, reviewer alias, lens, assigned lens guidance, Contract Surface Matrix guidance when applicable, custom lens notes, verification continuity and caller adjudication context when applicable, reporting mode, read-only rule, full-reread rule, issue-family rule, design-escape-hatch instruction, provisional-ID rule, and clean response sentinel.
    - Spawn clean-context reviewers in parallel when the harness supports it and the pass is authorized by an explicit review-pass or reviewer-panel request, or by a caller such as `review-loop`. If subagents are unavailable, run the pass as a clearly labeled single-agent fallback and state the limitation in the packet.
 
 5. Collect and close:
@@ -185,6 +186,7 @@ When applicable, read `references/lenses/contract-surface-matrix.md` and include
 - Structural-depth findings stay review-sized and escalate larger architecture or code-quality work through the design escape hatch.
 - Deep-review findings stay review-sized and escalate larger branch-audit work through the design escape hatch.
 - Verification mode checks prior issue families and performs a full current-diff reread.
+- Verification mode includes caller adjudication context when supplied and asks reviewers to verify it without adding new packet schema.
 - Verification mode records whether same-source reviewers were resumed or packet/finding-source fallback was used, and whether opaque handles were privately handed off or unavailable.
 - Spawned or resumed reviewers are closed after the pass.
 
@@ -206,6 +208,7 @@ Before finishing a review pass:
 12. Confirm every likely accepted family has evidence, a sibling-search suggestion, and a validation signal.
 13. Confirm every likely declined issue family has a short rationale.
 14. Confirm verification continuity mode was recorded when applicable.
-15. Confirm opaque reviewer handle availability was privately handed off or marked unavailable when same-source verification may be needed, and confirm handle values were not exposed in prompts or human-facing packets.
-16. Confirm every spawned or resumed reviewer was closed.
-17. Confirm no target files, PRs, issues, labels, branches, or external state were changed.
+15. Confirm verification prompts included caller adjudication context when supplied, such as autopilot classifications, complexity posture, smallest closing moves, or lazy-human decisions.
+16. Confirm opaque reviewer handle availability was privately handed off or marked unavailable when same-source verification may be needed, and confirm handle values were not exposed in prompts or human-facing packets.
+17. Confirm every spawned or resumed reviewer was closed.
+18. Confirm no target files, PRs, issues, labels, branches, or external state were changed.

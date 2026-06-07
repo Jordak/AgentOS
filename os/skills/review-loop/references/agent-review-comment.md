@@ -17,14 +17,24 @@ Issue families:
    Issue family: <generalized failure mode or invariant>
    Related occurrences or sweep: <siblings found, search performed, or why none expected>
    Why it matters: <risk>
-   Decision: <accepted | declined | fixed | unresolved>
+   Decision: <accepted | declined | fixed | user-approved-fix | user-declined/accepted-risk | unresolved>
+   Autopilot classification: <auto-fix | auto-decline | ask-user>
+   Autopilot rationale: <why the parent agent fixed, declined, or paused>
+   Complexity posture: <reduced | neutral | increased with rationale | not applicable>
+   Smallest closing move or lazy-human decision: <governor step used, fix commit, user decision, or user decision needed>
    Suggested fix or fix commit: <concrete fix or commit SHA>
 
 Declined issue families:
-- [<issue-family-id>] <short rationale; include reviewer finding IDs only as provenance when useful>
+- [<issue-family-id>] <short rationale; include autopilot classification and reviewer finding IDs only as provenance when useful>
+
+Resolved ask-user decisions:
+- [<issue-family-id>] <user-approved-fix commit, or user-declined/accepted-risk rationale and residual risk>
+
+Unresolved ask-user blockers:
+- [<issue-family-id>] <lazy-human brief summary, exact user decision needed, and decision state `unresolved`; non-ready until resolved>
 
 Validation notes:
 - <commands run or inspection limits>
 ```
 
-If a pass has no accepted issue families, do not post a clean-pass comment unless the parent explicitly wants a final readiness comment.
+If a pass has no `auto-fix` issue families, no resolved `ask-user` decisions, no useful declined issue-family rationale, and no unresolved `ask-user` blockers, do not post a clean-pass comment unless the parent explicitly wants a final readiness comment.
