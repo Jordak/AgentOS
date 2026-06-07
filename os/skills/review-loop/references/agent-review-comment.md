@@ -37,4 +37,4 @@ Validation notes:
 - <commands run or inspection limits>
 ```
 
-If a pass has no `auto-fix` issue families, no useful declined issue-family rationale, and no unresolved `ask-user` blockers, do not post a clean-pass comment unless the parent explicitly wants a final readiness comment.
+If a pass has no `auto-fix` issue families, no resolved `ask-user` decisions, no useful declined issue-family rationale, and no unresolved `ask-user` blockers, do not post a clean-pass comment unless the parent explicitly wants a final readiness comment.

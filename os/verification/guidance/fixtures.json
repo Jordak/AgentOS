@@ -241,7 +241,8 @@
       "Classify each issue family as auto-fix, auto-decline, or ask-user before fixing or asking the user.",
       "Use the complexity governor and record the smallest closing move for accepted auto-fix families.",
       "Sweep sibling occurrences and fix the whole accepted issue family before requesting verification.",
-      "Use a lazy-human brief only for unresolved ask-user blockers, route user-approved ask-user fixes through fix and verification, and finish only when no unresolved auto-fix or ask-user blockers remain after parent adjudication."
+      "Use a lazy-human brief only for unresolved ask-user blockers, route user-approved ask-user fixes through fix and verification, and finish only when no unresolved auto-fix or ask-user blockers remain after parent adjudication.",
+      "Preserve resolved ask-user decisions in the consolidated comment or report trail instead of suppressing them as a clean pass."
     ],
     "failure_modes": [
       "Treats reviewer finding IDs as the primary accepted-work units.",
@@ -249,7 +250,8 @@
       "Drops reviewer finding provenance entirely when consolidating into issue families.",
       "Treats raw review-pass likely-accept labels as terminal without autopilot classification.",
       "Asks the user to adjudicate auto-decline findings one by one instead of recording the rationale.",
-      "Treats an unresolved ask-user blocker as terminal without an explicit user-approved fix or user-declined/accepted-risk decision."
+      "Treats an unresolved ask-user blocker as terminal without an explicit user-approved fix or user-declined/accepted-risk decision.",
+      "Suppresses the consolidated comment or report trail for a resolved ask-user decision."
     ]
   },
   {

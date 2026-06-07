@@ -257,6 +257,7 @@
             "reviewer finding IDs only as provenance",
             "Autopilot classification",
             "Resolved ask-user decisions",
+            "user-approved fix",
             "Unresolved ask-user blockers"
           ]
         }

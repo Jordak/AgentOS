@@ -28,7 +28,7 @@ Output artifact:
 
 Mutability:
 
-- Mixed. The loop reads code and PR metadata, may edit local project files to fix `auto-fix` issue families, may create agent-labeled commits, may push to the target PR branch, may post consolidated "Agent Review" comments on the target PR, may apply the repository's established ready-for-human marker, and may write a temporary local HTML report.
+- Mixed. The loop reads code and PR metadata, may edit local project files to fix `auto-fix` and `user-approved-fix` issue families, may create agent-labeled commits, may push to the target PR branch, may post consolidated "Agent Review" comments on the target PR, may apply the repository's established ready-for-human marker, and may write a temporary local HTML report.
 - Reviewer-panel passes delegated to `review-pass` remain read-only.
 
 Tools and connectors:
@@ -202,7 +202,7 @@ Use the matrix to update affected contract surfaces in one pass. Check the ownin
    - Accept `auto-fix` issue families that identify real correctness, safety, regression, maintainability, test, or UX risks and can be closed with the complexity governor.
    - Decline `auto-decline` issue families that are incorrect, out of scope, stylistic without project support, duplicates, or lower-value than the churn they would create. Record a short rationale.
    - Ask the user only for unresolved `ask-user` families, unresolved evidence disputes, product/scope changes, or design-escape-hatch calls. Use the lazy-human brief format from Conservative Autopilot and record the resulting state as `user-approved-fix`, `user-declined/accepted-risk`, or `unresolved`. The `unresolved` state blocks ready marking and final convergence.
-   - For PR targets, read `references/agent-review-comment.md` and post one consolidated "Agent Review" comment for the panel pass when there are `auto-fix` issue families, useful declined issue-family rationale, or unresolved `ask-user` blockers. Do not have reviewers post separate PR comments.
+   - For PR targets, read `references/agent-review-comment.md` and post one consolidated "Agent Review" comment for the panel pass when there are `auto-fix` issue families, resolved `ask-user` decisions, useful declined issue-family rationale, or unresolved `ask-user` blockers. Do not have reviewers post separate PR comments.
 
 5. Fix `auto-fix` and `user-approved-fix` issue families:
    - Implement fixes in the parent workspace, preserving unrelated user changes.
