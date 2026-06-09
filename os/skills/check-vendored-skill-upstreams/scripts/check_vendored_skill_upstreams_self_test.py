@@ -36,8 +36,11 @@ def run() -> int:
             assert_result(results["directory"], "update-available", latest_sha, "/tree/main/skills/directory/")
             assert_result(results["bad-ref"], "check-failed", None, "malformed Vendored ref")
             assert_result(results["bad-latest"], "check-failed", None, "malformed commit SHA")
+            assert_result(results["missing-source"], "check-failed", None, "missing Source")
             assert_result(results["missing-path"], "check-failed", None, "missing Path")
+            assert_result(results["malformed-github-source"], "check-failed", None, "malformed Source")
             assert_result(results["unsupported-source"], "manual-check-required", None, "check upstream freshness manually")
+            assert_result(results["unsupported-missing-path"], "check-failed", None, "missing Path")
             assert_report_shapes(root, results["needs-update"])
         finally:
             checker.request_json = original_request_json
@@ -103,8 +106,11 @@ def run_cases(old_sha: str, latest_sha: str, snapshot_sha: str) -> dict[str, che
         ("directory", old_sha, "skills/directory/", "owner/repo", "owner", "repo"),
         ("bad-ref", "abc123", "skills/update/SKILL.md", "owner/repo", "owner", "repo"),
         ("bad-latest", old_sha, "skills/malformed-latest/SKILL.md", "owner/repo", "owner", "repo"),
+        ("missing-source", old_sha, "skills/unsupported/SKILL.md", "", None, None),
         ("missing-path", old_sha, None, "owner/repo", "owner", "repo"),
-        ("unsupported-source", old_sha, "skills/unsupported/SKILL.md", "https://gitlab.com/acme/skill", None, None),
+        ("malformed-github-source", old_sha, "skills/unsupported/SKILL.md", "github.com/owner", None, None),
+        ("unsupported-source", old_sha, "skills/unsupported/SKILL.md", "installed-global-skill", None, None),
+        ("unsupported-missing-path", old_sha, None, "installed-global-skill", None, None),
     ]
     return {
         skill: checker.check_upstream(metadata_fixture(skill, ref, path, source, owner, repo), timeout=0.1)

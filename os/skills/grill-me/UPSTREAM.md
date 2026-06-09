@@ -1,6 +1,6 @@
 # Upstream Provenance
 
-Source: `installed/global skill`
+Source: `installed-global-skill`
 
 Path: `grill-me/SKILL.md`
 
