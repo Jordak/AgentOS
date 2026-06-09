@@ -37,7 +37,7 @@ def run() -> int:
             assert_result(results["bad-ref"], "check-failed", None, "malformed Vendored ref")
             assert_result(results["bad-latest"], "check-failed", None, "malformed commit SHA")
             assert_result(results["missing-path"], "check-failed", None, "missing Path")
-            assert_result(results["unsupported-source"], "check-failed", None, "unsupported or malformed Source")
+            assert_result(results["unsupported-source"], "manual-check-required", None, "check upstream freshness manually")
             assert_report_shapes(root, results["needs-update"])
         finally:
             checker.request_json = original_request_json
@@ -89,6 +89,8 @@ def assert_parse_github_source() -> None:
 
 def assert_exit_codes(item: checker.UpstreamMetadata) -> None:
     assert checker.exit_code([checker.failed(item, "boom")], strict=False) == 1
+    assert checker.exit_code([checker.manual_check_required(item, "manual")], strict=False) == 0
+    assert checker.exit_code([checker.manual_check_required(item, "manual")], strict=True) == 0
     assert checker.exit_code([result_fixture("update-available")], strict=False) == 0
     assert checker.exit_code([result_fixture("update-available")], strict=True) == 1
 

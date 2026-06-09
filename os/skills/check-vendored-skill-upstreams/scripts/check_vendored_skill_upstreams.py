@@ -202,7 +202,7 @@ def parse_github_source(source: str) -> tuple[str | None, str | None]:
 
 def check_upstream(metadata: UpstreamMetadata, timeout: float) -> UpstreamResult:
     if not metadata.owner or not metadata.repo:
-        return failed(metadata, "unsupported or malformed Source; expected owner/repo or github.com URL")
+        return manual_check_required(metadata, "unsupported Source; check upstream freshness manually")
     if not metadata.path:
         return failed(metadata, "missing Path")
     if not metadata.vendored_ref:
@@ -310,6 +310,21 @@ def failed(metadata: UpstreamMetadata, note: str) -> UpstreamResult:
     return UpstreamResult(
         skill=metadata.skill,
         status="check-failed",
+        source=metadata.source or None,
+        path=metadata.path,
+        vendored_ref=metadata.vendored_ref,
+        upstream_ref=None,
+        upstream_branch=metadata.branch,
+        compare_url=None,
+        upstream_url=None,
+        note=note,
+    )
+
+
+def manual_check_required(metadata: UpstreamMetadata, note: str) -> UpstreamResult:
+    return UpstreamResult(
+        skill=metadata.skill,
+        status="manual-check-required",
         source=metadata.source or None,
         path=metadata.path,
         vendored_ref=metadata.vendored_ref,

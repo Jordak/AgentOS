@@ -127,6 +127,24 @@
       ]
     },
     {
+      "id": "grill-me-design-consensus",
+      "category": "design consensus",
+      "prompt": "Grill me on this implementation plan before I start coding.",
+      "expected": {
+        "skill": "grill-me"
+      },
+      "evidence": [
+        {
+          "path": "os/skills/grill-me/SKILL.md",
+          "contains": [
+            "ask one question at a time",
+            "recommended default answer",
+            "inspect local code or docs instead of asking"
+          ]
+        }
+      ]
+    },
+    {
       "id": "review-pass",
       "category": "code review",
       "prompt": "Run one manual review iteration on this PR and give me a structured review packet without fixing or posting anything.",

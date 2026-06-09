@@ -26,13 +26,14 @@ Workflow Phases:
 1. Read `os/skills/*/UPSTREAM.md`.
 2. Parse `Source`, `Path`, and `Vendored ref`.
 3. For GitHub sources, compare the vendored ref with the latest upstream commit touching the vendored path.
-4. Report `up-to-date`, `update-available`, or `check-failed`.
+4. Report `up-to-date`, `update-available`, `manual-check-required`, or `check-failed`.
 5. If an update is available, link to the upstream compare view and recommend a reviewed vendoring update.
 
 Quality Bar:
 
 - Compare against the latest commit touching the upstream path, not the repository's default-branch HEAD.
 - Treat a vendored repository snapshot as current when it already contains the latest path-touching commit.
+- Treat intentionally unsupported non-GitHub upstream sources as `manual-check-required` instead of a broken metadata failure.
 - Make network and metadata failures explicit as `check-failed`.
 - Keep manual and Weekly AgentOS Review output concise.
 
