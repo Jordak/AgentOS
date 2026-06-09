@@ -36,6 +36,8 @@ Use snapshot language to avoid staleness in issues. Prefer phrases like "As of t
 
 This convention helps future agents understand not only what to build, but why the old shape was insufficient.
 
+When writing PR bodies, issue comments, commit messages, or other GitHub text that references issues without resolving them, avoid phrases that combine GitHub auto-closing keywords with an issue reference, even in negated sentences. For example, do not write non-closing phrases like `does not close #123` or `does not fix #123`; GitHub can still interpret the keyword-plus-reference pattern as a closing reference. Prefer wording such as `GitHub issue #123 remains open`, `tracked in GitHub issue #123`, or `related to GitHub issue #123`. Use closing keywords only when the workflow intentionally resolves the issue and the integration evidence supports closure.
+
 ## PR Readiness Fields
 
 For feature-sized implementation PRs, include these fields in the PR body:

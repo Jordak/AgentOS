@@ -152,6 +152,46 @@ _Avoid_: live agent
 A publishable reusable skill procedure, safety contract, and verification workflow that does not require private user-specific inputs to understand.
 _Avoid_: private skill
 
+**Orchestration Loop**:
+A workflow that coordinates repeated steps, delegated workflows, tools, agents, or human decisions toward a convergence condition.
+_Avoid_: generic loop, one-off checklist, child workflow
+
+**Calling Workflow**:
+The workflow that delegates work in a specific invocation relationship. A workflow can be a Calling Workflow in one relationship and a Called Workflow in another.
+_Avoid_: parent loop as a permanent classification
+
+**Called Workflow**:
+The workflow being delegated to in a specific invocation relationship. A Called Workflow may itself be an Orchestration Loop.
+_Avoid_: child workflow as a permanent classification
+
+**Authorization Boundary**:
+The effective mutation permission for a workflow invocation. If a Calling Workflow provides no explicit Authorization Boundary, the Called Workflow's own contract is the default boundary.
+_Avoid_: blanket permission, silent permission expansion
+
+**Recovery Record**:
+The minimum durable or reconstructable state a Calling Workflow needs to resume safely after a pause, compaction, handoff, or Called Workflow completion. A Recovery Record is an obligation to preserve recoverability, not necessarily a separate file format.
+_Avoid_: mandatory ledger file, chat memory
+
+**Recovery Checkpoint**:
+A durable write or update that preserves the current Recovery Record, or enough of it to resume safely from the checkpointed phase.
+_Avoid_: compaction summary, model memory
+
+**Blocking Human Decision**:
+A human decision that must be resolved before an Orchestration Loop can safely continue along its current path.
+_Avoid_: human decision blocker, vague HITL need
+
+**Workflow Result**:
+The return shape a Called Workflow provides to its Calling Workflow, containing enough status, evidence, mutation, validation, risk, decision, and next-action information for the Calling Workflow to continue safely. A Workflow Result may be represented by a domain-specific artifact such as a Review Packet.
+_Avoid_: raw output, unstructured transcript dump
+
+**Isolation Boundary**:
+The scope that lets a Calling Workflow run Called Workflows concurrently without uncoordinated mutation of the same surface. An Isolation Boundary may be an issue, task, branch and worktree, PR, artifact, domain or module area, read-only lane, or explicit non-overlap assumption with conflict-resolution.
+_Avoid_: mandatory file ownership, shared mutable checkout
+
+**Integration Ownership**:
+The contract-defined responsibility to bring a workflow target to its completed, landed, closed, ready, or otherwise integrated state.
+_Avoid_: role-based closure, opportunistic integration, outermost-loop ownership
+
 **Review Pass**:
 One read-only review execution over a target, run in `fresh` or `verification` mode, that assembles a Review Panel and returns a Review Packet. A Review Pass does not edit files, post PR comments, push commits, or decide final disposition.
 _Avoid_: review loop, PR review comment, whole review workflow
@@ -241,7 +281,16 @@ _Avoid_: AgentOS Core
 - A **Live Agent Instance** belongs in the **Personal Overlay** by default.
 - An **Agent Template** may live in **AgentOS Core**.
 - A **Core Skill** may read an optional **Personal Skill Config** from the **Personal Overlay**.
+- An **Orchestration Loop** may be a **Calling Workflow** when it delegates work, a **Called Workflow** when another workflow delegates to it, or both across nested invocations.
+- An **Authorization Boundary** may narrow a Called Workflow's default contract permissions; it may widen them only when the wider scope is explicitly authorized and supported.
+- A **Recovery Record** may be reconstructed from existing durable artifacts such as issues, PR comments, commits, reports, design docs, and chat pause messages; it does not imply a dedicated file.
+- A **Recovery Checkpoint** is the act or artifact that makes a Recovery Record durable at a recovery boundary.
+- A **Blocking Human Decision** should be captured in a **Recovery Record** before the Orchestration Loop pauses for the human.
+- A **Workflow Result** may use a domain-specific artifact name and schema when the Calling Workflow can still extract the generic result fields it needs.
+- An **Isolation Boundary** is required before running parallel Called Workflows that may mutate state.
+- **Integration Ownership** belongs to the workflow contract and Authorization Boundary, not inherently to the Calling Workflow or Called Workflow role.
 - A **Review Pass** assembles one **Review Panel** and returns one **Review Packet**.
+- A **Review Packet** is the **Workflow Result** returned by a **Review Pass**.
 - A **Review Packet** groups **Reviewer Findings** into **Issue Families**.
 - A **Reviewer Finding** keeps its reviewer-scoped `F` ID even when it is grouped into an **Issue Family**.
 - An **Issue Family** may preserve its `IF` ID across verification packets when a prior packet is supplied and the family is clearly the same. New issue families receive new `IF` IDs.
