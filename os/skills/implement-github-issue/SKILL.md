@@ -39,7 +39,7 @@ Tools and connectors:
 - `os/skills/ensure-implementation-readiness/SKILL.md` and `os/playbook/IMPLEMENT_FEATURES.md` for readiness.
 - `os/playbook/GITHUB_WORKFLOW.md` for branch, worktree, PR, issue, and closure discipline.
 - `os/skills/review-loop/SKILL.md` for PR convergence.
-- `docs/adr/0009-contract-based-orchestration-loops.md` and `docs/design/issue-121-loop-composition-conventions.md` for orchestration-loop vocabulary when local AgentOS loop semantics matter.
+- `os/skills/ORCHESTRATION_LOOPS.md`, with background in `docs/adr/0009-contract-based-orchestration-loops.md` and `docs/design/issue-121-loop-composition-conventions.md`, for orchestration-loop vocabulary when local AgentOS loop semantics matter.
 
 Safety:
 
