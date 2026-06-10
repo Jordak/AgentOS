@@ -1,6 +1,6 @@
 ---
 name: select-issue-batch
-description: "Select and explain the next high-leverage GitHub issue or small issue batch without mutating tracker state or starting workers. Use when the user asks what issue to do next, wants a batch recommendation, or needs a read-only planner before coordinate-issue-batch."
+description: "Select and explain the next high-leverage GitHub issue or small issue batch without mutating tracker state or starting workers. Use when the user asks what issue to do next, wants a batch recommendation, or needs a read-only planner for coordinate-issue-batch."
 ---
 
 # Select Issue Batch
@@ -9,11 +9,11 @@ description: "Select and explain the next high-leverage GitHub issue or small is
 
 Recommend the next issue or small batch of issues to work on by inspecting tracker state, blocker relationships, readiness evidence, labels, and the user's current selection goal. The planner is read-only: it selects and explains. It does not coordinate execution, spawn workers, create branches, edit issues, change labels, close issues, or mutate GitHub by default.
 
-This skill is the selection layer between single-issue execution and future batch coordination:
+This skill is the selection layer in the issue-batch workflow stack:
 
-- `implement-github-issue` owns one issue through readiness, implementation, PR creation, review-loop convergence, and final reporting while stopping before merge and issue closure.
-- `select-issue-batch` recommends which issue or batch should be considered next and explains the next workflow for each candidate.
-- `coordinate-issue-batch` may later consume a selected or user-provided batch and coordinate Called Workflows that run `implement-github-issue` after explicit authorization.
+- Single-issue execution workflows own readiness repair, implementation, PR creation, review convergence, and final reporting for one issue.
+- `select-issue-batch` recommends which issue or batch should be considered next and explains why those issues belong together or should be sequenced.
+- `coordinate-issue-batch` consumes a selected or user-provided batch and owns execution coordination after explicit authorization.
 
 ## Contract
 
@@ -27,7 +27,7 @@ Inputs:
 
 Output artifact:
 
-- A Markdown recommendation report with ranked issues, rationale, readiness/blocker state, recommended next workflow, parallel-safety assessment, rejected or deferred candidates, assumptions, and useful handoff instructions for `implement-github-issue` or a future `coordinate-issue-batch` caller.
+- A Markdown recommendation report with ranked issues, rationale, readiness/blocker evidence, parallel-safety assessment, rejected or deferred candidates, assumptions, and useful handoff notes for `coordinate-issue-batch`.
 
 Mutability:
 
@@ -41,28 +41,28 @@ Tools and connectors:
 - GitHub connector or `gh` for read-only issue and PR metadata.
 - `os/playbook/GITHUB_WORKFLOW.md` for issue, branch, worker, and closure discipline.
 - `os/skills/ORCHESTRATION_LOOPS.md` for Workflow Result, Blocking Human Decision, Isolation Boundary, and parallel Called Workflow vocabulary.
-- `os/skills/implement-github-issue/SKILL.md` when recommending the single-issue execution path.
-- Future `os/skills/coordinate-issue-batch/SKILL.md` when it exists and the user wants execution coordination after selection.
+- The `coordinate-issue-batch` contract when the user wants execution coordination after selection.
 
 Safety:
 
 - Do not mutate GitHub by default: no issue comments, issue edits, labels, milestones, assignments, closures, PR comments, PR state changes, or repository settings.
-- Do not create or switch branches, create worktrees, spawn workers, call subagents, or start `implement-github-issue` by default.
-- Treat `blocked`, `HITL`, `ready-for-human`, `needs-human`, `needs-a-human`, and similar labels conservatively. They may still be high-leverage candidates, but the recommendation must name the blocker or human decision and choose the smallest safe next workflow.
+- Do not create or switch branches, create worktrees, spawn workers, call subagents, or start execution workflows by default.
+- Treat labels as evidence, not truth. Labels such as `blocked`, `HITL`, `ready-for-agent`, `ready-for-human`, `needs-human`, and `needs-a-human` can be stale or incomplete, so verify them against issue bodies, dependencies, comments when needed, and current tracker state before using them as selection reasons.
+- Treat current blocker or human-review evidence conservatively. A candidate may still be high leverage, but the recommendation must name what needs verification or resolution before coordination starts.
 - Do not treat `ready-for-agent` as the primary ranking signal. It is evidence that execution may be possible, not evidence that the issue is the best next move.
 - Ask before any external write or any transition from selection into execution or coordination.
 
 ## Ranking Policy
 
-Optimize primarily for future leverage: work that, if done next, makes later work easier, safer, or more valuable. Readiness is a modifier that affects the recommended next workflow; it is not the first ranking gate.
+Optimize primarily for future leverage: work that, if done next, makes later work easier, safer, or more valuable. Readiness is a modifier that affects sequencing and coordination risk; it is not the first ranking gate.
 
 Default ranking posture:
 
 1. Prefer high-leverage issues that unlock, de-risk, or increase the value of follow-on work.
 2. Prefer ready high-leverage issues when leverage is otherwise comparable.
-3. Prefer high-leverage issues that need design consensus over low-leverage issues that are already ready, because `implement-github-issue` starts with `ensure-implementation-readiness` and can handle design consensus before implementation.
+3. Prefer high-leverage issues that need design consensus over low-leverage issues that are already ready, because readiness repair belongs downstream and should not cause the selector to discard leverage.
 4. Recommend low-leverage ready issues as quick wins or filler only when they do not displace higher-leverage work.
-5. Treat blocked, HITL, and human-review issues conservatively by explaining the blocker and recommending the smallest next safe action.
+5. Treat blocker, HITL, and human-review signals as stale until verified; explain whether the evidence appears current and what makes the candidate safe or unsafe for the selected batch.
 
 If the user gives a narrower selection goal, honor it explicitly. For example, "find only issues that can be implemented immediately" may filter out not-ready high-leverage work; "find design work worth doing next" may elevate issues that need consensus.
 
@@ -83,14 +83,15 @@ If the user gives a narrower selection goal, honor it explicitly. For example, "
 3. Classify readiness and blockers:
    - Inspect labels such as `needs design consensus`, `ready-for-agent`, `ready-for-human`, `blocked`, `AFK`, and `HITL`.
    - Read issue bodies for readiness markers, acceptance criteria, `Blocked by` relationships, linked design sources, and explicit non-goals.
+   - Treat labels as potentially stale. Verify `blocked` against open dependencies, `HITL` or human-review labels against the issue body and recent comments when needed, and `ready-for-agent` against durable readiness evidence.
    - Classify each relevant issue as one of:
-     - `ready for implement-github-issue`;
-     - `implement-github-issue should start with readiness repair`;
-     - `blocked on dependency`;
-     - `blocked on human decision`;
+     - `appears ready for coordination`;
+     - `needs readiness or design repair before execution`;
+     - `appears blocked on dependency`;
+     - `appears blocked on human decision`;
      - `triage or design clarification needed before selection`;
      - `closure audit or no action candidate`.
-   - Remember that `implement-github-issue` can handle readiness repair before coding, so `needs design consensus` does not automatically make an issue lower priority than ready low-leverage work.
+   - Remember that `needs design consensus` does not automatically make an issue lower priority than ready low-leverage work.
 
 4. Score by leverage, not only readiness:
    - Identify issues that unblock other issues, establish reusable workflow conventions, reduce integration risk, remove repeated manual work, or improve the value of future agent runs.
@@ -99,21 +100,19 @@ If the user gives a narrower selection goal, honor it explicitly. For example, "
 
 5. Assess parallel safety:
    - For each selected issue, name the likely Isolation Boundary: issue, branch/worktree, PR, artifact, domain/module area, read-only lane, or explicit non-overlap assumption.
-   - Mark a batch as likely parallel-safe only when selected issues appear independent enough that separate `implement-github-issue` runs would not share an uncoordinated mutable surface.
+   - Mark a batch as likely parallel-safe only when selected issues appear independent enough that coordinated workers would not share an uncoordinated mutable surface.
    - Mark a batch as sequential when one issue depends on another, shares unclear files or workflow state, or needs a human/design decision before safe parallel work.
    - If uncertain, recommend a coordinator or human validate the boundary before worker launch.
 
-6. Recommend the next workflow:
-   - Use `implement-github-issue` for selected issues that should proceed through readiness, design repair, implementation, PR creation, and review-loop.
-   - Use `implement-github-issue` even when the issue needs design consensus if the issue is high-leverage and the next move is to resolve readiness and then implement inside that workflow.
-   - Recommend triage when the issue lacks enough tracker information to choose a next workflow.
-   - Recommend closure audit when the issue appears already implemented or stale against integration evidence.
-   - Recommend no action when the issue is blocked, low leverage, out of scope, or unsafe to start.
-   - Recommend future `coordinate-issue-batch` only after the user has an approved batch and wants execution coordination; do not start it from this skill.
+6. Select the batch:
+   - Choose the next 1-N issues that best match the selection goal and future-leverage ranking.
+   - Include readiness, blocker, and stale-label evidence as risk notes for the selected batch, not as workflow commands.
+   - Leave execution, worker assignment, issue comments, label hygiene, branches, PRs, and implementation workflow invocation to `coordinate-issue-batch` or another explicitly authorized mutating workflow.
+   - Recommend no selection for issues that are low leverage, out of scope, or unsafe to include in the batch after current evidence is checked.
 
 7. Return a selection report:
-   - Include the selection goal, inspected scope, selected issue or batch, ranked rationale, recommended next workflow, readiness/blocker state, parallel-safety conclusion, rejected or deferred candidates, assumptions, and next handoff instructions.
-   - For a future coordinator, include issue URLs, recommended sequencing, Isolation Boundary notes, and why each selected issue belongs in or outside the same batch.
+   - Include the selection goal, inspected scope, selected issue or batch, ranked rationale, readiness/blocker evidence, parallel-safety conclusion, rejected or deferred candidates, assumptions, and coordinator handoff notes.
+   - Include issue URLs, recommended sequencing, Isolation Boundary notes, and why each selected issue belongs in or outside the same batch.
 
 ## Output Shape
 
@@ -126,9 +125,9 @@ Use this structure unless the user requested a smaller answer:
 
 ## Recommended Batch
 
-1. #<issue> <title> — <recommended workflow>
+1. #<issue> <title>
    - Why this now: <future-leverage rationale>
-   - Readiness/blockers: <state>
+   - Readiness/blockers: <evidence and stale-label check>
    - Parallel-safety notes: <Isolation Boundary or sequencing reason>
 
 ## Parallel-Safety Assessment
@@ -139,9 +138,9 @@ Use this structure unless the user requested a smaller answer:
 
 - #<issue> <title> — <reason>
 
-## Handoff Instructions
+## Coordinator Handoff Notes
 
-<instructions for implement-github-issue or a future coordinator>
+<batch sequencing, risk, and Isolation Boundary notes for coordinate-issue-batch>
 
 ## Assumptions And Limits
 
@@ -152,15 +151,15 @@ Use this structure unless the user requested a smaller answer:
 
 - Default output stays in chat.
 - Do not create durable AgentOS state by default.
-- If the recommendation becomes an approved execution plan, the next workflow owns its own filing, recovery, issue/PR comments, branch/worktree state, or coordinator ledger.
+- If the recommendation becomes an approved execution plan, the downstream coordinator or approved mutating workflow owns its own filing, recovery, issue/PR comments, branch/worktree state, or coordinator ledger.
 - If selection discovers a reusable workflow gap outside the requested scope, recommend a follow-up issue rather than expanding this skill's output into execution.
 
 ## Quality Bar
 
 - The recommendation optimizes for future leverage unless the user gave a narrower goal.
-- Readiness state affects the recommended workflow, not just the ranking.
-- Blocked and human-review issues are handled conservatively and never silently selected for implementation without naming the blocker.
-- Each selected issue has a clear next workflow.
+- Readiness state affects sequencing and risk notes, not just the ranking.
+- Blocked and human-review labels are checked as potentially stale signals, and current blocker evidence is never silently ignored.
+- Each selected issue has a clear reason for being in the batch.
 - Batch recommendations include a parallel-safety assessment and any sequencing constraints.
 - The output separates selection from execution coordination.
 - The skill performs no external writes, local edits, branch/worktree actions, worker spawning, or issue state changes by default.
@@ -173,8 +172,8 @@ Before finishing:
 2. Confirm GitHub and local reads were read-only.
 3. Confirm labels, blocker relationships, readiness evidence, and acceptance criteria were considered for selected issues.
 4. Confirm the ranking rationale names future leverage, not only readiness.
-5. Confirm blocked, HITL, and human-review candidates are not treated as silently executable.
-6. Confirm each selected issue has a recommended next workflow.
+5. Confirm blocked, HITL, ready, and human-review labels were treated as potentially stale signals and checked against available evidence.
+6. Confirm each selected issue has a rationale for inclusion in the batch.
 7. Confirm batch output states whether the set appears parallel-safe and why.
 8. Confirm no branches, worktrees, workers, issue comments, labels, PRs, or other external state were changed.
 9. If this skill or its manifest entry changed, run `git diff --check` and `scripts/run-validator`.
