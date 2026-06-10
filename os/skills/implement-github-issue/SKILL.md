@@ -91,17 +91,18 @@ Safety:
 
 7. Create the pull request:
    - Create a PR against the integration branch with a body that starts from prior behavior, explains why it changes, summarizes the new behavior, and includes validation.
-   - Include exact readiness fields:
+   - Include exact readiness fields. Use `Ready to Implement` for a passed gate, or `Gate Skipped` only for an explicit bypass with the bypass reason in `Readiness evidence:`:
 
 ```md
 Readiness evidence: <GitHub issue, PRD, ADR, local design doc, or gate-skip reason>
-Readiness verdict: Ready to Implement
+Readiness verdict: <Ready to Implement | Gate Skipped>
 ```
 
    - Avoid GitHub issue auto-closing language because this workflow stops before issue closure.
    - Record the PR URL in the Recovery Record.
 
 8. Run review-loop:
+   - Before invoking `review-loop`, update the Recovery Record in an authorized checkpoint surface so the issue, PR, branch, readiness verdict, validation state, Authorization Boundary, and next action are recoverable.
    - Invoke `review-loop` on the PR with its normal PR-scoped Authorization Boundary unless this skill was narrowed to read-only mode.
    - Let `review-loop` own reviewer-panel delegation, review/fix convergence, PR comments, fix commits, pushes to the target PR branch, and ready-for-human marking inside its contract.
    - Treat the review-loop final report or Workflow Result as evidence for this skill's final result.
@@ -115,6 +116,8 @@ Readiness verdict: Ready to Implement
 ## Recovery Record
 
 Maintain enough state to resume safely after compaction, interruption, handoff, or a called workflow result. The record can live in chat, issue comments, PR comments, commits, local notes, or the final report depending on the current reporting mode and Authorization Boundary.
+
+Create or update an authorized Recovery Checkpoint before starting a called workflow that may outlive the current context, before yielding for a Blocking Human Decision, before ending a turn with incomplete workflow work, and before any external write after which lost context would make recovery unsafe. Use the narrowest authorized surface available, such as an issue comment, PR comment, commit, local note, chat pause message, or final report.
 
 For this skill, recover at least:
 
