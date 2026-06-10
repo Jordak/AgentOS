@@ -10,7 +10,7 @@ Contract reference: `os/skills/SKILL_CONTRACT.md`.
 
 ## Summary
 
-- Canonical Core skills: 24.
+- Canonical Core skills: 25.
 
 ## Markdown API
 
@@ -74,6 +74,18 @@ Each skill entry records:
 - Safety posture: normal invocation is explicit authorization for the skill's ordinary happy-path writes unless the caller narrows the Authorization Boundary to read-only mode; never merge PRs, close issues, or delete branches through this skill; always ask before permission changes, creating new labels, posting outside the target issue or PR scope, pushing outside the target feature branch, changing repository settings, credentials or MFA, or any external action outside the skill contract; stop when readiness is not ready unless repaired by `ensure-implementation-readiness` or explicitly gate-skipped; treat human-owned, HITL, blocked, `ready-for-human`, `needs-human`, `needs-a-human`, or equivalent labels as a Blocking Human Decision unless the current request explicitly authorizes continuing, the repository's label or triage owner resolves the human-owned or human-review state, or the only blocker is a stale `blocked` label whose blocking dependency is verifiably resolved and can be removed under repository label policy; readiness repair may resolve readiness evidence, markers, and authorized readiness-label hygiene, but does not by itself clear human-owned, HITL, or human-review states.
 - Verification coverage: confirm local instructions, readiness policy, GitHub workflow policy, and `review-loop` contract were honored; confirm `ensure-implementation-readiness` was invoked or explicitly skipped with a reason; confirm readiness evidence and verdict, including that readiness repair writes or approved design-source updates were followed by re-running or re-following readiness against the updated durable source before implementation; confirm human-owned/HITL/blocked/human-review label handling including verified stale-`blocked` removal when used, branch/worktree checkpoint, Recovery Checkpoints before external writes and called workflows, preserved unrelated changes, validation commands, PR readiness fields, review-loop result or skip reason, recoverable Workflow Result fields, and absence of merge, issue closure, branch deletion, permission, new-label, or out-of-scope external actions outside the skill contract; run `git diff --check` and `scripts/run-validator` after skill or manifest changes.
 - Upgrade notes: introduced for GitHub Issue #125 as the single-issue implementation orchestration skill; keep the happy path narrow, stop at reviewed PR evidence, and defer merge, issue closure, multi-issue selection, parallel workers, and broader landing semantics to later workflows such as a future `coordinate-issue-batch`.
+
+### `select-issue-batch`
+
+- Canonical source: `os/skills/select-issue-batch/SKILL.md`
+- Contract status: full.
+- Mutability: read-only by default for local files, GitHub, branches, worktrees, issues, labels, and PRs; if the user asks to turn a recommendation into tracker updates, worker launch, branch creation, issue comments, labels, or PR work, route that action to the appropriate mutating workflow.
+- Tools and connectors: local filesystem and `git` for repository identity and local policy files; read-only GitHub connector or `gh` for issue and PR metadata; `os/playbook/GITHUB_WORKFLOW.md`; `os/skills/ORCHESTRATION_LOOPS.md`; `os/skills/implement-github-issue/SKILL.md`; and future `os/skills/coordinate-issue-batch/SKILL.md` when it exists and the user wants execution coordination after selection.
+- Output artifact: Markdown recommendation report with ranked issues, rationale, readiness and blocker state, recommended next workflow, parallel-safety assessment, rejected or deferred candidates, assumptions, and handoff instructions for `implement-github-issue` or a future `coordinate-issue-batch` caller.
+- Filing rule: default output stays in chat; no durable AgentOS state is created by default; approved execution plans, recovery records, issue or PR comments, branch and worktree state, or coordinator ledgers belong to the next workflow that owns execution or coordination.
+- Safety posture: do not mutate GitHub, branches, worktrees, local files, labels, issue state, PR state, or repository settings by default; do not spawn workers or start execution from this skill; treat `blocked`, `HITL`, `ready-for-human`, `needs-human`, `needs-a-human`, and similar labels conservatively; ask for approval before any external write or transition from selection into execution or coordination.
+- Verification coverage: confirm the target repository and inspected issue scope, read-only posture, label and blocker inspection, readiness evidence, future-leverage ranking rationale, conservative handling of blocked/HITL/human-review candidates, recommended workflow for each selected issue, parallel-safety assessment, absence of external writes or branch/worktree/worker actions, and `git diff --check` plus `scripts/run-validator` after skill or manifest changes.
+- Upgrade notes: introduced for GitHub Issue #129 as the read-only issue-selection planner; keep it separate from `coordinate-issue-batch` so selection and explanation do not silently become worker execution or tracker mutation.
 
 ### `grill-me`
 
