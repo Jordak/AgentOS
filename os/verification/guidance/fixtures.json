@@ -23,7 +23,7 @@
     "scenario": "The user says: \"Let's implement a new feature from this issue. We discussed the design in chat, but nothing is written down outside this thread. Can you start coding?\"\n\nWhat do you do next?",
     "source_paths": [
       "os/playbook/IMPLEMENT_FEATURES.md",
-      "os/skills/check-implementation-readiness/SKILL.md"
+      "os/skills/ensure-implementation-readiness/SKILL.md"
     ],
     "expected_behavior": [
       "Recognize the work as feature-sized and gated by implementation readiness.",
