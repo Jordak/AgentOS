@@ -200,37 +200,13 @@ def parse_github_source(source: str) -> tuple[str | None, str | None]:
     return owner, repo
 
 
-def is_malformed_github_source(source: str) -> bool:
-    clean = clean_value(source)
-    if not clean:
-        return False
-    parsed = urllib.parse.urlparse(clean)
-    if parsed.scheme or parsed.netloc:
-        host = parsed.netloc.lower()
-        if host.startswith("www."):
-            host = host[4:]
-        if host != "github.com":
-            return False
-        parts = [part for part in parsed.path.split("/") if part]
-        return len(parts) < 2
-
-    parts = [part for part in clean.split("/") if part]
-    if parts and parts[0].lower() in {"github.com", "www.github.com"}:
-        return len(parts) < 3
-    return False
-
-
 def check_upstream(metadata: UpstreamMetadata, timeout: float) -> UpstreamResult:
-    if not metadata.source:
-        return failed(metadata, "missing Source")
+    if not metadata.owner or not metadata.repo:
+        return failed(metadata, "unsupported or malformed Source; expected owner/repo or github.com URL")
     if not metadata.path:
         return failed(metadata, "missing Path")
     if not metadata.vendored_ref:
         return failed(metadata, "missing Vendored ref")
-    if is_malformed_github_source(metadata.source):
-        return failed(metadata, "malformed Source; expected owner/repo or github.com owner/repo URL")
-    if not metadata.owner or not metadata.repo:
-        return manual_check_required(metadata, "unsupported Source; check upstream freshness manually")
     if not is_commit_sha(metadata.vendored_ref):
         return failed(metadata, "malformed Vendored ref; expected full 40-character commit SHA")
 
@@ -334,21 +310,6 @@ def failed(metadata: UpstreamMetadata, note: str) -> UpstreamResult:
     return UpstreamResult(
         skill=metadata.skill,
         status="check-failed",
-        source=metadata.source or None,
-        path=metadata.path,
-        vendored_ref=metadata.vendored_ref,
-        upstream_ref=None,
-        upstream_branch=metadata.branch,
-        compare_url=None,
-        upstream_url=None,
-        note=note,
-    )
-
-
-def manual_check_required(metadata: UpstreamMetadata, note: str) -> UpstreamResult:
-    return UpstreamResult(
-        skill=metadata.skill,
-        status="manual-check-required",
         source=metadata.source or None,
         path=metadata.path,
         vendored_ref=metadata.vendored_ref,

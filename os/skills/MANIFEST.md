@@ -66,14 +66,14 @@ Each skill entry records:
 ### `grill-me`
 
 - Canonical source: `os/skills/grill-me/SKILL.md`
-- Contract status: full.
+- Contract status: partial.
 - Mutability: read-only.
-- Tools and connectors: user-provided plan or design context, local repository files, docs, issues exported into the workspace, `rg`/local search for safely discoverable evidence, optional read-only connector or GitHub issue/PR reads when explicitly relevant and authorized, and no connector writes or external writes.
-- Output artifact: conversational design-consensus interview by default, plus a concise final summary of resolved decisions, explicit deferrals, remaining risks or blockers, and recommended next action when the session converges or stops.
-- Filing rule: default output stays in chat or the calling workflow's result artifact; `grill-me` creates no durable AgentOS state by itself; durable design evidence, issue updates, PRDs, ADRs, or follow-up artifacts belong to the calling workflow after the applicable write policy is satisfied.
-- Safety posture: ask one question at a time, recommend a default answer without treating it as user consent, inspect local evidence instead of asking when the answer can be discovered safely, and do not edit files, update docs, post comments, label, commit, push, merge, close issues, or perform external writes.
-- Verification coverage: confirm the target plan or design was identified, safe local evidence was inspected before asking discoverable questions, one question was asked at a time, each question included a recommended default answer, the final result distinguishes resolved decisions from explicit deferrals and unresolved blockers, no local or external mutation happened, and `scripts/run-validator` plus `git diff --check` pass after skill or manifest changes.
-- Upgrade notes: vendored from the current-machine installed/global `grill-me` skill for GitHub Issue #122; preserve `UPSTREAM.md`, keep the Core behavior aligned with upstream, keep the skill read-only by default, and avoid recording machine-local adapter paths or exposure state in Core metadata.
+- Tools and connectors: user-provided plan or design context and local codebase exploration when a question can be answered from the codebase.
+- Output artifact: a conversational grilling session that walks the design tree one question at a time and includes a recommended answer for each question.
+- Filing rule: output stays in chat or the invoking workflow's result artifact by default; the vendored upstream skill does not create durable AgentOS state by itself.
+- Safety posture: read-only; ask questions, inspect local evidence when available, and do not edit files or perform connector or external writes as part of this skill.
+- Verification coverage: confirm the vendored `SKILL.md` matches `mattpocock/skills` at the recorded `UPSTREAM.md` ref, the source-routing fixture resolves to `grill-me`, the vendored upstream freshness check reports `grill-me` up-to-date, and `scripts/run-validator` plus `git diff --check` pass after skill or manifest changes.
+- Upgrade notes: vendored from `mattpocock/skills` for GitHub Issue #122; preserve `UPSTREAM.md`, keep the skill aligned with upstream, and avoid local AgentOS behavior patches unless a future issue explicitly approves them.
 
 ### `refresh-benchmark-status`
 
@@ -153,7 +153,7 @@ Each skill entry records:
 - Contract status: full.
 - Mutability: read-only for the AgentOS checkout and upstream sources; local-write only for temporary fixtures when `--self-test` runs under the system temporary directory.
 - Tools and connectors: local filesystem, `os/skills/*/UPSTREAM.md`, skill-local Python helper plus no-network self-test sidecar, and public GitHub HTTP API for supported upstream sources.
-- Output artifact: text or JSON freshness report with one row per vendored skill, including status, vendored ref, latest path-touching upstream ref when available, notes, and compare URLs when useful; unsupported non-GitHub upstream sources report manual-check-required.
+- Output artifact: text or JSON freshness report with one row per vendored skill, including status, vendored ref, latest path-touching upstream ref, notes, and compare URLs when useful.
 - Filing rule: output stays in chat or the invoking weekly review report by default; no run history or upstream status snapshot is written to Core.
 - Safety posture: never auto-update vendored files, open PRs or issues, post comments, change automations, or write external state; update availability is only a prompt for a reviewed vendoring PR.
 - Verification coverage: run the helper with `--self-test` for parser discovery, status classification, malformed metadata, strict exits, directory-style upstream paths, and report shape; run text and JSON checks against the AgentOS root; run skill validation; run `scripts/run-validator`; and run `expose-skills` dry run before review or merge when current-machine discoverability matters. Apply current-machine exposure only after explicit user approval or after the reviewed PR lands.
