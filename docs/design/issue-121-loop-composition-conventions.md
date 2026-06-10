@@ -42,13 +42,13 @@ An **Orchestration Loop** is a workflow kind: it coordinates repeated steps towa
 
 A **Calling Workflow** is the workflow that delegates work in a specific invocation. A **Called Workflow** is the workflow being delegated to in that invocation. These are contextual roles, not permanent classifications.
 
-For example, `review-loop` is an Orchestration Loop by kind. When `implement-github-issue-loop` invokes it, `review-loop` is also the Called Workflow for that invocation. When `review-loop` invokes `review-pass`, `review-loop` is the Calling Workflow and `review-pass` is the Called Workflow.
+For example, `review-loop` is an Orchestration Loop by kind. When `implement-github-issue` invokes it, `review-loop` is also the Called Workflow for that invocation. When `review-loop` invokes `review-pass`, `review-loop` is the Calling Workflow and `review-pass` is the Called Workflow.
 
 ### Mutation ownership
 
 Mutation is owned by the Called Workflow for the surfaces explicitly inside its contract. The Calling Workflow owns the broader run state, invocation boundary, and any integration surface outside the Called Workflow's contract.
 
-For example, `implement-github-issue-loop` may invoke `review-loop` and allow `review-loop` to perform its normal PR-scoped mutations: fix commits on the target PR branch, consolidated Agent Review comments, and the repository's established ready-for-human marker. `review-loop` still may not merge the PR, close issues, create labels, or push outside the target PR branch, because those surfaces are outside the `review-loop` contract.
+For example, `implement-github-issue` may invoke `review-loop` and allow `review-loop` to perform its normal PR-scoped mutations: fix commits on the target PR branch, consolidated Agent Review comments, and the repository's established ready-for-human marker. `review-loop` still may not merge the PR, close issues, create labels, or push outside the target PR branch, because those surfaces are outside the `review-loop` contract.
 
 If a Calling Workflow wants only advisory evidence, it should invoke a read-only mode or a narrower Called Workflow such as `review-pass`.
 
@@ -115,7 +115,7 @@ A Workflow Result should include:
 - open risks or unresolved decisions: especially any Blocking Human Decision;
 - recommended next action.
 
-Domain-specific result artifacts should keep their names and richer structure. For example, a `Review Packet` is the Workflow Result produced by `review-pass`. It satisfies the generic Workflow Result convention through its target, mode, reviewer coverage, issue families, verification results, residual risks, and reporting location. A future `review-loop` final report or result summary can likewise serve as the Workflow Result for `review-loop` when it is called by `implement-github-issue-loop`.
+Domain-specific result artifacts should keep their names and richer structure. For example, a `Review Packet` is the Workflow Result produced by `review-pass`. It satisfies the generic Workflow Result convention through its target, mode, reviewer coverage, issue families, verification results, residual risks, and reporting location. A future `review-loop` final report or result summary can likewise serve as the Workflow Result for `review-loop` when it is called by `implement-github-issue`.
 
 Workflow Results should be Markdown-first and field-stable by default. Called Workflows should use predictable labels such as `Status`, `Evidence`, `Mutations performed`, `Validation`, `Open risks`, and `Recommended next action` where possible, but should not introduce JSON, YAML, or a separate schema unless a script or validator genuinely needs deterministic parsing.
 
@@ -148,7 +148,7 @@ Integration Ownership is contract-defined, not role-defined. A Called Workflow m
 
 As a directional principle, a workflow should own integration of the largest explicit target that is fully inside its contract and Authorization Boundary. It should not integrate broader parent targets merely because it completed a child target or can see the next tempting action. When broader integration is needed, it should return a Workflow Result with evidence and a recommended next action.
 
-For example, a future `implement-github-issue-loop` may own integration of its target implementation issue after landing semantics are designed. A PRD-level loop may call multiple issue loops and own integration of the parent PRD only after the child issues are integrated. `review-loop` does not merge today because its contract targets review convergence, not landing.
+For example, a future `implement-github-issue` may own integration of its target implementation issue after landing semantics are designed. A PRD-level loop may call multiple issue loops and own integration of the parent PRD only after the child issues are integrated. `review-loop` does not merge today because its contract targets review convergence, not landing.
 
 ### Recovery checkpointing
 
@@ -188,7 +188,7 @@ In scope:
 
 Out of scope:
 
-- Implementing `implement-github-issue-loop`.
+- Implementing `implement-github-issue`.
 - Implementing `select-next-issues-loop`.
 - Creating subagent workers or parallel execution.
 - Replacing the existing `review-loop` and `review-pass` contracts.
