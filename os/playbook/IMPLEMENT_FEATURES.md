@@ -91,7 +91,7 @@ Use this when the design source is missing, not durable, marked as needing conse
 
 Resolve this by asking targeted questions or routing through a design-consensus workflow, updating the durable design source, and creating any needed follow-up artifacts before coding begins.
 
-When a design-consensus workflow is available and useful for resolving blocking questions, use it. Use `grill-me` for pure design questioning where no durable docs need to change during the interview. Use `grill-with-docs` when the session needs to update domain language, ADRs, issue bodies, PRDs, local design docs, or other durable design sources as decisions crystallize. These workflows are conveniences, not Core requirements; targeted questions are the portable fallback for simple missing information or unavailable design-loop skills.
+When a design-consensus workflow is available and useful for resolving blocking questions, use it. Use `grill-me` for pure design questioning where no durable docs need to change during the interview. Use `grill-with-docs` for docs-aware questioning when the session needs to sharpen domain language or ADR-worthy rationale, or when readiness repair must result in updates to issue bodies, PRDs, local design docs, or other durable design sources. The readiness skill or its approved caller still owns those durable-source updates under the applicable write policy. These workflows are conveniences, not Core requirements; targeted questions are the portable fallback for simple missing information or unavailable design-loop skills.
 
 ### Gate Skipped
 
