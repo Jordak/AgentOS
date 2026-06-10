@@ -24,19 +24,20 @@ Inputs:
 - Current GitHub workflow and closure discipline at `os/playbook/GITHUB_WORKFLOW.md`.
 - `os/skills/audit-issues/SKILL.md` for reusable post-integration closure evidence rules.
 - `os/skills/ORCHESTRATION_LOOPS.md` for Authorization Boundary, Workflow Result, Recovery Record, and Calling Workflow vocabulary.
-- Optional explicit mode: read-only by default, checklist-update-only, or authorized landing mode when the caller's Authorization Boundary explicitly allows checklist edits and issue closure.
+- Optional explicit mode: read-only by default, checklist-update-only, comment-authorized, or authorized landing mode when the caller's Authorization Boundary explicitly allows the relevant issue-body edits, issue comments, and issue closure.
 
 Output artifact:
 
 - A Workflow Result naming the issue URL, labels, integration branch, evidence checked, fulfilled acceptance criteria, unmet or ambiguous acceptance criteria, checklist mutations, closure decision, validation, open risks, and recommended next action for the Calling Workflow.
 - Optional issue-body update that checks off fulfilled Markdown acceptance criteria.
-- Optional issue closure with a factual evidence comment when all closure gates pass and closure is authorized.
+- Optional issue closure with a factual evidence comment when all closure gates pass and closure plus the closure comment are authorized.
 
 Mutability:
 
 - Read-only by default. Inspect the issue, labels, integration branch, linked PRs, commits, acceptance criteria, and evidence, then return a landing recommendation without mutating issue state.
 - Checklist-update-only when the caller explicitly authorizes issue-body checkbox updates but not closure.
-- Authorized landing mode when the caller explicitly authorizes both issue-body checkbox updates and issue closure for the target issue. In this mode, the skill may update fulfilled acceptance-criteria checkboxes and close the issue only after all closure gates pass.
+- Comment-authorized when the caller explicitly authorizes target-issue comments, such as recovery or evidence comments, without necessarily authorizing checklist edits or closure.
+- Authorized landing mode when the caller explicitly authorizes issue-body checkbox updates, issue comments needed for recovery or closure evidence, and issue closure for the target issue. In this mode, the skill may update fulfilled acceptance-criteria checkboxes and close the issue only after all closure gates pass.
 
 Tools and connectors:
 
@@ -48,13 +49,13 @@ Tools and connectors:
 
 Safety:
 
-- Ask or stop unless the current Authorization Boundary explicitly allows the requested issue-body edits and issue closure for this issue.
+- Ask or stop unless the current Authorization Boundary explicitly allows the requested issue-body edits, issue comments, and issue closure for this issue.
 - Do not merge PRs, squash merge, push branches, delete branches, spawn implementation workers, create labels, change permissions, or mutate issues outside the target issue.
-- Do not close issues labeled for human ownership or human review, including `ready-for-human`, `needs-human`, `needs-a-human`, or equivalent labels, unless the caller provides a resolved human decision and repository policy permits closure.
+- Do not close issues labeled for human ownership or human review, including `ready-for-human`, `needs-human`, `needs-a-human`, or equivalent labels. Return a closure blocker and ask the Calling Workflow or human owner to decide the next step.
 - Do not close issues based on local commits, unmerged feature branches, title similarity, local-only code inspection, unchecked assumptions, or a worker's confidence alone.
 - Do not treat checked Markdown boxes as proof. Verify the acceptance criteria against integration-branch evidence; content and evidence win over checkbox state.
 - Do not uncheck previously checked acceptance criteria unless the caller explicitly asks for a corrective issue-body edit and the evidence shows the checkbox is wrong.
-- Keep issue comments factual and evidence-backed. Avoid GitHub auto-closing keywords in comments unless the skill is intentionally closing the target issue in the same authorized operation.
+- Keep authorized issue comments factual and evidence-backed. Issue comments, including recovery or evidence comments, require explicit authorization unless they are the closure evidence comment performed as part of an explicitly authorized closure operation.
 
 ## Workflow Phases
 
@@ -76,10 +77,11 @@ Safety:
    - If the issue has no clear acceptance criteria, classify closure as ambiguous and return a Blocking Human Decision or caller action instead of guessing.
 
 4. Reconcile acceptance criteria:
-   - For each criterion, decide one of: fulfilled, unmet, ambiguous, or out of scope.
+   - For each criterion, decide one of: fulfilled, unmet, or ambiguous.
    - Use integration-branch evidence as the closure standard. Code inspection, tests, comments, and worker Workflow Results may support the decision, but they do not replace integration proof.
    - Keep criteria unmet or ambiguous when evidence is missing, partial, contradicted, or not reachable from the integration branch.
-   - If any criterion is unmet or ambiguous, prepare a Workflow Result that names the exact criteria and evidence gaps. Recommend that the Calling Workflow restart an `implement-github-issue` Called Workflow, create a follow-up issue, or request a human decision depending on scope.
+   - If the caller believes a criterion is obsolete or outside the intended closure scope, require the issue body or acceptance criteria to be updated under an authorized issue-edit workflow before treating the issue as closable.
+   - If any criterion is unmet, ambiguous, obsolete, or disputed, prepare a Workflow Result that names the exact criteria and evidence gaps. Recommend that the Calling Workflow restart an `implement-github-issue` Called Workflow, create a follow-up issue, update the issue body under authorization, or request a human decision depending on scope.
 
 5. Update fulfilled checklist items:
    - If issue-body edits are authorized, update fulfilled Markdown acceptance-criteria checkboxes from `[ ]` to `[x]`.
@@ -87,9 +89,10 @@ Safety:
    - Do not rewrite non-acceptance checklists unless the caller explicitly scoped them into the landing check.
    - If issue-body edits are not authorized, include the proposed checkbox diff or item list in the Workflow Result instead of mutating the issue.
    - Create or update a Recovery Checkpoint before the issue-body edit.
+   - If issue comments are not authorized, use the caller ledger, final Workflow Result, or local note for Recovery Checkpoints instead of posting to the issue.
 
 6. Decide closure:
-   - Close only when all acceptance criteria are fulfilled or explicitly out of scope, all integration evidence is reachable from the remote integration branch, no human-review or human-owned label blocks closure, and the Authorization Boundary explicitly allows closure.
+   - Close only when all acceptance criteria are fulfilled, all integration evidence is reachable from the remote integration branch, no human-review or human-owned label blocks closure, and the Authorization Boundary explicitly allows closure plus the closure evidence comment.
    - If closure is blocked, return a Workflow Result with the reason and recommended next action.
    - If closure is authorized, close with a factual comment that cites the merged PR or integration commit, the remote integration branch, fulfilled acceptance criteria, and validation evidence when available.
    - Create or update a Recovery Checkpoint before closure.
@@ -105,16 +108,16 @@ Maintain enough state to resume safely after compaction, interruption, or handof
 
 - issue URL and repository;
 - integration branch and fetched remote state when available;
-- Authorization Boundary, including whether checklist edits and closure are authorized;
+- Authorization Boundary, including whether checklist edits, comments, and closure are authorized;
 - issue labels and any human-review or human-owned blocker;
-- acceptance criteria with fulfilled, unmet, ambiguous, or out-of-scope classification;
+- acceptance criteria with fulfilled, unmet, or ambiguous classification;
 - evidence PRs, commits, merge commits, reachability checks, and validation results;
 - checklist mutations performed or proposed;
 - closure action performed or blocker;
 - current phase and next safe action;
 - open risks and recommended action for the Calling Workflow.
 
-Create a Recovery Checkpoint before issue-body edits, issue comments, issue closure, yielding for a Blocking Human Decision, or ending with incomplete landing work. Use the narrowest authorized surface, such as a caller ledger, issue comment, final Workflow Result, or local note.
+Create a Recovery Checkpoint before issue-body edits, issue comments, issue closure, yielding for a Blocking Human Decision, or ending with incomplete landing work. Use the narrowest authorized surface, such as a caller ledger, authorized issue comment, final Workflow Result, or local note.
 
 ## Filing Rules
 
@@ -130,8 +133,9 @@ Create a Recovery Checkpoint before issue-body edits, issue comments, issue clos
 - Every closure decision is grounded in integration-branch reachability and acceptance-criteria reconciliation.
 - Fulfilled Markdown checkbox criteria are checked off only when evidence supports them.
 - Unmet or ambiguous criteria remain unchecked and are returned to the Calling Workflow.
-- Human-owned or human-review issues are not closed without a resolved human decision.
-- Issue-body edits and issue closure happen only inside the explicit Authorization Boundary.
+- Obsolete, disputed, or supposedly out-of-scope criteria block closure until the issue body or acceptance criteria are updated under an authorized issue-edit workflow.
+- Human-owned or human-review issues are not closed by this skill.
+- Issue-body edits, issue comments, and issue closure happen only inside the explicit Authorization Boundary.
 - No PR merge, branch deletion, worker spawning, label creation, permission change, or out-of-target issue mutation happens through this skill.
 - The Workflow Result is recoverable and names all mutations, evidence, validation, risks, and recommended next action.
 
@@ -146,7 +150,8 @@ Before finishing:
 5. Confirm acceptance criteria were extracted from the issue body and classified.
 6. Confirm fulfilled checkbox criteria were updated or proposed, while unmet and ambiguous criteria stayed unchecked.
 7. Confirm no issue closure happened while any criterion was unmet or ambiguous.
-8. Confirm human-review and human-owned labels were treated as closure blockers unless a resolved human decision was provided.
-9. Confirm closure, if performed, used an evidence-backed factual comment and stayed inside the Authorization Boundary.
-10. Confirm the Workflow Result names fulfilled criteria, unmet criteria, checklist mutations, closure state, validation, open risks, and recommended Calling Workflow action.
-11. If this skill or its manifest entry changed, run `git diff --check` and `scripts/run-validator`.
+8. Confirm human-review and human-owned labels were treated as closure blockers.
+9. Confirm issue comments were not posted without explicit authorization, except for the closure evidence comment inside an authorized closure operation.
+10. Confirm closure, if performed, used an evidence-backed factual comment and stayed inside the Authorization Boundary.
+11. Confirm the Workflow Result names fulfilled criteria, unmet criteria, checklist mutations, closure state, validation, open risks, and recommended Calling Workflow action.
+12. If this skill or its manifest entry changed, run `git diff --check` and `scripts/run-validator`.
