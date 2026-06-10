@@ -4,7 +4,7 @@ Design readiness: ready to implement
 
 AgentOS should compose loop-shaped skills through workflow contracts and invocation-scoped boundaries, not through a hardcoded parent/child hierarchy or one giant orchestrator.
 
-Issue #121 defines the detailed loop composition convention in `docs/design/issue-121-loop-composition-conventions.md`. This ADR records the core architecture decision behind that design.
+The reusable loop composition convention now lives in `os/skills/ORCHESTRATION_LOOPS.md`. Issue #121's design doc remains the detailed rationale and readiness source behind that convention.
 
 ## Context
 

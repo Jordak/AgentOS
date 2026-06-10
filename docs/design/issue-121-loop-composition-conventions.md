@@ -1,6 +1,6 @@
 # Issue 121 Loop Composition Conventions
 
-Design readiness: needs consensus
+Design readiness: ready to implement
 
 ## Problem
 
