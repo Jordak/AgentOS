@@ -67,6 +67,7 @@ Safety:
 2. Run the readiness gate:
    - Invoke or follow `ensure-implementation-readiness` for the issue, passing along the issue context, project guidance, discovered design sources, and this skill's Authorization Boundary.
    - Let the readiness workflow own locating, creating, or repairing the durable design source, including issue-body updates, design-consensus routing, deferred follow-up artifacts, readiness markers, and readiness-label hygiene when those writes are authorized.
+   - After readiness repair writes or approved design-source updates are applied, re-run or re-follow `ensure-implementation-readiness` against the updated durable source before starting implementation.
    - Before invoking the readiness workflow in a mode that may perform external writes, or before carrying out a readiness-workflow-directed external write in this skill's thread, update the Recovery Record in an authorized checkpoint surface.
    - If the user chooses `Gate Skipped`, record the bypass reason and missing evidence in the Recovery Record and PR readiness fields.
    - Do not proceed to implementation until the verdict is `Ready to Implement` or `Gate Skipped`.
