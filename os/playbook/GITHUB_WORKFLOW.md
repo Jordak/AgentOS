@@ -141,6 +141,8 @@ Standard worker handoff language:
 
 Closing a GitHub issue is an external project-state action, not just a local bookkeeping step.
 
+For post-integration issue reconciliation, use `os/skills/audit-issues/SKILL.md` when running the reusable audit workflow, or follow its evidence standard before closure.
+
 Before closing an implementation issue:
 
 - Ensure the resolving commit or commits have landed on the repository's integration branch, usually `main`, either by pushing directly to that branch or by merging a pull request/feature branch into it.
