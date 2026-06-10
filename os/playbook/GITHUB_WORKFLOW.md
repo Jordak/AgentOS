@@ -148,7 +148,7 @@ Before closing an implementation issue:
 - Verify the remote integration branch contains the resolving commit before closing the issue.
 - Reconcile the issue acceptance criteria against the merged PR or integration commit evidence.
 - Confirm no human-review label such as `ready-for-human`, `needs-human`, `needs-a-human`, or equivalent still requires a human closure decision.
-- Then close the issue with a comment that references the commit on `main`, the merged PR, or another durable artifact that proves the work is integrated.
+- Then close the issue with a factual comment that references the integration branch, the commit on `main`, the merged PR or another durable integration artifact, and relevant validation evidence when available.
 
 ## Workflow Labels
 

@@ -19,7 +19,7 @@ Inputs:
 - A checkout for the target repository, or enough remote context for `gh` or the GitHub connector to inspect the PR.
 - Explicit user authorization for a review loop. A request to run `review-loop`, "run a review loop", or equivalent delegated review/fix loop includes explicit authorization to request `review-pass` panel cycles, including clean-context reviewer subagents when the harness supports them. If the user only says something like "review PR #X", first ask whether to run `review-loop` or do a normal review, and name the ordinary PR-scoped writes listed below.
 - For a PR target, an explicit request to run `review-loop`, made through a current user request or adapter prompt that names the write scope, grants permission for read-only reviewer subagents plus ordinary PR-scoped loop writes: posting consolidated "Agent Review" comments, pushing fix commits to the PR branch, and applying the repository's established ready-for-human marker at the end.
-- Ask before non-PR-target writes, pushes to branches outside the target PR, merges, issue closures, creating new labels, permission changes, deletion, posting outside the target PR, or other external actions beyond the loop.
+- Route PR merges, issue closures, and branch deletion to a landing-capable workflow or direct human integration step whose contract owns those actions. Ask before non-PR-target writes, pushes to branches outside the target PR, creating new labels, permission changes, posting outside the target PR, or other external actions beyond the loop.
 
 Output artifact:
 
@@ -307,4 +307,4 @@ Before finishing:
 22. Confirm fix commits use the active agent-name prefix.
 23. Confirm the temporary HTML report exists, follows `references/report-guidance.md`, hyperlinks commit hashes to GitHub commits when possible, and is linked in the orchestrator's chat as a clickable absolute-path `.html` Markdown link.
 24. Confirm consolidated "Agent Review" comments followed `references/agent-review-comment.md` when posted.
-25. Confirm no merges, issue closures, label creation, permission changes, non-target-branch pushes, or other out-of-loop external writes happened without current user authorization.
+25. Confirm no PR merges, issue closures, or branch deletion happened through `review-loop`; confirm no label creation, permission changes, non-target-branch pushes, or other out-of-loop external writes happened without current user authorization.
