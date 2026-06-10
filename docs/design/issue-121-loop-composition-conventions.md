@@ -83,7 +83,7 @@ For every mutating Orchestration Loop, the Recovery Record should preserve at le
 - validation evidence: commands or checks run, result, and skipped validation with reason;
 - next action: the next safe step.
 
-Opaque runtime handles, private thread IDs, or harness-internal references should be kept out of public PR comments, public reports, and other human-facing artifacts when they could expose private or irrelevant implementation details. If a stable reference is unavailable, record that limitation explicitly.
+Opaque runtime handles, private thread IDs, or harness-internal references should be kept out of public, publishable, or Git-backed checkpoint surfaces when they could expose private or irrelevant implementation details. Public issue comments, PR comments, design docs, commits, branch state, and reports should contain only public-safe stable references. Store private runtime references only on an authorized private surface, such as Personal Overlay orchestration state, or record that the stable reference is unavailable or redacted.
 
 ### Blocking human decisions
 
@@ -165,7 +165,7 @@ Recovery boundaries include:
 - ending a turn with loop work incomplete;
 - handing off to another thread, agent, or workflow.
 
-The checkpoint surface can be an existing durable surface such as a GitHub issue comment, PR comment, design doc, final report, branch commit, or local artifact. If no authorized durable surface exists, the loop should ask for permission to create or update one, include the Recovery Record in the user-facing pause message as a best-effort fallback, or stop before doing work that would become unsafe to resume.
+The checkpoint surface can be an existing durable surface such as a GitHub issue comment, PR comment, design doc, final report, branch commit, or local artifact. Public, publishable, or Git-backed checkpoint surfaces must use only public-safe Recovery Record fields. Private runtime handles belong in an authorized private surface or should be redacted with an explicit limitation. If no authorized durable surface exists, the loop should ask for permission to create or update one, include the public-safe Recovery Record fields in the user-facing pause message as a best-effort fallback, or stop before doing work that would become unsafe to resume.
 
 ## Open Design Questions
 

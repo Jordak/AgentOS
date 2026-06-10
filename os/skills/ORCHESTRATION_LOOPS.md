@@ -107,7 +107,7 @@ For every mutating Orchestration Loop, the Recovery Record should preserve at le
 - validation evidence: commands or checks run, result, and skipped validation with reason;
 - next action: the next safe step.
 
-Keep opaque runtime handles, private thread IDs, or harness-internal references out of public PR comments, public reports, and other human-facing artifacts when they could expose private or irrelevant implementation details. If a stable reference is unavailable, record that limitation explicitly.
+Keep opaque runtime handles, private thread IDs, or harness-internal references out of public, publishable, or Git-backed checkpoint surfaces when they could expose private or irrelevant implementation details. Public issue comments, PR comments, design docs, commits, branch state, and reports should contain only public-safe stable references. Store private runtime references only on an authorized private surface, such as Personal Overlay orchestration state, or record that the stable reference is unavailable or redacted.
 
 ## Recovery Checkpoint
 
@@ -124,7 +124,7 @@ Recovery boundaries include:
 - ending a turn with loop work incomplete;
 - handing off to another thread, agent, or workflow.
 
-The checkpoint surface can be an existing durable surface such as a GitHub issue comment, PR comment, design doc, final report, branch commit, or local artifact. If no authorized durable surface exists, the loop should ask for permission to create or update one, include the Recovery Record in the user-facing pause message as a best-effort fallback, or stop before doing work that would become unsafe to resume.
+The checkpoint surface can be an existing durable surface such as a GitHub issue comment, PR comment, design doc, final report, branch commit, or local artifact. Public, publishable, or Git-backed checkpoint surfaces must use only public-safe Recovery Record fields. Private runtime handles belong in an authorized private surface or should be redacted with an explicit limitation. If no authorized durable surface exists, the loop should ask for permission to create or update one, include the public-safe Recovery Record fields in the user-facing pause message as a best-effort fallback, or stop before doing work that would become unsafe to resume.
 
 ## Blocking Human Decision
 
@@ -165,10 +165,10 @@ Future worker handoff issues should define the detailed handoff shape for implem
 
 Existing AgentOS workflows keep their native contracts and artifacts:
 
-- `review-loop` is an Orchestration Loop for PR-scoped review/fix convergence. It may own PR-scoped review mutations inside its contract, but it does not merge PRs or close issues.
-- `review-pass` is a read-only Called Workflow shape. Its Review Packet can serve as a domain-specific Workflow Result.
-- `ensure-implementation-readiness` owns the feature-sized readiness gate and readiness-repair workflow, including durable design-source updates when authorized.
-- `audit-issues` owns evidence-backed issue tracker reconciliation after integration evidence exists.
+- `review-loop` (`os/skills/review-loop/SKILL.md`) is an Orchestration Loop for PR-scoped review/fix convergence. It may own PR-scoped review mutations inside its contract, but it does not merge PRs or close issues.
+- `review-pass` (`os/skills/review-pass/SKILL.md`) is a read-only Called Workflow shape. Its Review Packet can serve as a domain-specific Workflow Result.
+- `ensure-implementation-readiness` (`os/skills/ensure-implementation-readiness/SKILL.md`) owns the feature-sized readiness gate and readiness-repair workflow, including durable design-source updates when authorized.
+- `audit-issues` (`os/skills/audit-issues/SKILL.md`) owns evidence-backed issue tracker reconciliation after integration evidence exists.
 - `os/playbook/GITHUB_WORKFLOW.md` owns repository branch, PR, external-write, and issue-closure discipline.
 
 Link to these contracts rather than copying their rules into every new loop.
