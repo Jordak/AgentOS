@@ -171,6 +171,7 @@ Existing AgentOS workflows keep their native contracts and artifacts:
 - `review-pass` (`os/skills/review-pass/SKILL.md`) is a read-only Called Workflow shape. Its Review Packet can serve as a domain-specific Workflow Result.
 - `ensure-implementation-readiness` (`os/skills/ensure-implementation-readiness/SKILL.md`) owns the feature-sized readiness gate and readiness-repair workflow, including durable design-source updates when authorized.
 - `audit-issues` (`os/skills/audit-issues/SKILL.md`) owns evidence-backed issue tracker reconciliation after integration evidence exists.
+- `land-github-issue` (`os/skills/land-github-issue/SKILL.md`) owns one-issue acceptance-criteria reconciliation, fulfilled-checkbox updates, and authorized issue closure after integration evidence exists. It returns unmet criteria to the Calling Workflow instead of spawning workers or widening implementation scope.
 - `os/playbook/GITHUB_WORKFLOW.md` owns repository branch, PR, external-write, and issue-closure discipline.
 
 Link to these contracts rather than copying their rules into every new loop.
