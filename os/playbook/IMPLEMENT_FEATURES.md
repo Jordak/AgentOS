@@ -89,9 +89,9 @@ Meaningful open questions must be explicitly out of scope and captured in durabl
 
 Use this when the design source is missing, not durable, marked as needing consensus, lacks a chosen design, lacks non-goals, lacks acceptance criteria, has blocking open questions, or leaves a scope boundary unclear enough that implementation could drift.
 
-Resolve this by asking targeted questions or routing through a design-consensus workflow, updating the durable design source, and creating any needed follow-up artifacts before coding begins.
+Resolve this by running a design-consensus workflow by default, updating the durable design source, and creating any needed follow-up artifacts before coding begins.
 
-When a design-consensus workflow is available and useful for resolving blocking questions, use it. Use `grill-me` for pure design questioning where no durable docs need to change during the interview. Use `grill-with-docs` for docs-aware questioning when the session needs to sharpen domain language or ADR-worthy rationale, or when readiness repair must result in updates to issue bodies, PRDs, local design docs, or other durable design sources. The readiness skill or its approved caller still owns those durable-source updates under the applicable write policy. These workflows are conveniences, not Core requirements; targeted questions are the portable fallback for simple missing information or unavailable design-loop skills.
+When readiness repair is needed, run `grill-with-docs` by default. Use `grill-with-docs` when the session needs to sharpen domain language or ADR-worthy rationale, or when readiness repair must result in updates to issue bodies, PRDs, local design docs, or other durable design sources. Use `grill-me` only for pure design questioning where no durable docs need to change during the interview. The readiness skill or its approved caller still owns those durable-source updates under the applicable write policy. Targeted questions are supporting mechanics inside the selected workflow, post-workflow clarifications for narrow residual gaps, or the fallback only when the Core design-consensus skills are unavailable or explicitly excessive for the scope. If targeted questions are used without a grill workflow, the report must explain why a grill workflow was unavailable or excessive for the scope.
 
 ### Gate Skipped
 
