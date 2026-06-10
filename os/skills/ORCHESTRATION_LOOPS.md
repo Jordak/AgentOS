@@ -21,7 +21,7 @@ Do not duplicate the whole rationale into each skill. Link here when a skill nee
 
 AgentOS composes loop-shaped skills through workflow contracts and invocation-scoped boundaries, not through a hardcoded parent/child hierarchy or one giant orchestrator.
 
-A workflow can be an Orchestration Loop by kind while also being a Called Workflow in a larger invocation. For example, `review-loop` is an Orchestration Loop. When a future `implement-github-issue-loop` invokes it, `review-loop` is also the Called Workflow for that invocation.
+A workflow can be an Orchestration Loop by kind while also being a Called Workflow in a larger invocation. For example, `review-loop` is an Orchestration Loop. When `implement-github-issue` invokes it, `review-loop` is also the Called Workflow for that invocation.
 
 ## Workflow Kind And Invocation Roles
 

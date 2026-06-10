@@ -1,0 +1,178 @@
+---
+name: implement-github-issue
+description: Take one GitHub issue in a repository checkout through readiness gating, implementation, validation, pull request creation, review-loop convergence, and recoverable final reporting while stopping before merge and issue closure.
+---
+
+# Implement GitHub Issue
+
+## Goal
+
+Own the happy path for one GitHub issue from assignment to a reviewed pull request. The skill composes narrower workflow contracts instead of duplicating them: `ensure-implementation-readiness` owns the design gate, the repository's GitHub workflow guidance owns protected-branch and pull-request discipline, and `review-loop` owns PR review/fix convergence.
+
+This skill stops at a PR ready for parent or human review. It must stop before merge and issue closure, and it does not delete branches, change permissions, create labels, or take broader integration ownership unless a separate request explicitly authorizes that action.
+
+## Contract
+
+Inputs:
+
+- A GitHub issue URL or issue number plus the target repository, inferred from the current checkout when possible.
+- A repository checkout for the target project.
+- Current local agent instructions and project guidance, including `AGENTS.md`.
+- Existing durable design sources when already linked from the issue, request, repository, or project guidance.
+- Relevant project domain docs when present, such as `DOMAIN.md` and `DOMAIN-MAP.md`, with legacy `CONTEXT.md` and `CONTEXT-MAP.md` as aliases.
+- `ensure-implementation-readiness`, repository GitHub workflow guidance, and `review-loop` when available in the active AgentOS checkout or harness.
+- Optional explicit mode: normal mutating mode by default, or read-only mode when the caller says not to write.
+
+Output artifact:
+
+- A pull request with `Readiness evidence:` and `Readiness verdict:` fields.
+- A recoverable Workflow Result in the current reporting mode, naming issue, branch, worktree, PR, readiness verdict, validation, review-loop status, mutations, open risks, and recommended next action.
+- Optional issue or PR comments when useful for recovery or handoff.
+
+Mutability:
+
+- Mixed. In normal mode, invoking this skill on a GitHub issue authorizes the ordinary happy-path writes needed for this workflow: passing an Authorization Boundary that permits `ensure-implementation-readiness` to create or update issue-body/design-source readiness evidence and existing readiness labels; existing workflow-label hygiene within the assigned issue scope, such as verified stale `blocked` label removal; issue or PR comments for recoverable status and evidence; feature-branch pushes; PR creation with readiness fields; and `review-loop` invocation with its ordinary PR-scoped writes.
+- Read-only when the caller explicitly says read-only mode, audit-only, no writes, no external writes, or equivalent. In read-only mode, inspect and report the planned steps and blockers without mutating local files or external state.
+
+Tools and connectors:
+
+- Local filesystem, `git`, `rg`, project-specific validation commands, GitHub connector or `gh`, and repository-local push helpers when local instructions require them.
+- Project-local domain docs when relevant, such as `DOMAIN.md` and `DOMAIN-MAP.md`, with legacy `CONTEXT.md` and `CONTEXT-MAP.md` as aliases.
+- `os/skills/ensure-implementation-readiness/SKILL.md` and `os/playbook/IMPLEMENT_FEATURES.md` for readiness when AgentOS skills are available.
+- `os/playbook/GITHUB_WORKFLOW.md` or equivalent repository guidance for branch, worktree, PR, issue, and closure discipline.
+- `os/skills/review-loop/SKILL.md` for PR convergence when available.
+- `os/skills/ORCHESTRATION_LOOPS.md`, with background in `docs/adr/0009-contract-based-orchestration-loops.md` and `docs/design/issue-121-loop-composition-conventions.md`, for AgentOS orchestration-loop vocabulary and recovery semantics when those Core files are available.
+
+Safety:
+
+- Treat normal invocation as explicit authorization for the ordinary happy-path writes listed in this contract, unless the caller narrows the Authorization Boundary to read-only mode.
+- Ask before merge, issue closure, branch deletion, permission changes, creating new labels, posting outside the target issue or PR scope, pushing outside the target feature branch, changing repository settings, handling credentials or MFA, or any external action outside this contract.
+- Do not implement when `ensure-implementation-readiness` returns `Needs Design Consensus` unless that skill repairs the durable source to `Ready to Implement` or the user explicitly chooses `Gate Skipped`.
+- Do not treat a `ready-for-agent` label as a substitute for the readiness gate.
+- Treat human-owned, HITL, blocked, `ready-for-human`, `needs-human`, `needs-a-human`, or equivalent labels as a Blocking Human Decision. Continue only when the current request explicitly authorizes continuing despite that label state, the repository's label or triage owner resolves the human-owned or human-review state, or the only blocker is a stale `blocked` label whose blocking dependency is verifiably resolved. `ensure-implementation-readiness` may resolve readiness evidence, readiness markers, and authorized readiness-label hygiene; it does not by itself clear human-owned, HITL, or human-review states.
+- Preserve unrelated local changes. If the checkout is dirty before edits, identify whether changes are yours; stop or isolate work rather than overwriting user changes.
+- Do not merge `main` into the feature branch. Rebase on the integration branch when updating a branch you own.
+- Do not use GitHub auto-closing keywords with issue references in PR text unless issue closure is intentionally in scope after integration. This skill does not close the issue.
+
+## Workflow Phases
+
+1. Establish the target:
+   - Identify the issue, repository, current branch, remote, base branch, and checkout path.
+   - Read local instructions, repository GitHub workflow guidance, and the narrow skill contracts this workflow will call.
+   - Inspect the issue body, labels, linked PR or design context, and comments relevant to readiness or blockers.
+   - Read project-local domain docs when relevant to the implementation surface or required by local instructions, using `DOMAIN.md` and `DOMAIN-MAP.md` with legacy `CONTEXT.md` and `CONTEXT-MAP.md` as aliases.
+   - If issue labels indicate human ownership, HITL, blocked state, or human review, record a Blocking Human Decision and stop unless the current request explicitly authorizes continuing, the repository's label or triage owner resolves the human-owned or human-review state, or the only blocker is a stale `blocked` label whose blocking dependency is verifiably resolved.
+   - Record the initial Recovery Record: issue URL, repository, branch, worktree, current phase, Authorization Boundary, known blockers, and next action.
+
+2. Run the readiness gate:
+   - Invoke or follow `ensure-implementation-readiness` for the issue, passing along the issue context, project guidance, discovered design sources, and this skill's Authorization Boundary.
+   - Let the readiness workflow own locating, creating, or repairing the durable design source, including issue-body updates, design-consensus routing, deferred follow-up artifacts, readiness markers, and readiness-label hygiene when those writes are authorized.
+   - Before invoking the readiness workflow in a mode that may perform external writes, or before carrying out a readiness-workflow-directed external write in this skill's thread, update the Recovery Record in an authorized checkpoint surface.
+   - If the user chooses `Gate Skipped`, record the bypass reason and missing evidence in the Recovery Record and PR readiness fields.
+   - Do not proceed to implementation until the verdict is `Ready to Implement` or `Gate Skipped`.
+
+3. Check branch and worktree discipline:
+   - Run `git status --short --branch` before tracked-file edits.
+   - Use the harness-provided worktree and branch when present.
+   - Do not edit tracked files on a protected integration branch for PR-bound work.
+   - If no suitable branch or worktree exists, create or switch to an isolated feature branch or worktree according to repository guidance.
+
+4. Implement inside the issue boundary:
+   - Keep changes within the issue's desired behavior, non-goals, and acceptance criteria.
+   - Prefer existing project patterns and narrow edits over new durable machinery.
+   - Add or update tests, fixtures, manifest metadata, source-routing evidence, or docs only when they directly support the issue.
+   - Before leaving a long-running or interruptible point, update the Recovery Record in the current reporting mode.
+
+5. Validate:
+   - Run the smallest trustworthy local checks for the touched surface, broadening for shared workflow or validation-policy changes.
+   - Follow project-local validation instructions. For AgentOS skill or manifest changes in this repository, run `git diff --check` and `scripts/run-validator`.
+   - Record skipped checks with reasons.
+
+6. Commit and push:
+   - Inspect the diff and status before staging.
+   - Commit cohesive changes with an agent-prefixed subject.
+   - Use the repository's documented push path. For AgentOS public repository persistence, use `scripts/agent-push` when available.
+   - Push only the target feature branch.
+
+7. Create the pull request:
+   - Before creating the PR or posting related evidence comments, update the Recovery Record in an authorized checkpoint surface.
+   - Create a PR against the integration branch with a body that starts from prior behavior, explains why it changes, summarizes the new behavior, and includes validation.
+   - Include exact readiness fields. Use `Ready to Implement` for a passed gate, or `Gate Skipped` only for an explicit bypass with the bypass reason in `Readiness evidence:`:
+
+```md
+Readiness evidence: <GitHub issue, PRD, ADR, local design doc, or gate-skip reason>
+Readiness verdict: <Ready to Implement | Gate Skipped>
+```
+
+   - Avoid GitHub issue auto-closing language because this workflow stops before issue closure.
+   - Record the PR URL in the Recovery Record.
+
+8. Run review-loop:
+   - Before invoking `review-loop`, update the Recovery Record in an authorized checkpoint surface so the issue, PR, branch, readiness verdict, validation state, Authorization Boundary, and next action are recoverable.
+   - Invoke `review-loop` on the PR with its normal PR-scoped Authorization Boundary unless this skill was narrowed to read-only mode.
+   - Let `review-loop` own reviewer-panel delegation, review/fix convergence, PR comments, fix commits, pushes to the target PR branch, and ready-for-human marking inside its contract.
+   - Treat the review-loop final report or Workflow Result as evidence for this skill's final result.
+   - If review-loop returns a Blocking Human Decision, record it recoverably and pause instead of guessing.
+
+9. Report final Workflow Result:
+   - Begin with status and whether the PR is ready for parent or human review.
+   - Include issue and PR links, branch and worktree, readiness evidence and verdict, mutations performed, commits, validation, review-loop evidence, open risks, and recommended next action.
+   - State clearly that merge, issue closure, branch deletion, and any broader integration action remain out of scope unless separately approved.
+
+## Recovery Record
+
+Maintain enough state to resume safely after compaction, interruption, handoff, or a called workflow result. The record can live in chat, issue comments, PR comments, commits, temporary files, local notes, or the final report depending on the current reporting mode and Authorization Boundary.
+
+Create or update an authorized Recovery Checkpoint before every external write, before starting a called workflow that may outlive the current context, before yielding for a Blocking Human Decision, and before ending a turn with incomplete workflow work. Use the narrowest authorized surface available, such as an issue comment, PR comment, commit, temporary file, local note, chat pause message, or final report.
+
+For this skill, recover at least:
+
+- issue URL and repository;
+- relevant issue labels and whether any label state created or resolved a Blocking Human Decision;
+- branch, base branch, worktree, and current commit SHA when available;
+- Authorization Boundary, including any read-only narrowing;
+- readiness evidence and verdict;
+- current phase and next safe action;
+- PR URL after creation;
+- validation commands and results;
+- review-loop status, report path or comment URL, and any unresolved Blocking Human Decision;
+- mutations performed, including issue edits, labels, comments, commits, pushes, and PR state changes;
+- open risks and recommended parent/human action.
+
+## Filing Rules
+
+- Canonical reusable workflow guidance lives in this skill.
+- Issue-specific design and readiness evidence stay wherever the readiness workflow places them under project policy.
+- PR and review-loop evidence stay on the PR surface or in review-loop's temporary report.
+- Do not create durable global or framework state by default for ordinary project implementation details.
+- If this workflow discovers a reusable project improvement or any work outside the assigned issue, file it as a follow-up issue or project-approved propagation item rather than expanding scope silently.
+
+## Quality Bar
+
+- The issue has a durable readiness source with `Ready to Implement` or an explicit `Gate Skipped` bypass before implementation.
+- `ensure-implementation-readiness` was invoked or explicitly skipped with a recorded reason.
+- Human-owned, HITL, blocked, or human-review labels were resolved, explicitly authorized, or recorded as a Blocking Human Decision before mutating implementation work.
+- Branch/worktree discipline was checked before tracked-file edits.
+- Implementation stays inside the issue boundary.
+- Validation matches the touched surface and follows project-local instructions, including `scripts/run-validator` plus `git diff --check` for AgentOS skill or manifest changes in this repository.
+- The PR body includes readiness fields and avoids accidental issue-closing language.
+- `review-loop` is invoked or explicitly skipped with a reason; reviewer logic is not duplicated here.
+- The final result is recoverable and names every mutation, validation signal, open risk, and next action.
+- The workflow stops before merge, issue closure, branch deletion, permission changes, and new label creation unless separately approved.
+
+## Verification
+
+Before finishing:
+
+1. Confirm local instructions, readiness policy, GitHub workflow policy, and `review-loop` contract were read or honored.
+2. Confirm `ensure-implementation-readiness` was invoked or explicitly skipped with a reason, and the readiness verdict and evidence are recorded.
+3. Confirm human-owned, HITL, blocked, or human-review labels were resolved, explicitly authorized, or recorded as a Blocking Human Decision before mutating implementation work; if `blocked` was removed, confirm the blocker was verifiably resolved and no other blocker remained.
+4. Confirm branch/worktree status was inspected before edits.
+5. Confirm a Recovery Checkpoint was created before external writes, called workflows, Blocking Human Decision pauses, and incomplete turn endings.
+6. Confirm no unrelated user changes were overwritten.
+7. Confirm validation commands and results are recorded.
+8. Confirm the PR body includes `Readiness evidence:` and `Readiness verdict:`.
+9. Confirm review-loop was run, or record why it could not be run.
+10. Confirm the final Workflow Result includes issue, issue-label state, branch/worktree, PR, commits, validation, review-loop evidence, open risks, and recommended next action.
+11. Confirm merge, issue closure, branch deletion, permission changes, and new label creation were not performed without separate approval.
+12. If this skill or its manifest entry changed, run `git diff --check` and `scripts/run-validator`.
