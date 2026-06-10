@@ -48,7 +48,7 @@ Safety:
 - Treat a request to run `review-loop` on a specific PR as permission to request read-only `review-pass` panel cycles and for the listed PR-scoped writes when the current request or invocation surface made that write scope explicit. Do not ask for separate reviewer-panel permission, and do not ask before each reviewer spawn or ordinary loop write.
 - Keep `review-pass` reviewers read-only. They report to the parent through `review-pass`; the parent is the single PR-comment writer.
 - Before spawning reviewers for feature-sized work, run or honor the implementation-readiness gate. If no durable design source exists, or if the source is not ready for the PR scope, pause before review unless the user explicitly chooses `Gate Skipped`.
-- Do not merge the PR, close issues, create labels, delete branches, change permissions, push outside the target PR branch, or publish outside the PR review surface unless separately requested and approved.
+- Do not merge the PR, close issues, or delete branches through `review-loop`; route those actions to a landing-capable workflow or direct human integration step whose contract owns them. Ask before creating labels, changing permissions, pushing outside the target PR branch, or publishing outside the PR review surface.
 - Do not copy private connector data, secrets, or unrelated repository context into reviewer prompts, review packets, PR comments, or final reports.
 
 ## Context Recovery Invariant

@@ -1,6 +1,6 @@
 ---
 name: implement-github-issue
-description: Take one GitHub issue in a repository checkout through readiness gating, implementation, validation, pull request creation, review-loop convergence, and recoverable final reporting while stopping before merge and issue closure.
+description: Take one GitHub issue in a repository checkout through readiness gating, implementation, validation, pull request creation, review-loop convergence, and recoverable final reporting while stopping before merge, issue closure, and branch deletion.
 ---
 
 # Implement GitHub Issue
@@ -26,7 +26,7 @@ Inputs:
 Output artifact:
 
 - A pull request with `Readiness evidence:` and `Readiness verdict:` fields.
-- A recoverable Workflow Result in the current reporting mode, naming issue, branch, worktree, PR, readiness verdict, validation, review-loop status, mutations, open risks, and recommended next action for the integration owner.
+- A recoverable Workflow Result in the current reporting mode, naming issue URL and final issue labels, branch, worktree, PR, readiness verdict, validation, review-loop status, mutations, open risks, and recommended next action for the integration owner.
 - Optional issue or PR comments when useful for recovery or handoff.
 
 Mutability:
@@ -118,8 +118,8 @@ Readiness verdict: <Ready to Implement | Gate Skipped>
    - If review-loop returns a Blocking Human Decision, record it recoverably and pause instead of guessing.
 
 9. Report final Workflow Result:
-   - Begin with status and whether the PR is ready for parent or human review.
-   - Include issue and PR links, branch and worktree, readiness evidence and verdict, mutations performed, commits, validation, review-loop evidence, open risks, and recommended next action.
+   - Begin with status and whether the PR is ready for integration-owner review, naming the parent, coordinator, or human owner when known.
+   - Include issue URL and final issue labels, PR link, branch and worktree, readiness evidence and verdict, mutations performed, commits, validation, review-loop evidence, open risks, and recommended next action for the integration owner.
    - State clearly that merge, issue closure, branch deletion, and any broader integration action remain out of scope for this skill and must be handled by a landing-capable workflow or direct human integration step.
 
 ## Recovery Record
@@ -140,8 +140,7 @@ For this skill, recover at least:
 - validation commands and results;
 - review-loop status, report path or comment URL, and any unresolved Blocking Human Decision;
 - mutations performed, including issue edits, labels, comments, commits, pushes, and PR state changes;
-- open risks and recommended parent/human action.
-- landing recommendation for the integration owner, without claiming merge or issue closure.
+- open risks and recommended next action for the integration owner, including any landing recommendation without claiming merge or issue closure.
 
 ## Filing Rules
 

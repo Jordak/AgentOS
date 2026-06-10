@@ -54,7 +54,7 @@ A Called Workflow must not treat silence as authorization for actions outside it
 
 Mutation is owned by the workflow whose contract and Authorization Boundary explicitly include that mutation surface.
 
-The Calling Workflow owns the broader run state, invocation boundary, and integration surfaces outside the Called Workflow's contract.
+The Calling Workflow owns the broader run state and invocation boundary. It owns integration surfaces outside the Called Workflow's contract only when the Calling Workflow's own contract and Authorization Boundary explicitly include those surfaces.
 
 For example, `review-loop` may perform its normal PR-scoped mutations when invoked normally: fix commits on the target PR branch, consolidated Agent Review comments, and the repository's established ready-for-human marker. It still may not merge the PR, close issues, create labels, or push outside the target PR branch, because those surfaces are outside the `review-loop` contract.
 
