@@ -63,8 +63,11 @@ Safety:
 ## Workflow Phases
 
 1. Confirm scope and source.
-   - Identify the target skill name and target Core path.
-   - Ask for the upstream source if it is not explicit.
+   - Ask for or confirm the full initial vendoring bundle before resolving or writing files:
+     upstream public GitHub repository or source URL, path within the upstream repository,
+     intended full commit ref or permission to discover the latest path-touching commit,
+     target skill name and target `os/skills/<skill-name>/` path, mirror-vs-patch intent,
+     and known license location or expected license terms.
    - Confirm the source is a public GitHub repository and the path is inside that repository.
    - Confirm whether the user wants an exact upstream mirror or explicit local AgentOS patches.
    - If only a current-machine installed/global adapter is known, stop and ask for the real upstream source.
