@@ -227,7 +227,7 @@ class SkillValidator(ValidatorDelegate):
         skills_dir = self.root / "os/skills"
         skills: dict[str, Path] = {}
         for path in skills_dir.glob("*.md"):
-            if path.name in {"MANIFEST.md", "README.md", "SKILL_CONTRACT.md"}:
+            if path.name in {"MANIFEST.md", "ORCHESTRATION_LOOPS.md", "README.md", "SKILL_CONTRACT.md"}:
                 continue
             if path.name.endswith(".template.md"):
                 continue
@@ -496,6 +496,10 @@ def run_self_test(harness) -> None:
     (semantic_manifest_root / "os/skills").mkdir(parents=True)
     for skill_name in ("bad-contract", "bad-mutability", "mixed-without-approval", "placeholder"):
         write_fixture_skill(semantic_manifest_root, skill_name)
+    (semantic_manifest_root / "os/skills/ORCHESTRATION_LOOPS.md").write_text(
+        "# Orchestration Loops\n\nStatus: convention fixture.\n",
+        encoding="utf-8",
+    )
     (semantic_manifest_root / "os/skills/MANIFEST.md").write_text(
         "# Skills\n\n"
         "## Summary\n\n"
@@ -574,6 +578,10 @@ def run_self_test(harness) -> None:
         "# Personal Overlay Skills Manifest\n\nStatus: template.\n",
         encoding="utf-8",
     )
+    (frontmatter_root / "os/skills/ORCHESTRATION_LOOPS.md").write_text(
+        "# Orchestration Loops\n\nStatus: convention fixture.\n",
+        encoding="utf-8",
+    )
     frontmatter_validator = harness.validator(frontmatter_root)
     frontmatter_validator.check_skill_frontmatter()
 
@@ -604,6 +612,11 @@ def run_self_test(harness) -> None:
         and any("frontmatter.description must be a one-line scalar string" in error.message for error in frontmatter_validator.errors)
         and any("frontmatter.description must be a non-empty string" in error.message for error in frontmatter_validator.errors)
         and not any(error.path == "os/skills/PERSONAL_OVERLAY_MANIFEST.template.md" for error in frontmatter_validator.errors),
+    )
+    harness.expect(
+        "skills ignores top-level convention docs",
+        not any(error.path == "os/skills/ORCHESTRATION_LOOPS.md" for error in semantic_manifest_validator.errors)
+        and not any(error.path == "os/skills/ORCHESTRATION_LOOPS.md" for error in frontmatter_validator.errors),
     )
     harness.record(
         canonical_escape_validator,

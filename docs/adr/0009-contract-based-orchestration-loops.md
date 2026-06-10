@@ -38,7 +38,7 @@ Existing workflow artifacts can become domain-specific Workflow Results instead 
 
 The design requires workflows to be explicit about Authorization Boundaries, Recovery Records, Workflow Results, Blocking Human Decisions, and Integration Ownership when they are loop-shaped or mutating. Simple skills do not need to carry the full convention.
 
-AgentOS should keep the full convention in a progressively discovered file, planned as `os/skills/ORCHESTRATION_LOOPS.md`, and link to it from a small `## Orchestration Loops` section in `os/skills/SKILL_CONTRACT.md`.
+AgentOS keeps the full convention in a progressively discovered file at `os/skills/ORCHESTRATION_LOOPS.md` and links to it from a small `## Orchestration Loops` section in `os/skills/SKILL_CONTRACT.md`.
 
 ## Alternatives Considered
 
