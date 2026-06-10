@@ -23,7 +23,7 @@ For issue-driven work, prefer a GitHub issue as the readiness evidence. The issu
 
 `Readiness verdict: Gate Skipped` is allowed for exempt work or an intentional bypass, but the reason belongs in `Readiness evidence:`. A `ready-for-agent` label, confident prompt, branch name, or PR existence is not a substitute for readiness evidence.
 
-The CI check should remain shallow. It verifies that PR bodies contain the fields and that the readiness verdict is one of the allowed visible states. It must not parse design prose or judge whether the design is good. Humans and agents still apply `os/playbook/IMPLEMENT_FEATURES.md` and `os/skills/check-implementation-readiness/SKILL.md`.
+The CI check should remain shallow. It verifies that PR bodies contain the fields and that the readiness verdict is one of the allowed visible states. It must not parse design prose or judge whether the design is good. Humans and agents still apply `os/playbook/IMPLEMENT_FEATURES.md` and `os/skills/ensure-implementation-readiness/SKILL.md`.
 
 Review-loop should treat readiness as preflight context. Before spawning reviewers for feature-sized PRs, it should locate the readiness evidence or record an explicit gate skip. The first review panel should compare the implementation shape against the durable design source so early design drift is surfaced as design risk, not only as isolated code findings.
 
@@ -48,7 +48,7 @@ The check can still produce false confidence if the fields are present but the e
 ## Acceptance Criteria
 
 - `IMPLEMENT_FEATURES.md` says no feature implementation commit should happen before `Ready to Implement` or an explicit `Gate Skipped` verdict.
-- `check-implementation-readiness` says that chat-only consensus must be promoted into a durable source before implementation.
+- `ensure-implementation-readiness` says that chat-only consensus must be promoted into a durable source before implementation.
 - GitHub workflow guidance and the PR template use `Readiness evidence:` and `Readiness verdict:`.
 - CI fails pull requests whose body is missing those fields or uses an unsupported readiness verdict.
 - `review-loop` preflights readiness before spawning reviewers and asks reviewers to compare implementation shape against the durable design source in the first pass.

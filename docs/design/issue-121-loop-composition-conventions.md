@@ -4,7 +4,7 @@ Design readiness: needs consensus
 
 ## Problem
 
-AgentOS has strong individual skills such as `check-implementation-readiness`, `review-loop`, `review-pass`, `audit-issues`, and GitHub workflow playbooks. As of this design being written, AgentOS does not yet have shared conventions for composing those skills into nested control loops.
+AgentOS has strong individual skills such as `ensure-implementation-readiness`, `review-loop`, `review-pass`, `audit-issues`, and GitHub workflow playbooks. As of this design being written, AgentOS does not yet have shared conventions for composing those skills into nested control loops.
 
 The immediate goal is to define the conventions that future loop-shaped skills can reuse, starting with a single-GitHub-issue implementation loop and later an outer issue-selection and parallel-worker loop.
 
@@ -184,7 +184,7 @@ In scope:
 - Recoverable state conventions for mutating orchestration loops.
 - HITL blocker representation and recovery.
 - External-write and integration-boundary rules.
-- Compatibility with `review-loop`, `review-pass`, `check-implementation-readiness`, `audit-issues`, and `os/playbook/GITHUB_WORKFLOW.md`.
+- Compatibility with `review-loop`, `review-pass`, `ensure-implementation-readiness`, `audit-issues`, and `os/playbook/GITHUB_WORKFLOW.md`.
 
 Out of scope:
 
@@ -200,7 +200,7 @@ Out of scope:
 - Run `git diff --check`.
 - Inspect the final design against GitHub issue #121 acceptance criteria.
 - Inspect `DOMAIN.md` to ensure glossary additions stay domain-language, not implementation specification.
-- Inspect `os/skills/ORCHESTRATION_LOOPS.md` to ensure it links to existing `review-loop`, `review-pass`, `check-implementation-readiness`, `audit-issues`, and `GITHUB_WORKFLOW` contracts rather than duplicating them.
+- Inspect `os/skills/ORCHESTRATION_LOOPS.md` to ensure it links to existing `review-loop`, `review-pass`, `ensure-implementation-readiness`, `audit-issues`, and `GITHUB_WORKFLOW` contracts rather than duplicating them.
 - Do not add a deterministic validator in this slice; the convention is prose-shaped and should mature before scripts enforce it.
 
 ## PR Readiness Fields

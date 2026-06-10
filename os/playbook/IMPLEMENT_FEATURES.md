@@ -4,7 +4,7 @@ Status: implementation readiness policy v1.
 
 Use this playbook before implementing feature-sized AgentOS or mapped-project work. The goal is to keep agents from coding before the design source is durable, complete, and ready for the requested scope.
 
-For the callable workflow, use `os/skills/check-implementation-readiness/SKILL.md`. This playbook is the canonical policy; the skill runs the gate.
+For the callable workflow, use `os/skills/ensure-implementation-readiness/SKILL.md`. This playbook is the canonical policy; the skill runs the gate and, when requested, repairs missing design consensus before implementation starts.
 
 ## No First Commit Before Consensus
 
@@ -89,9 +89,9 @@ Meaningful open questions must be explicitly out of scope and captured in durabl
 
 Use this when the design source is missing, not durable, marked as needing consensus, lacks a chosen design, lacks non-goals, lacks acceptance criteria, has blocking open questions, or leaves a scope boundary unclear enough that implementation could drift.
 
-Resolve this by asking targeted questions, updating the durable design source, and creating any needed follow-up artifacts before coding begins.
+Resolve this by asking targeted questions or routing through a design-consensus workflow, updating the durable design source, and creating any needed follow-up artifacts before coding begins.
 
-When a design-interview workflow is available and useful for resolving blocking questions, use it. Popular harness-provided examples include `grill-me` and `grill-with-docs` when present. These are conveniences, not Core requirements; targeted questions are the portable fallback.
+When a design-consensus workflow is available and useful for resolving blocking questions, use it. Use `grill-me` for pure design questioning where no durable docs need to change during the interview. Use `grill-with-docs` for docs-aware questioning when the session needs to sharpen domain language or ADR-worthy rationale, or when readiness repair must result in updates to issue bodies, PRDs, local design docs, or other durable design sources. The readiness skill or its approved caller still owns those durable-source updates under the applicable write policy. These workflows are conveniences, not Core requirements; targeted questions are the portable fallback for simple missing information or unavailable design-loop skills.
 
 ### Gate Skipped
 

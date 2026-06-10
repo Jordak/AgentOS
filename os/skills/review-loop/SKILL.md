@@ -36,7 +36,7 @@ Tools and connectors:
 - `os/skills/review-pass/SKILL.md` for fresh and verification reviewer-panel passes.
 - Local `git`, project test commands, and repository-specific validation.
 - GitHub connector or `gh` for PR metadata, consolidated comments, labels, draft state, and branch pushes.
-- `os/skills/check-implementation-readiness/SKILL.md` and `os/playbook/IMPLEMENT_FEATURES.md` for PR design-source preflight.
+- `os/skills/ensure-implementation-readiness/SKILL.md` and `os/playbook/IMPLEMENT_FEATURES.md` for PR design-source preflight.
 - `make-temp-file` for temporary report paths when available.
 - `os/playbook/ARTIFACTS.md` for substantial report format decisions.
 - `os/playbook/GITHUB_WORKFLOW.md` for GitHub issue, PR, and ready-for-human safety rules.
