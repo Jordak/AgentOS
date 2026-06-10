@@ -119,8 +119,8 @@ When delegating implementation issues to subagents on feature branches, make wor
 - Record each worker's worktree path, branch name, assigned issue, and owned files or responsibility before starting parallel work.
 - Before integrating results, inspect the worktree list and each worker branch status to confirm workers did not step on each other's branches or local changes.
 - Instruct workers to commit, push their feature branch, open or update their PR when their contract owns that step, and return evidence through their Workflow Result or issue/PR comments.
-- Do not instruct feature-branch workers to merge PRs, close issues, or delete branches. In particular, `implement-github-issue` stops at reviewed PR evidence and a recommendation for the integration owner.
-- Landing, issue closure, and branch deletion belong to a workflow or human integration step whose contract explicitly owns those surfaces, such as a future `coordinate-issue-batch` workflow.
+- Do not instruct feature-branch workers to merge PRs, close issues, or delete branches.
+- Landing, issue closure, and branch deletion belong to a workflow or human integration step whose contract explicitly owns those surfaces.
 - Issue closure belongs after the resolving commit has landed on `main` or the pull request has merged and the integration owner has reconciled the issue acceptance criteria.
 - Avoid wording such as "close after the commit is pushed" unless the push is directly to the integration branch.
 
@@ -130,7 +130,7 @@ Standard worker handoff language:
 > or switch another worker's branch. Do not commit directly to `main`. Rebase
 > on `origin/main` instead of merging `main` into your branch. Push with
 > `scripts/agent-push` and report branch, PR, commit, validation, and
-> review-loop evidence in your Workflow Result. If you need Personal Overlay state,
+> review evidence in your Workflow Result. If you need Personal Overlay state,
 > read it from the canonical primary AgentOS checkout, not from this feature
 > worktree's ignored-file skeleton. Write Personal Overlay files only when
 > explicitly assigned a non-overlapping path. Do not merge PRs, close issues,
@@ -140,8 +140,6 @@ Standard worker handoff language:
 ## GitHub Issue Closure Discipline
 
 Closing a GitHub issue is an external project-state action, not just a local bookkeeping step.
-
-For post-integration issue reconciliation, use `os/skills/audit-issues/SKILL.md` when running the reusable audit workflow, or follow its evidence standard before closure.
 
 Before closing an implementation issue:
 
