@@ -46,7 +46,7 @@ For example, `review-loop` is an Orchestration Loop by kind. When `implement-git
 
 ### Mutation ownership
 
-Mutation is owned by the Called Workflow for the surfaces explicitly inside its contract. The Calling Workflow owns the broader run state, invocation boundary, and any integration surface outside the Called Workflow's contract.
+Mutation is owned by the workflow whose contract and Authorization Boundary explicitly include that mutation surface. The Calling Workflow owns the broader run state and invocation boundary. It owns integration surfaces outside the Called Workflow's contract only when the Calling Workflow's own contract and Authorization Boundary explicitly include those surfaces.
 
 For example, `implement-github-issue` may invoke `review-loop` and allow `review-loop` to perform its normal PR-scoped mutations: fix commits on the target PR branch, consolidated Agent Review comments, and the repository's established ready-for-human marker. `review-loop` still may not merge the PR, close issues, create labels, or push outside the target PR branch, because those surfaces are outside the `review-loop` contract.
 
