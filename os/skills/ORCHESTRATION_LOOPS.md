@@ -68,6 +68,8 @@ Integration Ownership is contract-defined, not role-defined. A Called Workflow m
 
 As a directional principle, a workflow should own integration of the largest explicit target that is fully inside its contract and Authorization Boundary. It should not integrate broader parent targets merely because it completed a child target or can see the next tempting action.
 
+Do not infer merge, closure, or branch-deletion authority from whether a workflow is currently acting as a Calling Workflow or a Called Workflow. Those actions belong only to workflows whose contracts explicitly own landing and closure. For example, `implement-github-issue` may be called by a future coordinator, but its contract still stops at reviewed PR evidence; the future coordinator may own landing only if its own contract says so.
+
 When broader integration is needed, the workflow should return a Workflow Result with evidence and a recommended next action.
 
 ## Workflow Result

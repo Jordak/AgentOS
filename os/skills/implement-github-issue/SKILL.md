@@ -9,7 +9,7 @@ description: Take one GitHub issue in a repository checkout through readiness ga
 
 Own the happy path for one GitHub issue from assignment to a reviewed pull request. The skill composes narrower workflow contracts instead of duplicating them: `ensure-implementation-readiness` owns the design gate, the repository's GitHub workflow guidance owns protected-branch and pull-request discipline, and `review-loop` owns PR review/fix convergence.
 
-This skill stops at a PR ready for parent or human review. It must stop before merge and issue closure, and it does not delete branches, change permissions, create labels, or take broader integration ownership unless a separate request explicitly authorizes that action.
+This skill stops at a PR ready for parent, coordinator, or human review. It must stop before merge and issue closure, and it never deletes branches or takes broader integration ownership. Landing and issue closure belong to a workflow or human integration action whose own contract explicitly owns those surfaces.
 
 ## Contract
 
@@ -26,7 +26,7 @@ Inputs:
 Output artifact:
 
 - A pull request with `Readiness evidence:` and `Readiness verdict:` fields.
-- A recoverable Workflow Result in the current reporting mode, naming issue, branch, worktree, PR, readiness verdict, validation, review-loop status, mutations, open risks, and recommended next action.
+- A recoverable Workflow Result in the current reporting mode, naming issue, branch, worktree, PR, readiness verdict, validation, review-loop status, mutations, open risks, and recommended next action for the integration owner.
 - Optional issue or PR comments when useful for recovery or handoff.
 
 Mutability:
@@ -42,17 +42,19 @@ Tools and connectors:
 - `os/playbook/GITHUB_WORKFLOW.md` or equivalent repository guidance for branch, worktree, PR, issue, and closure discipline.
 - `os/skills/review-loop/SKILL.md` for PR convergence when available.
 - `os/skills/ORCHESTRATION_LOOPS.md`, with background in `docs/adr/0009-contract-based-orchestration-loops.md` and `docs/design/issue-121-loop-composition-conventions.md`, for AgentOS orchestration-loop vocabulary and recovery semantics when those Core files are available.
+- `docs/design/issue-126-landing-closure-semantics.md` for the durable decision that `implement-github-issue` does not own merge, issue closure, or branch deletion.
 
 Safety:
 
 - Treat normal invocation as explicit authorization for the ordinary happy-path writes listed in this contract, unless the caller narrows the Authorization Boundary to read-only mode.
-- Ask before merge, issue closure, branch deletion, permission changes, creating new labels, posting outside the target issue or PR scope, pushing outside the target feature branch, changing repository settings, handling credentials or MFA, or any external action outside this contract.
+- Do not merge PRs, close issues, or delete branches through this skill. User requests for those actions must route to a workflow or direct integration step whose contract owns landing and closure.
+- Ask before permission changes, creating new labels, posting outside the target issue or PR scope, pushing outside the target feature branch, changing repository settings, handling credentials or MFA, or any external action outside this contract.
 - Do not implement when `ensure-implementation-readiness` returns `Needs Design Consensus` unless that skill repairs the durable source to `Ready to Implement` or the user explicitly chooses `Gate Skipped`.
 - Do not treat a `ready-for-agent` label as a substitute for the readiness gate.
 - Treat human-owned, HITL, blocked, `ready-for-human`, `needs-human`, `needs-a-human`, or equivalent labels as a Blocking Human Decision. Continue only when the current request explicitly authorizes continuing despite that label state, the repository's label or triage owner resolves the human-owned or human-review state, or the only blocker is a stale `blocked` label whose blocking dependency is verifiably resolved. `ensure-implementation-readiness` may resolve readiness evidence, readiness markers, and authorized readiness-label hygiene; it does not by itself clear human-owned, HITL, or human-review states.
 - Preserve unrelated local changes. If the checkout is dirty before edits, identify whether changes are yours; stop or isolate work rather than overwriting user changes.
 - Do not merge `main` into the feature branch. Rebase on the integration branch when updating a branch you own.
-- Do not use GitHub auto-closing keywords with issue references in PR text unless issue closure is intentionally in scope after integration. This skill does not close the issue.
+- Do not use GitHub auto-closing keywords with issue references in PR text. This skill does not close the issue.
 
 ## Workflow Phases
 
@@ -118,7 +120,7 @@ Readiness verdict: <Ready to Implement | Gate Skipped>
 9. Report final Workflow Result:
    - Begin with status and whether the PR is ready for parent or human review.
    - Include issue and PR links, branch and worktree, readiness evidence and verdict, mutations performed, commits, validation, review-loop evidence, open risks, and recommended next action.
-   - State clearly that merge, issue closure, branch deletion, and any broader integration action remain out of scope unless separately approved.
+   - State clearly that merge, issue closure, branch deletion, and any broader integration action remain out of scope for this skill and must be handled by a landing-capable workflow or direct human integration step.
 
 ## Recovery Record
 
@@ -139,6 +141,7 @@ For this skill, recover at least:
 - review-loop status, report path or comment URL, and any unresolved Blocking Human Decision;
 - mutations performed, including issue edits, labels, comments, commits, pushes, and PR state changes;
 - open risks and recommended parent/human action.
+- landing recommendation for the integration owner, without claiming merge or issue closure.
 
 ## Filing Rules
 
@@ -160,7 +163,7 @@ For this skill, recover at least:
 - The PR body includes readiness fields and avoids accidental issue-closing language.
 - `review-loop` is invoked or explicitly skipped with a reason; reviewer logic is not duplicated here.
 - The final result is recoverable and names every mutation, validation signal, open risk, and next action.
-- The workflow stops before merge, issue closure, branch deletion, permission changes, and new label creation unless separately approved.
+- The workflow stops before merge, issue closure, and branch deletion. Permission changes, new label creation, and other out-of-scope external actions also remain outside this contract unless another approved workflow owns them.
 
 ## Verification
 
@@ -177,5 +180,5 @@ Before finishing:
 9. Confirm the PR body includes `Readiness evidence:` and `Readiness verdict:`.
 10. Confirm review-loop was run, or record why it could not be run.
 11. Confirm the final Workflow Result includes issue, issue-label state, branch/worktree, PR, commits, validation, review-loop evidence, open risks, and recommended next action.
-12. Confirm merge, issue closure, branch deletion, permission changes, and new label creation were not performed without separate approval.
+12. Confirm merge, issue closure, branch deletion, permission changes, new label creation, and other out-of-scope external actions were not performed without a separate approved workflow or direct user-supervised action.
 13. If this skill or its manifest entry changed, run `git diff --check` and `scripts/run-validator`.

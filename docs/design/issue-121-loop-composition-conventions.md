@@ -148,7 +148,7 @@ Integration Ownership is contract-defined, not role-defined. A Called Workflow m
 
 As a directional principle, a workflow should own integration of the largest explicit target that is fully inside its contract and Authorization Boundary. It should not integrate broader parent targets merely because it completed a child target or can see the next tempting action. When broader integration is needed, it should return a Workflow Result with evidence and a recommended next action.
 
-For example, a future `implement-github-issue` may own integration of its target implementation issue after landing semantics are designed. A PRD-level loop may call multiple issue loops and own integration of the parent PRD only after the child issues are integrated. `review-loop` does not merge today because its contract targets review convergence, not landing.
+For example, `implement-github-issue` stops at reviewed PR evidence because its contract does not own landing or issue closure. A future coordinator such as `coordinate-issue-batch` may own landing and closure after its contract is designed, even if that coordinator is itself a Called Workflow in a larger invocation. A PRD-level loop may call multiple issue loops and own integration of the parent PRD only after the child issues are integrated. `review-loop` does not merge today because its contract targets review convergence, not landing.
 
 ### Recovery checkpointing
 
