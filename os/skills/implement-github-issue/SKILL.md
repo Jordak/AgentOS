@@ -31,7 +31,7 @@ Output artifact:
 
 Mutability:
 
-- Mixed. In normal mode, invoking this skill on a GitHub issue authorizes the ordinary happy-path writes needed for this workflow: issue-body readiness/design updates, existing label changes for readiness or workflow hygiene within the assigned issue scope, issue or PR comments for recoverable status and evidence, feature-branch pushes, PR creation with readiness fields, and `review-loop` invocation with its ordinary PR-scoped writes.
+- Mixed. In normal mode, invoking this skill on a GitHub issue authorizes the ordinary happy-path writes needed for this workflow: passing an Authorization Boundary that permits `ensure-implementation-readiness` to create or update issue-body/design-source readiness evidence and existing readiness labels; existing workflow-label hygiene within the assigned issue scope, such as verified stale `blocked` label removal; issue or PR comments for recoverable status and evidence; feature-branch pushes; PR creation with readiness fields; and `review-loop` invocation with its ordinary PR-scoped writes.
 - Read-only when the caller explicitly says read-only mode, audit-only, no writes, no external writes, or equivalent. In read-only mode, inspect and report the planned steps and blockers without mutating local files or external state.
 
 Tools and connectors:
@@ -49,7 +49,7 @@ Safety:
 - Ask before merge, issue closure, branch deletion, permission changes, creating new labels, posting outside the target issue or PR scope, pushing outside the target feature branch, changing repository settings, handling credentials or MFA, or any external action outside this contract.
 - Do not implement when `ensure-implementation-readiness` returns `Needs Design Consensus` unless that skill repairs the durable source to `Ready to Implement` or the user explicitly chooses `Gate Skipped`.
 - Do not treat a `ready-for-agent` label as a substitute for the readiness gate.
-- Treat human-owned, HITL, blocked, `ready-for-human`, `needs-human`, `needs-a-human`, or equivalent labels as a Blocking Human Decision unless the current request explicitly authorizes continuing despite that label state or the readiness workflow resolves the label state before implementation. The skill may remove a `blocked` label from the assigned issue when it can verify the blocker is no longer open or no longer applies, no other blocker remains, and the repository's label policy allows ordinary existing-label hygiene inside this workflow's Authorization Boundary.
+- Treat human-owned, HITL, blocked, `ready-for-human`, `needs-human`, `needs-a-human`, or equivalent labels as a Blocking Human Decision. Continue only when the current request explicitly authorizes continuing despite that label state, the repository's label or triage owner resolves the human-owned or human-review state, or the only blocker is a stale `blocked` label whose blocking dependency is verifiably resolved. `ensure-implementation-readiness` may resolve readiness evidence, readiness markers, and authorized readiness-label hygiene; it does not by itself clear human-owned, HITL, or human-review states.
 - Preserve unrelated local changes. If the checkout is dirty before edits, identify whether changes are yours; stop or isolate work rather than overwriting user changes.
 - Do not merge `main` into the feature branch. Rebase on the integration branch when updating a branch you own.
 - Do not use GitHub auto-closing keywords with issue references in PR text unless issue closure is intentionally in scope after integration. This skill does not close the issue.
@@ -61,13 +61,13 @@ Safety:
    - Read local instructions, repository GitHub workflow guidance, and the narrow skill contracts this workflow will call.
    - Inspect the issue body, labels, linked PR or design context, and comments relevant to readiness or blockers.
    - Read project-local domain docs when relevant to the implementation surface or required by local instructions, using `DOMAIN.md` and `DOMAIN-MAP.md` with legacy `CONTEXT.md` and `CONTEXT-MAP.md` as aliases.
-   - If issue labels indicate human ownership, HITL, blocked state, or human review, record a Blocking Human Decision and stop unless the current request explicitly authorizes continuing, the readiness workflow resolves the label state, or the only blocker is a stale `blocked` label whose blocking dependency is verifiably resolved.
+   - If issue labels indicate human ownership, HITL, blocked state, or human review, record a Blocking Human Decision and stop unless the current request explicitly authorizes continuing, the repository's label or triage owner resolves the human-owned or human-review state, or the only blocker is a stale `blocked` label whose blocking dependency is verifiably resolved.
    - Record the initial Recovery Record: issue URL, repository, branch, worktree, current phase, Authorization Boundary, known blockers, and next action.
 
 2. Run the readiness gate:
    - Invoke or follow `ensure-implementation-readiness` for the issue, passing along the issue context, project guidance, discovered design sources, and this skill's Authorization Boundary.
    - Let the readiness workflow own locating, creating, or repairing the durable design source, including issue-body updates, design-consensus routing, deferred follow-up artifacts, readiness markers, and readiness-label hygiene when those writes are authorized.
-   - Before this skill performs readiness-related external writes itself, update the Recovery Record in an authorized checkpoint surface.
+   - Before invoking the readiness workflow in a mode that may perform external writes, or before carrying out a readiness-workflow-directed external write in this skill's thread, update the Recovery Record in an authorized checkpoint surface.
    - If the user chooses `Gate Skipped`, record the bypass reason and missing evidence in the Recovery Record and PR readiness fields.
    - Do not proceed to implementation until the verdict is `Ready to Implement` or `Gate Skipped`.
 
