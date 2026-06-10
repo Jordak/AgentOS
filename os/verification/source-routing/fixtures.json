@@ -137,9 +137,9 @@
         {
           "path": "os/skills/grill-me/SKILL.md",
           "contains": [
-            "ask one question at a time",
-            "recommended default answer",
-            "inspect local code or docs instead of asking"
+            "Ask the questions one at a time.",
+            "provide your recommended answer",
+            "exploring the codebase"
           ]
         }
       ]

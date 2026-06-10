@@ -1,10 +1,10 @@
 # Upstream Provenance
 
-Source: `installed-global-skill`
+Source: `mattpocock/skills`
 
-Path: `grill-me/SKILL.md`
+Path: `skills/productivity/grill-me/`
 
-Vendored ref: `issue-122-called-workflow-20260609-002`
+Vendored ref: `62f43a18177be6ec82da242e59ffbc490a4c22ea`
 
 Files vendored:
 
@@ -13,19 +13,35 @@ Files vendored:
 Local AgentOS patches:
 
 - Add this provenance file.
-- Add AgentOS operating contract, safety, filing, quality, and verification sections.
-- Preserve the upstream skill name and read-only interview behavior.
-- Avoid recording current-machine adapter paths in Core metadata.
 
 Update procedure:
 
-1. Fetch the current upstream `grill-me` skill content from the maintained installed/global source.
-2. Diff against this vendored Core copy.
-3. Accept upstream behavior changes deliberately.
-4. Reapply the local AgentOS contract wrapper above.
-5. Confirm the skill remains read-only by default.
-6. Run `scripts/run-validator` and `git diff --check`.
+1. Fetch the upstream directory at the new ref.
+2. Diff against this vendored copy.
+3. Accept upstream changes deliberately.
+4. Reapply local AgentOS patches above.
+5. Run skill validation, `scripts/run-validator`, and an `expose-skills` dry run when current-machine discoverability matters.
 
-Freshness note:
+## License
 
-The current upstream source is an installed/global skill source rather than a supported public GitHub repository source. `check-vendored-skill-upstreams` may report this provenance as unsupported until a public upstream repository is recorded.
+MIT License
+
+Copyright (c) 2026 Matt Pocock
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
