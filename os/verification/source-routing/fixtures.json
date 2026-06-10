@@ -366,7 +366,7 @@
           "contains": [
             "Verify a GitHub issue's acceptance criteria against remote integration-branch evidence",
             "update fulfilled Markdown checklist criteria",
-            "returns unmet criteria to the caller",
+            "return unmet criteria to the caller",
             "Authorization Boundary explicitly allows",
             "Do not close issues labeled for human ownership or human review"
           ]

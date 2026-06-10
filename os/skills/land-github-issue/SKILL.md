@@ -9,9 +9,7 @@ description: Verify a GitHub issue's acceptance criteria against remote integrat
 
 Own the approval-gated issue-landing step after integration evidence exists for one GitHub issue.
 
-This skill is for a landing-capable Calling Workflow, such as a future `coordinate-issue-batch`, to reconcile an issue after implementation work has landed on the remote integration branch. It verifies the issue's acceptance criteria, checks off fulfilled Markdown checklist items, closes the issue only when all closure gates pass, and returns unmet criteria to the caller when more implementation work is needed.
-
-`implement-github-issue` does not call or own this skill. Implementation workers stop at reviewed PR evidence. Coordinators or human-supervised landing actions decide whether and when to invoke this skill.
+Verify the issue's acceptance criteria, check off fulfilled Markdown checklist items, close the issue only when all closure gates pass, and return unmet criteria to the caller when more implementation work is needed.
 
 ## Contract
 
@@ -24,7 +22,7 @@ Inputs:
 - Current GitHub workflow and closure discipline at `os/playbook/GITHUB_WORKFLOW.md`.
 - `os/skills/audit-issues/SKILL.md` for reusable post-integration closure evidence rules.
 - `os/skills/ORCHESTRATION_LOOPS.md` for Authorization Boundary, Workflow Result, Recovery Record, and Calling Workflow vocabulary.
-- Optional explicit mode: read-only by default, checklist-update-only, comment-authorized, or authorized landing mode when the caller's Authorization Boundary explicitly allows the relevant issue-body edits, issue comments, and issue closure.
+- Optional explicit mode: normal landing mode by default, or read-only, checklist-update-only, or comment-authorized mode when the caller narrows the Authorization Boundary.
 
 Output artifact:
 
@@ -34,10 +32,10 @@ Output artifact:
 
 Mutability:
 
-- Read-only by default. Inspect the issue, labels, integration branch, linked PRs, commits, acceptance criteria, and evidence, then return a landing recommendation without mutating issue state.
+- Normal landing mode updates fulfilled acceptance-criteria checkboxes, posts authorized issue comments needed for recovery or closure evidence, and closes the issue when all closure gates pass and the Authorization Boundary explicitly permits those mutations.
+- Read-only mode inspects the issue, labels, integration branch, linked PRs, commits, acceptance criteria, and evidence, then returns a landing recommendation without mutating issue state.
 - Checklist-update-only when the caller explicitly authorizes issue-body checkbox updates but not closure.
 - Comment-authorized when the caller explicitly authorizes target-issue comments, such as recovery or evidence comments, without necessarily authorizing checklist edits or closure.
-- Authorized landing mode when the caller explicitly authorizes issue-body checkbox updates, issue comments needed for recovery or closure evidence, and issue closure for the target issue. In this mode, the skill may update fulfilled acceptance-criteria checkboxes and close the issue only after all closure gates pass.
 
 Tools and connectors:
 
@@ -49,7 +47,7 @@ Tools and connectors:
 
 Safety:
 
-- Ask or stop unless the current Authorization Boundary explicitly allows the requested issue-body edits, issue comments, and issue closure for this issue.
+- Ask or stop before each requested mutation unless the current Authorization Boundary explicitly allows that issue-body edit, issue comment, or issue closure for this issue.
 - Do not merge PRs, squash merge, push branches, delete branches, spawn implementation workers, create labels, change permissions, or mutate issues outside the target issue.
 - Do not close issues labeled for human ownership or human review, including `ready-for-human`, `needs-human`, `needs-a-human`, or equivalent labels. Return a closure blocker and ask the Calling Workflow or human owner to decide the next step.
 - Do not close issues based on local commits, unmerged feature branches, title similarity, local-only code inspection, unchecked assumptions, or a worker's confidence alone.
@@ -123,7 +121,7 @@ Create a Recovery Checkpoint before issue-body edits, issue comments, issue clos
 
 - Canonical reusable workflow guidance lives in this skill.
 - Issue-specific closure evidence and checklist state stay on the GitHub issue.
-- Coordinator ledgers and batch-level decisions belong to the Calling Workflow, not this skill.
+- Calling Workflow ledgers and broader integration decisions belong to the caller, not this skill.
 - Broader stale-issue sweeps belong to `audit-issues`; this skill handles one assigned issue at a time.
 - Implementation recovery belongs to `implement-github-issue` or a follow-up issue when the caller decides more work is needed.
 
