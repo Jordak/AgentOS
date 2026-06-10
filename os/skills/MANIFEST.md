@@ -10,7 +10,7 @@ Contract reference: `os/skills/SKILL_CONTRACT.md`.
 
 ## Summary
 
-- Canonical Core skills: 21.
+- Canonical Core skills: 22.
 
 ## Markdown API
 
@@ -74,6 +74,18 @@ Each skill entry records:
 - Safety posture: read-only; ask questions, inspect local evidence when available, and do not edit files or perform connector or external writes as part of this skill.
 - Verification coverage: confirm the vendored `SKILL.md` matches `mattpocock/skills` at the recorded `UPSTREAM.md` ref, the source-routing fixture resolves to `grill-me`, the vendored upstream freshness check reports `grill-me` up-to-date, and `scripts/run-validator` plus `git diff --check` pass after skill or manifest changes.
 - Upgrade notes: vendored from `mattpocock/skills` for GitHub Issue #122; preserve `UPSTREAM.md`, keep the skill aligned with upstream, and avoid local AgentOS behavior patches unless a future issue explicitly approves them.
+
+### `grill-with-docs`
+
+- Canonical source: `os/skills/grill-with-docs/SKILL.md`
+- Contract status: partial.
+- Mutability: mixed: interviews are read-only until a project documentation update is agreed; local-write for glossary or ADR updates during an approved project documentation workflow; no connector or external-write behavior by itself.
+- Tools and connectors: user-provided plan or design context, local repository code, existing `CONTEXT.md`/`CONTEXT-MAP.md` domain docs, `docs/adr/`, and no external connectors by default.
+- Output artifact: conversational design-consensus interview plus inline project documentation updates when the session resolves glossary terms or ADR-worthy decisions and local write scope is approved.
+- Filing rule: keep the vendored upstream skill files mirrored exactly from `mattpocock/skills`; project glossary updates follow upstream `CONTEXT.md`/`CONTEXT-MAP.md` conventions; ADRs live under the target project's `docs/adr/`; AgentOS-specific adaptation should live in callers, repository instructions, or future upstream-aligned changes rather than patching the mirrored skill body.
+- Safety posture: ask one question at a time, recommend a default answer without treating it as consent, inspect local code/docs instead of asking when the answer can be discovered safely, and do not post GitHub comments, edit issue bodies, label, commit, push, merge, close issues, or perform external writes; tracked-file documentation edits require the user's approved write scope or a calling workflow that already owns those writes.
+- Verification coverage: confirm the upstream files are mirrored exactly except for AgentOS `UPSTREAM.md`, confirm provenance points at a full GitHub commit SHA, confirm manifest metadata uses the Markdown API, and run `scripts/run-validator` plus `git diff --check` after skill or manifest changes.
+- Upgrade notes: vendored from `mattpocock/skills` path `skills/engineering/grill-with-docs/` at ref `e3b90b5238f38cdea5996e16861dcae28ef52eda`; preserve companion references and `UPSTREAM.md`, keep upstream files mirrored exactly unless a future issue explicitly approves a local patch, and run `expose-skills` dry run when current-machine discoverability matters after accepted updates.
 
 ### `refresh-benchmark-status`
 
