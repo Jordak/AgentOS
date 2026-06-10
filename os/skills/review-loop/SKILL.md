@@ -19,7 +19,7 @@ Inputs:
 - A checkout for the target repository, or enough remote context for `gh` or the GitHub connector to inspect the PR.
 - Explicit user authorization for a review loop. A request to run `review-loop`, "run a review loop", or equivalent delegated review/fix loop includes explicit authorization to request `review-pass` panel cycles, including clean-context reviewer subagents when the harness supports them. If the user only says something like "review PR #X", first ask whether to run `review-loop` or do a normal review, and name the ordinary PR-scoped writes listed below.
 - For a PR target, an explicit request to run `review-loop`, made through a current user request or adapter prompt that names the write scope, grants permission for read-only reviewer subagents plus ordinary PR-scoped loop writes: posting consolidated "Agent Review" comments, pushing fix commits to the PR branch, and applying the repository's established ready-for-human marker at the end.
-- Ask before non-PR-target writes, pushes to branches outside the target PR, merges, issue closures, creating new labels, permission changes, deletion, posting outside the target PR, or other external actions beyond the loop.
+- Route PR merges, issue closures, and branch deletion to a landing-capable workflow or direct human integration step whose contract owns those actions. Ask before non-PR-target writes, pushes to branches outside the target PR, creating new labels, permission changes, posting outside the target PR, or other external actions beyond the loop.
 
 Output artifact:
 
@@ -48,7 +48,7 @@ Safety:
 - Treat a request to run `review-loop` on a specific PR as permission to request read-only `review-pass` panel cycles and for the listed PR-scoped writes when the current request or invocation surface made that write scope explicit. Do not ask for separate reviewer-panel permission, and do not ask before each reviewer spawn or ordinary loop write.
 - Keep `review-pass` reviewers read-only. They report to the parent through `review-pass`; the parent is the single PR-comment writer.
 - Before spawning reviewers for feature-sized work, run or honor the implementation-readiness gate. If no durable design source exists, or if the source is not ready for the PR scope, pause before review unless the user explicitly chooses `Gate Skipped`.
-- Do not merge the PR, close issues, create labels, delete branches, change permissions, push outside the target PR branch, or publish outside the PR review surface unless separately requested and approved.
+- Do not merge the PR, close issues, or delete branches through `review-loop`; route those actions to a landing-capable workflow or direct human integration step whose contract owns them. Ask before creating labels, changing permissions, pushing outside the target PR branch, or publishing outside the PR review surface.
 - Do not copy private connector data, secrets, or unrelated repository context into reviewer prompts, review packets, PR comments, or final reports.
 
 ## Context Recovery Invariant
@@ -307,4 +307,4 @@ Before finishing:
 22. Confirm fix commits use the active agent-name prefix.
 23. Confirm the temporary HTML report exists, follows `references/report-guidance.md`, hyperlinks commit hashes to GitHub commits when possible, and is linked in the orchestrator's chat as a clickable absolute-path `.html` Markdown link.
 24. Confirm consolidated "Agent Review" comments followed `references/agent-review-comment.md` when posted.
-25. Confirm no merges, issue closures, label creation, permission changes, non-target-branch pushes, or other out-of-loop external writes happened without current user authorization.
+25. Confirm no PR merges, issue closures, or branch deletion happened through `review-loop`; confirm no label creation, permission changes, non-target-branch pushes, or other out-of-loop external writes happened without current user authorization.

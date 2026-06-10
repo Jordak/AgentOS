@@ -54,7 +54,7 @@ A Called Workflow must not treat silence as authorization for actions outside it
 
 Mutation is owned by the workflow whose contract and Authorization Boundary explicitly include that mutation surface.
 
-The Calling Workflow owns the broader run state, invocation boundary, and integration surfaces outside the Called Workflow's contract.
+The Calling Workflow owns the broader run state and invocation boundary. It owns integration surfaces outside the Called Workflow's contract only when the Calling Workflow's own contract and Authorization Boundary explicitly include those surfaces.
 
 For example, `review-loop` may perform its normal PR-scoped mutations when invoked normally: fix commits on the target PR branch, consolidated Agent Review comments, and the repository's established ready-for-human marker. It still may not merge the PR, close issues, create labels, or push outside the target PR branch, because those surfaces are outside the `review-loop` contract.
 
@@ -67,6 +67,8 @@ If a Calling Workflow wants advisory evidence only, it should invoke a read-only
 Integration Ownership is contract-defined, not role-defined. A Called Workflow may own integration of its own target when its contract and Authorization Boundary say so. A Calling Workflow may own a broader target that remains open after the Called Workflow completes.
 
 As a directional principle, a workflow should own integration of the largest explicit target that is fully inside its contract and Authorization Boundary. It should not integrate broader parent targets merely because it completed a child target or can see the next tempting action.
+
+Do not infer merge, closure, or branch-deletion authority from whether a workflow is currently acting as a Calling Workflow or a Called Workflow. Those actions belong only to workflows whose contracts explicitly own landing and closure. For example, `implement-github-issue` may be called by a future coordinator, but its contract still stops at reviewed PR evidence; the future coordinator may own landing only if its own contract says so.
 
 When broader integration is needed, the workflow should return a Workflow Result with evidence and a recommended next action.
 

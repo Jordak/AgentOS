@@ -111,16 +111,17 @@ Do not broad-copy `personal/os/` into feature worktrees, and do not use `git add
 
 ## Subagent / Feature Branch Delegation
 
-When delegating implementation issues to subagents on feature branches, make worktree isolation explicit, and make issue closure an integration responsibility, not a branch-worker responsibility.
+When delegating implementation issues to subagents on feature branches, make worktree isolation explicit, and make landing and issue closure an integration responsibility, not a branch-worker responsibility.
 
 - Give each subagent its own isolated worktree and feature branch. Prefer `git worktree` checkouts rooted from the current integration branch.
 - Preserve Codex-managed worktrees when Codex creates them; for manual AgentOS worktrees, use `$CODEX_HOME/worktrees/`.
 - Do not have multiple subagents share the same checkout, working tree, index, or feature branch.
 - Record each worker's worktree path, branch name, assigned issue, and owned files or responsibility before starting parallel work.
 - Before integrating results, inspect the worktree list and each worker branch status to confirm workers did not step on each other's branches or local changes.
-- Instruct workers to commit, push their feature branch, and comment evidence on the issue.
-- Do not instruct feature-branch workers to close the issue.
-- Issue closure belongs to the integration step, after the resolving commit has landed on `main` or the pull request has merged.
+- Instruct workers to commit, push their feature branch, open or update their PR when their contract owns that step, and return evidence through their Workflow Result or issue/PR comments.
+- Do not instruct feature-branch workers to merge PRs, close issues, or delete branches.
+- Landing, issue closure, and branch deletion belong to a workflow or human integration step whose contract explicitly owns those surfaces.
+- Issue closure belongs after the resolving commit has landed on `main` or the pull request has merged and the integration owner has reconciled the issue acceptance criteria.
 - Avoid wording such as "close after the commit is pushed" unless the push is directly to the integration branch.
 
 Standard worker handoff language:
@@ -128,12 +129,13 @@ Standard worker handoff language:
 > Work only in your assigned isolated worktree and feature branch. Do not reuse
 > or switch another worker's branch. Do not commit directly to `main`. Rebase
 > on `origin/main` instead of merging `main` into your branch. Push with
-> `scripts/agent-push` and comment on the issue with branch, commit,
-> validation, and smoke-trial evidence. If you need Personal Overlay state,
+> `scripts/agent-push` and report branch, PR, commit, validation, and
+> review evidence in your Workflow Result. If you need Personal Overlay state,
 > read it from the canonical primary AgentOS checkout, not from this feature
 > worktree's ignored-file skeleton. Write Personal Overlay files only when
-> explicitly assigned a non-overlapping path. Do not close the issue. The
-> integrator will close it after the resolving PR is squash-merged into `main`.
+> explicitly assigned a non-overlapping path. Do not merge PRs, close issues,
+> or delete branches. The integration owner will decide landing and closure
+> after the resolving PR is merged and the issue acceptance criteria are reconciled.
 
 ## GitHub Issue Closure Discipline
 
@@ -144,7 +146,9 @@ Before closing an implementation issue:
 - Ensure the resolving commit or commits have landed on the repository's integration branch, usually `main`, either by pushing directly to that branch or by merging a pull request/feature branch into it.
 - A pushed feature branch is not enough. A comment that references only a local commit hash or an unmerged remote branch is not enough.
 - Verify the remote integration branch contains the resolving commit before closing the issue.
-- Then close the issue with a comment that references the commit on `main`, the merged PR, or another durable artifact that proves the work is integrated.
+- Reconcile the issue acceptance criteria against the merged PR or integration commit evidence.
+- Confirm no human-review label such as `ready-for-human`, `needs-human`, `needs-a-human`, or equivalent still requires a human closure decision.
+- Then close the issue with a factual comment that references the integration branch, the commit on `main`, the merged PR or another durable integration artifact, and relevant validation evidence when available.
 
 ## Workflow Labels
 
