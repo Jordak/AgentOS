@@ -145,6 +145,24 @@
       ]
     },
     {
+      "id": "vendor-skill",
+      "category": "skill vendoring",
+      "prompt": "Vendor this public GitHub skill into AgentOS Core and make sure the license and UPSTREAM.md provenance are correct.",
+      "expected": {
+        "skill": "vendor-skill"
+      },
+      "evidence": [
+        {
+          "path": "os/skills/vendor-skill/SKILL.md",
+          "contains": [
+            "source-first provenance",
+            "license-first safety",
+            "Do not broaden validators"
+          ]
+        }
+      ]
+    },
+    {
       "id": "review-pass",
       "category": "code review",
       "prompt": "Run one manual review iteration on this PR and give me a structured review packet without fixing or posting anything.",
