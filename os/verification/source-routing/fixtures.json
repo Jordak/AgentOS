@@ -315,7 +315,7 @@
     {
       "id": "implement-github-issue",
       "category": "github issue implementation",
-      "prompt": "Take this ready GitHub issue through implementation, pull request creation, and review-loop convergence.",
+      "prompt": "Take this GitHub issue through readiness gating, implementation, pull request creation, and review-loop convergence.",
       "expected": {
         "skill": "implement-github-issue"
       },
@@ -323,7 +323,7 @@
         {
           "path": "os/skills/implement-github-issue/SKILL.md",
           "contains": [
-            "ready GitHub issue",
+            "readiness gating",
             "pull request creation",
             "review-loop convergence",
             "Readiness evidence:",
