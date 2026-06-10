@@ -10,7 +10,7 @@ Contract reference: `os/skills/SKILL_CONTRACT.md`.
 
 ## Summary
 
-- Canonical Core skills: 23.
+- Canonical Core skills: 24.
 
 ## Markdown API
 
@@ -62,6 +62,18 @@ Each skill entry records:
 - Safety posture: do not treat a missing readiness marker as silently ready; infer and confirm with the user before implementation proceeds; do not allow chat-only consensus to become the first implementation commit; when repairing consensus, carry resolved answers into the durable design source before reporting `Ready to Implement`; require approval through the shared external-write policy before external tracker writes; do not leave meaningful deferred questions only in chat, model memory, or unpersisted reports.
 - Verification coverage: confirms the target was classified as gated, exempt, or explicitly bypassed, the durable source and readiness marker were checked, unmarked readiness was not silently accepted, the design-consensus route was selected appropriately with `grill-with-docs` as the default repair route, `grill-me` for pure design questioning, and targeted questions only as support, residual clarification, or a documented unavailable-or-excessive fallback, resolved answers were captured durably before `Ready to Implement`, deferred follow-up artifacts were created where required, external writes complied with the shared external-write policy, and PR-bound work has readiness fields or a recorded gate-skip reason; run `scripts/run-validator` after skill or manifest changes.
 - Upgrade notes: Core reusable gate and readiness-repair workflow for feature-sized implementation work.
+
+### `implement-github-issue`
+
+- Canonical source: `os/skills/implement-github-issue/SKILL.md`
+- Contract status: full.
+- Mutability: mixed: normal invocation on a GitHub issue authorizes ordinary happy-path issue-body readiness/design updates, existing readiness/workflow label changes within the assigned issue scope, issue or PR evidence comments, feature-branch pushes, PR creation with readiness fields, and `review-loop` invocation with its ordinary PR-scoped writes; read-only mode inspects and reports without local or external writes.
+- Tools and connectors: local filesystem, `git`, `rg`, project validation commands, GitHub connector or `gh`, `scripts/agent-push` when available for AgentOS feature-branch pushes, `os/skills/ensure-implementation-readiness/SKILL.md`, `os/playbook/IMPLEMENT_FEATURES.md`, `os/playbook/GITHUB_WORKFLOW.md`, `os/skills/review-loop/SKILL.md`, and AgentOS loop-composition guidance in `docs/adr/0009-contract-based-orchestration-loops.md` and `docs/design/issue-121-loop-composition-conventions.md`.
+- Output artifact: a pull request with readiness fields, review-loop convergence evidence, and a recoverable Workflow Result naming issue, branch/worktree, PR, readiness verdict, validation, mutations, review-loop status, open risks, and recommended next action.
+- Filing rule: canonical workflow guidance lives in `os/skills/implement-github-issue/SKILL.md`; issue-specific readiness evidence stays in the GitHub issue unless a local design doc is more appropriate; PR and review-loop evidence stay on the PR surface or in review-loop temporary reports; reusable follow-up work belongs in the issue tracker or propagation review rather than silent scope expansion.
+- Safety posture: normal invocation is explicit authorization for the skill's ordinary happy-path writes unless the caller narrows the Authorization Boundary to read-only mode; always ask before merge, issue closure, branch deletion, permission changes, creating new labels, posting outside the target issue or PR scope, pushing outside the target feature branch, changing repository settings, credentials or MFA, or any external action outside the skill contract; stop when readiness is not ready unless repaired by `ensure-implementation-readiness` or explicitly gate-skipped.
+- Verification coverage: confirm local instructions, readiness policy, GitHub workflow policy, and `review-loop` contract were honored; confirm readiness evidence and verdict, branch/worktree checkpoint, preserved unrelated changes, validation commands, PR readiness fields, review-loop result or skip reason, recoverable Workflow Result fields, and absence of unapproved merge, issue closure, branch deletion, permission, new-label, or out-of-scope external actions; run `git diff --check` and `scripts/run-validator` after skill or manifest changes.
+- Upgrade notes: introduced for GitHub Issue #125 as the first single-issue implementation orchestration skill; keep the v1 happy path narrow and defer merge, issue closure, multi-issue selection, parallel workers, and broader landing semantics to later issues.
 
 ### `grill-me`
 
