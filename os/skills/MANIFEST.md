@@ -10,7 +10,7 @@ Contract reference: `os/skills/SKILL_CONTRACT.md`.
 
 ## Summary
 
-- Canonical Core skills: 22.
+- Canonical Core skills: 23.
 
 ## Markdown API
 
@@ -86,6 +86,18 @@ Each skill entry records:
 - Safety posture: ask one question at a time, recommend a default answer without treating it as consent, inspect local code/docs instead of asking when the answer can be discovered safely, and do not post GitHub comments, edit issue bodies, label, commit, push, merge, close issues, or perform external writes; tracked-file documentation edits require the user's approved write scope or a calling workflow that already owns those writes.
 - Verification coverage: confirm the upstream files are mirrored exactly except for AgentOS `UPSTREAM.md`, confirm provenance points at a full GitHub commit SHA, confirm manifest metadata uses the Markdown API, and run `scripts/run-validator` plus `git diff --check` after skill or manifest changes.
 - Upgrade notes: vendored from `mattpocock/skills` path `skills/engineering/grill-with-docs/` at ref `e3b90b5238f38cdea5996e16861dcae28ef52eda`; preserve companion references and `UPSTREAM.md`, keep upstream files mirrored exactly unless a future issue explicitly approves a local patch, and run `expose-skills` dry run when current-machine discoverability matters after accepted updates.
+
+### `vendor-skill`
+
+- Canonical source: `os/skills/vendor-skill/SKILL.md`
+- Contract status: full.
+- Mutability: mixed: read-only while auditing upstream source, license, provenance, and existing Core state; local-write when the user asks to vendor or update Core skill files, manifest entries, provenance, or safe fixtures; external-write only under the shared GitHub/external-write policy for issue body edits, labels, PRs, comments, pushes, or other tracker/repository state.
+- Tools and connectors: local filesystem, `rg`, `git`, `curl` or `gh` for public GitHub source reads, raw upstream file comparisons, `os/skills/check-vendored-skill-upstreams/`, `os/skills/expose-skills/`, AgentOS validators, and GitHub issue/PR tooling when the vendoring work is issue-driven.
+- Output artifact: a Core skill directory under `os/skills/<skill-name>/`, `UPSTREAM.md` provenance with license notice, manifest metadata, optional source-routing fixture, and a concise vendoring report naming source, ref, license, local patches, validation, and blockers.
+- Filing rule: canonical vendored skills live under `os/skills/`; source and license provenance lives in each skill's `UPSTREAM.md`; Core maintenance metadata lives in `os/skills/MANIFEST.md`; current-machine adapter state stays out of Core and is handled by `expose-skills`; unresolved source/license questions belong in the issue tracker or calling workflow, not in guessed provenance.
+- Safety posture: support only public GitHub upstreams with machine-checkable paths and full commit SHAs in v1; stop for human review on private repos, non-GitHub sources, current-machine installed/global adapters, missing or ambiguous licenses, incompatible terms, or non-machine-checkable refs; do not broaden validators or freshness checkers to make incorrect provenance pass; ask before external writes or current-machine exposure changes.
+- Verification coverage: confirm source/path/ref, license usability and included notice, listed vendored files, exact raw upstream diffs unless local patches are explicitly documented, honest manifest contract status, `git diff --check`, `scripts/run-validator`, upstream-checker self-test when relevant, supported upstream freshness check when available, `expose-skills` dry run when discoverability matters, and absence of private state or current-machine adapter paths in Core.
+- Upgrade notes: introduced from GitHub Issue #138 after the #122/#123 vendoring pilots; keep source-first, license-first behavior conservative until a separate issue expands supported upstream types or license policy.
 
 ### `refresh-benchmark-status`
 
