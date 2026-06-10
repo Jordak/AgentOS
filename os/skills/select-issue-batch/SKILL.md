@@ -33,7 +33,7 @@ Mutability:
 
 - Read-only by default for local files, GitHub, branches, worktrees, issues, labels, and PRs.
 - No local-write, connector-write, or external-write behavior by default.
-- If the user asks to turn the recommendation into tracker updates, worker launch, branch creation, issue comments, labels, or PR work, stop and route that action to the appropriate mutating workflow.
+- If the user asks to turn the recommendation into tracker updates, worker launch, branch creation, issue comments, labels, or PR work, stop after the recommendation and tell the caller or user to explicitly invoke `coordinate-issue-batch` or another authorized mutating workflow in a separate step.
 
 Tools and connectors:
 
@@ -50,7 +50,7 @@ Safety:
 - Treat labels as evidence, not truth. Labels such as `blocked`, `HITL`, `ready-for-agent`, `ready-for-human`, `needs-human`, and `needs-a-human` can be stale or incomplete, so verify them against issue bodies, dependencies, comments when needed, and current tracker state before using them as selection reasons.
 - Treat current blocker or human-review evidence conservatively. A candidate may still be high leverage, but the recommendation must name what needs verification or resolution before coordination starts.
 - Do not treat `ready-for-agent` as the primary ranking signal. It is evidence that execution may be possible, not evidence that the issue is the best next move.
-- Ask before any external write or any transition from selection into execution or coordination.
+- Ask before any external write request, and do not perform the write from this skill. For execution or coordination requests, stop after the recommendation and tell the caller or user to explicitly invoke `coordinate-issue-batch` or another authorized mutating workflow in a separate step.
 
 ## Ranking Policy
 

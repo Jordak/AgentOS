@@ -333,6 +333,27 @@
       ]
     },
     {
+      "id": "select-issue-batch",
+      "category": "github issue batch selection",
+      "prompt": "Recommend the next high-leverage batch of GitHub issues to work on without starting workers or mutating tracker state.",
+      "expected": {
+        "skill": "select-issue-batch"
+      },
+      "evidence": [
+        {
+          "path": "os/skills/select-issue-batch/SKILL.md",
+          "contains": [
+            "Select and explain the next high-leverage GitHub issue or small issue batch",
+            "The planner is read-only",
+            "ranked issues",
+            "future leverage",
+            "Treat labels as evidence, not truth",
+            "stop after the recommendation"
+          ]
+        }
+      ]
+    },
+    {
       "id": "github-issue-breakdown",
       "category": "github issue breakdown",
       "prompt": "Break a plan into implementation issues and preserve GitHub safety rules.",
