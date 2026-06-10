@@ -65,7 +65,7 @@ Safety:
    Classify open questions as blocking or deferred using the playbook's rules. When the user only asked for a readiness check, report the missing consensus and the recommended repair route. When the user asked to make the work ready, own the repair loop:
    - Use `grill-with-docs` by default when decisions need to sharpen domain language or ADR-worthy rationale, or when the readiness repair must result in updates to an issue body, PRD, local design doc, or other durable design source.
    - Use `grill-me` only for pure design questioning where the durable source already exists and no domain glossary, ADR, issue body, or local design document needs to change during the questioning.
-   - Use targeted questions as supporting mechanics inside the selected workflow, post-workflow clarifications for narrow residual gaps, or the fallback only when the Core design-consensus skills are unavailable. If targeted questions are used without `grill-me` or `grill-with-docs`, explain why a grill workflow was unavailable or excessive for the scope.
+   - Use targeted questions as supporting mechanics inside the selected workflow, post-workflow clarifications for narrow residual gaps, or the fallback only when the Core design-consensus skills are unavailable or explicitly excessive for the scope. If targeted questions are used without `grill-me` or `grill-with-docs`, explain why a grill workflow was unavailable or excessive for the scope.
    Ask one question at a time, recommend a default answer, inspect the codebase or existing docs instead of asking when the answer is discoverable, and carry resolved answers back into the durable design source before declaring the scope ready. `grill-with-docs` should supply the docs-aware interview path by default, but this skill or its approved caller owns issue-body, PRD, local-design-doc, and other durable-source updates under the applicable write policy. Follow that policy before GitHub issue creation, issue-body edits, comments, or label updates. If GitHub writes are not authorized, create the local artifact named by the playbook unless the project has a better convention or the user redirects. If required durable source updates or follow-up artifacts are not created, the verdict remains `Needs Design Consensus`. Update or propose updating the current design source with a readiness marker and a `Deferred Follow-ups` section linking to created artifacts.
 
 6. Report the verdict.
@@ -98,7 +98,7 @@ Before finishing:
 3. Confirm the verdict is `Ready to Implement`, `Needs Design Consensus`, or `Gate Skipped`.
 4. Confirm the design source's marker and content were both checked.
 5. Confirm unmarked readiness was not silently accepted.
-6. Confirm the selected design-consensus route was appropriate: `grill-with-docs` by default for readiness repair, `grill-me` for pure design questioning, targeted questions only as a documented fallback or residual clarification, or no repair loop needed.
+6. Confirm the selected design-consensus route was appropriate: `grill-with-docs` by default for readiness repair, `grill-me` for pure design questioning, targeted questions only as a documented unavailable-or-excessive fallback or residual clarification, or no repair loop needed.
 7. Confirm resolved answers were captured in the durable design source before reporting `Ready to Implement`.
 8. Confirm deferred follow-up artifacts were created where required.
 9. Confirm external tracker writes complied with the applicable external-write policy before they happened.

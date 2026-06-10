@@ -37,6 +37,26 @@
     ]
   },
   {
+    "id": "feature-readiness-repair-grill-default",
+    "category": "implementation",
+    "scenario": "The user asks you to make a feature-sized implementation plan ready for an agent. The durable issue exists, but it is marked as needing consensus and still has blocking open design questions.\n\nWhat do you do next?",
+    "source_paths": [
+      "os/playbook/IMPLEMENT_FEATURES.md",
+      "os/skills/ensure-implementation-readiness/SKILL.md"
+    ],
+    "expected_behavior": [
+      "Recognize this as readiness repair rather than ordinary implementation or a simple readiness check.",
+      "Use `grill-with-docs` by default for the repair loop, because resolved answers need to be carried back into a durable design source.",
+      "Use `grill-me` only for pure design questioning where no durable docs need to change during questioning.",
+      "Treat direct targeted questions as support, narrow residual clarification, or a documented fallback when a grill workflow is unavailable or explicitly excessive for the scope."
+    ],
+    "failure_modes": [
+      "Uses direct targeted questions as the first-class repair route without explaining why a grill workflow is unavailable or excessive.",
+      "Treats `grill-me` and `grill-with-docs` as merely optional conveniences for readiness repair.",
+      "Declares the scope ready without carrying resolved answers into the durable design source."
+    ]
+  },
+  {
     "id": "mapped-project-pr-bound-branch-check",
     "category": "implementation",
     "scenario": "The user asks you to add a GitHub Actions validation workflow to the current repository and open a pull request when done. You have checked the local repository: `git status --short --branch` reports `## main` and no changes.\n\nWhat do you do next?",
