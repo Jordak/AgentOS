@@ -4,7 +4,7 @@ Design readiness: ready to implement
 
 AgentOS should compose loop-shaped skills through workflow contracts and invocation-scoped boundaries, not through a hardcoded parent/child hierarchy or one giant orchestrator.
 
-Issue #121 defines the detailed loop composition convention in `docs/design/issue-121-loop-composition-conventions.md`. This ADR records the core architecture decision behind that design.
+The reusable loop composition convention now lives in `os/skills/ORCHESTRATION_LOOPS.md`. Issue #121's design doc remains the detailed rationale and readiness source behind that convention.
 
 ## Context
 
@@ -38,7 +38,7 @@ Existing workflow artifacts can become domain-specific Workflow Results instead 
 
 The design requires workflows to be explicit about Authorization Boundaries, Recovery Records, Workflow Results, Blocking Human Decisions, and Integration Ownership when they are loop-shaped or mutating. Simple skills do not need to carry the full convention.
 
-AgentOS should keep the full convention in a progressively discovered file, planned as `os/skills/ORCHESTRATION_LOOPS.md`, and link to it from a small `## Orchestration Loops` section in `os/skills/SKILL_CONTRACT.md`.
+AgentOS keeps the full convention in a progressively discovered file at `os/skills/ORCHESTRATION_LOOPS.md` and links to it from a small `## Orchestration Loops` section in `os/skills/SKILL_CONTRACT.md`.
 
 ## Alternatives Considered
 

@@ -67,6 +67,12 @@ A skill's verification guidance should test observable behavior, not internal st
 - output-format checks for HTML, DOCX/PDF, slides, sheets, or issue bodies;
 - filing checks that generated state landed in the intended home.
 
+## Orchestration Loops
+
+Loop-shaped or mutating skills that coordinate repeated steps, call other workflows, wait on human decisions, or need safe recovery after interruption should also follow `os/skills/ORCHESTRATION_LOOPS.md`.
+
+That convention defines AgentOS guidance for Authorization Boundaries, Workflow Results, Recovery Records, Recovery Checkpoints, Blocking Human Decisions, parallel Called Workflows, and Integration Ownership. Do not copy the full convention into every skill; link to it when the skill's contract needs loop-specific boundaries or recovery behavior.
+
 ## Exposure Rules
 
 Canonical public AgentOS skills live under `os/skills/`. Canonical private skills can live under `personal/os/skills/<skill-name>/SKILL.md`. Personal Overlay skills implement this same Core contract; do not fork a separate private skill contract in v1.
