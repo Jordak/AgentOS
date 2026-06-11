@@ -112,6 +112,7 @@ Rebuild or load the loop Recovery Record, verify the current batch-pass state, a
    - Start a separate durable called-workflow invocation when the harness supports it.
    - In Codex harnesses, create or resume a child coordinator thread for the `coordinate-issue-batch` pass; do not treat same-thread execution as the default.
    - When thread renaming is supported, rename the child coordinator thread to a public-safe, legible target-specific name before sending the assignment or `READY` signal; otherwise record why a public-safe rename was unavailable.
+   - After create or resume, and after any supported rename, update the loop Recovery Record with the actual public-safe child coordinator thread name or rename-unavailable reason, actual Workflow Invocation Reference or result surface when available, any redaction or unavailable reason, and release instruction before sending the assignment or `READY` signal.
    - Pass a Workflow Invocation Reference, expected coordinator Workflow Result shape, and release instruction to the coordinator when the harness supports a callback or result surface.
    - After launch, let the loop go idle until the coordinator returns its Workflow Result. Use runtime polling only as bounded bootstrap, timeout, recovery, or diagnostic behavior, and record the reason and bound in the Recovery Record.
    - Use same-thread fallback only when a separate durable invocation is unavailable, fails, is denied, or is explicitly unsuitable, and record the fallback reason.
@@ -170,7 +171,7 @@ Recover at least:
 - loop-level caps and pass-through caps for `coordinate-issue-batch`;
 - ledger or checkpoint surface;
 - current pass number and current phase;
-- called `coordinate-issue-batch` public-safe child coordinator thread names or rename-unavailable reasons, invocation references, callback/result surfaces, release instructions, release-instruction handling, or public-safe summaries;
+- called `coordinate-issue-batch` public-safe child coordinator thread names or rename-unavailable reasons, invocation references, callback/result surfaces, release instructions, pre-assignment actual-reference checkpoints, release-instruction handling, or public-safe summaries;
 - bounded polling reason, bound, and result when runtime polling was used for bootstrap, timeout, recovery, or diagnostics;
 - batch result summaries, including selected issues, worker status, PRs, merge-report state, landing outcomes, skipped issues, blockers, needs-human decisions, failures, cancellations, validation, release-instruction handling, and recommended next action;
 - Blocking Human Decisions with exact question, recommended default, decision state, recovery location, and resume rule;
@@ -199,6 +200,7 @@ Public, publishable, or Git-backed recovery surfaces must use only public-safe f
 - Separate durable called-workflow invocations are the normal path when the harness supports them; same-thread execution is a recorded fallback that keeps loop and batch recovery records distinct.
 - Each called batch pass receives a Workflow Invocation Reference and release instruction when the harness supports it.
 - Supported child coordinator threads are renamed to public-safe, legible target-specific names before assignment or `READY`, or the unavailable rename is recorded.
+- Actual child coordinator thread names, invocation references or result surfaces, redaction or unavailable reasons, and release instructions are checkpointed after create/resume/rename and before assignment or `READY`.
 - The loop goes idle after batch-pass launch and uses polling only as bounded bootstrap, timeout, recovery, or diagnostic behavior.
 - Another pass starts only after the prior batch is cleanly settled.
 - No selected issues ends the loop for the current goal instead of silently broadening scope.
@@ -214,7 +216,7 @@ Before finishing:
 3. Confirm the loop did not perform issue selection, worker launch, or landing directly.
 4. Confirm Recovery Checkpoints before starting or resuming batch passes.
 5. Confirm each normal or resume batch pass used a separate durable called-workflow invocation when supported, or recorded why same-thread fallback was necessary.
-6. Confirm supported child coordinator threads were renamed to public-safe, legible target-specific names before assignment or `READY`, or record why a public-safe rename was unavailable.
+6. Confirm supported child coordinator threads were renamed to public-safe, legible target-specific names before assignment or `READY`, or record why a public-safe rename was unavailable, and confirm the actual child coordinator thread name, invocation reference or result surface, redaction or unavailable reason, and release instruction were checkpointed before assignment or `READY`.
 7. Confirm each called batch pass received a Workflow Invocation Reference and release instruction when supported.
 8. Confirm the loop used callback-first Workflow Results and did not continuously poll `coordinate-issue-batch` except for recorded bounded bootstrap, timeout, recovery, or diagnostics.
 9. Confirm any called `coordinate-issue-batch` pass returned a recoverable Workflow Result with release-instruction handling, or a Blocking Human Decision, before the loop continued.
