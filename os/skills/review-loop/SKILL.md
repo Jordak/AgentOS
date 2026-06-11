@@ -60,7 +60,7 @@ After any pause, interruption, resume, unusually long loop, or suspected compact
 ## Review-Pass Invocation Guard
 
 - Reopen `os/skills/review-pass/SKILL.md`, `os/skills/review-pass/references/reviewer-prompts.md`, and `os/skills/review-pass/references/review-packet-template.md` before every fresh and verification pass. If the harness cannot discover `review-pass` by name, read those canonical files directly and follow them as the fallback.
-- Fill every pass request explicitly with the common fields: target, repository, base, head or current head, mode, baseline intent, reviewer count or risk posture, optional lens overrides, custom lens notes, and reporting mode.
+- Fill every pass request explicitly with the common fields: target, repository, base, head or current head, mode, baseline intent, model and effort policy when available, reviewer count or risk posture, optional lens overrides, custom lens notes, and reporting mode.
 - For `fresh` passes, keep reviewer context clean: do not include prior packets, parent analysis, autopilot classifications, complexity posture, lazy-human decisions, fix commits, accepted fixes, declined rationales, consolidated comment URLs, or validation results unless they are part of the baseline intent itself.
 - For `verification` passes, include only the needed prior packet, reviewer finding IDs, issue-family IDs, autopilot classifications and rationales, complexity posture, smallest closing moves or lazy-human decisions, fix commits, accepted fixes, declined rationales, consolidated comment URL, and validation results.
 - Preserve `review-pass` template rules about read-only review, no reviewer PR comments, issue-family sweeps, design-escape-hatch concerns, full-diff rereads, provisional IDs, and the clean response sentinel.
@@ -183,7 +183,7 @@ Use the matrix to update affected contract surfaces in one pass. Check the ownin
    - Establish the baseline intent summary described in the Design Escape Hatch section. Keep it in the loop ledger so later packets can be compared against the original brief and allowed alternatives.
 
 2. Set the loop ledger:
-   - Track each pass cycle, pass mode, reviewer continuity mode, opaque handle availability, review packet path or chat status, reviewer aliases when supplied by `review-pass`, raw reviewer findings or crosswalk summaries, normalized family IDs, autopilot classification (`auto-fix`, `auto-decline`, or `ask-user`), accepted/declined/user-decision status, `ask-user` decision state, unresolved `ask-user` blockers, lazy-human brief status, complexity posture, chosen smallest closing move, fix commits, validation results, consolidated comment URL or chat status, and pass closure status.
+   - Track each pass cycle, pass mode, model and effort metadata when available, reviewer continuity mode, opaque handle availability, review packet path or chat status, reviewer aliases when supplied by `review-pass`, raw reviewer findings or crosswalk summaries, normalized family IDs, autopilot classification (`auto-fix`, `auto-decline`, or `ask-user`), accepted/declined/user-decision status, `ask-user` decision state, unresolved `ask-user` blockers, lazy-human brief status, complexity posture, chosen smallest closing move, fix commits, validation results, consolidated comment URL or chat status, and pass closure status.
    - Normalize families into stable ledger IDs such as `C1-IF3` and preserve source reviewer finding IDs from `review-pass`.
    - If compaction or interruption loses details, rebuild the ledger from consolidated "Agent Review" comments, chat pause messages, user replies, conversation summaries, commit history, local validation output, and saved or pasted review packets. Recover autopilot classifications, rationales, ask-user decision states, lazy-human briefs or user decisions, complexity posture, and smallest closing moves from the newest durable source or chat-reporting source that contains them. If no source contains a resolved `ask-user` decision, recover the family as `unresolved` and ask again rather than inferring approval or accepted risk.
    - Prefer one consolidated "Agent Review" comment per panel pass for PR targets. For non-PR targets, keep packet output in chat and the final report.
@@ -285,19 +285,20 @@ Before finishing:
 
 1. Confirm the target, base, head, final reviewed commit SHA or local diff state, and review-pass sizing rationale.
 2. Confirm the baseline intent summary was captured from the original brief, including allowed alternatives and non-goals when available.
-3. Confirm feature-sized review targets had a durable `Ready to Implement` design source or an explicit `Gate Skipped` bypass before reviewers were spawned.
-4. Confirm every design-escape-hatch trigger was either surfaced to the user, explicitly declined with rationale, or found not applicable.
-5. Confirm every fresh and verification pass used `review-pass` or its canonical fallback files.
-6. Confirm the final fresh `review-pass` packet left no unresolved `auto-fix` or `ask-user` blockers after parent adjudication.
-7. Confirm every issue family was classified as `auto-fix`, `auto-decline`, or `ask-user`, with rationale.
-8. Confirm every `auto-fix` issue family has a fix or a scope/design change.
-9. Confirm every accepted fix recorded the smallest closing move from the complexity governor, or recorded why new machinery was necessary.
-10. Confirm every declined issue family has a rationale, including complexity/churn rationale when relevant.
-11. Confirm every unresolved `ask-user` blocker has a recoverable lazy-human brief before yielding and remains non-terminal, and every resolved `ask-user` family has either a verified `user-approved-fix` or an explicit `user-declined/accepted-risk` decision.
-12. Confirm `auto-fix` and `user-approved-fix` issue families were swept for sibling occurrences before verification.
-13. Confirm `auto-fix` and `user-approved-fix` semantic contract changes used a Contract Surface Matrix, or record why the matrix was skipped.
-14. Confirm verification review-pass requests included autopilot classifications and rationales, complexity posture, smallest closing moves or lazy-human decisions, accepted fixes, declined rationales, and validation results when applicable.
-15. Confirm review-pass requests used the current fresh or verification templates, including reporting mode, read-only rule, no-reviewer-PR-comment rule, dirty-validation rule, issue-family sweep instruction, design-escape-hatch instruction, full-reread instruction, provisional-ID rule, and clean response sentinel.
+3. Confirm model and effort metadata was recorded when available, or marked `unknown` or `not reported` when unavailable.
+4. Confirm feature-sized review targets had a durable `Ready to Implement` design source or an explicit `Gate Skipped` bypass before reviewers were spawned.
+5. Confirm every design-escape-hatch trigger was either surfaced to the user, explicitly declined with rationale, or found not applicable.
+6. Confirm every fresh and verification pass used `review-pass` or its canonical fallback files.
+7. Confirm the final fresh `review-pass` packet left no unresolved `auto-fix` or `ask-user` blockers after parent adjudication.
+8. Confirm every issue family was classified as `auto-fix`, `auto-decline`, or `ask-user`, with rationale.
+9. Confirm every `auto-fix` issue family has a fix or a scope/design change.
+10. Confirm every accepted fix recorded the smallest closing move from the complexity governor, or recorded why new machinery was necessary.
+11. Confirm every declined issue family has a rationale, including complexity/churn rationale when relevant.
+12. Confirm every unresolved `ask-user` blocker has a recoverable lazy-human brief before yielding and remains non-terminal, and every resolved `ask-user` family has either a verified `user-approved-fix` or an explicit `user-declined/accepted-risk` decision.
+13. Confirm `auto-fix` and `user-approved-fix` issue families were swept for sibling occurrences before verification.
+14. Confirm `auto-fix` and `user-approved-fix` semantic contract changes used a Contract Surface Matrix, or record why the matrix was skipped.
+15. Confirm verification review-pass requests included autopilot classifications and rationales, complexity posture, smallest closing moves or lazy-human decisions, accepted fixes, declined rationales, and validation results when applicable.
+16. Confirm review-pass requests used the current fresh or verification templates, including reporting mode, read-only rule, no-reviewer-PR-comment rule, dirty-validation rule, issue-family sweep instruction, design-escape-hatch instruction, full-reread instruction, provisional-ID rule, and clean response sentinel.
 16. If a deep-review lens was assigned, confirm `review-pass` supplied the deep-review lens instructions and no full standalone `thermo-nuclear-review` workflow was run inside `review-loop`.
 17. If a structural-depth lens was assigned, confirm `review-pass` supplied the structural-depth lens instructions and no full standalone `improve-codebase-architecture` or `thermo-nuclear-code-quality-review` workflow was run inside `review-loop`.
 18. Confirm explicit `review-pass` panel requests were treated as permission for read-only reviewer subagents when the harness supported them, or record why `review-pass` used fallback.

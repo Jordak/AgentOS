@@ -23,6 +23,7 @@ Inputs:
 - Optional caller adjudication context for verification mode, such as autopilot classifications and rationales, complexity posture, smallest closing moves, or lazy-human decisions.
 - Optional verification continuity preference, source reviewer aliases, opaque source reviewer handles, and source reviewer finding IDs when a caller wants same-reviewer verification and the harness can safely resume prior reviewers.
 - Optional reviewer count, lens plan, custom lens notes, and reporting constraints.
+- Optional requested model and effort metadata supplied by the caller or harness.
 - An explicit user request to run `review-pass`, run a review pass, use a reviewer panel, or perform equivalent read-only panel review counts as authorization to spawn or resume multiple read-only clean-context reviewers when the harness supports them. This authorization covers reviewer reads only, not target edits or external writes.
 
 Output artifact:
@@ -30,6 +31,7 @@ Output artifact:
 - A structured Markdown review packet in chat by default.
 - Optional temporary Markdown packet file when requested or when the packet is too large for comfortable chat delivery.
 - Optional caller-private reviewer continuity handoff when an orchestrating caller may need same-source verification and the harness exposes resumable reviewer handles. Do not include opaque handles in the human-facing packet.
+- Model and effort metadata when available, including requested model and effort, actual model and effort if reported, selection source, override notes, and `unknown` or `not reported` fallbacks.
 
 Mutability:
 
@@ -161,9 +163,10 @@ When applicable, read `references/lenses/contract-surface-matrix.md` and include
    - Flag design-escape-hatch concerns when repeated symptoms suggest scope reduction, design clarification, or a different implementation shape.
 
 7. Return the packet:
-   - Use the exact packet template in `references/review-packet-template.md`.
-   - Include residual risks, limitations, reviewer continuity mode, handle availability, and whether a temporary packet file was written.
-   - Do not post the packet externally unless another approved workflow owns that write.
+- Use the exact packet template in `references/review-packet-template.md`.
+- Include residual risks, limitations, reviewer continuity mode, handle availability, and whether a temporary packet file was written.
+- Include model and effort metadata when available, using `unknown` or `not reported` instead of guessing.
+- Do not post the packet externally unless another approved workflow owns that write.
 
 ## Filing Rules
 
@@ -176,6 +179,7 @@ When applicable, read `references/lenses/contract-surface-matrix.md` and include
 ## Quality Bar
 
 - The target, base, head or current head, mode, reviewer count, lens plan, and baseline-intent quality are explicit.
+- The packet records requested and actual model/effort metadata when available, or records `unknown` or `not reported` fallbacks.
 - Reviewers get clean, read-only prompts assembled from the current reference template and assigned per-lens files.
 - Every reviewer reviews the full target, even when assigned a lens.
 - The packet groups findings by issue family, not only by reviewer chronology.
@@ -197,18 +201,19 @@ Before finishing a review pass:
 1. Confirm the prompt reference was read for the current pass.
 2. Confirm the packet template reference was read before normalizing or returning the packet.
 3. Confirm target, repository, base, head or current head, mode, reviewer count, and lens plan.
-4. Confirm baseline intent source and any missing-baseline limitation.
-5. Confirm every assigned named lens file under `references/lenses/` was read, and unassigned lens files were not required for prompt assembly.
-6. Confirm `references/lenses/contract-surface-matrix.md` was read when the target changed reusable contract surfaces.
-7. Confirm reviewer prompts included the read-only rule, no-comment rule, dirty-validation rule, assigned lens guidance, Contract Surface Matrix guidance when applicable, issue-family instruction, design-escape-hatch instruction, full-reread instruction, provisional-ID rule, and clean response sentinel.
-8. If `deep-review` was assigned, confirm the reviewer received the deep-review lens instructions and no full Thermos orchestration or standalone `thermo-nuclear-review` workflow was run.
-9. If `structural-depth` was assigned, confirm the reviewer received the structural-depth lens instructions and no full `improve-codebase-architecture` or `thermo-nuclear-code-quality-review` workflow was run.
-10. Confirm an explicit review-pass or reviewer-panel request was treated as authorization for read-only reviewer subagents when the harness supported them, or record why fallback was used.
-11. Confirm raw Reviewer Findings were deduped into Issue Families and mapped back to reviewer sources.
-12. Confirm every likely accepted family has evidence, a sibling-search suggestion, and a validation signal.
-13. Confirm every likely declined issue family has a short rationale.
-14. Confirm verification continuity mode was recorded when applicable.
-15. Confirm verification prompts included caller adjudication context when supplied, such as autopilot classifications, complexity posture, smallest closing moves, or lazy-human decisions.
-16. Confirm opaque reviewer handle availability was privately handed off or marked unavailable when same-source verification may be needed, and confirm handle values were not exposed in prompts or human-facing packets.
-17. Confirm every spawned or resumed reviewer was closed.
-18. Confirm no target files, PRs, issues, labels, branches, or external state were changed.
+4. Confirm model and effort metadata was recorded when available, or marked `unknown` or `not reported` when unavailable.
+5. Confirm baseline intent source and any missing-baseline limitation.
+6. Confirm every assigned named lens file under `references/lenses/` was read, and unassigned lens files were not required for prompt assembly.
+7. Confirm `references/lenses/contract-surface-matrix.md` was read when the target changed reusable contract surfaces.
+8. Confirm reviewer prompts included the read-only rule, no-comment rule, dirty-validation rule, assigned lens guidance, Contract Surface Matrix guidance when applicable, issue-family instruction, design-escape-hatch instruction, full-reread instruction, provisional-ID rule, and clean response sentinel.
+9. If `deep-review` was assigned, confirm the reviewer received the deep-review lens instructions and no full Thermos orchestration or standalone `thermo-nuclear-review` workflow was run.
+10. If `structural-depth` was assigned, confirm the reviewer received the structural-depth lens instructions and no full `improve-codebase-architecture` or `thermo-nuclear-code-quality-review` workflow was run.
+11. Confirm an explicit review-pass or reviewer-panel request was treated as authorization for read-only reviewer subagents when the harness supported them, or record why fallback was used.
+12. Confirm raw Reviewer Findings were deduped into Issue Families and mapped back to reviewer sources.
+13. Confirm every likely accepted family has evidence, a sibling-search suggestion, and a validation signal.
+14. Confirm every likely declined issue family has a short rationale.
+15. Confirm verification continuity mode was recorded when applicable.
+16. Confirm verification prompts included caller adjudication context when supplied, such as autopilot classifications, complexity posture, smallest closing moves, or lazy-human decisions.
+17. Confirm opaque reviewer handle availability was privately handed off or marked unavailable when same-source verification may be needed, and confirm handle values were not exposed in prompts or human-facing packets.
+18. Confirm every spawned or resumed reviewer was closed.
+19. Confirm no target files, PRs, issues, labels, branches, or external state were changed.

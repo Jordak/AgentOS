@@ -5,7 +5,7 @@ Use this when creating the final temporary HTML report for a review-loop run. Th
 ## Required Structure
 
 1. Executive summary:
-   - PR link, final status, base, head branch, final head commit, merge state when known, commit count, review-pass count, reviewer count, issue-family count, terminal condition, unresolved ask-user blockers, user-declined/accepted-risk decisions, and residual risks.
+   - PR link, final status, base, head branch, final head commit, merge state when known, commit count, review-pass count, reviewer count, model and effort metadata when available, issue-family count, terminal condition, unresolved ask-user blockers, user-declined/accepted-risk decisions, and residual risks.
    - One short paragraph explaining the overall pattern the review loop uncovered.
    - A short readiness note with the final consolidated comment link when available.
 
@@ -24,7 +24,7 @@ Use this when creating the final temporary HTML report for a review-loop run. Th
    - Explain what changed at the family level, not only at the individual commit level.
 
 5. Review-loop convergence:
-   - Show review-pass cycles, reviewer aliases, reviewer continuity mode and opaque handle availability for verification passes, auto-fix issue families, user-approved-fix ask-user decisions, unresolved ask-user blockers, user-declined/accepted-risk decisions, autopilot classification counts, complexity posture summaries, fix commits, and final adjudicated-clean status. Include source aliases when useful, but never expose opaque reviewer handles.
+   - Show review-pass cycles, reviewer aliases, model and effort metadata when available, reviewer continuity mode and opaque handle availability for verification passes, auto-fix issue families, user-approved-fix ask-user decisions, unresolved ask-user blockers, user-declined/accepted-risk decisions, autopilot classification counts, complexity posture summaries, fix commits, and final adjudicated-clean status. Include source aliases when useful, but never expose opaque reviewer handles.
    - Name the final fresh review-pass packet and terminal condition.
 
 6. Validation evidence:

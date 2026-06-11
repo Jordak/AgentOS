@@ -29,7 +29,7 @@ Inputs:
 
 Output artifact:
 
-- A coordinator Workflow Result returned in the current reporting mode or caller-supplied Workflow Invocation Reference, with terminal status (`completed`, `blocked`, `failed`, `cancelled`, or `needs-human`), batch status, selected or provided issues, ledger location, worker branches, worktrees, PRs, worker lifecycle states, public-safe thread names and invocation references or redacted private-surface summaries, merge-event state, landing outcomes, skipped issues, blockers and needs-human decisions, release-instruction handling, validation, mutations performed, open risks, and recommended next action.
+- A coordinator Workflow Result returned in the current reporting mode or caller-supplied Workflow Invocation Reference, with terminal status (`completed`, `blocked`, `failed`, `cancelled`, or `needs-human`), batch status, selected or provided issues, ledger location, worker branches, worktrees, PRs, worker lifecycle states, coordinator and worker model/effort metadata with `unknown` or `not reported` fallbacks, public-safe thread names and invocation references or redacted private-surface summaries, merge-event state, landing outcomes, skipped issues, blockers and needs-human decisions, release-instruction handling, validation, mutations performed, open risks, and recommended next action.
 - A recoverable coordinator ledger or report in the current reporting mode.
 - Optional dedicated GitHub batch tracking issue when the Authorization Boundary explicitly permits creating or using that tracker surface.
 
@@ -93,7 +93,7 @@ Landing is a phase of normal or resume mode, not a separate top-level mode.
 1. Establish the target:
    - Identify repository, tracker, base branch, checkout path, mode, Authorization Boundary, and any provided issue batch.
    - Read local instructions, `os/playbook/GITHUB_WORKFLOW.md`, `os/skills/ORCHESTRATION_LOOPS.md`, and the narrow skill contracts this workflow may call.
-   - Record the initial Recovery Record: target, mode, Authorization Boundary, ledger surface, any caller-supplied Workflow Invocation Reference or result surface, coordinator release instruction, current phase, known blockers, and next action.
+   - Record the initial Recovery Record: target, mode, Authorization Boundary, model and effort policy, actual model and effort if reported, selection source, override notes, `unknown` or `not reported` fallbacks, ledger surface, any caller-supplied Workflow Invocation Reference or result surface, coordinator release instruction, current phase, known blockers, and next action.
 
 2. Select or accept the batch:
    - If no explicit batch is supplied, invoke or follow `select-issue-batch` in read-only mode using the requested selection goal and scope filters.
@@ -144,7 +144,7 @@ Landing is a phase of normal or resume mode, not a separate top-level mode.
 9. Report the coordinator Workflow Result:
    - Begin with `Status:` using one canonical terminal value: `completed`, `blocked`, `failed`, `cancelled`, or `needs-human`.
    - For mixed child outcomes, report the detailed worker, issue, landing, skipped, blocked, needs-human, failed, and cancelled states. Aggregate status precedence rules and richer status maps are deferred to GitHub issue #158.
-   - Include issue URLs, selection source, ledger surface, branch and worktree status, PRs, public-safe thread status or redacted private-surface summary, merge-event status, landing outcomes, skipped issues, blocked and needs-human states, per-worker release status or post-result availability, validation, mutations, open risks, and recommended next action.
+   - Include issue URLs, selection source, ledger surface, branch and worktree status, PRs, coordinator and worker model/effort metadata with `unknown` or `not reported` fallbacks, public-safe thread status or redacted private-surface summary, merge-event status, landing outcomes, skipped issues, blocked and needs-human states, per-worker release status or post-result availability, validation, mutations, open risks, and recommended next action.
    - When the caller supplied a Workflow Invocation Reference or result surface, return the coordinator Workflow Result there when available, and then stop or wait according to the explicit coordinator release instruction.
    - State clearly that PR merge/squash, branch deletion, new label creation, and any out-of-boundary external action remain outside v1 unless a separate approved workflow or direct human step owns them.
 
@@ -159,6 +159,7 @@ Recover at least:
 - coordinator release instruction, including whether the coordinator should stop after returning the result, remain assigned for correction/resume, or wait for a caller release signal;
 - repository and integration branch;
 - mode and Authorization Boundary;
+- coordinator model and effort policy when available, and actual model/effort metadata if reported;
 - ledger surface and checkpoint history;
 - selected or provided issues and selection evidence;
 - concurrency limit and queued issues;
@@ -213,5 +214,5 @@ Before finishing:
 11. Confirm no PR merge/squash, branch deletion, label creation, permission change, out-of-scope issue mutation, or Personal Overlay access happened without explicit authorization.
 12. Confirm landing checks waited for worker quiescence, recorded needs-human Blocking Human Decisions, worker release status or post-result availability, and human merge reports.
 13. Confirm `land-github-issue` was invoked or followed only for eligible merged issues under an explicit landing Authorization Boundary.
-14. Confirm final Workflow Result includes canonical terminal status, selected issues, ledger state, worker terminal statuses and lifecycle states including needs-human, release-instruction handling, PRs, merge status, landing outcomes, skipped issues, validation, mutations, open risks, and recommended next action.
+14. Confirm final Workflow Result includes canonical terminal status, selected issues, ledger state, worker terminal statuses and lifecycle states including needs-human, coordinator and worker model/effort metadata with `unknown` or `not reported` fallbacks, release-instruction handling, PRs, merge status, landing outcomes, skipped issues, validation, mutations, open risks, and recommended next action.
 15. If this skill or its manifest entry changed, run `git diff --check` and `scripts/run-validator`.

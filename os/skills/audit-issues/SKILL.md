@@ -20,7 +20,7 @@ Inputs:
 
 Output artifact:
 
-- A concise audit report listing closed issues, commented issues, skipped issues, evidence, and follow-up needed.
+- A concise audit report listing closed issues, commented issues, skipped issues, model and effort metadata when available, evidence, and follow-up needed.
 - Optional external tracker updates: status comments, issue closures, labels, or other tracker-native state changes.
 
 Mutability:
