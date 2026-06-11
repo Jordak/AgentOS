@@ -122,7 +122,7 @@ Rebuild or load the loop Recovery Record, verify the current batch-pass state, a
 6. Decide whether to continue:
    - Start another batch only when the previous batch is cleanly settled:
      - every launched worker is quiescent;
-     - no worker failed;
+     - no worker or batch pass failed or was cancelled;
      - no worker or issue remains blocked;
      - no ready PRs are waiting on human merge reports;
      - all eligible merged work was landed or explicitly skipped by `coordinate-issue-batch`;
