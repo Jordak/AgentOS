@@ -121,7 +121,7 @@ When delegating implementation issues to workers on feature branches, make workt
 - For `coordinate-issue-batch` to `implement-github-issue` worker launches, use the pointer-first handoff shape in `os/skills/coordinate-issue-batch/SKILL.md`. This playbook supplies branch, worktree, push, pull request, and issue-closure discipline, but it is not the universal worker prompt.
 - Give each worker its own isolated worktree and feature branch. Prefer `git worktree` checkouts rooted from the current integration branch.
 - In Codex harnesses that support branch-backed project threads, use separate Codex threads for durable implementation workers rather than in-thread subagents. In-thread subagents remain suitable for read-only review, exploration, or short-lived advisory fan-out when no durable branch/worktree worker is needed.
-- When the harness supports thread renaming, rename the worker thread to a legible target-specific name before sending the `READY` signal or substantive assignment message.
+- When the harness supports thread renaming, rename the worker thread to a public-safe, legible target-specific name before sending the `READY` signal or substantive assignment message.
 - Preserve Codex-managed worktrees when Codex creates them; for manual AgentOS worktrees, use `$CODEX_HOME/worktrees/`.
 - Do not have multiple workers share the same checkout, working tree, index, or feature branch.
 - Record each worker's worktree path, branch name, assigned issue, and owned files or responsibility before starting parallel work.

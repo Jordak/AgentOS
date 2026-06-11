@@ -116,7 +116,7 @@ Landing is a phase of normal or resume mode, not a separate top-level mode.
 5. Prepare worker setup and minimal handoffs:
    - Assign each launched worker one issue, branch, isolated worktree, base branch, rebase policy, Isolation Boundary, Authorization Boundary, owned scope, workflow mode, validation expectations, PR expectations, Personal Overlay restrictions, prohibited actions, expected Workflow Result, recovery checkpoint expectations, release instruction, and blocked/failed/cancelled/needs-human reporting rules.
    - In Codex, use separate branch-backed project threads for durable implementation workers when available. Do not use in-thread subagents for durable implementation workers that need branches and worktrees.
-   - When the harness supports worker thread renaming, create or assign the worker thread, rename it to a legible target-specific name, record the thread name and Workflow Invocation Reference in the coordinator ledger only on a surface where those references are public-safe or authorized, and only then send the `READY` signal or substantive assignment.
+   - When the harness supports worker thread renaming, create or assign the worker thread, rename it to a public-safe, legible target-specific name, record the thread name and Workflow Invocation Reference in the coordinator ledger only on a surface where those references are public-safe or authorized, and only then send the `READY` signal or substantive assignment.
    - For a `coordinate-issue-batch` to `implement-github-issue` worker, use a pointer-first assignment packet with these fields: assigned issue URL and number; worker branch and isolated worktree; base branch and rebase policy; instruction to run `implement-github-issue` in the assigned mode; Isolation Boundary; Authorization Boundary; callback or result surface; release instruction; durable sources to read, including `AGENTS.md`, the issue body, `os/playbook/GITHUB_WORKFLOW.md`, `os/skills/ORCHESTRATION_LOOPS.md`, and `os/skills/implement-github-issue/SKILL.md`; validation expectations; PR and readiness-field expectations; Personal Overlay restrictions; prohibited actions, especially merge, issue closure, branch deletion, integration-branch mutation, label creation, permission changes, and writes outside the assigned scope; expected Workflow Result fields; and blocked, failed, cancelled, and needs-human reporting rules.
    - Include only enough batch context for the worker to respect its Isolation Boundary and escalation rules, such as sibling issue numbers, known shared surfaces to avoid, dependency notes that affect the assigned issue, and escalation rules. Do not make the worker responsible for the full batch ledger, selection rationale, landing queue, or other workers' detailed state.
 
@@ -180,7 +180,7 @@ Recover at least:
 - Read-only/plan-only mode performs no local or external mutation.
 - Resume mode can reconstruct enough ledger state to continue safely.
 - Every launched worker has an Isolation Boundary, branch/worktree, Authorization Boundary, Workflow Invocation Reference when supported, release instruction, and expected Workflow Result.
-- Supported durable worker threads are renamed before `READY`, and worker handoffs are minimal pointer-first packets rather than copied workflow contracts.
+- Supported durable worker threads are renamed to public-safe, legible target-specific names before `READY`, and worker handoffs are minimal pointer-first packets rather than copied workflow contracts.
 - The coordinator goes idle after worker launch and uses polling only as bounded bootstrap, timeout, recovery, or diagnostic behavior.
 - Non-parallel-safe selected batches stop for a Blocking Human Decision.
 - Workers own issue-local design/readiness questions, while coordinator-owned batch decisions return to the coordinator.
@@ -199,7 +199,7 @@ Before finishing:
 5. Confirm coordinator ledger surface and Recovery Checkpoints.
 6. Confirm worker handoffs include required fields, Workflow Invocation References when supported, release instructions, and only boundary-relevant batch context.
 7. Confirm Codex durable workers use branch-backed project threads when that harness path is available, not in-thread subagents.
-8. Confirm supported worker threads were renamed before `READY`, or record why renaming was unavailable.
+8. Confirm supported worker threads were renamed to public-safe, legible target-specific names before `READY`, or record why a public-safe rename was unavailable.
 9. Confirm the coordinator used callback-first Workflow Results and did not continuously poll workers except for recorded bounded bootstrap, timeout, recovery, or diagnostics.
 10. Confirm per-issue readiness repair and label hygiene stayed with assigned worker workflows.
 11. Confirm no PR merge/squash, branch deletion, label creation, permission change, out-of-scope issue mutation, or Personal Overlay access happened without explicit authorization.

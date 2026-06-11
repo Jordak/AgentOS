@@ -20,7 +20,7 @@ Runtime polling of Called Workflows is not the normal orchestration pattern. Pol
 
 Calling Workflows should send minimal assignment packets. The packet should point to durable task sources, issue bodies, ADRs, playbooks, skill contracts, and expected Workflow Result fields instead of copying those contracts into each launch message. Workflow-specific handoff shapes belong in the workflow that owns the launch, not in a universal reusable prompt.
 
-When the harness supports branch-backed or durable worker threads, the orchestrator should include a setup stage before real worker execution: create or assign the worker branch and worktree, rename the worker thread to a legible target-specific name, record the invocation reference, and only then send the worker the `READY` signal or assignment message.
+When the harness supports branch-backed or durable worker threads, the orchestrator should include a setup stage before real worker execution: create or assign the worker branch and worktree, rename the worker thread to a public-safe, legible target-specific name, record the invocation reference, and only then send the worker the `READY` signal or assignment message.
 
 ## Consequences
 

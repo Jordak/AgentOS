@@ -21,12 +21,13 @@ Inputs:
 - Existing durable design sources when already linked from the issue, request, repository, or project guidance.
 - Relevant project domain docs when present, such as `DOMAIN.md` and `DOMAIN-MAP.md`, with legacy `CONTEXT.md` and `CONTEXT-MAP.md` as aliases.
 - `ensure-implementation-readiness`, repository GitHub workflow guidance, and `review-loop` when available in the active AgentOS checkout or harness.
+- Optional caller-supplied Workflow Invocation Reference or result surface, plus an explicit release instruction, when this skill is invoked as a durable Called Workflow.
 - Optional explicit mode: normal mutating mode by default, or read-only mode when the caller says not to write.
 
 Output artifact:
 
 - A pull request with `Readiness evidence:` and `Readiness verdict:` fields.
-- A recoverable Workflow Result in the current reporting mode, naming issue URL and final issue labels, branch, worktree, PR, readiness verdict, validation, review-loop status, mutations, open risks, and recommended next action for the integration owner.
+- A recoverable Workflow Result in the current reporting mode or caller-supplied Workflow Invocation Reference, naming issue URL and final issue labels, branch, worktree, PR, readiness verdict, validation, review-loop status, mutations, open risks, and recommended next action for the integration owner.
 - Optional issue or PR comments when useful for recovery or handoff.
 
 Mutability:
@@ -65,7 +66,7 @@ Safety:
    - Inspect the issue body, labels, linked PR or design context, and comments relevant to readiness or blockers.
    - Read project-local domain docs when relevant to the implementation surface or required by local instructions, using `DOMAIN.md` and `DOMAIN-MAP.md` with legacy `CONTEXT.md` and `CONTEXT-MAP.md` as aliases.
    - If issue labels indicate human ownership, HITL, blocked state, or human review, record a Blocking Human Decision and stop unless the current request explicitly authorizes continuing, the repository's label or triage owner resolves the human-owned or human-review state, or the only blocker is a stale `blocked` label whose blocking dependency is verifiably resolved.
-   - Record the initial Recovery Record: issue URL, repository, branch, worktree, current phase, Authorization Boundary, known blockers, and next action.
+   - Record the initial Recovery Record: issue URL, repository, branch, worktree, current phase, Authorization Boundary, any caller-supplied Workflow Invocation Reference or result surface, release instruction, known blockers, and next action.
 
 2. Run the readiness gate:
    - Invoke or follow `ensure-implementation-readiness` for the issue, passing along the issue context, project guidance, discovered design sources, and this skill's Authorization Boundary.
@@ -121,6 +122,7 @@ Readiness verdict: <Ready to Implement | Gate Skipped>
 9. Report final Workflow Result:
    - Begin with status and whether the PR is ready for integration-owner review, naming the parent, coordinator, or human owner when known.
    - Include issue URL and final issue labels, PR link, branch and worktree, readiness evidence and verdict, mutations performed, commits, validation, review-loop evidence, open risks, and recommended next action for the integration owner.
+   - When the caller supplied a Workflow Invocation Reference or result surface, return the Workflow Result there when available, include completion, blocked, failed, cancelled, and needs-human states as applicable, and then stop or wait according to the explicit release instruction.
    - State clearly that merge, issue closure, branch deletion, and any broader integration action remain out of scope for this skill and must be handled by a landing-capable workflow such as `land-github-issue` after integration evidence exists, or by a direct human integration step.
 
 ## Recovery Record
@@ -135,6 +137,8 @@ For this skill, recover at least:
 - relevant issue labels and whether any label state created or resolved a Blocking Human Decision;
 - branch, base branch, worktree, and current commit SHA when available;
 - Authorization Boundary, including any read-only narrowing;
+- caller-supplied Workflow Invocation Reference or result surface, using only public-safe stable references in public or Git-backed surfaces and redacting private runtime handles when needed;
+- release instruction, including whether the worker should stop after returning the result, remain assigned for review corrections, or wait for a caller release signal;
 - readiness evidence and verdict;
 - current phase and next safe action;
 - PR URL after creation;
@@ -163,6 +167,7 @@ For this skill, recover at least:
 - The PR body includes readiness fields and avoids accidental issue-closing language.
 - `review-loop` is invoked or explicitly skipped with a reason; reviewer logic is not duplicated here.
 - The final result is recoverable and names every mutation, validation signal, open risk, and next action.
+- When called with a Workflow Invocation Reference or result surface, the final Workflow Result is returned through that surface when available and the release instruction is followed.
 - The workflow stops before merge, issue closure, and branch deletion. Permission changes, new label creation, and other out-of-scope external actions also remain outside this contract unless another approved workflow owns them.
 
 ## Verification
@@ -179,6 +184,6 @@ Before finishing:
 8. Confirm validation commands and results are recorded.
 9. Confirm the PR body includes `Readiness evidence:` and `Readiness verdict:`.
 10. Confirm review-loop was run, or record why it could not be run.
-11. Confirm the final Workflow Result includes issue, issue-label state, branch/worktree, PR, commits, validation, review-loop evidence, open risks, and recommended next action.
+11. Confirm the final Workflow Result includes issue, issue-label state, branch/worktree, PR, commits, validation, review-loop evidence, open risks, recommended next action, any caller-supplied Workflow Invocation Reference or result surface, and release-instruction handling.
 12. Confirm merge, issue closure, branch deletion, permission changes, new label creation, and other out-of-scope external actions were not performed without a separate approved workflow or direct user-supervised action.
 13. If this skill or its manifest entry changed, run `git diff --check` and `scripts/run-validator`.

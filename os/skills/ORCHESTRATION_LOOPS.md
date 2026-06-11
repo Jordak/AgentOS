@@ -194,7 +194,7 @@ Parallel Called Workflows must not share an uncoordinated mutable surface. They 
 When a harness supports durable worker threads or branch-backed project threads, the Calling Workflow should separate setup from execution:
 
 1. Create or assign the worker branch, isolated worktree, and worker thread.
-2. Rename the worker thread to a legible target-specific name before sending the `READY` signal or substantive assignment message.
+2. Rename the worker thread to a public-safe, legible target-specific name before sending the `READY` signal or substantive assignment message.
 3. Record the worker branch, worktree, public-safe invocation reference, Isolation Boundary, Authorization Boundary, and expected Workflow Result in the Recovery Record.
 4. Send the minimal assignment packet only after the setup checkpoint is complete.
 
