@@ -184,6 +184,18 @@ _Avoid_: human decision blocker, vague HITL need
 The return shape a Called Workflow provides to its Calling Workflow, containing enough status, evidence, mutation, validation, risk, decision, and next-action information for the Calling Workflow to continue safely. A Workflow Result may be represented by a domain-specific artifact such as a Review Packet.
 _Avoid_: raw output, unstructured transcript dump
 
+**Workflow Invocation Reference**:
+The callback or coordination reference a Calling Workflow gives to a Called Workflow for one invocation, such as a callback thread id, child-thread URL, ledger location, issue or PR comment surface, or local report path.
+_Avoid_: hidden worker handle, informal callback note
+
+**Callback-First Invocation**:
+The orchestration rule that durable Called Workflows receive a Workflow Invocation Reference and report completed, blocked, failed, cancelled, or needs-human states back through that reference instead of relying on continuous polling by the Calling Workflow.
+_Avoid_: live worker monitoring, supervisor polling
+
+**Minimal Assignment Packet**:
+A pointer-first launch message that gives a Called Workflow only the invocation-specific target, callback reference, boundaries, required durable sources, validation expectations, expected result, release instruction, and prohibited actions.
+_Avoid_: universal worker prompt, copied skill contract
+
 **Isolation Boundary**:
 The scope that lets a Calling Workflow run Called Workflows concurrently without uncoordinated mutation of the same surface. An Isolation Boundary may be an issue, task, branch and worktree, PR, artifact, domain or module area, read-only lane, or explicit non-overlap assumption with conflict-resolution.
 _Avoid_: mandatory file ownership, shared mutable checkout
@@ -287,6 +299,8 @@ _Avoid_: AgentOS Core
 - A **Recovery Checkpoint** is the act or artifact that makes a Recovery Record durable at a recovery boundary.
 - A **Blocking Human Decision** should be captured in a **Recovery Record** before the Orchestration Loop pauses for the human.
 - A **Workflow Result** may use a domain-specific artifact name and schema when the Calling Workflow can still extract the generic result fields it needs.
+- A **Workflow Invocation Reference** is the callback surface for a **Callback-First Invocation**.
+- A **Minimal Assignment Packet** should point to durable task and contract sources rather than copying those sources into the launch message.
 - An **Isolation Boundary** is required before running parallel Called Workflows that may mutate state.
 - **Integration Ownership** belongs to the workflow contract and Authorization Boundary, not inherently to the Calling Workflow or Called Workflow role.
 - A **Review Pass** assembles one **Review Panel** and returns one **Review Packet**.
