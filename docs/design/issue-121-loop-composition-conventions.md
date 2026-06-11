@@ -189,7 +189,7 @@ In scope:
 Out of scope:
 
 - Implementing `implement-github-issue`.
-- Implementing `select-next-issues-loop`.
+- Implementing issue-selection or batch-coordination loops.
 - Creating subagent workers or parallel execution.
 - Replacing the existing `review-loop` and `review-pass` contracts.
 - Adding deterministic validators unless this design identifies narrow objective invariants worth checking.

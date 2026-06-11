@@ -183,9 +183,13 @@ Required harness-neutral fields:
 - recovery checkpoint expectations: where the worker records resumable state before external writes, long waits, blocked decisions, or final handoff;
 - blocked, failed, and needs-human reporting: exact status labels or prose the worker should return, plus the evidence and decision needed to resume.
 
+Worker handoffs should include enough batch context for the worker to respect its Isolation Boundary, such as sibling issue numbers, known shared surfaces to avoid, dependency notes that affect the assigned issue, and escalation rules. They should not make each worker responsible for the full batch ledger, selection rationale, landing queue, or other workers' detailed state unless the Calling Workflow explicitly delegates that coordinator responsibility.
+
 Harness-specific invocation references are optional. Thread IDs, child-thread URLs, Codex worktree paths, source-thread IDs, subagent handles, or app-specific run IDs may help a coordinator recover a live invocation, but they are runtime references rather than reusable contract fields. Keep private or opaque references out of public issue, PR, commit, and design-doc surfaces unless the repository policy explicitly allows them.
 
-The Calling Workflow remains responsible for recording worker status, preserving each worker's Workflow Result, detecting branch or scope conflicts, routing blocked or needs-human results to the right decision owner, and deciding any coordinator-owned integration step. Workers should not merge PRs, close issues, delete branches, mutate the integration branch, or reconcile broader batch state unless their own contract and Authorization Boundary explicitly own those actions.
+The worker's live assignment may be broader than one Called Workflow invocation. For example, a worker can run `implement-github-issue` until its PR is ready for human review, then remain assigned to the same branch and PR for human review corrections until the Calling Workflow releases it. That post-result availability is part of the Calling Workflow's worker lifecycle, not a silent expansion of the Called Workflow contract.
+
+The Calling Workflow remains responsible for recording worker status, preserving each worker's Workflow Result, detecting branch or scope conflicts, routing blocked or needs-human results to the right decision owner, tracking post-result worker availability, and deciding any coordinator-owned integration step. Workers should not merge PRs, close issues, delete branches, mutate the integration branch, or reconcile broader batch state unless their own contract and Authorization Boundary explicitly own those actions.
 
 ## Existing Workflow Mapping
 

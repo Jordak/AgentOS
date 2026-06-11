@@ -354,6 +354,27 @@
       ]
     },
     {
+      "id": "coordinate-issue-batch",
+      "category": "github issue batch coordination",
+      "prompt": "Coordinate a GitHub issue batch pass by selecting issues, launching isolated workers, tracking their PRs, and landing eligible merged issues.",
+      "expected": {
+        "skill": "coordinate-issue-batch"
+      },
+      "evidence": [
+        {
+          "path": "os/skills/coordinate-issue-batch/SKILL.md",
+          "contains": [
+            "Coordinate a full GitHub issue batch pass",
+            "call `select-issue-batch`",
+            "branch-backed project threads",
+            "coordinator ledger",
+            "worker quiescence",
+            "land-github-issue"
+          ]
+        }
+      ]
+    },
+    {
       "id": "land-github-issue",
       "category": "github issue landing",
       "prompt": "Land this merged GitHub issue by verifying its acceptance criteria on origin/main, checking off fulfilled checklist items, and reporting any unmet criteria before authorized closure.",
