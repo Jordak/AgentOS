@@ -13,6 +13,7 @@ This file is the progressively discovered Core convention for loop-shaped AgentO
 Background and rationale live in:
 
 - `docs/adr/0009-contract-based-orchestration-loops.md`
+- `docs/adr/0011-callback-first-orchestration.md`
 - `docs/design/issue-121-loop-composition-conventions.md`
 
 Do not duplicate the whole rationale into each skill. Link here when a skill needs the convention.
@@ -23,6 +24,8 @@ AgentOS composes loop-shaped skills through workflow contracts and invocation-sc
 
 A workflow can be an Orchestration Loop by kind while also being a Called Workflow in a larger invocation. For example, `review-loop` is an Orchestration Loop. When `implement-github-issue` invokes it, `review-loop` is also the Called Workflow for that invocation.
 
+Durable Called Workflow execution is callback-first. A Calling Workflow should pass a callback thread id, invocation reference, ledger surface, issue or PR comment surface, or equivalent result target to the Called Workflow when the harness supports it. The Called Workflow reports its Workflow Result there when it completes, blocks, fails, is cancelled, or needs a human decision; the Calling Workflow does not continuously poll for progress as the normal control pattern.
+
 ## Workflow Kind And Invocation Roles
 
 An **Orchestration Loop** is a workflow kind: it coordinates repeated steps toward a convergence condition.
@@ -32,6 +35,32 @@ A **Calling Workflow** is the workflow that delegates work in a specific invocat
 A **Called Workflow** is the workflow being delegated to in a specific invocation.
 
 Calling Workflow and Called Workflow are contextual invocation roles, not permanent classifications.
+
+## Callback-First Invocation
+
+A **Workflow Invocation Reference** is the stable callback or coordination reference a Calling Workflow gives to a Called Workflow for one invocation. It may be a callback thread id, child-thread URL, coordinator ledger location, issue or PR comment surface, local report path, or another durable reference appropriate to the harness and Authorization Boundary.
+
+When a Calling Workflow delegates durable work, it should include a Workflow Invocation Reference, expected Workflow Result shape, and explicit release instruction in the launch context. The release instruction says whether the Called Workflow should stop after returning its result, remain assigned for review corrections, or wait for a caller release signal.
+
+A Called Workflow should return completion, blocked, failed, cancelled, and needs-human states through the invocation reference when the reference is available. After returning the result, it should stop or wait according to the release instruction. It should not assume the caller is watching the worker live.
+
+Convention v1 standardizes callback result surfaces and terminal status vocabulary, not aggregate status precedence. For workflows that aggregate mixed child outcomes, keep per-worker, per-issue, or per-batch outcomes visible in the Workflow Result; aggregate precedence rules and richer status maps are deferred to GitHub issue #158.
+
+Runtime polling of Called Workflows is not the normal orchestration pattern. It is allowed only as bounded bootstrap, timeout, recovery, or diagnostic behavior. The Calling Workflow should record the polling reason, bound, and result in its Recovery Record.
+
+## Minimal Assignment Packets
+
+Calling Workflows should send pointer-first assignment packets to Called Workflows. A packet should include only the invocation-specific facts needed to begin safely:
+
+- target: issue, PR, branch, artifact, design source, or other durable task pointer;
+- Workflow Invocation Reference and release instruction;
+- Isolation Boundary and Authorization Boundary;
+- workflow mode and owned scope;
+- required durable sources to read, such as local instructions, issue bodies, ADRs, playbooks, and skill contracts;
+- validation and expected Workflow Result requirements;
+- prohibited actions and escalation rules.
+
+Do not copy whole skill contracts, playbooks, issue bodies, or batch ledgers into each launch message when stable pointers are sufficient. Workflow-specific handoff shapes belong in the workflow that owns the launch, while this convention keeps the reusable rule small.
 
 ## Authorization Boundary
 
@@ -156,36 +185,22 @@ For each parallel Called Workflow, the Calling Workflow should provide:
 - an explicit Authorization Boundary;
 - a Workflow Invocation Reference;
 - an expected Workflow Result;
+- an explicit release instruction;
 - a Recovery Checkpoint before launch;
 - a coordinator-owned integration or conflict-resolution step after results return.
 
 Parallel Called Workflows must not share an uncoordinated mutable surface. They should not share the same working tree, index, branch, issue-body edit, PR comment stream, or other mutation surface unless the Calling Workflow has a designed coordination rule for that surface.
 
-### Implementation Worker Handoff Packet
+### Worker Thread Setup
 
-When a Calling Workflow launches an implementation worker, it should give the worker a concise handoff packet before the worker starts. The packet is an invocation-scoped contract, not a new skill and not a replacement for the worker's own skill contract.
+When a harness supports durable worker threads or branch-backed project threads, the Calling Workflow should separate setup from execution:
 
-Required harness-neutral fields:
+1. Create or assign the worker branch, isolated worktree, and worker thread.
+2. When thread renaming is supported, rename the worker thread to a public-safe, legible target-specific name before sending the `READY` signal or substantive assignment message; otherwise record why a public-safe rename was unavailable.
+3. Record the worker branch, worktree, public-safe thread name when available or unavailable reason, public-safe invocation reference, Isolation Boundary, Authorization Boundary, and expected Workflow Result in the Recovery Record.
+4. Send the minimal assignment packet only after the setup checkpoint is complete.
 
-- assigned issue: issue URL and number, or another durable task reference;
-- worker branch: the feature branch the worker owns;
-- isolated worktree: the checkout path or equivalent isolated workspace;
-- base branch and rebase policy: the integration branch to start from and whether to rebase instead of merging;
-- Isolation Boundary: the issue, artifact, module area, branch/worktree, read-only lane, or explicit non-overlap assumption the worker owns;
-- Authorization Boundary: the exact mutations the worker may perform and the actions that still require approval;
-- owned scope or responsibility: files, docs, issue criteria, phase, or outcome the worker owns;
-- workflow mode: whether the worker should run full `implement-github-issue` or an explicitly approved subphase;
-- validation expectations: required commands, checks, review loops, or evidence for skipped validation;
-- PR and evidence expectations: whether to create or update a PR, where to report commits and validation, and which readiness fields or comments are required;
-- Personal Overlay restrictions: where private state may be read from and whether any non-overlapping Personal Overlay writes are assigned;
-- prohibited actions: especially merge, issue closure, branch deletion, integration-branch mutation, label creation, permission changes, and writes outside the assigned scope;
-- expected Workflow Result: required final fields, evidence links, mutations performed, validation, open risks, and recommended next action;
-- recovery checkpoint expectations: where the worker records resumable state before external writes, long waits, blocked decisions, or final handoff;
-- blocked, failed, and needs-human reporting: exact status labels or prose the worker should return, plus the evidence and decision needed to resume.
-
-Worker handoffs should include enough batch context for the worker to respect its Isolation Boundary, such as sibling issue numbers, known shared surfaces to avoid, dependency notes that affect the assigned issue, and escalation rules. They should not make each worker responsible for the full batch ledger, selection rationale, landing queue, or other workers' detailed state unless the Calling Workflow explicitly delegates that coordinator responsibility.
-
-Harness-specific invocation references are optional. Thread IDs, child-thread URLs, Codex worktree paths, source-thread IDs, subagent handles, or app-specific run IDs may help a coordinator recover a live invocation, but they are runtime references rather than reusable contract fields. Keep private or opaque references out of public issue, PR, commit, and design-doc surfaces unless the repository policy explicitly allows them.
+Harness-specific invocation references can help recover a live invocation, but they are runtime references rather than reusable contract fields. Keep private or opaque references out of public issue, PR, commit, and design-doc surfaces unless repository policy explicitly allows them.
 
 The worker's live assignment may be broader than one Called Workflow invocation. For example, a worker can run `implement-github-issue` until its PR is ready for human review, then remain assigned to the same branch and PR for human review corrections until the Calling Workflow releases it. That post-result availability is part of the Calling Workflow's worker lifecycle, not a silent expansion of the Called Workflow contract.
 
@@ -200,8 +215,8 @@ Existing AgentOS workflows keep their native contracts and artifacts:
 - `ensure-implementation-readiness` (`os/skills/ensure-implementation-readiness/SKILL.md`) owns the feature-sized readiness gate and readiness-repair workflow, including durable design-source updates when authorized.
 - `audit-issues` (`os/skills/audit-issues/SKILL.md`) owns evidence-backed issue tracker reconciliation after integration evidence exists.
 - `land-github-issue` (`os/skills/land-github-issue/SKILL.md`) owns one-issue acceptance-criteria reconciliation, fulfilled-checkbox updates, and authorized issue closure after integration evidence exists. It returns unmet criteria to the Calling Workflow instead of spawning workers or widening implementation scope.
-- `coordinate-issue-batch` (`os/skills/coordinate-issue-batch/SKILL.md`) owns one GitHub issue batch pass: selection or accepted-batch conversion, worker launch and tracking, human merge-event handling, and eligible landing through `land-github-issue`.
-- `github-loop` (`os/skills/github-loop/SKILL.md`) owns repeated GitHub issue batch-pass sequencing by invoking or resuming `coordinate-issue-batch` until no suitable issues remain or a stop condition halts the repository-level loop.
+- `coordinate-issue-batch` (`os/skills/coordinate-issue-batch/SKILL.md`) owns one GitHub issue batch pass: selection or accepted-batch conversion, callback-first worker launch and tracking, human merge-event handling, and eligible landing through `land-github-issue`.
+- `github-loop` (`os/skills/github-loop/SKILL.md`) owns repeated GitHub issue batch-pass sequencing by invoking or resuming `coordinate-issue-batch` with callback-first batch-pass handoffs until no suitable issues remain or a stop condition halts the repository-level loop.
 - `os/playbook/GITHUB_WORKFLOW.md` owns repository branch, PR, external-write, and issue-closure discipline.
 
 Link to these contracts rather than copying their rules into every new loop.
@@ -215,6 +230,10 @@ When a skill is an Orchestration Loop or can be invoked by one, its skill contra
 - what external writes require additional approval;
 - what it may call;
 - what Workflow Result it returns;
+- which canonical terminal statuses it can return, normally `completed`, `blocked`, `failed`, `cancelled`, and `needs-human` unless the skill documents a narrower set;
+- how it accepts and reports any caller-supplied Workflow Invocation Reference or result surface;
+- how it follows release instructions after returning a result to a caller;
+- what Minimal Assignment Packet it sends when it launches called workflows or workers, including callback/result surface, release instruction, target, boundary, and expected Workflow Result ownership;
 - what Recovery Record or Recovery Checkpoint it maintains;
 - what Integration Ownership, if any, belongs to the skill.
 
@@ -226,5 +245,5 @@ Before changing this convention or a loop-shaped skill that depends on it:
 
 1. Run `scripts/run-validator`.
 2. Run `git diff --check`.
-3. Inspect affected skill contracts or manifest entries for clear Authorization Boundaries, Workflow Results, Recovery Records, and Integration Ownership where relevant.
+3. Inspect affected skill contracts or manifest entries for clear Authorization Boundaries, Workflow Invocation References, Minimal Assignment Packets, Workflow Results, Recovery Records, and Integration Ownership where relevant.
 4. Keep deterministic validators shallow and objective until the convention matures enough to enforce mechanically.

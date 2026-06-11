@@ -117,36 +117,21 @@ Do not broad-copy `personal/os/` into feature worktrees, and do not use `git add
 
 When delegating implementation issues to workers on feature branches, make worktree isolation explicit, and make landing and issue closure an integration responsibility, not a branch-worker responsibility.
 
-- Use the implementation worker handoff packet in `os/skills/ORCHESTRATION_LOOPS.md` when launching workers. This playbook supplies the GitHub-specific branch, worktree, push, pull request, and issue-closure language for that packet.
+- Follow the callback-first and minimal-assignment guidance in `os/skills/ORCHESTRATION_LOOPS.md` when launching durable workers.
+- For `coordinate-issue-batch` to `implement-github-issue` worker launches, use the pointer-first handoff shape in `os/skills/coordinate-issue-batch/SKILL.md`. This playbook supplies branch, worktree, push, pull request, and issue-closure discipline, but it is not the universal worker prompt.
 - Give each worker its own isolated worktree and feature branch. Prefer `git worktree` checkouts rooted from the current integration branch.
 - In Codex harnesses that support branch-backed project threads, use separate Codex threads for durable implementation workers rather than in-thread subagents. In-thread subagents remain suitable for read-only review, exploration, or short-lived advisory fan-out when no durable branch/worktree worker is needed.
+- When the harness supports thread renaming, rename the worker thread to a public-safe, legible target-specific name before sending the `READY` signal or substantive assignment message.
 - Preserve Codex-managed worktrees when Codex creates them; for manual AgentOS worktrees, use `$CODEX_HOME/worktrees/`.
 - Do not have multiple workers share the same checkout, working tree, index, or feature branch.
-- Record each worker's worktree path, branch name, assigned issue, and owned files or responsibility before starting parallel work.
+- Record each worker's worktree path, branch name, assigned issue, owned files or responsibility, callback/result surface or unavailable reason, release instruction, and expected terminal Workflow Result before starting parallel work.
 - Before integrating results, inspect the worktree list and each worker branch status to confirm workers did not step on each other's branches or local changes.
 - Instruct workers to commit, push their feature branch, open or update their PR when their contract owns that step, and return evidence through their Workflow Result or issue/PR comments.
+- Give workers a callback thread id, invocation reference, ledger surface, or equivalent result target when the harness supports one. Do not continuously poll workers for progress except as bounded bootstrap, timeout, recovery, or diagnostic behavior.
 - Do not instruct feature-branch workers to merge PRs, close issues, or delete branches.
 - Landing, issue closure, and branch deletion belong to a workflow or human integration step whose contract explicitly owns those surfaces.
 - Issue closure belongs after the resolving commit has landed on `main` or the pull request has merged and the integration owner has reconciled the issue acceptance criteria.
 - Avoid wording such as "close after the commit is pushed" unless the push is directly to the integration branch.
-
-Standard worker handoff language:
-
-> Work only in your assigned isolated worktree and feature branch. Do not reuse
-> or switch another worker's branch. Do not commit directly to `main`. Rebase
-> on `origin/main` instead of merging `main` into your branch. Push with
-> `scripts/agent-push` and report branch, PR, commit, validation, and
-> review evidence in your Workflow Result. If you need Personal Overlay state,
-> read it from the canonical primary AgentOS checkout, not from this feature
-> worktree's ignored-file skeleton. Write Personal Overlay files only when
-> explicitly assigned a non-overlapping path. Do not merge PRs, close issues,
-> delete branches, mutate the integration branch, create labels, or write
-> outside your assigned scope. Return blocked, failed, and needs-human states
-> with the evidence and decision needed to resume. After your implementation
-> workflow returns reviewed PR evidence, remain available for review-comment
-> corrections on your assigned branch until the coordinator releases you. The
-> integration owner will decide landing and closure after the resolving PR is
-> merged and the issue acceptance criteria are reconciled.
 
 ## GitHub Issue Closure Discipline
 
