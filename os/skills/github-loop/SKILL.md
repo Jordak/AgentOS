@@ -64,6 +64,8 @@ Safety:
 
 ### Normal
 
+This is the default mode when none is specified.
+
 Run repeated batch passes:
 
 1. Establish the loop target, goal, caps, Authorization Boundary, and Recovery Record.
