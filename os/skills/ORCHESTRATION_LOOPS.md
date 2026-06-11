@@ -24,7 +24,7 @@ AgentOS composes loop-shaped skills through workflow contracts and invocation-sc
 
 A workflow can be an Orchestration Loop by kind while also being a Called Workflow in a larger invocation. For example, `review-loop` is an Orchestration Loop. When `implement-github-issue` invokes it, `review-loop` is also the Called Workflow for that invocation.
 
-Durable Called Workflow execution is callback-first. A Calling Workflow should pass a callback thread id, invocation reference, ledger surface, issue or PR comment surface, or equivalent result target to the Called Workflow when the harness supports it. The Called Workflow reports its Workflow Result there when it completes, blocks, fails, or needs a human decision; the Calling Workflow does not continuously poll for progress as the normal control pattern.
+Durable Called Workflow execution is callback-first. A Calling Workflow should pass a callback thread id, invocation reference, ledger surface, issue or PR comment surface, or equivalent result target to the Called Workflow when the harness supports it. The Called Workflow reports its Workflow Result there when it completes, blocks, fails, is cancelled, or needs a human decision; the Calling Workflow does not continuously poll for progress as the normal control pattern.
 
 ## Workflow Kind And Invocation Roles
 

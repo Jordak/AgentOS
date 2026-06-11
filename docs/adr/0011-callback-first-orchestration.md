@@ -14,7 +14,7 @@ AgentOS orchestration should use callback-first invocation for durable Called Wo
 
 A Calling Workflow should pass a Workflow Invocation Reference to each Called Workflow when the harness or workflow surface supports it. The reference can be a callback thread id, child-thread URL, coordinator ledger location, issue or PR comment surface, or equivalent stable place where the Called Workflow can return its Workflow Result.
 
-A Called Workflow should report completion, blocked, failed, and needs-human states back to the Calling Workflow through that reference. After reporting, the Called Workflow should stop or wait according to the caller's explicit release instruction. It should not assume the caller will continuously poll for progress.
+A Called Workflow should report completion, blocked, failed, cancelled, and needs-human states back to the Calling Workflow through that reference. After reporting, the Called Workflow should stop or wait according to the caller's explicit release instruction. It should not assume the caller will continuously poll for progress.
 
 Runtime polling of Called Workflows is not the normal orchestration pattern. Polling is allowed only as bounded bootstrap, timeout, recovery, or diagnostic behavior, and the caller should record why polling was needed in its Recovery Record.
 

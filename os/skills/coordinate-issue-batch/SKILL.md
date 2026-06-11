@@ -28,7 +28,7 @@ Inputs:
 
 Output artifact:
 
-- A coordinator Workflow Result with batch status, selected or provided issues, ledger location, worker branches/worktrees/thread names/invocation references/PRs, worker states, merge-event state, landing outcomes, skipped issues, blockers, validation, mutations performed, open risks, and recommended next action.
+- A coordinator Workflow Result with batch status, selected or provided issues, ledger location, worker branches, worktrees, PRs, worker states, public-safe thread names and invocation references or redacted private-surface summaries, merge-event state, landing outcomes, skipped issues, blockers, validation, mutations performed, open risks, and recommended next action.
 - A recoverable coordinator ledger or report in the current reporting mode.
 - Optional dedicated GitHub batch tracking issue when the Authorization Boundary explicitly permits creating or using that tracker surface.
 
@@ -103,7 +103,7 @@ Landing is a phase of normal or resume mode, not a separate top-level mode.
 3. Establish the coordinator ledger:
    - Use an invocation-owned coordinator ledger by default.
    - Create or use a dedicated GitHub batch tracking issue only when the Authorization Boundary explicitly permits that tracker write.
-   - Record selected issues, selection evidence, batch source, concurrency limit, worker slots, planned branches/worktrees/thread names, planned Workflow Invocation References, Isolation Boundaries, known dependencies, stale-label evidence, and next action.
+   - Record selected issues, selection evidence, batch source, concurrency limit, worker slots, planned branches/worktrees, public-safe planned thread names and Workflow Invocation References or redacted/private-surface summaries, Isolation Boundaries, known dependencies, stale-label evidence, and next action.
    - Create a Recovery Checkpoint before worker launch or any other recovery boundary where losing context would make resumption unsafe.
 
 4. Check blockers and parallel safety:
@@ -114,10 +114,10 @@ Landing is a phase of normal or resume mode, not a separate top-level mode.
    - Do not perform per-issue label hygiene in the coordinator. Pass issue-local readiness and stale-label evidence to the assigned worker.
 
 5. Prepare worker setup and minimal handoffs:
-   - Assign each launched worker one issue, branch, isolated worktree, base branch, rebase policy, Isolation Boundary, Authorization Boundary, owned scope, workflow mode, validation expectations, PR expectations, Personal Overlay restrictions, prohibited actions, expected Workflow Result, recovery checkpoint expectations, release instruction, and blocked/failed/needs-human reporting rules.
+   - Assign each launched worker one issue, branch, isolated worktree, base branch, rebase policy, Isolation Boundary, Authorization Boundary, owned scope, workflow mode, validation expectations, PR expectations, Personal Overlay restrictions, prohibited actions, expected Workflow Result, recovery checkpoint expectations, release instruction, and blocked/failed/cancelled/needs-human reporting rules.
    - In Codex, use separate branch-backed project threads for durable implementation workers when available. Do not use in-thread subagents for durable implementation workers that need branches and worktrees.
-   - When the harness supports worker thread renaming, create or assign the worker thread, rename it to a legible target-specific name, record the thread name and Workflow Invocation Reference in the coordinator ledger, and only then send the `READY` signal or substantive assignment.
-   - For a `coordinate-issue-batch` to `implement-github-issue` worker, use a pointer-first assignment packet with these fields: assigned issue URL and number; worker branch and isolated worktree; base branch and rebase policy; instruction to run `implement-github-issue` in the assigned mode; Isolation Boundary; Authorization Boundary; callback or result surface; release instruction; durable sources to read, including `AGENTS.md`, the issue body, `os/playbook/GITHUB_WORKFLOW.md`, `os/skills/ORCHESTRATION_LOOPS.md`, and `os/skills/implement-github-issue/SKILL.md`; validation expectations; PR and readiness-field expectations; Personal Overlay restrictions; prohibited actions, especially merge, issue closure, branch deletion, integration-branch mutation, label creation, permission changes, and writes outside the assigned scope; expected Workflow Result fields; and blocked, failed, and needs-human reporting rules.
+   - When the harness supports worker thread renaming, create or assign the worker thread, rename it to a legible target-specific name, record the thread name and Workflow Invocation Reference in the coordinator ledger only on a surface where those references are public-safe or authorized, and only then send the `READY` signal or substantive assignment.
+   - For a `coordinate-issue-batch` to `implement-github-issue` worker, use a pointer-first assignment packet with these fields: assigned issue URL and number; worker branch and isolated worktree; base branch and rebase policy; instruction to run `implement-github-issue` in the assigned mode; Isolation Boundary; Authorization Boundary; callback or result surface; release instruction; durable sources to read, including `AGENTS.md`, the issue body, `os/playbook/GITHUB_WORKFLOW.md`, `os/skills/ORCHESTRATION_LOOPS.md`, and `os/skills/implement-github-issue/SKILL.md`; validation expectations; PR and readiness-field expectations; Personal Overlay restrictions; prohibited actions, especially merge, issue closure, branch deletion, integration-branch mutation, label creation, permission changes, and writes outside the assigned scope; expected Workflow Result fields; and blocked, failed, cancelled, and needs-human reporting rules.
    - Include only enough batch context for the worker to respect its Isolation Boundary and escalation rules, such as sibling issue numbers, known shared surfaces to avoid, dependency notes that affect the assigned issue, and escalation rules. Do not make the worker responsible for the full batch ledger, selection rationale, landing queue, or other workers' detailed state.
 
 6. Launch and track workers:
@@ -141,7 +141,7 @@ Landing is a phase of normal or resume mode, not a separate top-level mode.
    - Record fulfilled, skipped, blocked, failed, cancelled, unmerged, unresolved, and landed outcomes in the coordinator ledger.
 
 9. Report the coordinator Workflow Result:
-   - Include issue URLs, selection source, ledger surface, branch/worktree/thread status, PRs, merge-event status, landing outcomes, skipped issues, validation, mutations, open risks, and recommended next action.
+   - Include issue URLs, selection source, ledger surface, branch and worktree status, PRs, public-safe thread status or redacted private-surface summary, merge-event status, landing outcomes, skipped issues, validation, mutations, open risks, and recommended next action.
    - State clearly that PR merge/squash, branch deletion, new label creation, and any out-of-boundary external action remain outside v1 unless a separate approved workflow or direct human step owns them.
 
 ## Coordinator Ledger
@@ -156,7 +156,7 @@ Recover at least:
 - ledger surface and checkpoint history;
 - selected or provided issues and selection evidence;
 - concurrency limit and queued issues;
-- worker branch, worktree, thread name when available, Workflow Invocation Reference or callback surface when available, PR, assigned issue, Isolation Boundary, Authorization Boundary, release instruction, and worker state;
+- worker branch, worktree, public-safe thread name and Workflow Invocation Reference when available, redacted/private-surface summary when references are not public-safe, PR, assigned issue, Isolation Boundary, Authorization Boundary, release instruction, and worker state;
 - worker Workflow Result evidence, validation, review-loop evidence, and open risks;
 - bounded polling reason, bound, and result when runtime polling was used for bootstrap, timeout, recovery, or diagnostics;
 - human-review, review-correction, merge, landing, skipped, blocked, failed, cancelled, and unresolved state;
