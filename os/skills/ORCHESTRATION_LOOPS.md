@@ -161,7 +161,31 @@ For each parallel Called Workflow, the Calling Workflow should provide:
 
 Parallel Called Workflows must not share an uncoordinated mutable surface. They should not share the same working tree, index, branch, issue-body edit, PR comment stream, or other mutation surface unless the Calling Workflow has a designed coordination rule for that surface.
 
-Future worker handoff issues should define the detailed handoff shape for implementation workers. This file establishes the general loop composition convention.
+### Implementation Worker Handoff Packet
+
+When a Calling Workflow launches an implementation worker, it should give the worker a concise handoff packet before the worker starts. The packet is an invocation-scoped contract, not a new skill and not a replacement for the worker's own skill contract.
+
+Required harness-neutral fields:
+
+- assigned issue: issue URL and number, or another durable task reference;
+- worker branch: the feature branch the worker owns;
+- isolated worktree: the checkout path or equivalent isolated workspace;
+- base branch and rebase policy: the integration branch to start from and whether to rebase instead of merging;
+- Isolation Boundary: the issue, artifact, module area, branch/worktree, read-only lane, or explicit non-overlap assumption the worker owns;
+- Authorization Boundary: the exact mutations the worker may perform and the actions that still require approval;
+- owned scope or responsibility: files, docs, issue criteria, phase, or outcome the worker owns;
+- workflow mode: whether the worker should run full `implement-github-issue` or an explicitly approved subphase;
+- validation expectations: required commands, checks, review loops, or evidence for skipped validation;
+- PR and evidence expectations: whether to create or update a PR, where to report commits and validation, and which readiness fields or comments are required;
+- Personal Overlay restrictions: where private state may be read from and whether any non-overlapping Personal Overlay writes are assigned;
+- prohibited actions: especially merge, issue closure, branch deletion, integration-branch mutation, label creation, permission changes, and writes outside the assigned scope;
+- expected Workflow Result: required final fields, evidence links, mutations performed, validation, open risks, and recommended next action;
+- recovery checkpoint expectations: where the worker records resumable state before external writes, long waits, blocked decisions, or final handoff;
+- blocked, failed, and needs-human reporting: exact status labels or prose the worker should return, plus the evidence and decision needed to resume.
+
+Harness-specific invocation references are optional. Thread IDs, child-thread URLs, Codex worktree paths, source-thread IDs, subagent handles, or app-specific run IDs may help a coordinator recover a live invocation, but they are runtime references rather than reusable contract fields. Keep private or opaque references out of public issue, PR, commit, and design-doc surfaces unless the repository policy explicitly allows them.
+
+The Calling Workflow remains responsible for recording worker status, preserving each worker's Workflow Result, detecting branch or scope conflicts, routing blocked or needs-human results to the right decision owner, and deciding any coordinator-owned integration step. Workers should not merge PRs, close issues, delete branches, mutate the integration branch, or reconcile broader batch state unless their own contract and Authorization Boundary explicitly own those actions.
 
 ## Existing Workflow Mapping
 
