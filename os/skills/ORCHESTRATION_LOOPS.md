@@ -15,6 +15,7 @@ Background and rationale live in:
 - `docs/adr/0009-contract-based-orchestration-loops.md`
 - `docs/adr/0011-callback-first-orchestration.md`
 - `docs/design/issue-121-loop-composition-conventions.md`
+- `docs/design/issue-144-called-workflow-effort-policy.md`
 
 Do not duplicate the whole rationale into each skill. Link here when a skill needs the convention.
 
@@ -79,6 +80,37 @@ A Calling Workflow may widen the Authorization Boundary only when all of these a
 
 A Called Workflow must not treat silence as authorization for actions outside its contract. When it discovers broader work is needed, it should return a Workflow Result with evidence, risks, and any Blocking Human Decision. The Calling Workflow decides whether to widen the boundary, call another workflow, or stop.
 
+## Effort Policy
+
+Reasoning effort and model selection are part of workflow composition, but they are not authorization. A high-effort Called Workflow still owns only the mutations allowed by its contract and invocation Authorization Boundary.
+
+Use effort recommendations as defaults, not mandates. User instructions about budget, latency, rate limits, or quality override AgentOS defaults when they do not conflict with safety or the workflow's minimum quality bar. Platform defaults, custom agent configuration, and model support can also override or ignore the requested effort.
+
+AgentOS-owned workflow contracts may name their own stable default effort. For shared loop composition, this file is the canonical convention. For vendored skills, do not patch upstream `SKILL.md` files solely to add AgentOS-specific effort policy. Put AgentOS-specific recommendations in Calling Workflow invocation instructions, AgentOS-owned wrapper workflows, `os/skills/MANIFEST.md` metadata, or this convention file.
+
+When a Calling Workflow invokes a Called Workflow and the harness exposes effort controls, the invocation may include an effort policy with:
+
+- requested model and requested effort, or `harness default`;
+- reason for the selection;
+- selection source, such as `contract default`, `Calling Workflow override`, `user budget override`, `user latency override`, `custom agent config`, `platform selected`, or `unknown`;
+- fallback rule when the platform cannot honor or report the request.
+
+If no invocation-specific effort is supplied, the Called Workflow uses its own contract or AgentOS manifest recommendation when one exists. If no recommendation exists, the harness default applies.
+
+Initial defaults:
+
+| Workflow type | Default effort | Escalate when | De-escalate when |
+| --- | --- | --- | --- |
+| Parent orchestration loops such as `implement-github-issue`, `coordinate-issue-batch`, and `github-loop` | `medium` | Design adjudication, recovery from ambiguity, or cross-workflow risk is substantial | The loop is only bookkeeping, status polling, or handoff packaging |
+| `ensure-implementation-readiness` | `medium` | Readiness repair is fuzzy, architectural, or requires `grill-with-docs` | The gate is a mechanical marker or source-shape check |
+| `grill-me` | `high` when invoked for design consensus | The decision is hard to reverse or spans multiple domains | The session is a small read-only sanity check |
+| `grill-with-docs` | `high` when invoked for readiness repair or ADR-worthy design | Domain terms conflict, durable docs need careful edits, or the decision is hard to reverse | The update is a narrow glossary clarification |
+| `review-pass` | `high` for normal reviewer panels | Security, publication safety, broad contract changes, or deeply ambiguous design drift may justify `xhigh` when the user budget allows it | Tiny docs-only or formatting-only review can use `medium` |
+| `review-loop` parent orchestrator | `medium` | Ambiguous adjudication, repeated findings, or design-escape-hatch decisions need deeper judgment | Routine ledger management and PR-comment packaging can use `low` or `medium` |
+| Simple audit or closure workflows such as `audit-issues` and `land-github-issue` | `medium` | Acceptance criteria, human-review labels, or integration evidence are ambiguous | The check is purely mechanical and already backed by integration-branch evidence |
+
+Do not invent precision. If the platform does not expose the actual model or effort used, record `unknown`, `not reported`, `platform default`, or `not applicable` rather than guessing.
+
 ## Mutation Ownership
 
 Mutation is owned by the workflow whose contract and Authorization Boundary explicitly include that mutation surface.
@@ -112,6 +144,7 @@ A Workflow Result should include:
 - Called Workflow: name and invocation reference when available;
 - status: a workflow-specific status such as `completed`, `blocked`, `failed`, `cancelled`, or `needs-human`;
 - evidence: links, paths, commits, comments, reports, packets, verdicts, or other artifacts produced;
+- model and effort metadata when available: requested model, requested effort, actual model, actual effort, selection source, and override or mismatch notes;
 - mutations performed: local edits, commits, pushes, comments, labels, external writes, or `none`;
 - validation: checks run and results;
 - open risks or unresolved decisions: especially any Blocking Human Decision;
@@ -132,6 +165,7 @@ For every mutating Orchestration Loop, the Recovery Record should preserve at le
 - target: the issue, PR, branch, repository, artifact, or task the loop is operating on;
 - workflow invocation references: available references for the Calling Workflow and Called Workflows, including thread IDs, child-thread URLs, subagent handles, report paths, comment URLs, issue URLs, PR URLs, and commit SHAs when safe;
 - authorization boundary: mutations and external writes allowed for this run, plus actions that still require approval;
+- model and effort policy: requested model and effort, actual or reported model and effort, selection source, and any user, platform, custom-agent, budget, or latency override when known;
 - current phase: enough information to resume without guessing;
 - blocking human decisions: exact question, recommended default, and decision state such as `unresolved`, `approved`, or `declined/accepted-risk`;
 - Called Workflow results: links or summaries of returned evidence, reports, comments, commits, or verdicts;
@@ -200,7 +234,30 @@ When a harness supports durable worker threads or branch-backed project threads,
 3. Record the worker branch, worktree, public-safe thread name when available or unavailable reason, public-safe invocation reference, Isolation Boundary, Authorization Boundary, and expected Workflow Result in the Recovery Record.
 4. Send the minimal assignment packet only after the setup checkpoint is complete.
 
-Harness-specific invocation references can help recover a live invocation, but they are runtime references rather than reusable contract fields. Keep private or opaque references out of public issue, PR, commit, and design-doc surfaces unless repository policy explicitly allows them.
+Minimal Assignment Packets should include:
+
+- assigned issue: issue URL and number, or another durable task reference;
+- worker branch: the feature branch the worker owns;
+- isolated worktree: the checkout path or equivalent isolated workspace;
+- base branch and rebase policy: the integration branch to start from and whether to rebase instead of merging;
+- Isolation Boundary: the issue, artifact, module area, branch/worktree, read-only lane, or explicit non-overlap assumption the worker owns;
+- Authorization Boundary: the exact mutations the worker may perform and the actions that still require approval;
+- owned scope or responsibility: files, docs, issue criteria, phase, or outcome the worker owns;
+- workflow mode: whether the worker should run full `implement-github-issue` or an explicitly approved subphase;
+- effort policy: requested model or effort when the caller has one, fallback behavior when unsupported, and any budget or latency override;
+- callback or result surface: where the worker should return the Workflow Result when a caller-supplied surface exists;
+- release instruction: whether the worker should stop after returning the result, remain assigned for correction or resume, or wait for caller release;
+- validation expectations: required commands, checks, review loops, or evidence for skipped validation;
+- PR and evidence expectations: whether to create or update a PR, where to report commits and validation, and which readiness fields or comments are required;
+- Personal Overlay restrictions: where private state may be read from and whether any non-overlapping Personal Overlay writes are assigned;
+- prohibited actions: especially merge, issue closure, branch deletion, integration-branch mutation, label creation, permission changes, and writes outside the assigned scope;
+- expected Workflow Result: required status, final fields, evidence links, mutations performed, validation, open risks, and recommended next action;
+- recovery checkpoint expectations: where the worker records resumable state before external writes, long waits, blocked decisions, or final handoff;
+- blocked, failed, cancelled, and needs-human reporting: exact status labels or prose the worker should return, plus the evidence and decision needed to resume.
+
+Worker handoffs should include enough batch context for the worker to respect its Isolation Boundary, such as sibling issue numbers, known shared surfaces to avoid, dependency notes that affect the assigned issue, and escalation rules. They should not make each worker responsible for the full batch ledger, selection rationale, landing queue, or other workers' detailed state unless the Calling Workflow explicitly delegates that coordinator responsibility.
+
+Harness-specific invocation references are optional. Thread IDs, child-thread URLs, Codex worktree paths, source-thread IDs, subagent handles, or app-specific run IDs may help a coordinator recover a live invocation, but they are runtime references rather than reusable contract fields. Keep private or opaque references out of public issue, PR, commit, and design-doc surfaces unless repository policy explicitly allows them.
 
 The worker's live assignment may be broader than one Called Workflow invocation. For example, a worker can run `implement-github-issue` until its PR is ready for human review, then remain assigned to the same branch and PR for human review corrections until the Calling Workflow releases it. That post-result availability is part of the Calling Workflow's worker lifecycle, not a silent expansion of the Called Workflow contract.
 
@@ -227,6 +284,7 @@ When a skill is an Orchestration Loop or can be invoked by one, its skill contra
 
 - whether it is read-only, mutating, or mode-dependent;
 - what target it owns;
+- recommended effort policy when AgentOS owns that recommendation or when a vendored skill needs AgentOS-owned routing metadata;
 - what external writes require additional approval;
 - what it may call;
 - what Workflow Result it returns;
@@ -245,5 +303,5 @@ Before changing this convention or a loop-shaped skill that depends on it:
 
 1. Run `scripts/run-validator`.
 2. Run `git diff --check`.
-3. Inspect affected skill contracts or manifest entries for clear Authorization Boundaries, Workflow Invocation References, Minimal Assignment Packets, Workflow Results, Recovery Records, and Integration Ownership where relevant.
+3. Inspect affected skill contracts or manifest entries for clear Authorization Boundaries, effort policy, Workflow Invocation References, Minimal Assignment Packets, Workflow Results, Recovery Records, and Integration Ownership where relevant.
 4. Keep deterministic validators shallow and objective until the convention matures enough to enforce mechanically.

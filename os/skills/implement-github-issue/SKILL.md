@@ -27,7 +27,7 @@ Inputs:
 Output artifact:
 
 - A pull request with `Readiness evidence:` and `Readiness verdict:` fields.
-- A recoverable Workflow Result in the current reporting mode or caller-supplied Workflow Invocation Reference, with terminal status (`completed`, `blocked`, `failed`, `cancelled`, or `needs-human`), issue URL and final issue labels, branch, worktree, PR, readiness verdict, validation, review-loop status, mutations, open risks, release-instruction handling, and recommended next action for the integration owner.
+- A recoverable Workflow Result in the current reporting mode or caller-supplied Workflow Invocation Reference, with terminal status (`completed`, `blocked`, `failed`, `cancelled`, or `needs-human`), issue URL and final issue labels, branch, worktree, PR, readiness verdict, model and effort metadata with `unknown` or `not reported` fallbacks, validation, review-loop status, mutations, open risks, release-instruction handling, and recommended next action for the integration owner.
 - Optional issue or PR comments when useful for recovery or handoff.
 
 Mutability:
@@ -67,7 +67,7 @@ Safety:
    - Inspect the issue body, labels, linked PR or design context, and comments relevant to readiness or blockers.
    - Read project-local domain docs when relevant to the implementation surface or required by local instructions, using `DOMAIN.md` and `DOMAIN-MAP.md` with legacy `CONTEXT.md` and `CONTEXT-MAP.md` as aliases.
    - If issue labels indicate human ownership, HITL, blocked state, or human review, record a Blocking Human Decision and stop unless the current request explicitly authorizes continuing, the repository's label or triage owner resolves the human-owned or human-review state, or the only blocker is a stale `blocked` label whose blocking dependency is verifiably resolved.
-   - Record the initial Recovery Record: issue URL, repository, branch, worktree, current phase, Authorization Boundary, any caller-supplied Workflow Invocation Reference or result surface, release instruction, known blockers, and next action.
+   - Record the initial Recovery Record: issue URL, repository, branch, worktree, current phase, Authorization Boundary, any caller-supplied Workflow Invocation Reference or result surface, release instruction, model and effort policy, actual model and effort if reported, selection source, override notes, `unknown` or `not reported` fallbacks, known blockers, and next action.
 
 2. Run the readiness gate:
    - Invoke or follow `ensure-implementation-readiness` for the issue, passing along the issue context, project guidance, discovered design sources, and this skill's Authorization Boundary.
@@ -114,7 +114,7 @@ Readiness verdict: <Ready to Implement | Gate Skipped>
    - Record the PR URL in the Recovery Record.
 
 8. Run review-loop:
-   - Before invoking `review-loop`, update the Recovery Record in an authorized checkpoint surface so the issue, PR, branch, readiness verdict, validation state, Authorization Boundary, and next action are recoverable.
+   - Before invoking `review-loop`, update the Recovery Record in an authorized checkpoint surface so the issue, PR, branch, readiness verdict, validation state, Authorization Boundary, caller-supplied result surface, release instruction, model and effort policy, actual model and effort if reported, selection source, override notes, `unknown` or `not reported` fallbacks, and next action are recoverable.
    - Invoke `review-loop` on the PR with its normal PR-scoped Authorization Boundary unless this skill was narrowed to read-only mode.
    - Let `review-loop` own reviewer-panel delegation, review/fix convergence, PR comments, fix commits, pushes to the target PR branch, and ready-for-human marking inside its contract.
    - Treat the review-loop final report or Workflow Result as evidence for this skill's final result.
@@ -124,6 +124,7 @@ Readiness verdict: <Ready to Implement | Gate Skipped>
    - Begin with `Status:` using one canonical terminal value: `completed`, `blocked`, `failed`, `cancelled`, or `needs-human`. Include whether the PR is ready for integration-owner review, naming the parent, coordinator, or human owner when known.
    - Include issue URL and final issue labels, PR link, branch and worktree, readiness evidence and verdict, mutations performed, commits, validation, review-loop evidence, open risks, and recommended next action for the integration owner.
    - When the caller supplied a Workflow Invocation Reference or result surface, return the Workflow Result there when available, and then stop or wait according to the explicit release instruction.
+   - Include requested and actual model/effort metadata when the harness reports it, and use `unknown` or `not reported` rather than guessing when it does not.
    - State clearly that merge, issue closure, branch deletion, and any broader integration action remain out of scope for this skill and must be handled by a landing-capable workflow such as `land-github-issue` after integration evidence exists, or by a direct human integration step.
 
 ## Recovery Record
@@ -140,6 +141,7 @@ For this skill, recover at least:
 - Authorization Boundary, including any read-only narrowing;
 - caller-supplied Workflow Invocation Reference or result surface, using only public-safe stable references in public or Git-backed surfaces and redacting private runtime handles when needed;
 - release instruction, including whether the worker should stop after returning the result, remain assigned for review corrections, or wait for a caller release signal;
+- model and effort policy, requested and actual model/effort metadata, selection source, override notes, and `unknown` or `not reported` fallbacks;
 - readiness evidence and verdict;
 - current phase and next safe action;
 - PR URL after creation;
@@ -185,6 +187,6 @@ Before finishing:
 8. Confirm validation commands and results are recorded.
 9. Confirm the PR body includes `Readiness evidence:` and `Readiness verdict:`.
 10. Confirm review-loop was run, or record why it could not be run.
-11. Confirm the final Workflow Result includes canonical terminal status, issue, issue-label state, branch/worktree, PR, commits, validation, review-loop evidence, open risks, recommended next action, any caller-supplied Workflow Invocation Reference or result surface, and release-instruction handling.
+11. Confirm the final Workflow Result includes canonical terminal status, issue, issue-label state, branch/worktree, PR, commits, model and effort metadata with `unknown` or `not reported` fallbacks, validation, review-loop evidence, open risks, recommended next action, any caller-supplied Workflow Invocation Reference or result surface, and release-instruction handling.
 12. Confirm merge, issue closure, branch deletion, permission changes, new label creation, and other out-of-scope external actions were not performed without a separate approved workflow or direct user-supervised action.
 13. If this skill or its manifest entry changed, run `git diff --check` and `scripts/run-validator`.

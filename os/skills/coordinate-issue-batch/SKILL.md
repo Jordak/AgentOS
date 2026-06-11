@@ -115,7 +115,7 @@ Landing is a phase of normal or resume mode, not a separate top-level mode.
    - Do not perform per-issue label hygiene in the coordinator. Pass issue-local readiness and stale-label evidence to the assigned worker.
 
 5. Prepare worker setup and minimal handoffs:
-   - Assign each launched worker one issue, branch, isolated worktree, base branch, rebase policy, Isolation Boundary, Authorization Boundary, owned scope, workflow mode, validation expectations, PR expectations, Personal Overlay restrictions, prohibited actions, expected Workflow Result, recovery checkpoint expectations, release instruction, and blocked/failed/cancelled/needs-human reporting rules.
+   - Assign each launched worker one issue, branch, isolated worktree, base branch, rebase policy, Isolation Boundary, Authorization Boundary, owned scope, workflow mode, effort policy when the caller has one, validation expectations, PR expectations, Personal Overlay restrictions, prohibited actions, expected Workflow Result, recovery checkpoint expectations, release instruction, and blocked/failed/cancelled/needs-human reporting rules.
    - In Codex, use separate branch-backed project threads for durable implementation workers when available. Do not use in-thread subagents for durable implementation workers that need branches and worktrees.
    - When the harness supports worker thread renaming, create or assign the worker thread, rename it to a public-safe, legible target-specific name, record the thread name and Workflow Invocation Reference in the coordinator ledger only on a surface where those references are public-safe or authorized, and only then send the `READY` signal or substantive assignment.
    - For a `coordinate-issue-batch` to `implement-github-issue` worker, use a pointer-first assignment packet with these fields: assigned issue URL and number; worker branch and isolated worktree; base branch and rebase policy; instruction to run `implement-github-issue` in the assigned mode; Isolation Boundary; Authorization Boundary; callback or result surface; release instruction; durable sources to read, including `AGENTS.md`, the issue body, `os/playbook/GITHUB_WORKFLOW.md`, `os/skills/ORCHESTRATION_LOOPS.md`, and `os/skills/implement-github-issue/SKILL.md`; validation expectations; PR and readiness-field expectations; Personal Overlay restrictions; prohibited actions, especially merge, issue closure, branch deletion, integration-branch mutation, label creation, permission changes, and writes outside the assigned scope; expected Workflow Result fields; and blocked, failed, cancelled, and needs-human reporting rules.
@@ -163,7 +163,7 @@ Recover at least:
 - selected or provided issues and selection evidence;
 - concurrency limit and queued issues;
 - worker branch, worktree, public-safe thread name and Workflow Invocation Reference when available, redacted/private-surface summary when references are not public-safe, PR, assigned issue, Isolation Boundary, Authorization Boundary, release instruction, release status or post-result availability, and worker state;
-- worker Workflow Result evidence, validation, review-loop evidence, and open risks;
+- worker Workflow Result evidence, model and effort metadata with `unknown` or `not reported` fallbacks, validation, review-loop evidence, and open risks;
 - bounded polling reason, bound, and result when runtime polling was used for bootstrap, timeout, recovery, or diagnostics;
 - human-review, review-correction, merge, landing, skipped, blocked, needs-human, failed, cancelled, and unresolved state;
 - Blocking Human Decisions with exact question, recommended default, decision state, and resume rule;
@@ -186,7 +186,7 @@ Recover at least:
 - Read-only/plan-only mode performs no local or external mutation.
 - Resume mode can reconstruct enough ledger state to continue safely.
 - The coordinator final Workflow Result includes a canonical terminal status, is returned through any caller-supplied result surface when available, and follows the coordinator release instruction.
-- Every launched worker has an Isolation Boundary, branch/worktree, Authorization Boundary, Workflow Invocation Reference when supported, release instruction, and expected Workflow Result.
+- Every launched worker has an Isolation Boundary, branch/worktree, Authorization Boundary, effort policy when applicable, Workflow Invocation Reference when supported, release instruction, and expected Workflow Result.
 - Returned worker results record release status or post-result availability before the batch is treated as quiescent.
 - Supported durable worker threads are renamed to public-safe, legible target-specific names before `READY` or substantive assignment, and worker handoffs are minimal pointer-first packets rather than copied workflow contracts.
 - The coordinator goes idle after worker launch and uses polling only as bounded bootstrap, timeout, recovery, or diagnostic behavior.

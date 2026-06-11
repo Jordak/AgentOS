@@ -71,7 +71,7 @@ A skill's verification guidance should test observable behavior, not internal st
 
 Loop-shaped or mutating skills that coordinate repeated steps, call other workflows, wait on human decisions, or need safe recovery after interruption should also follow `os/skills/ORCHESTRATION_LOOPS.md`.
 
-That convention defines AgentOS guidance for Authorization Boundaries, Workflow Invocation References, Callback-First Invocation, Minimal Assignment Packets, Workflow Results, Recovery Records, Recovery Checkpoints, Blocking Human Decisions, parallel Called Workflows, and Integration Ownership. Do not copy the full convention into every skill; link to it when the skill's contract needs loop-specific boundaries or recovery behavior.
+That convention defines AgentOS guidance for Authorization Boundaries, effort policy, Workflow Invocation References, Callback-First Invocation, Minimal Assignment Packets, Workflow Results, Recovery Records, Recovery Checkpoints, Blocking Human Decisions, parallel Called Workflows, and Integration Ownership. Do not copy the full convention into every skill; link to it when the skill's contract needs loop-specific boundaries, model or effort selection, or recovery behavior.
 
 ## Exposure Rules
 

@@ -119,7 +119,7 @@ Before yielding for an `ask-user` decision, make the unresolved blocker recovera
 
 ## Efficiency Controls
 
-- Use a moderate, balanced, or medium effort level for the orchestrator by default when the harness exposes reasoning-effort controls. Reserve high or extra-high effort for `review-pass` reviewer quality, genuinely ambiguous adjudication, and hard design tradeoffs.
+- Follow the effort policy in `os/skills/ORCHESTRATION_LOOPS.md`: use medium effort for the parent orchestrator by default when the harness exposes reasoning-effort controls. Reserve high or extra-high effort for `review-pass` reviewer quality, genuinely ambiguous adjudication, and hard design tradeoffs, subject to user budget or latency overrides.
 - Keep the orchestrator focused on ledger management, deduplication, implementation, validation, PR-surface writes, and reporting.
 - Batch work by issue family. When a candidate Reviewer Finding identifies real risk, normalize it into an Issue Family, then search or inspect for sibling occurrences and fix the whole family before requesting verification.
 - Prefer one family-level fix commit over several single-occurrence commits when the related fixes are cohesive. Keep separate commits for unrelated families or risky changes that need isolated validation.
