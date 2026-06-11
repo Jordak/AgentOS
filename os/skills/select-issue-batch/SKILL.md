@@ -13,7 +13,7 @@ This skill is the selection layer in the issue-batch workflow stack:
 
 - Single-issue execution workflows own readiness repair, implementation, PR creation, review convergence, and final reporting for one issue.
 - `select-issue-batch` recommends which issue or batch should be considered next and explains why those issues belong together or should be sequenced.
-- `coordinate-issue-batch` consumes a selected or user-provided batch and owns execution coordination after explicit authorization.
+- Mutating coordination workflows may consume the recommendation as an input to their own Authorization Boundary; `select-issue-batch` remains read-only and does not execute the recommendation itself.
 
 ## Contract
 
@@ -41,7 +41,7 @@ Tools and connectors:
 - GitHub connector or `gh` for read-only issue and PR metadata.
 - `os/playbook/GITHUB_WORKFLOW.md` for issue, branch, worker, and closure discipline.
 - `os/skills/ORCHESTRATION_LOOPS.md` for Workflow Result, Blocking Human Decision, Isolation Boundary, and parallel Called Workflow vocabulary.
-- The `coordinate-issue-batch` contract when the user wants execution coordination after selection.
+- Mutating coordination workflow contracts when the user wants execution after selection.
 
 Safety:
 

@@ -58,12 +58,24 @@ Do not create a `coordinate-issue-batch` skill in this issue. These notes are du
 
 The future coordinator should:
 
-- accept an explicitly approved issue batch, either selected by `select-issue-batch` or provided by the user;
+- treat a full batch pass as its default shape: when no explicit batch is supplied, invoke `select-issue-batch` in read-only mode, then turn the recommendation into a concrete coordinator target inside its own Authorization Boundary;
+- also accept a user-provided or caller-provided issue batch for recovery, reruns, human-curated work, and higher-level workflows that already own selection;
 - spawn or request isolated worker branches, worktrees, and threads only after explicit authorization;
+- use separate Codex branch-backed threads for durable Codex implementation workers when that harness path is available, while keeping the reusable worker contract harness-neutral;
 - require each worker to follow `implement-github-issue` or another approved worker contract;
 - prevent workers from merging PRs, closing issues, deleting branches, or mutating integration state;
 - record every worker Workflow Result in a recoverable coordinator ledger;
+- allow a worker thread to remain assigned to its PR for human review corrections after `implement-github-issue` returns reviewed PR evidence, without expanding the `implement-github-issue` contract beyond its reviewed-PR boundary;
+- maintain an invocation-owned coordinator ledger by default, and optionally create or use a dedicated GitHub batch tracking issue when the Authorization Boundary explicitly permits that tracker write;
+- support normal, read-only, and resume modes; landing is a phase of normal or resume mode, not a separate top-level mode;
+- default to at most three parallel implementation workers unless the user or Calling Workflow specifies a different concurrency limit;
+- stop for a Blocking Human Decision when coordinator checks show a selected batch is not actually parallel-safe, even if a sequential order is obvious, so planner mistakes and stale evidence are visible;
+- leave per-issue readiness and label hygiene to the assigned worker workflow, while the coordinator records any stale-label or blocker evidence in the worker handoff;
+- give workers only enough batch context to respect their Isolation Boundary and escalation rules; the coordinator remains responsible for the full batch ledger, landing queue, and other workers' state;
 - wait for all expected workers to return, fail, block, or be explicitly cancelled before beginning closure review for the batch;
+- wait for the worker set to be quiescent before beginning closure review: every expected worker is complete, permanently blocked, failed, or explicitly cancelled, so workers are no longer producing review-correction events for the current batch;
+- wait for the user or integration owner to report that all PRs intended for the current landing phase are merged before beginning post-merge landing checks;
+- skip permanently blocked, failed, cancelled, or unmerged issues during the landing phase and record their next action in the coordinator ledger instead of blocking landing for completed merged issues;
 - process landing and closure candidates one issue at a time from the coordinator ledger;
 - record late worker results without interrupting the currently active closure decision;
 - compare the worker evidence, merged PR evidence, acceptance criteria, and blocker/dependency state before closing any issue;

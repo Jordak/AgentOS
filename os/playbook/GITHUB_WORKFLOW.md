@@ -111,14 +111,15 @@ Personal-only ignored-file edits may happen in the primary checkout even when it
 
 Do not broad-copy `personal/os/` into feature worktrees, and do not use `git add -f personal/...` unless the user explicitly approves a narrow, public-safe skeleton or template change.
 
-## Subagent / Feature Branch Delegation
+## Worker / Feature Branch Delegation
 
-When delegating implementation issues to subagents on feature branches, make worktree isolation explicit, and make landing and issue closure an integration responsibility, not a branch-worker responsibility.
+When delegating implementation issues to workers on feature branches, make worktree isolation explicit, and make landing and issue closure an integration responsibility, not a branch-worker responsibility.
 
 - Use the implementation worker handoff packet in `os/skills/ORCHESTRATION_LOOPS.md` when launching workers. This playbook supplies the GitHub-specific branch, worktree, push, pull request, and issue-closure language for that packet.
-- Give each subagent its own isolated worktree and feature branch. Prefer `git worktree` checkouts rooted from the current integration branch.
+- Give each worker its own isolated worktree and feature branch. Prefer `git worktree` checkouts rooted from the current integration branch.
+- In Codex harnesses that support branch-backed project threads, use separate Codex threads for durable implementation workers rather than in-thread subagents. In-thread subagents remain suitable for read-only review, exploration, or short-lived advisory fan-out when no durable branch/worktree worker is needed.
 - Preserve Codex-managed worktrees when Codex creates them; for manual AgentOS worktrees, use `$CODEX_HOME/worktrees/`.
-- Do not have multiple subagents share the same checkout, working tree, index, or feature branch.
+- Do not have multiple workers share the same checkout, working tree, index, or feature branch.
 - Record each worker's worktree path, branch name, assigned issue, and owned files or responsibility before starting parallel work.
 - Before integrating results, inspect the worktree list and each worker branch status to confirm workers did not step on each other's branches or local changes.
 - Instruct workers to commit, push their feature branch, open or update their PR when their contract owns that step, and return evidence through their Workflow Result or issue/PR comments.
@@ -139,9 +140,11 @@ Standard worker handoff language:
 > explicitly assigned a non-overlapping path. Do not merge PRs, close issues,
 > delete branches, mutate the integration branch, create labels, or write
 > outside your assigned scope. Return blocked, failed, and needs-human states
-> with the evidence and decision needed to resume. The integration owner will
-> decide landing and closure after the resolving PR is merged and the issue
-> acceptance criteria are reconciled.
+> with the evidence and decision needed to resume. After your implementation
+> workflow returns reviewed PR evidence, remain available for review-comment
+> corrections on your assigned branch until the coordinator releases you. The
+> integration owner will decide landing and closure after the resolving PR is
+> merged and the issue acceptance criteria are reconciled.
 
 ## GitHub Issue Closure Discipline
 
