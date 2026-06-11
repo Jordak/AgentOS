@@ -163,10 +163,10 @@ When applicable, read `references/lenses/contract-surface-matrix.md` and include
    - Flag design-escape-hatch concerns when repeated symptoms suggest scope reduction, design clarification, or a different implementation shape.
 
 7. Return the packet:
-- Use the exact packet template in `references/review-packet-template.md`.
-- Include residual risks, limitations, reviewer continuity mode, handle availability, and whether a temporary packet file was written.
-- Include model and effort metadata when available, using `unknown` or `not reported` instead of guessing.
-- Do not post the packet externally unless another approved workflow owns that write.
+   - Use the exact packet template in `references/review-packet-template.md`.
+   - Include residual risks, limitations, reviewer continuity mode, handle availability, and whether a temporary packet file was written.
+   - Include model and effort metadata when available, using `unknown` or `not reported` instead of guessing.
+   - Do not post the packet externally unless another approved workflow owns that write.
 
 ## Filing Rules
 
