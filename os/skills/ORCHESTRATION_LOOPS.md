@@ -228,6 +228,10 @@ When a skill is an Orchestration Loop or can be invoked by one, its skill contra
 - what external writes require additional approval;
 - what it may call;
 - what Workflow Result it returns;
+- which canonical terminal statuses it can return, normally `completed`, `blocked`, `failed`, `cancelled`, and `needs-human` unless the skill documents a narrower set;
+- how it accepts and reports any caller-supplied Workflow Invocation Reference or result surface;
+- how it follows release instructions after returning a result to a caller;
+- what Minimal Assignment Packet it sends when it launches called workflows or workers, including callback/result surface, release instruction, target, boundary, and expected Workflow Result ownership;
 - what Recovery Record or Recovery Checkpoint it maintains;
 - what Integration Ownership, if any, belongs to the skill.
 

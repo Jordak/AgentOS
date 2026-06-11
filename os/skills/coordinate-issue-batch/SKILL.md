@@ -142,8 +142,9 @@ Landing is a phase of normal or resume mode, not a separate top-level mode.
    - Record fulfilled, skipped, blocked, needs-human, failed, cancelled, unmerged, unresolved, and landed outcomes in the coordinator ledger.
 
 9. Report the coordinator Workflow Result:
+   - Begin with `Status:` using one canonical terminal value: `completed`, `blocked`, `failed`, `cancelled`, or `needs-human`.
    - Include issue URLs, selection source, ledger surface, branch and worktree status, PRs, public-safe thread status or redacted private-surface summary, merge-event status, landing outcomes, skipped issues, blocked and needs-human states, per-worker release status or post-result availability, validation, mutations, open risks, and recommended next action.
-   - When the caller supplied a Workflow Invocation Reference or result surface, return the coordinator Workflow Result there when available, include terminal status `completed`, `blocked`, `failed`, `cancelled`, or `needs-human` as applicable, and then stop or wait according to the explicit coordinator release instruction.
+   - When the caller supplied a Workflow Invocation Reference or result surface, return the coordinator Workflow Result there when available, and then stop or wait according to the explicit coordinator release instruction.
    - State clearly that PR merge/squash, branch deletion, new label creation, and any out-of-boundary external action remain outside v1 unless a separate approved workflow or direct human step owns them.
 
 ## Coordinator Ledger
@@ -183,7 +184,7 @@ Recover at least:
 - Normal mode owns a full batch pass while preserving explicit Authorization Boundaries for worker launch, tracking issue creation, landing, closure, and other external writes.
 - Read-only/plan-only mode performs no local or external mutation.
 - Resume mode can reconstruct enough ledger state to continue safely.
-- When called with a Workflow Invocation Reference or result surface, the coordinator final Workflow Result is returned through that surface when available and the coordinator release instruction is followed.
+- The coordinator final Workflow Result includes a canonical terminal status, is returned through any caller-supplied result surface when available, and follows the coordinator release instruction.
 - Every launched worker has an Isolation Boundary, branch/worktree, Authorization Boundary, Workflow Invocation Reference when supported, release instruction, and expected Workflow Result.
 - Returned worker results record release status or post-result availability before the batch is treated as quiescent.
 - Supported durable worker threads are renamed to public-safe, legible target-specific names before `READY` or substantive assignment, and worker handoffs are minimal pointer-first packets rather than copied workflow contracts.
@@ -211,5 +212,5 @@ Before finishing:
 11. Confirm no PR merge/squash, branch deletion, label creation, permission change, out-of-scope issue mutation, or Personal Overlay access happened without explicit authorization.
 12. Confirm landing checks waited for worker quiescence, recorded needs-human Blocking Human Decisions, worker release status or post-result availability, and human merge reports.
 13. Confirm `land-github-issue` was invoked or followed only for eligible merged issues under an explicit landing Authorization Boundary.
-14. Confirm final Workflow Result includes selected issues, ledger state, worker terminal statuses and lifecycle states including needs-human, release-instruction handling, PRs, merge status, landing outcomes, skipped issues, validation, mutations, open risks, and recommended next action.
+14. Confirm final Workflow Result includes canonical terminal status, selected issues, ledger state, worker terminal statuses and lifecycle states including needs-human, release-instruction handling, PRs, merge status, landing outcomes, skipped issues, validation, mutations, open risks, and recommended next action.
 15. If this skill or its manifest entry changed, run `git diff --check` and `scripts/run-validator`.

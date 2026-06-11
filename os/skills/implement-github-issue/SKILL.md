@@ -120,9 +120,9 @@ Readiness verdict: <Ready to Implement | Gate Skipped>
    - If review-loop returns a Blocking Human Decision, record it recoverably and pause instead of guessing.
 
 9. Report final Workflow Result:
-   - Begin with status and whether the PR is ready for integration-owner review, naming the parent, coordinator, or human owner when known.
+   - Begin with `Status:` using one canonical terminal value: `completed`, `blocked`, `failed`, `cancelled`, or `needs-human`. Include whether the PR is ready for integration-owner review, naming the parent, coordinator, or human owner when known.
    - Include issue URL and final issue labels, PR link, branch and worktree, readiness evidence and verdict, mutations performed, commits, validation, review-loop evidence, open risks, and recommended next action for the integration owner.
-   - When the caller supplied a Workflow Invocation Reference or result surface, return the Workflow Result there when available, include terminal status `completed`, `blocked`, `failed`, `cancelled`, or `needs-human` as applicable, and then stop or wait according to the explicit release instruction.
+   - When the caller supplied a Workflow Invocation Reference or result surface, return the Workflow Result there when available, and then stop or wait according to the explicit release instruction.
    - State clearly that merge, issue closure, branch deletion, and any broader integration action remain out of scope for this skill and must be handled by a landing-capable workflow such as `land-github-issue` after integration evidence exists, or by a direct human integration step.
 
 ## Recovery Record
@@ -166,7 +166,7 @@ For this skill, recover at least:
 - Validation matches the touched surface and follows project-local instructions, including `scripts/run-validator` plus `git diff --check` for AgentOS skill or manifest changes in this repository.
 - The PR body includes readiness fields and avoids accidental issue-closing language.
 - `review-loop` is invoked or explicitly skipped with a reason; reviewer logic is not duplicated here.
-- The final result is recoverable and names every mutation, validation signal, open risk, and next action.
+- The final result is recoverable and names its canonical terminal status, every mutation, validation signal, open risk, and next action.
 - When called with a Workflow Invocation Reference or result surface, the final Workflow Result is returned through that surface when available and the release instruction is followed.
 - The workflow stops before merge, issue closure, and branch deletion. Permission changes, new label creation, and other out-of-scope external actions also remain outside this contract unless another approved workflow owns them.
 
@@ -184,6 +184,6 @@ Before finishing:
 8. Confirm validation commands and results are recorded.
 9. Confirm the PR body includes `Readiness evidence:` and `Readiness verdict:`.
 10. Confirm review-loop was run, or record why it could not be run.
-11. Confirm the final Workflow Result includes issue, issue-label state, branch/worktree, PR, commits, validation, review-loop evidence, open risks, recommended next action, any caller-supplied Workflow Invocation Reference or result surface, and release-instruction handling.
+11. Confirm the final Workflow Result includes canonical terminal status, issue, issue-label state, branch/worktree, PR, commits, validation, review-loop evidence, open risks, recommended next action, any caller-supplied Workflow Invocation Reference or result surface, and release-instruction handling.
 12. Confirm merge, issue closure, branch deletion, permission changes, new label creation, and other out-of-scope external actions were not performed without a separate approved workflow or direct user-supervised action.
 13. If this skill or its manifest entry changed, run `git diff --check` and `scripts/run-validator`.
