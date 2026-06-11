@@ -115,6 +115,7 @@ Do not broad-copy `personal/os/` into feature worktrees, and do not use `git add
 
 When delegating implementation issues to subagents on feature branches, make worktree isolation explicit, and make landing and issue closure an integration responsibility, not a branch-worker responsibility.
 
+- Use the implementation worker handoff packet in `os/skills/ORCHESTRATION_LOOPS.md` when launching workers. This playbook supplies the GitHub-specific branch, worktree, push, pull request, and issue-closure language for that packet.
 - Give each subagent its own isolated worktree and feature branch. Prefer `git worktree` checkouts rooted from the current integration branch.
 - Preserve Codex-managed worktrees when Codex creates them; for manual AgentOS worktrees, use `$CODEX_HOME/worktrees/`.
 - Do not have multiple subagents share the same checkout, working tree, index, or feature branch.
@@ -136,8 +137,11 @@ Standard worker handoff language:
 > read it from the canonical primary AgentOS checkout, not from this feature
 > worktree's ignored-file skeleton. Write Personal Overlay files only when
 > explicitly assigned a non-overlapping path. Do not merge PRs, close issues,
-> or delete branches. The integration owner will decide landing and closure
-> after the resolving PR is merged and the issue acceptance criteria are reconciled.
+> delete branches, mutate the integration branch, create labels, or write
+> outside your assigned scope. Return blocked, failed, and needs-human states
+> with the evidence and decision needed to resume. The integration owner will
+> decide landing and closure after the resolving PR is merged and the issue
+> acceptance criteria are reconciled.
 
 ## GitHub Issue Closure Discipline
 
