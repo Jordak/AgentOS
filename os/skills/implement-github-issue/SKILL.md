@@ -9,7 +9,7 @@ description: Take one GitHub issue in a repository checkout through readiness ga
 
 Own the happy path for one GitHub issue from assignment to a reviewed pull request. The skill composes narrower workflow contracts instead of duplicating them: `ensure-implementation-readiness` owns the design gate, the repository's GitHub workflow guidance owns protected-branch and pull-request discipline, and `review-loop` owns PR review/fix convergence.
 
-This skill stops at a PR ready for parent, coordinator, or human review. It must stop before merge and issue closure, and it never deletes branches or takes broader integration ownership. Landing and issue closure belong to a workflow or human integration action whose own contract explicitly owns those surfaces.
+This skill stops at a PR ready for parent, coordinator, or human review. It must stop before merge and issue closure, and it never deletes branches or takes broader integration ownership. Landing and issue closure belong to a workflow or human integration action whose own contract explicitly owns those surfaces, such as `land-github-issue` after integration evidence exists.
 
 ## Contract
 
@@ -43,6 +43,7 @@ Tools and connectors:
 - `os/skills/review-loop/SKILL.md` for PR convergence when available.
 - `os/skills/ORCHESTRATION_LOOPS.md`, with background in `docs/adr/0009-contract-based-orchestration-loops.md` and `docs/design/issue-121-loop-composition-conventions.md`, for AgentOS orchestration-loop vocabulary and recovery semantics when those Core files are available.
 - `docs/design/issue-126-landing-closure-semantics.md` for the durable decision that `implement-github-issue` does not own merge, issue closure, or branch deletion.
+- `os/skills/land-github-issue/SKILL.md` only as a downstream integration-owner reference; this skill does not call or own it.
 
 Safety:
 
@@ -120,7 +121,7 @@ Readiness verdict: <Ready to Implement | Gate Skipped>
 9. Report final Workflow Result:
    - Begin with status and whether the PR is ready for integration-owner review, naming the parent, coordinator, or human owner when known.
    - Include issue URL and final issue labels, PR link, branch and worktree, readiness evidence and verdict, mutations performed, commits, validation, review-loop evidence, open risks, and recommended next action for the integration owner.
-   - State clearly that merge, issue closure, branch deletion, and any broader integration action remain out of scope for this skill and must be handled by a landing-capable workflow or direct human integration step.
+   - State clearly that merge, issue closure, branch deletion, and any broader integration action remain out of scope for this skill and must be handled by a landing-capable workflow such as `land-github-issue` after integration evidence exists, or by a direct human integration step.
 
 ## Recovery Record
 

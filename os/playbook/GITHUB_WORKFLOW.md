@@ -15,8 +15,10 @@ When the active agent harness exposes these skills or equivalent workflows, pref
 - Use `/to-prd` when the user wants to turn the current conversation context into a PRD and publish it to the project issue tracker.
 - Use `/to-issues` when the user wants to break a plan, spec, or PRD into independently grabbable implementation issues. Publish issues only after the breakdown is approved, and do not close or modify any parent issue as part of that workflow.
 - Use `/triage` for issue intake, classification, readiness checks, label/state transitions, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`, and agent brief comments.
+- Use `land-github-issue` when a landing-capable workflow needs to verify one issue's acceptance criteria against remote integration-branch evidence, check off fulfilled Markdown criteria, and close the issue when closure is authorized.
+- Use `audit-issues` for broader issue-tracker reconciliation, stale issue sweeps, or multi-issue audits against merged code.
 
-Do not use these skills or equivalent workflows as the default for simple PR descriptions, branch integration, merge verification, or post-implementation issue closure unless the work also needs PRD generation, issue breakdown, or triage/state changes.
+Do not use PRD, issue-breakdown, or triage workflows as the default for simple PR descriptions, branch integration, merge verification, or post-implementation issue closure unless the work also needs PRD generation, issue breakdown, or triage/state changes. Use the narrow workflow that owns the requested surface instead.
 
 When using `/triage`, follow its posting rules, including the AI-generated triage disclaimer. If the repository's issue-tracker or triage-label mapping is missing, run `/setup-matt-pocock-skills` or ask the user for the mapping.
 
@@ -147,8 +149,11 @@ Before closing an implementation issue:
 - A pushed feature branch is not enough. A comment that references only a local commit hash or an unmerged remote branch is not enough.
 - Verify the remote integration branch contains the resolving commit before closing the issue.
 - Reconcile the issue acceptance criteria against the merged PR or integration commit evidence.
+- For issues with Markdown checkbox acceptance criteria, check off only the criteria that are fulfilled by integration-branch evidence and leave unmet or ambiguous criteria unchecked.
 - Confirm no human-review label such as `ready-for-human`, `needs-human`, `needs-a-human`, or equivalent still requires a human closure decision.
 - Then close the issue with a factual comment that references the integration branch, the commit on `main`, the merged PR or another durable integration artifact, and relevant validation evidence when available.
+
+For one assigned issue, prefer `land-github-issue` when an agent workflow owns the closure step. If any acceptance criterion is unmet or ambiguous, keep the issue open and return the evidence gap to the Calling Workflow rather than guessing or closing partially completed work.
 
 ## Workflow Labels
 

@@ -354,6 +354,26 @@
       ]
     },
     {
+      "id": "land-github-issue",
+      "category": "github issue landing",
+      "prompt": "Land this merged GitHub issue by verifying its acceptance criteria on origin/main, checking off fulfilled checklist items, and reporting any unmet criteria before authorized closure.",
+      "expected": {
+        "skill": "land-github-issue"
+      },
+      "evidence": [
+        {
+          "path": "os/skills/land-github-issue/SKILL.md",
+          "contains": [
+            "Verify a GitHub issue's acceptance criteria against remote integration-branch evidence",
+            "update fulfilled Markdown checklist criteria",
+            "return unmet criteria to the caller",
+            "Authorization Boundary explicitly allows",
+            "Do not close issues labeled for human ownership or human review"
+          ]
+        }
+      ]
+    },
+    {
       "id": "github-issue-breakdown",
       "category": "github issue breakdown",
       "prompt": "Break a plan into implementation issues and preserve GitHub safety rules.",
