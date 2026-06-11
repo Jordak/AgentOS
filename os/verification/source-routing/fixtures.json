@@ -375,6 +375,27 @@
       ]
     },
     {
+      "id": "github-loop",
+      "category": "github issue repository loop",
+      "prompt": "Keep running GitHub issue batch passes for this repository until no suitable issues remain or a human stop condition blocks the loop.",
+      "expected": {
+        "skill": "github-loop"
+      },
+      "evidence": [
+        {
+          "path": "os/skills/github-loop/SKILL.md",
+          "contains": [
+            "Repeatedly run or resume GitHub issue batch passes",
+            "coordinate-issue-batch",
+            "successive batch-pass invocations",
+            "no selected issues",
+            "human merge reports",
+            "cleanly settled"
+          ]
+        }
+      ]
+    },
+    {
       "id": "land-github-issue",
       "category": "github issue landing",
       "prompt": "Land this merged GitHub issue by verifying its acceptance criteria on origin/main, checking off fulfilled checklist items, and reporting any unmet criteria before authorized closure.",
