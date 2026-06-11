@@ -16,6 +16,8 @@ A Calling Workflow should pass a Workflow Invocation Reference to each Called Wo
 
 A Called Workflow should report completion, blocked, failed, cancelled, and needs-human states back to the Calling Workflow through that reference. After reporting, the Called Workflow should stop or wait according to the caller's explicit release instruction. It should not assume the caller will continuously poll for progress.
 
+This ADR standardizes callback-first result surfaces and terminal status vocabulary. It does not define aggregate workflow status precedence or richer status maps for mixed child outcomes; that design is deferred to GitHub issue #158. Until that follow-up lands, aggregate workflows should keep per-worker, per-issue, or per-batch outcomes visible in their Workflow Results instead of implying a durable precedence rule.
+
 Runtime polling of Called Workflows is not the normal orchestration pattern. Polling is allowed only as bounded bootstrap, timeout, recovery, or diagnostic behavior, and the caller should record why polling was needed in its Recovery Record.
 
 Calling Workflows should send minimal assignment packets. The packet should point to durable task sources, issue bodies, ADRs, playbooks, skill contracts, and expected Workflow Result fields instead of copying those contracts into each launch message. Workflow-specific handoff shapes belong in the workflow that owns the launch, not in a universal reusable prompt.
@@ -45,6 +47,7 @@ Require a deterministic callback transport before documenting the convention. Th
 The implementation for GitHub issue #156 should:
 
 - update `os/skills/ORCHESTRATION_LOOPS.md` with callback-first invocation, anti-polling, minimal assignment, and worker-thread setup guidance;
+- record that aggregate workflow status precedence and richer status maps are deferred to GitHub issue #158 while preserving detailed child outcome reporting;
 - move or restate the `coordinate-issue-batch` to `implement-github-issue` worker handoff shape in `os/skills/coordinate-issue-batch/SKILL.md`;
 - update `github-loop`, GitHub workflow guidance, and manifest summaries so parent workflows go idle after launch and recover through Workflow Results rather than continuous polling;
 - run `git diff --check` and `scripts/run-validator`.

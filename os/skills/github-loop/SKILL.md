@@ -137,6 +137,7 @@ Rebuild or load the loop Recovery Record, verify the current batch-pass state, a
 
 7. Report the loop Workflow Result:
    - Begin with `Status:` using one canonical terminal value: `completed`, `blocked`, `failed`, `cancelled`, or `needs-human`.
+   - For mixed batch-pass outcomes, report the detailed batch, worker, issue, merge-report, landing, blocked, needs-human, failed, and cancelled states. Aggregate status precedence rules and richer status maps are deferred to GitHub issue #158.
    - Include repository, loop goal, mode, Authorization Boundary, pass count, public-safe child coordinator thread names or unavailable reasons, batch invocation references or public-safe summaries, batch result summaries, release-instruction handling, stop reason, validation, mutations performed, open risks, and recommended next action.
    - Return the result in the current prose reporting surface. Do not wait for a caller release signal; inbound caller-supplied Workflow Invocation References, result surfaces, and release instructions are out of scope for `github-loop` v1.
    - State clearly that merge, branch deletion, new label creation, and out-of-boundary external actions remain outside v1 unless a separate approved workflow or direct human step owns them.
