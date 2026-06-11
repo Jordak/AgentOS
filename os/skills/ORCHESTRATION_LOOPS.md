@@ -144,7 +144,7 @@ A Workflow Result should include:
 - Called Workflow: name and invocation reference when available;
 - status: a workflow-specific status such as `completed`, `blocked`, `failed`, `cancelled`, or `needs-human`;
 - evidence: links, paths, commits, comments, reports, packets, verdicts, or other artifacts produced;
-- model and effort metadata when available: requested model, requested effort, actual model, actual effort, selection source, and override or mismatch notes;
+- model and effort metadata: requested model, requested effort, actual model, actual effort, selection source, and override or mismatch notes, using `unknown` or `not reported` fallbacks instead of silent omission;
 - mutations performed: local edits, commits, pushes, comments, labels, external writes, or `none`;
 - validation: checks run and results;
 - open risks or unresolved decisions: especially any Blocking Human Decision;

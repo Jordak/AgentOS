@@ -50,7 +50,7 @@ Effort policy does not widen the Authorization Boundary. A high-effort review st
 
 ## Workflow Result Metadata
 
-Workflow Results and equivalent handoffs should report model and effort metadata when available:
+Workflow Results and equivalent handoffs should report model and effort metadata explicitly, using `unknown` or `not reported` fallbacks instead of silent omission:
 
 - requested model and requested effort;
 - actual model and actual effort, if reported by the harness;

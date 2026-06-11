@@ -19,6 +19,7 @@ Inputs:
 Output artifact:
 
 - A concise readiness report with exactly one verdict: `Ready to Implement`, `Needs Design Consensus`, or `Gate Skipped`.
+- Model and effort metadata: requested model and effort, actual model and effort if reported, selection source, override notes, and `unknown` or `not reported` fallbacks.
 - Optional durable local follow-up artifacts for deferred questions.
 - Optional proposed or approved updates to the source design artifact.
 - Optional GitHub issue updates or follow-up issues only when permitted by the applicable external-write policy.
@@ -69,7 +70,7 @@ Safety:
    Ask one question at a time, recommend a default answer, inspect the codebase or existing docs instead of asking when the answer is discoverable, and carry resolved answers back into the durable design source before declaring the scope ready. `grill-with-docs` should supply the docs-aware interview path by default, but this skill or its approved caller owns issue-body, PRD, local-design-doc, and other durable-source updates under the applicable write policy. Follow that policy before GitHub issue creation, issue-body edits, comments, or label updates. If GitHub writes are not authorized, create the local artifact named by the playbook unless the project has a better convention or the user redirects. If required durable source updates or follow-up artifacts are not created, the verdict remains `Needs Design Consensus`. Update or propose updating the current design source with a readiness marker and a `Deferred Follow-ups` section linking to created artifacts.
 
 6. Report the verdict.
-   Include the source reviewed, satisfied and missing readiness fields, implementation boundary, non-goals, design-consensus route used or recommended, created follow-up artifacts, proposed source-design updates, and whether external writes happened, were proposed, or were skipped. If the work will become a PR, include the exact `Readiness evidence:` and `Readiness verdict:` lines the PR body should carry. Prefer a GitHub issue as readiness evidence for issue-driven work; use a design doc only when the design is too large, architectural, private, or not naturally issue-shaped.
+   Include the source reviewed, satisfied and missing readiness fields, implementation boundary, non-goals, model and effort metadata with `unknown` or `not reported` fallbacks, design-consensus route used or recommended, created follow-up artifacts, proposed source-design updates, and whether external writes happened, were proposed, or were skipped. If the work will become a PR, include the exact `Readiness evidence:` and `Readiness verdict:` lines the PR body should carry. Prefer a GitHub issue as readiness evidence for issue-driven work; use a design doc only when the design is too large, architectural, private, or not naturally issue-shaped.
 
 ## Filing Rules
 
@@ -88,6 +89,7 @@ Safety:
 - External writes comply with the applicable external-write policy before they happen.
 - The implementation boundary is clear enough that another agent can avoid design creep.
 - For PR-bound work, the readiness report supplies PR-body readiness fields.
+- The readiness report records model and effort metadata with `unknown` or `not reported` fallbacks.
 
 ## Verification
 
@@ -103,4 +105,5 @@ Before finishing:
 8. Confirm deferred follow-up artifacts were created where required.
 9. Confirm external tracker writes complied with the applicable external-write policy before they happened.
 10. Confirm PR-bound work has visible PR-body readiness fields or a recorded `Gate Skipped` reason.
-11. If this skill or its manifest entry changed, run `scripts/run-validator`.
+11. Confirm model and effort metadata is recorded with `unknown` or `not reported` fallbacks.
+12. If this skill or its manifest entry changed, run `scripts/run-validator`.

@@ -96,7 +96,7 @@ Rebuild or load the loop Recovery Record, verify the current batch-pass state, a
 1. Establish the target:
    - Identify repository, issue tracker, integration branch, checkout path, mode, loop goal, caps, Authorization Boundary, and reporting mode.
    - Read local instructions, `os/playbook/GITHUB_WORKFLOW.md`, `os/skills/ORCHESTRATION_LOOPS.md`, and `os/skills/coordinate-issue-batch/SKILL.md`.
-   - Record the initial Recovery Record: target, mode, loop goal, caps, Authorization Boundary, model and effort policy when available, ledger surface, current phase, known blockers, and next action.
+   - Record the initial Recovery Record: target, mode, loop goal, caps, Authorization Boundary, model and effort policy, actual model and effort if reported, selection source, override notes, `unknown` or `not reported` fallbacks, ledger surface, current phase, known blockers, and next action.
 
 2. Plan the next batch pass:
    - If this is pass 1, prepare the `coordinate-issue-batch` request from the loop goal, selection filters, caps, and Authorization Boundary.
@@ -167,7 +167,7 @@ Recover at least:
 - loop id or invocation reference when available;
 - prose invocation request and current reporting surface; if another workflow called `github-loop`, record that the inbound contract is still prose-only and no caller-supplied callback/result surface or release instruction is supported in v1;
 - repository and integration branch;
-- loop goal, mode, Authorization Boundary, and model/effort policy when available;
+- loop goal, mode, Authorization Boundary, model/effort policy, actual model/effort metadata, selection source, override notes, and `unknown` or `not reported` fallbacks;
 - loop-level caps and pass-through caps for `coordinate-issue-batch`;
 - ledger or checkpoint surface;
 - current pass number and current phase;

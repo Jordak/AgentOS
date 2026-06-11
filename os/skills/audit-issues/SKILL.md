@@ -20,7 +20,7 @@ Inputs:
 
 Output artifact:
 
-- A concise audit report listing closed issues, commented issues, skipped issues, model and effort metadata when available, evidence, and follow-up needed.
+- A concise audit report listing closed issues, commented issues, skipped issues, model and effort metadata with `unknown` or `not reported` fallbacks, evidence, and follow-up needed.
 - Optional external tracker updates: status comments, issue closures, labels, or other tracker-native state changes.
 
 Mutability:
@@ -139,3 +139,4 @@ Before finishing:
 4. For each skipped issue, record the reason.
 5. Confirm no human-owned issue was closed.
 6. Confirm no external write happened outside the shared external-write policy.
+7. Confirm the audit report records model and effort metadata with `unknown` or `not reported` fallbacks.

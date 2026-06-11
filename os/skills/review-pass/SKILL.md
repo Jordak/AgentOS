@@ -31,7 +31,7 @@ Output artifact:
 - A structured Markdown review packet in chat by default.
 - Optional temporary Markdown packet file when requested or when the packet is too large for comfortable chat delivery.
 - Optional caller-private reviewer continuity handoff when an orchestrating caller may need same-source verification and the harness exposes resumable reviewer handles. Do not include opaque handles in the human-facing packet.
-- Model and effort metadata when available, including requested model and effort, actual model and effort if reported, selection source, override notes, and `unknown` or `not reported` fallbacks.
+- Model and effort metadata, including requested model and effort, actual model and effort if reported, selection source, override notes, and `unknown` or `not reported` fallbacks.
 
 Mutability:
 
@@ -61,9 +61,9 @@ Safety:
 
 ## Modes
 
-Use `fresh` mode for an independent pass over the current target. The panel gets only the target, repository, base/head or commit range, baseline intent, reviewer alias, optional lens, custom lens notes, and the current prompt template.
+Use `fresh` mode for an independent pass over the current target. The panel gets only the target, repository, base/head or commit range, baseline intent, model and effort metadata with `unknown` or `not reported` fallbacks, reviewer alias, optional lens, custom lens notes, and the current prompt template.
 
-Use `verification` mode after a caller has fixed, declined, or otherwise adjudicated prior issue families. The panel gets the target, current head, prior packet or relevant reviewer finding IDs and issue-family IDs, fix commits, accepted fixes, declined rationales, optional caller adjudication context, validation results, and any consolidated comment URL. Verification reviewers check the prior issue families and still reread the full current diff for missed or newly introduced issues.
+Use `verification` mode after a caller has fixed, declined, or otherwise adjudicated prior issue families. The panel gets the target, current head, model and effort metadata with `unknown` or `not reported` fallbacks, prior packet or relevant reviewer finding IDs and issue-family IDs, fix commits, accepted fixes, declined rationales, optional caller adjudication context, validation results, and any consolidated comment URL. Verification reviewers check the prior issue families and still reread the full current diff for missed or newly introduced issues.
 
 Verification continuity is caller-directed. When a caller provides source reviewer handles and asks for same-reviewer continuity, prefer resuming those reviewers for the current verification pass if the harness can do so safely. If live resumption is unavailable or unsafe, fall back to fresh verification reviewers using the prior packet, source reviewer aliases, and source reviewer finding IDs as the continuity trail. Record the continuity mode and handle availability in the packet so callers such as `review-loop` can preserve it in their ledgers.
 
@@ -142,7 +142,7 @@ When applicable, read `references/lenses/contract-surface-matrix.md` and include
    - For each assigned named lens, read only the matching file under `references/lenses/` and include its prompt snippet or equivalent instructions in that reviewer's prompt.
    - When the target triggers the Contract Surface Matrix lens, read `references/lenses/contract-surface-matrix.md` and include its prompt snippet or equivalent instructions in every relevant reviewer prompt.
    - Fill the fresh or verification template explicitly for every reviewer.
-   - Include target, repository, base/head or current head, baseline intent, reviewer alias, lens, assigned lens guidance, Contract Surface Matrix guidance when applicable, custom lens notes, verification continuity and caller adjudication context when applicable, reporting mode, read-only rule, full-reread rule, issue-family rule, design-escape-hatch instruction, provisional-ID rule, and clean response sentinel.
+   - Include target, repository, base/head or current head, baseline intent, model and effort metadata with `unknown` or `not reported` fallbacks, reviewer alias, lens, assigned lens guidance, Contract Surface Matrix guidance when applicable, custom lens notes, verification continuity and caller adjudication context when applicable, reporting mode, read-only rule, full-reread rule, issue-family rule, design-escape-hatch instruction, provisional-ID rule, and clean response sentinel.
    - Spawn clean-context reviewers in parallel when the harness supports it and the pass is authorized by an explicit review-pass or reviewer-panel request, or by a caller such as `review-loop`. If subagents are unavailable, run the pass as a clearly labeled single-agent fallback and state the limitation in the packet.
 
 5. Collect and close:
@@ -165,7 +165,7 @@ When applicable, read `references/lenses/contract-surface-matrix.md` and include
 7. Return the packet:
    - Use the exact packet template in `references/review-packet-template.md`.
    - Include residual risks, limitations, reviewer continuity mode, handle availability, and whether a temporary packet file was written.
-   - Include model and effort metadata when available, using `unknown` or `not reported` instead of guessing.
+   - Include model and effort metadata, using `unknown` or `not reported` instead of guessing.
    - Do not post the packet externally unless another approved workflow owns that write.
 
 ## Filing Rules
@@ -179,7 +179,7 @@ When applicable, read `references/lenses/contract-surface-matrix.md` and include
 ## Quality Bar
 
 - The target, base, head or current head, mode, reviewer count, lens plan, and baseline-intent quality are explicit.
-- The packet records requested and actual model/effort metadata when available, or records `unknown` or `not reported` fallbacks.
+- The packet records requested and actual model/effort metadata, or records `unknown` or `not reported` fallbacks.
 - Reviewers get clean, read-only prompts assembled from the current reference template and assigned per-lens files.
 - Every reviewer reviews the full target, even when assigned a lens.
 - The packet groups findings by issue family, not only by reviewer chronology.

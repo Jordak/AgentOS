@@ -8,7 +8,7 @@ Before sending a reviewer prompt, confirm it includes:
 
 - target, repository, base, and head or current head;
 - baseline intent summary from the issue, PR description, spec, design doc, ADR, commit range, patch, or user request;
-- model and effort metadata when available, or `unknown`/`not reported`/`not applicable` fallbacks;
+- model and effort metadata, using `unknown`/`not reported`/`not applicable` fallbacks instead of silent omission;
 - mode: `fresh` or `verification`;
 - reviewer alias and optional lens; reviewer aliases use `P<panel-number>-R<reviewer-number>`, where `P` means panel;
 - custom lens notes when provided;
@@ -178,7 +178,7 @@ For every fresh reviewer, fill and send the "Fresh Reviewer Prompt" template. Fo
 Do not reconstruct these prompts from memory. Each reviewer prompt must include:
 - target, repository, base, and current head;
 - baseline intent summary and source or limitation;
-- model and effort metadata when available, or `unknown`/`not reported`/`not applicable` fallbacks;
+- model and effort metadata, using `unknown`/`not reported`/`not applicable` fallbacks instead of silent omission;
 - mode, reviewer alias, optional lens, and custom lens notes;
 - assigned lens guidance loaded from `references/lenses/<lens>.md` when a named lens is assigned;
 - Contract Surface Matrix guidance loaded from `references/lenses/contract-surface-matrix.md` when the target changes reusable contract surfaces;
