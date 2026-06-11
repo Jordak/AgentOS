@@ -200,6 +200,8 @@ Existing AgentOS workflows keep their native contracts and artifacts:
 - `ensure-implementation-readiness` (`os/skills/ensure-implementation-readiness/SKILL.md`) owns the feature-sized readiness gate and readiness-repair workflow, including durable design-source updates when authorized.
 - `audit-issues` (`os/skills/audit-issues/SKILL.md`) owns evidence-backed issue tracker reconciliation after integration evidence exists.
 - `land-github-issue` (`os/skills/land-github-issue/SKILL.md`) owns one-issue acceptance-criteria reconciliation, fulfilled-checkbox updates, and authorized issue closure after integration evidence exists. It returns unmet criteria to the Calling Workflow instead of spawning workers or widening implementation scope.
+- `coordinate-issue-batch` (`os/skills/coordinate-issue-batch/SKILL.md`) owns one GitHub issue batch pass: selection or accepted-batch conversion, worker launch and tracking, human merge-event handling, and eligible landing through `land-github-issue`.
+- `github-loop` (`os/skills/github-loop/SKILL.md`) owns repeated GitHub issue batch-pass sequencing by invoking or resuming `coordinate-issue-batch` until no suitable issues remain or a stop condition halts the repository-level loop.
 - `os/playbook/GITHUB_WORKFLOW.md` owns repository branch, PR, external-write, and issue-closure discipline.
 
 Link to these contracts rather than copying their rules into every new loop.

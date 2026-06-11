@@ -15,6 +15,8 @@ When the active agent harness exposes these skills or equivalent workflows, pref
 - Use `/to-prd` when the user wants to turn the current conversation context into a PRD and publish it to the project issue tracker.
 - Use `/to-issues` when the user wants to break a plan, spec, or PRD into independently grabbable implementation issues. Publish issues only after the breakdown is approved, and do not close or modify any parent issue as part of that workflow.
 - Use `/triage` for issue intake, classification, readiness checks, label/state transitions, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`, and agent brief comments.
+- Use `github-loop` when the user wants to keep running successive GitHub issue batch passes for a repository until no suitable issues remain or a stop condition halts the repository-level loop.
+- Use `coordinate-issue-batch` when the user wants one full GitHub issue batch pass: select or accept a batch, launch isolated workers when authorized, track PRs and merge reports, and land eligible merged issues.
 - Use `land-github-issue` when a landing-capable workflow needs to verify one issue's acceptance criteria against remote integration-branch evidence, check off fulfilled Markdown criteria, and close the issue when closure is authorized.
 - Use `audit-issues` for broader issue-tracker reconciliation, stale issue sweeps, or multi-issue audits against merged code.
 
