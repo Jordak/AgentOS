@@ -11,6 +11,8 @@ Coordinate repeated GitHub issue batch passes for one repository while preservin
 
 `github-loop` is the repository-level loop above `coordinate-issue-batch`. It owns the decision to start, resume, or stop successive batch-pass invocations. It passes callback-first invocation references to batch coordinators when the harness supports them, then waits for returned Workflow Results instead of continuously monitoring the coordinator. It does not own issue selection internals, worker launch, batch ledgers, landing, issue closure, PR merge, branch deletion, or per-issue readiness repair.
 
+Inbound invocation is prose-only in v1. A caller may ask `github-loop` to start or resume in the current conversation, thread, or reporting surface, but `github-loop` itself does not accept a caller-supplied Workflow Invocation Reference, result surface, or release instruction. Its callback-first responsibilities are downstream responsibilities for the `coordinate-issue-batch` invocations it launches.
+
 ## Contract
 
 Inputs:
@@ -23,6 +25,7 @@ Inputs:
 - Current orchestration-loop vocabulary at `os/skills/ORCHESTRATION_LOOPS.md`.
 - `coordinate-issue-batch` when available in the active AgentOS checkout or harness.
 - Optional explicit mode: normal, read-only/plan-only, or resume.
+- No inbound callback/release protocol in v1; treat the user's prose request and current reporting surface as the invocation contract.
 
 Output artifact:
 
@@ -135,6 +138,7 @@ Rebuild or load the loop Recovery Record, verify the current batch-pass state, a
 7. Report the loop Workflow Result:
    - Begin with `Status:` using one canonical terminal value: `completed`, `blocked`, `failed`, `cancelled`, or `needs-human`.
    - Include repository, loop goal, mode, Authorization Boundary, pass count, public-safe child coordinator thread names or unavailable reasons, batch invocation references or public-safe summaries, batch result summaries, release-instruction handling, stop reason, validation, mutations performed, open risks, and recommended next action.
+   - Return the result in the current prose reporting surface. Do not wait for a caller release signal; inbound caller-supplied Workflow Invocation References, result surfaces, and release instructions are out of scope for `github-loop` v1.
    - State clearly that merge, branch deletion, new label creation, and out-of-boundary external actions remain outside v1 unless a separate approved workflow or direct human step owns them.
 
 ## Stop Conditions
@@ -159,6 +163,7 @@ The loop Recovery Record must be recoverable enough to resume after interruption
 Recover at least:
 
 - loop id or invocation reference when available;
+- prose invocation request and current reporting surface; if another workflow called `github-loop`, record that the inbound contract is still prose-only and no caller-supplied callback/result surface or release instruction is supported in v1;
 - repository and integration branch;
 - loop goal, mode, and Authorization Boundary;
 - loop-level caps and pass-through caps for `coordinate-issue-batch`;
@@ -188,6 +193,7 @@ Public, publishable, or Git-backed recovery surfaces must use only public-safe f
 - Normal mode owns repeated batch-pass sequencing while preserving explicit Authorization Boundaries.
 - Read-only/plan-only mode performs no local or external mutation.
 - Resume mode can reconstruct enough loop state to continue safely.
+- The inbound `github-loop` contract is prose-only in v1; callback/result surfaces and release instructions are passed only to called batch-pass workflows.
 - Each batch pass has a Recovery Checkpoint before launch or resume.
 - Separate durable called-workflow invocations are the normal path when the harness supports them; same-thread execution is a recorded fallback that keeps loop and batch recovery records distinct.
 - Each called batch pass receives a Workflow Invocation Reference and release instruction when the harness supports it.
@@ -203,7 +209,7 @@ Public, publishable, or Git-backed recovery surfaces must use only public-safe f
 Before finishing:
 
 1. Confirm local instructions, GitHub workflow policy, orchestration-loop guidance, and `coordinate-issue-batch` were read or honored.
-2. Confirm mode, loop goal, loop caps, and Authorization Boundary.
+2. Confirm mode, loop goal, loop caps, Authorization Boundary, and prose-only inbound invocation contract.
 3. Confirm the loop did not perform issue selection, worker launch, or landing directly.
 4. Confirm Recovery Checkpoints before starting or resuming batch passes.
 5. Confirm each normal or resume batch pass used a separate durable called-workflow invocation when supported, or recorded why same-thread fallback was necessary.
@@ -213,5 +219,5 @@ Before finishing:
 9. Confirm any called `coordinate-issue-batch` pass returned a recoverable Workflow Result with release-instruction handling, or a Blocking Human Decision, before the loop continued.
 10. Confirm no later batch started while the prior batch had failed or cancelled workers, failed or cancelled batch passes, blocked work, needs-human states, unresolved human decisions, ready unmerged PRs, or incomplete landing decisions.
 11. Confirm no PR merge/squash, branch deletion, issue closure, label creation, permission change, out-of-scope external write, or Personal Overlay access happened without explicit authorization.
-12. Confirm final Workflow Result includes canonical terminal status, repository, loop goal, pass count, batch result summaries, stop reason, release-instruction handling, validation, mutations, open risks, and recommended next action.
+12. Confirm final Workflow Result includes canonical terminal status, repository, loop goal, pass count, batch result summaries, stop reason, downstream release-instruction handling, validation, mutations, open risks, and recommended next action.
 13. If this skill or its manifest entry changed, run `git diff --check` and `scripts/run-validator`.
