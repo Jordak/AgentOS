@@ -49,6 +49,7 @@ Safety:
 - Do not create or switch branches, create worktrees, spawn workers, call subagents, or start execution workflows by default.
 - Treat labels as evidence, not truth. Labels such as `blocked`, `HITL`, `ready-for-agent`, `ready-for-human`, `needs-human`, and `needs-a-human` can be stale or incomplete, so verify them against issue bodies, dependencies, comments when needed, and current tracker state before using them as selection reasons.
 - Treat current blocker or human-review evidence conservatively. A candidate may still be high leverage, but the recommendation must name what needs verification or resolution before coordination starts.
+- Do not turn normal issue starting states into selection stop conditions. `needs design consensus`, missing readiness markers, missing design-consensus evidence, sparse acceptance criteria, `HITL`, or human-participation labels are candidate-state facts for ranking and handoff. They may mean the downstream coordinator should start with readiness repair, a design-consensus lane, human-participation workflow, or sequential execution, but they are not by themselves Blocking Human Decisions for this read-only selector.
 - Do not treat `ready-for-agent` as the primary ranking signal. It is evidence that execution may be possible, not evidence that the issue is the best next move.
 - Ask before any external write request, and do not perform the write from this skill. For execution or coordination requests, stop after the recommendation and tell the caller or user to explicitly invoke `coordinate-issue-batch` or another authorized mutating workflow in a separate step.
 
@@ -62,7 +63,7 @@ Default ranking posture:
 2. Prefer ready high-leverage issues when leverage is otherwise comparable.
 3. Prefer high-leverage issues that need design consensus over low-leverage issues that are already ready, because readiness repair belongs downstream and should not cause the selector to discard leverage.
 4. Recommend low-leverage ready issues as quick wins or filler only when they do not displace higher-leverage work.
-5. Treat blocker, HITL, and human-review signals as stale until verified; explain whether the evidence appears current and what makes the candidate safe or unsafe for the selected batch.
+5. Treat blocker, HITL, readiness, and human-review signals as candidate-state evidence rather than automatic filters; explain the likely first lane for the downstream workflow.
 
 If the user gives a narrower selection goal, honor it explicitly. For example, "find only issues that can be implemented immediately" may filter out not-ready high-leverage work; "find design work worth doing next" may elevate issues that need consensus.
 
@@ -86,11 +87,12 @@ If the user gives a narrower selection goal, honor it explicitly. For example, "
    - Treat labels as potentially stale. Verify `blocked` against open dependencies, `HITL` or human-review labels against the issue body and recent comments when needed, and `ready-for-agent` against durable readiness evidence.
    - Classify each relevant issue as one of:
      - `appears ready for coordination`;
-     - `needs readiness or design repair before execution`;
+     - `needs readiness or design repair as the first execution lane`;
      - `appears blocked on dependency`;
-     - `appears blocked on human decision`;
+     - `needs human participation during design or execution`;
      - `triage or design clarification needed before selection`;
      - `closure audit or no action candidate`.
+   - Do not classify `needs design consensus`, missing readiness evidence, missing readiness markers, sparse acceptance criteria, or `HITL` as Blocking Human Decisions by default. They are normal starting points for issue work. Reserve blocker language for a real dependency, a user goal that excludes that starting state, or evidence that selection itself cannot proceed without a human choosing between incompatible options.
    - Remember that `needs design consensus` does not automatically make an issue lower priority than ready low-leverage work.
 
 4. Score by leverage, not only readiness:
@@ -101,12 +103,14 @@ If the user gives a narrower selection goal, honor it explicitly. For example, "
 5. Assess parallel safety:
    - For each selected issue, name the likely Isolation Boundary: issue, branch/worktree, PR, artifact, domain/module area, read-only lane, or explicit non-overlap assumption.
    - Mark a batch as likely parallel-safe only when selected issues appear independent enough that coordinated workers would not share an uncoordinated mutable surface.
-   - Mark a batch as sequential when one issue depends on another, shares unclear files or workflow state, or needs a human/design decision before safe parallel work.
-   - If uncertain, recommend a coordinator or human validate the boundary before worker launch.
+   - Mark a batch as sequential when one issue depends on another, shares unclear files or workflow state, or has a design question that can affect a sibling issue's scope.
+   - Do not mark a batch sequential solely because one or more issues begin with readiness repair, design consensus, missing readiness evidence, or HITL participation. Independent design/readiness lanes can still be parallel-safe when their mutable surfaces and decisions do not overlap.
+   - If uncertain, recommend that the coordinator validate the boundary before worker launch; ask for a human selection decision only when the selector cannot rank or group the candidates without choosing between incompatible goals.
 
 6. Select the batch:
    - Choose the next 1-N issues that best match the selection goal and future-leverage ranking.
    - Include readiness, blocker, and stale-label evidence as risk notes for the selected batch, not as workflow commands.
+   - Include the recommended first lane for each selected issue, such as implementation-ready, readiness repair, design consensus, human-participation design, closure audit, or dependency verification.
    - Leave execution, worker assignment, issue comments, label hygiene, branches, PRs, and implementation workflow invocation to `coordinate-issue-batch` or another explicitly authorized mutating workflow.
    - Recommend no selection for issues that are low leverage, out of scope, or unsafe to include in the batch after current evidence is checked.
 
@@ -128,6 +132,7 @@ Use this structure unless the user requested a smaller answer:
 1. #<issue> <title>
    - Why this now: <future-leverage rationale>
    - Readiness/blockers: <evidence and stale-label check>
+   - First lane: <implementation-ready / readiness repair / design consensus / human-participation design / closure audit / dependency verification>
    - Parallel-safety notes: <Isolation Boundary or sequencing reason>
 
 ## Parallel-Safety Assessment
@@ -158,6 +163,7 @@ Use this structure unless the user requested a smaller answer:
 
 - The recommendation optimizes for future leverage unless the user gave a narrower goal.
 - Readiness state affects sequencing and risk notes, not just the ranking.
+- Normal starting states such as missing readiness evidence, `needs design consensus`, and `HITL` are reported as first-lane handoff notes rather than treated as selector stop conditions.
 - Blocked and human-review labels are checked as potentially stale signals, and current blocker evidence is never silently ignored.
 - Each selected issue has a clear reason for being in the batch.
 - Batch recommendations include a parallel-safety assessment and any sequencing constraints.
@@ -172,8 +178,9 @@ Before finishing:
 2. Confirm GitHub and local reads were read-only.
 3. Confirm labels, blocker relationships, readiness evidence, and acceptance criteria were considered for selected issues.
 4. Confirm the ranking rationale names future leverage, not only readiness.
-5. Confirm blocked, HITL, ready, and human-review labels were treated as potentially stale signals and checked against available evidence.
+5. Confirm blocked, HITL, ready, and human-review labels were treated as candidate-state evidence, not automatic selection blockers.
 6. Confirm each selected issue has a rationale for inclusion in the batch.
 7. Confirm batch output states whether the set appears parallel-safe and why.
-8. Confirm no branches, worktrees, workers, issue comments, labels, PRs, or other external state were changed.
-9. If this skill or its manifest entry changed, run `git diff --check` and `scripts/run-validator`.
+8. Confirm the output names each selected issue's recommended first lane when readiness or human participation affects the handoff.
+9. Confirm no branches, worktrees, workers, issue comments, labels, PRs, or other external state were changed.
+10. If this skill or its manifest entry changed, run `git diff --check` and `scripts/run-validator`.
