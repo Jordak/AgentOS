@@ -22,19 +22,20 @@ Inputs:
 - Current AgentOS GitHub workflow policy at `os/playbook/GITHUB_WORKFLOW.md`.
 - Current orchestration-loop vocabulary and worker handoff guidance at `os/skills/ORCHESTRATION_LOOPS.md`.
 - `select-issue-batch`, `implement-github-issue`, and `land-github-issue` when available in the active AgentOS checkout or harness.
+- Optional caller-supplied Workflow Invocation Reference or result surface, plus an explicit coordinator release instruction, when this skill is invoked as a durable Called Workflow.
 - A supported durable worker-launch path when normal mode launches implementation workers. In Codex harnesses that support branch-backed project threads, durable implementation workers should be separate branch-backed threads, not in-thread subagents.
 - A callback or result surface for each launched worker when the harness supports one, such as a callback thread id, child-thread URL, coordinator ledger location, or equivalent Workflow Invocation Reference.
 - Optional explicit mode: normal, read-only/plan-only, or resume.
 
 Output artifact:
 
-- A coordinator Workflow Result with batch status, selected or provided issues, ledger location, worker branches, worktrees, PRs, worker states, public-safe thread names and invocation references or redacted private-surface summaries, merge-event state, landing outcomes, skipped issues, blockers, validation, mutations performed, open risks, and recommended next action.
+- A coordinator Workflow Result returned in the current reporting mode or caller-supplied Workflow Invocation Reference, with batch status, selected or provided issues, ledger location, worker branches, worktrees, PRs, worker states, public-safe thread names and invocation references or redacted private-surface summaries, merge-event state, landing outcomes, skipped issues, blockers and needs-human decisions, release-instruction handling, validation, mutations performed, open risks, and recommended next action.
 - A recoverable coordinator ledger or report in the current reporting mode.
 - Optional dedicated GitHub batch tracking issue when the Authorization Boundary explicitly permits creating or using that tracker surface.
 
 Mutability:
 
-- Mixed. Normal mode may perform ordinary coordinator writes inside the Authorization Boundary: read-only selection, coordinator checks, ledger or checkpoint updates on authorized surfaces, branch/worktree/thread setup for supported workers, supported worker-thread renaming before `READY`, callback/invocation-reference handoff, minimal worker handoff packets, and worker launch.
+- Mixed. Normal mode may perform ordinary coordinator writes inside the Authorization Boundary: read-only selection, coordinator checks, ledger or checkpoint updates on authorized surfaces, caller-supplied result-surface handling when invoked as a durable Called Workflow, branch/worktree/thread setup for supported workers, supported worker-thread renaming before `READY`, callback/invocation-reference handoff, minimal worker handoff packets, and worker launch.
 - Read-only/plan-only mode inspects, selects, and proposes the batch, ledger, handoffs, sequencing, and risks without worker launch, tracker mutation, branch/worktree creation, or external writes.
 - Resume mode rebuilds or loads the coordinator ledger and continues from the next safe phase under the current Authorization Boundary.
 
@@ -72,7 +73,7 @@ Run a full batch pass:
 3. Check blocker, dependency, readiness, stale-label, and Isolation Boundary evidence.
 4. Set up supported isolated workers with callback-first invocation references when authorized and parallel-safe.
 5. Go idle until worker Workflow Results return, using bounded polling only for bootstrap, timeout, recovery, or diagnostics.
-6. Track worker Workflow Results, review-correction lifecycle, blocked/failed/cancelled states, PRs, and merge events.
+6. Track worker Workflow Results, review-correction lifecycle, blocked/failed/cancelled/needs-human states, release handling, PRs, and merge events.
 7. Wait for worker quiescence and human merge reports.
 8. Invoke or follow `land-github-issue` one issue at a time for eligible merged issues.
 9. Return a final coordinator Workflow Result.
@@ -92,7 +93,7 @@ Landing is a phase of normal or resume mode, not a separate top-level mode.
 1. Establish the target:
    - Identify repository, tracker, base branch, checkout path, mode, Authorization Boundary, and any provided issue batch.
    - Read local instructions, `os/playbook/GITHUB_WORKFLOW.md`, `os/skills/ORCHESTRATION_LOOPS.md`, and the narrow skill contracts this workflow may call.
-   - Record the initial Recovery Record: target, mode, Authorization Boundary, ledger surface, current phase, known blockers, and next action.
+   - Record the initial Recovery Record: target, mode, Authorization Boundary, ledger surface, any caller-supplied Workflow Invocation Reference or result surface, coordinator release instruction, current phase, known blockers, and next action.
 
 2. Select or accept the batch:
    - If no explicit batch is supplied, invoke or follow `select-issue-batch` in read-only mode using the requested selection goal and scope filters.
@@ -103,7 +104,7 @@ Landing is a phase of normal or resume mode, not a separate top-level mode.
 3. Establish the coordinator ledger:
    - Use an invocation-owned coordinator ledger by default.
    - Create or use a dedicated GitHub batch tracking issue only when the Authorization Boundary explicitly permits that tracker write.
-   - Record selected issues, selection evidence, batch source, concurrency limit, worker slots, planned branches/worktrees, public-safe planned thread names and Workflow Invocation References or redacted/private-surface summaries, Isolation Boundaries, known dependencies, stale-label evidence, and next action.
+   - Record selected issues, selection evidence, batch source, concurrency limit, worker slots, planned branches/worktrees, public-safe planned thread names and Workflow Invocation References or redacted/private-surface summaries, caller-supplied result-surface handling when present, Isolation Boundaries, known dependencies, stale-label evidence, and next action.
    - Create a Recovery Checkpoint before worker launch or any other recovery boundary where losing context would make resumption unsafe.
 
 4. Check blockers and parallel safety:
@@ -124,24 +125,25 @@ Landing is a phase of normal or resume mode, not a separate top-level mode.
    - Launch supported workers only in normal mode and only after the ledger checkpoint, parallel-safety checks, worker setup, thread naming when available, and callback/reference recording pass.
    - After launch, let the coordinator go idle until worker Workflow Results return. Use runtime polling only as bounded bootstrap, timeout, recovery, or diagnostic behavior, and record the reason and bound in the ledger.
    - Preserve one worker per isolated checkout, index, branch, and issue scope.
-   - Track states such as `queued`, `launched`, `implementing`, `ready-for-human-review`, `revising-after-review`, `complete`, `permanently-blocked`, `failed`, `cancelled`, `merged`, `landing-skipped`, and `landed`.
+   - Track states such as `queued`, `launched`, `implementing`, `ready-for-human-review`, `revising-after-review`, `complete`, `permanently-blocked`, `failed`, `cancelled`, `needs-human`, `merged`, `landing-skipped`, and `landed`, plus release status or post-result availability for workers that should stop, remain assigned, or wait for caller release.
    - Let workers run issue-local readiness repair, design consensus, implementation, validation, PR creation, review-loop convergence, and review-comment corrections within their assigned scope.
    - Route worker decisions to the coordinator only when they change the batch ledger, Isolation Boundary, Authorization Boundary, worker assignment, landing sequence, or coordinator-owned integration state.
 
 7. Wait for quiescence and merge reports:
    - Do not begin post-merge landing checks while workers may still produce review-correction events for the current batch.
-   - Treat the worker set as quiescent when every expected worker is complete, permanently blocked, failed, or explicitly cancelled.
+   - Treat the worker set as quiescent when every expected worker is complete, permanently blocked, failed, needs-human with a recorded Blocking Human Decision, or explicitly cancelled, and each returned worker has recorded release handling or post-result availability.
    - Wait for the integration owner to report which completed PRs intended for the current landing phase are merged.
-   - Record unmerged, blocked, failed, and cancelled issues as skipped for landing with their next action.
+   - Record unmerged, blocked, needs-human, failed, and cancelled issues as skipped for landing with their next action.
 
 8. Land eligible issues:
    - Fetch or otherwise verify the remote integration branch when landing checks require current integration evidence.
    - For each eligible merged issue, invoke or follow `land-github-issue` one issue at a time under an explicit landing Authorization Boundary.
    - Skip issues whose PRs are unmerged, whose acceptance criteria are ambiguous, whose human-review labels block closure, or whose landing authorization is absent.
-   - Record fulfilled, skipped, blocked, failed, cancelled, unmerged, unresolved, and landed outcomes in the coordinator ledger.
+   - Record fulfilled, skipped, blocked, needs-human, failed, cancelled, unmerged, unresolved, and landed outcomes in the coordinator ledger.
 
 9. Report the coordinator Workflow Result:
-   - Include issue URLs, selection source, ledger surface, branch and worktree status, PRs, public-safe thread status or redacted private-surface summary, merge-event status, landing outcomes, skipped issues, validation, mutations, open risks, and recommended next action.
+   - Include issue URLs, selection source, ledger surface, branch and worktree status, PRs, public-safe thread status or redacted private-surface summary, merge-event status, landing outcomes, skipped issues, blocked and needs-human states, per-worker release status or post-result availability, validation, mutations, open risks, and recommended next action.
+   - When the caller supplied a Workflow Invocation Reference or result surface, return the coordinator Workflow Result there when available, include completion, blocked, failed, cancelled, and needs-human states as applicable, and then stop or wait according to the explicit coordinator release instruction.
    - State clearly that PR merge/squash, branch deletion, new label creation, and any out-of-boundary external action remain outside v1 unless a separate approved workflow or direct human step owns them.
 
 ## Coordinator Ledger
@@ -151,15 +153,17 @@ The coordinator ledger must be recoverable enough to resume after interruption, 
 Recover at least:
 
 - batch id or invocation reference;
+- caller-supplied Workflow Invocation Reference or result surface for this coordinator invocation, using only public-safe stable references in public or Git-backed surfaces and redacting private runtime handles when needed;
+- coordinator release instruction, including whether the coordinator should stop after returning the result, remain assigned for correction/resume, or wait for a caller release signal;
 - repository and integration branch;
 - mode and Authorization Boundary;
 - ledger surface and checkpoint history;
 - selected or provided issues and selection evidence;
 - concurrency limit and queued issues;
-- worker branch, worktree, public-safe thread name and Workflow Invocation Reference when available, redacted/private-surface summary when references are not public-safe, PR, assigned issue, Isolation Boundary, Authorization Boundary, release instruction, and worker state;
+- worker branch, worktree, public-safe thread name and Workflow Invocation Reference when available, redacted/private-surface summary when references are not public-safe, PR, assigned issue, Isolation Boundary, Authorization Boundary, release instruction, release status or post-result availability, and worker state;
 - worker Workflow Result evidence, validation, review-loop evidence, and open risks;
 - bounded polling reason, bound, and result when runtime polling was used for bootstrap, timeout, recovery, or diagnostics;
-- human-review, review-correction, merge, landing, skipped, blocked, failed, cancelled, and unresolved state;
+- human-review, review-correction, merge, landing, skipped, blocked, needs-human, failed, cancelled, and unresolved state;
 - Blocking Human Decisions with exact question, recommended default, decision state, and resume rule;
 - mutations performed;
 - next action.
@@ -179,14 +183,16 @@ Recover at least:
 - Normal mode owns a full batch pass while preserving explicit Authorization Boundaries for worker launch, tracking issue creation, landing, closure, and other external writes.
 - Read-only/plan-only mode performs no local or external mutation.
 - Resume mode can reconstruct enough ledger state to continue safely.
+- When called with a Workflow Invocation Reference or result surface, the coordinator final Workflow Result is returned through that surface when available and the coordinator release instruction is followed.
 - Every launched worker has an Isolation Boundary, branch/worktree, Authorization Boundary, Workflow Invocation Reference when supported, release instruction, and expected Workflow Result.
+- Returned worker results record release status or post-result availability before the batch is treated as quiescent.
 - Supported durable worker threads are renamed to public-safe, legible target-specific names before `READY`, and worker handoffs are minimal pointer-first packets rather than copied workflow contracts.
 - The coordinator goes idle after worker launch and uses polling only as bounded bootstrap, timeout, recovery, or diagnostic behavior.
 - Non-parallel-safe selected batches stop for a Blocking Human Decision.
 - Workers own issue-local design/readiness questions, while coordinator-owned batch decisions return to the coordinator.
 - Landing waits for worker quiescence and human merge reports.
 - Eligible merged issues are landed one at a time through `land-github-issue`.
-- Blocked, failed, cancelled, unmerged, ambiguous, and unauthorized issues are skipped for landing with next-action evidence.
+- Blocked, needs-human, failed, cancelled, unmerged, ambiguous, and unauthorized issues are skipped for landing with next-action evidence.
 
 ## Verification
 
@@ -196,14 +202,14 @@ Before finishing:
 2. Confirm mode and Authorization Boundary.
 3. Confirm selection source or provided batch source.
 4. Confirm parallel-safety checks and any Blocking Human Decisions.
-5. Confirm coordinator ledger surface and Recovery Checkpoints.
+5. Confirm coordinator ledger surface, any caller-supplied Workflow Invocation Reference or result surface, release instruction, and Recovery Checkpoints.
 6. Confirm worker handoffs include required fields, Workflow Invocation References when supported, release instructions, and only boundary-relevant batch context.
 7. Confirm Codex durable workers use branch-backed project threads when that harness path is available, not in-thread subagents.
 8. Confirm supported worker threads were renamed to public-safe, legible target-specific names before `READY`, or record why a public-safe rename was unavailable.
-9. Confirm the coordinator used callback-first Workflow Results and did not continuously poll workers except for recorded bounded bootstrap, timeout, recovery, or diagnostics.
+9. Confirm the coordinator used callback-first Workflow Results, returned the coordinator result through any caller-supplied result surface when available, followed the coordinator release instruction, and did not continuously poll workers except for recorded bounded bootstrap, timeout, recovery, or diagnostics.
 10. Confirm per-issue readiness repair and label hygiene stayed with assigned worker workflows.
 11. Confirm no PR merge/squash, branch deletion, label creation, permission change, out-of-scope issue mutation, or Personal Overlay access happened without explicit authorization.
-12. Confirm landing checks waited for worker quiescence and human merge reports.
+12. Confirm landing checks waited for worker quiescence, recorded needs-human Blocking Human Decisions, worker release status or post-result availability, and human merge reports.
 13. Confirm `land-github-issue` was invoked or followed only for eligible merged issues under an explicit landing Authorization Boundary.
-14. Confirm final Workflow Result includes selected issues, ledger state, worker states, PRs, merge status, landing outcomes, skipped issues, validation, mutations, open risks, and recommended next action.
+14. Confirm final Workflow Result includes selected issues, ledger state, worker states including needs-human, release-instruction handling, PRs, merge status, landing outcomes, skipped issues, validation, mutations, open risks, and recommended next action.
 15. If this skill or its manifest entry changed, run `git diff --check` and `scripts/run-validator`.

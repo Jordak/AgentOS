@@ -26,13 +26,13 @@ Inputs:
 
 Output artifact:
 
-- A GitHub loop Workflow Result with repository, loop goal, mode, Authorization Boundary, loop caps, pass count, called batch-pass invocation references or public-safe summaries, called batch-pass results, merge-report state, blockers, failures, cancellations, stop reason, validation, mutations performed, open risks, and recommended next action.
+- A GitHub loop Workflow Result with repository, loop goal, mode, Authorization Boundary, loop caps, pass count, public-safe child coordinator thread names or unavailable reasons, called batch-pass invocation references or public-safe summaries, called batch-pass results, merge-report state, blockers, needs-human decisions, failures, cancellations, release-instruction handling, stop reason, validation, mutations performed, open risks, and recommended next action.
 - A recoverable loop Recovery Record in the current reporting mode.
 - Optional dedicated GitHub tracking issue only when the Authorization Boundary explicitly permits creating or using that tracker surface.
 
 Mutability:
 
-- Mixed. Normal mode may perform ordinary loop writes inside the Authorization Boundary: loop Recovery Checkpoints on authorized surfaces, callback-first called-workflow handoff packets, durable called-workflow launches when the harness supports them, and resume requests to `coordinate-issue-batch`.
+- Mixed. Normal mode may perform ordinary loop writes inside the Authorization Boundary: loop Recovery Checkpoints on authorized surfaces, callback-first called-workflow handoff packets, durable called-workflow launches when the harness supports them, supported child coordinator thread renaming to public-safe, legible target-specific names before assignment or `READY`, and resume requests to `coordinate-issue-batch`.
 - Read-only/plan-only mode proposes the loop goal, caps, stop policy, recovery surface, and batch-pass sequencing without launching coordinators, creating workers, mutating tracker state, creating branches, or editing local tracked files.
 - Resume mode rebuilds or loads the loop Recovery Record and continues from the next safe phase under the current Authorization Boundary.
 
@@ -56,7 +56,7 @@ Safety:
 - Do not continuously poll `coordinate-issue-batch` as the normal progress model. Pass a Workflow Invocation Reference when supported and wait for a Workflow Result, using polling only as bounded bootstrap, timeout, recovery, or diagnostic behavior recorded in the loop Recovery Record.
 - Do not land issues directly. Resume or invoke `coordinate-issue-batch` so its batch ledger can invoke or follow `land-github-issue` for eligible merged issues.
 - Do not merge or squash PRs, close issues, delete branches, create labels, change permissions or settings, handle credentials or MFA, or write outside the loop's assigned scope unless another approved workflow or explicit user authorization owns that action.
-- Do not start a later batch while the current batch has unmerged ready PRs waiting for human merge reports, failed or cancelled workers, a failed or cancelled batch pass, permanently blocked issues or workers, unresolved Blocking Human Decisions, or incomplete landing decisions.
+- Do not start a later batch while the current batch has unmerged ready PRs waiting for human merge reports, failed or cancelled workers, a failed or cancelled batch pass, permanently blocked issues or workers, needs-human states, unresolved Blocking Human Decisions, or incomplete landing decisions.
 - Do not silently broaden the selection goal when no issues are selected. Stop for the current goal and recommend a broader rerun when appropriate.
 - Keep opaque runtime handles, private thread IDs, and machine-local details out of public, publishable, or Git-backed recovery surfaces unless policy explicitly permits them.
 - Read or write Personal Overlay state only when explicitly assigned and authorized.
@@ -78,7 +78,7 @@ Run repeated batch passes:
 
 When the harness supports a durable called-workflow launch path, run each normal `coordinate-issue-batch` pass as a separate recoverable called-workflow invocation. Same-thread execution is an acceptable fallback, but the loop-level Recovery Record and batch-level coordinator ledger must remain distinct.
 
-For Codex harnesses with thread creation tools, this means start a child coordinator thread for the batch pass after the loop Recovery Checkpoint, pass the `coordinate-issue-batch` request and Authorization Boundary into that child, then wait for or recover its Workflow Result before deciding whether to continue. The user's `github-loop` request is the explicit request for that child coordinator thread; ask again only when the launch would require a permission, scope, cost, or target choice outside this skill's normal Authorization Boundary.
+For Codex harnesses with thread creation tools, this means start a child coordinator thread for the batch pass after the loop Recovery Checkpoint, rename it to a public-safe, legible target-specific name before assignment or `READY` when thread renaming is supported, pass the `coordinate-issue-batch` request and Authorization Boundary into that child, then wait for or recover its Workflow Result before deciding whether to continue. The user's `github-loop` request is the explicit request for that child coordinator thread; ask again only when the launch would require a permission, scope, cost, or target choice outside this skill's normal Authorization Boundary.
 
 ### Read-Only / Plan-Only
 
@@ -102,12 +102,13 @@ Rebuild or load the loop Recovery Record, verify the current batch-pass state, a
 
 3. Create a Recovery Checkpoint:
    - Before starting or resuming a batch pass, checkpoint the loop Recovery Record on an authorized surface.
-   - Include the current pass number, expected `coordinate-issue-batch` Workflow Result, Workflow Invocation Reference or result surface when available, loop caps, Authorization Boundary, and next action.
+   - Include the current pass number, expected `coordinate-issue-batch` Workflow Result, planned public-safe child coordinator thread name or rename-unavailable reason, Workflow Invocation Reference or result surface when available, loop caps, Authorization Boundary, and next action.
    - Keep private runtime references out of public or Git-backed surfaces.
 
 4. Invoke or resume `coordinate-issue-batch`:
    - Start a separate durable called-workflow invocation when the harness supports it.
    - In Codex harnesses, create or resume a child coordinator thread for the `coordinate-issue-batch` pass; do not treat same-thread execution as the default.
+   - When thread renaming is supported, rename the child coordinator thread to a public-safe, legible target-specific name before sending the assignment or `READY` signal; otherwise record why a public-safe rename was unavailable.
    - Pass a Workflow Invocation Reference, expected coordinator Workflow Result shape, and release instruction to the coordinator when the harness supports a callback or result surface.
    - After launch, let the loop go idle until the coordinator returns its Workflow Result. Use runtime polling only as bounded bootstrap, timeout, recovery, or diagnostic behavior, and record the reason and bound in the Recovery Record.
    - Use same-thread fallback only when a separate durable invocation is unavailable, fails, is denied, or is explicitly unsuitable, and record the fallback reason.
@@ -115,24 +116,24 @@ Rebuild or load the loop Recovery Record, verify the current batch-pass state, a
    - Wait for or recover the coordinator Workflow Result before deciding whether to start another batch pass.
 
 5. Consume the coordinator result:
-   - Record selected issues, worker states, PRs, merge-report state, landing outcomes, skipped issues, blockers, failures, cancellations, validation, mutations, open risks, and recommended next action.
-   - Treat failed or cancelled workers, failed or cancelled batch passes, permanently blocked workers or issues, unresolved Blocking Human Decisions, and ready unmerged PRs as loop stop conditions.
+   - Record selected issues, worker states, PRs, merge-report state, landing outcomes, skipped issues, blockers, needs-human decisions, failures, cancellations, release-instruction handling, validation, mutations, open risks, and recommended next action.
+   - Treat failed or cancelled workers, failed or cancelled batch passes, permanently blocked workers or issues, needs-human states, unresolved Blocking Human Decisions, and ready unmerged PRs as loop stop conditions.
    - Let `coordinate-issue-batch` finish any same-batch duties it can safely finish, including authorized landing of eligible succeeded and merged issues, before treating blocked work as a loop-level stop.
 
 6. Decide whether to continue:
    - Start another batch only when the previous batch is cleanly settled:
      - every launched worker is quiescent;
      - no worker or batch pass failed or was cancelled;
-     - no worker or issue remains blocked;
+     - no worker or issue remains blocked or needs a human decision;
      - no ready PRs are waiting on human merge reports;
      - all eligible merged work was landed or explicitly skipped by `coordinate-issue-batch`;
      - the coordinator result recommends continuing selection for the current loop goal;
      - loop-level caps and Authorization Boundary permit another pass.
    - If `coordinate-issue-batch` returns no selected issues, stop successfully for the current loop goal and recommend a broader rerun only when useful.
-   - If successful PRs and blocked work coexist, return a combined stop report naming both the merge-report state and the blocker.
+   - If successful PRs and blocked or needs-human work coexist, return a combined stop report naming both the merge-report state and the blocker or human decision needed.
 
 7. Report the loop Workflow Result:
-   - Include repository, loop goal, mode, Authorization Boundary, pass count, batch invocation references or public-safe summaries, batch result summaries, stop reason, validation, mutations performed, open risks, and recommended next action.
+   - Include repository, loop goal, mode, Authorization Boundary, pass count, public-safe child coordinator thread names or unavailable reasons, batch invocation references or public-safe summaries, batch result summaries, release-instruction handling, stop reason, validation, mutations performed, open risks, and recommended next action.
    - State clearly that merge, branch deletion, new label creation, and out-of-boundary external actions remain outside v1 unless a separate approved workflow or direct human step owns them.
 
 ## Stop Conditions
@@ -141,6 +142,7 @@ Stop the repository-level loop when any of these are true:
 
 - `coordinate-issue-batch` returns no selected issues for the current loop goal or filters.
 - A Blocking Human Decision is needed.
+- A worker, issue, or batch pass returns `needs-human`.
 - A worker fails or is cancelled, or the batch pass fails or is cancelled.
 - A worker or issue remains permanently blocked after the batch coordinator finishes same-batch work it can safely finish.
 - Ready PRs need human merge reports before landing can continue.
@@ -161,9 +163,9 @@ Recover at least:
 - loop-level caps and pass-through caps for `coordinate-issue-batch`;
 - ledger or checkpoint surface;
 - current pass number and current phase;
-- called `coordinate-issue-batch` invocation references, callback/result surfaces, release instructions, or public-safe summaries;
+- called `coordinate-issue-batch` public-safe child coordinator thread names or rename-unavailable reasons, invocation references, callback/result surfaces, release instructions, release-instruction handling, or public-safe summaries;
 - bounded polling reason, bound, and result when runtime polling was used for bootstrap, timeout, recovery, or diagnostics;
-- batch result summaries, including selected issues, worker status, PRs, merge-report state, landing outcomes, skipped issues, blockers, failures, cancellations, validation, and recommended next action;
+- batch result summaries, including selected issues, worker status, PRs, merge-report state, landing outcomes, skipped issues, blockers, needs-human decisions, failures, cancellations, validation, release-instruction handling, and recommended next action;
 - Blocking Human Decisions with exact question, recommended default, decision state, recovery location, and resume rule;
 - mutations performed by `github-loop`;
 - next safe action.
@@ -188,11 +190,12 @@ Public, publishable, or Git-backed recovery surfaces must use only public-safe f
 - Each batch pass has a Recovery Checkpoint before launch or resume.
 - Separate durable called-workflow invocations are the normal path when the harness supports them; same-thread execution is a recorded fallback that keeps loop and batch recovery records distinct.
 - Each called batch pass receives a Workflow Invocation Reference and release instruction when the harness supports it.
+- Supported child coordinator threads are renamed to public-safe, legible target-specific names before assignment or `READY`, or the unavailable rename is recorded.
 - The loop goes idle after batch-pass launch and uses polling only as bounded bootstrap, timeout, recovery, or diagnostic behavior.
 - Another pass starts only after the prior batch is cleanly settled.
 - No selected issues ends the loop for the current goal instead of silently broadening scope.
-- Failed or cancelled workers, failed or cancelled batch passes, blocked workers or issues, unresolved human decisions, and unmerged ready PRs stop the loop before later batch selection.
-- The final Workflow Result makes merge reports, blockers, validation, mutations, open risks, and next action recoverable.
+- Failed or cancelled workers, failed or cancelled batch passes, blocked workers or issues, needs-human states, unresolved human decisions, and unmerged ready PRs stop the loop before later batch selection.
+- The final Workflow Result makes merge reports, blockers, release-instruction handling, validation, mutations, open risks, and next action recoverable.
 
 ## Verification
 
@@ -203,10 +206,11 @@ Before finishing:
 3. Confirm the loop did not perform issue selection, worker launch, or landing directly.
 4. Confirm Recovery Checkpoints before starting or resuming batch passes.
 5. Confirm each normal or resume batch pass used a separate durable called-workflow invocation when supported, or recorded why same-thread fallback was necessary.
-6. Confirm each called batch pass received a Workflow Invocation Reference and release instruction when supported.
-7. Confirm the loop used callback-first Workflow Results and did not continuously poll `coordinate-issue-batch` except for recorded bounded bootstrap, timeout, recovery, or diagnostics.
-8. Confirm any called `coordinate-issue-batch` pass returned a recoverable Workflow Result or a Blocking Human Decision before the loop continued.
-9. Confirm no later batch started while the prior batch had failed or cancelled workers, failed or cancelled batch passes, blocked work, unresolved human decisions, ready unmerged PRs, or incomplete landing decisions.
-10. Confirm no PR merge/squash, branch deletion, issue closure, label creation, permission change, out-of-scope external write, or Personal Overlay access happened without explicit authorization.
-11. Confirm final Workflow Result includes repository, loop goal, pass count, batch result summaries, stop reason, validation, mutations, open risks, and recommended next action.
-12. If this skill or its manifest entry changed, run `git diff --check` and `scripts/run-validator`.
+6. Confirm supported child coordinator threads were renamed to public-safe, legible target-specific names before assignment or `READY`, or record why a public-safe rename was unavailable.
+7. Confirm each called batch pass received a Workflow Invocation Reference and release instruction when supported.
+8. Confirm the loop used callback-first Workflow Results and did not continuously poll `coordinate-issue-batch` except for recorded bounded bootstrap, timeout, recovery, or diagnostics.
+9. Confirm any called `coordinate-issue-batch` pass returned a recoverable Workflow Result with release-instruction handling, or a Blocking Human Decision, before the loop continued.
+10. Confirm no later batch started while the prior batch had failed or cancelled workers, failed or cancelled batch passes, blocked work, needs-human states, unresolved human decisions, ready unmerged PRs, or incomplete landing decisions.
+11. Confirm no PR merge/squash, branch deletion, issue closure, label creation, permission change, out-of-scope external write, or Personal Overlay access happened without explicit authorization.
+12. Confirm final Workflow Result includes repository, loop goal, pass count, batch result summaries, stop reason, release-instruction handling, validation, mutations, open risks, and recommended next action.
+13. If this skill or its manifest entry changed, run `git diff --check` and `scripts/run-validator`.
