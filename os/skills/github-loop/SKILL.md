@@ -26,7 +26,7 @@ Inputs:
 
 Output artifact:
 
-- A GitHub loop Workflow Result with repository, loop goal, mode, Authorization Boundary, loop caps, pass count, public-safe child coordinator thread names or unavailable reasons, called batch-pass invocation references or public-safe summaries, called batch-pass results, merge-report state, blockers, needs-human decisions, failures, cancellations, release-instruction handling, stop reason, validation, mutations performed, open risks, and recommended next action.
+- A GitHub loop Workflow Result with terminal status (`completed`, `blocked`, `failed`, `cancelled`, or `needs-human`), repository, loop goal, mode, Authorization Boundary, loop caps, pass count, public-safe child coordinator thread names or unavailable reasons, called batch-pass invocation references or public-safe summaries, called batch-pass results, merge-report state, blockers, needs-human decisions, failures, cancellations, release-instruction handling, stop reason, validation, mutations performed, open risks, and recommended next action.
 - A recoverable loop Recovery Record in the current reporting mode.
 - Optional dedicated GitHub tracking issue only when the Authorization Boundary explicitly permits creating or using that tracker surface.
 
@@ -56,7 +56,7 @@ Safety:
 - Do not continuously poll `coordinate-issue-batch` as the normal progress model. Pass a Workflow Invocation Reference when supported and wait for a Workflow Result, using polling only as bounded bootstrap, timeout, recovery, or diagnostic behavior recorded in the loop Recovery Record.
 - Do not land issues directly. Resume or invoke `coordinate-issue-batch` so its batch ledger can invoke or follow `land-github-issue` for eligible merged issues.
 - Do not merge or squash PRs, close issues, delete branches, create labels, change permissions or settings, handle credentials or MFA, or write outside the loop's assigned scope unless another approved workflow or explicit user authorization owns that action.
-- Do not start a later batch while the current batch has unmerged ready PRs waiting for human merge reports, failed or cancelled workers, a failed or cancelled batch pass, permanently blocked issues or workers, needs-human states, unresolved Blocking Human Decisions, or incomplete landing decisions.
+- Do not start a later batch while the current batch has unmerged ready PRs waiting for human merge reports, failed or cancelled workers, a failed or cancelled batch pass, blocked issues or workers, needs-human states, unresolved Blocking Human Decisions, or incomplete landing decisions.
 - Do not silently broaden the selection goal when no issues are selected. Stop for the current goal and recommend a broader rerun when appropriate.
 - Keep opaque runtime handles, private thread IDs, and machine-local details out of public, publishable, or Git-backed recovery surfaces unless policy explicitly permits them.
 - Read or write Personal Overlay state only when explicitly assigned and authorized.
@@ -117,7 +117,7 @@ Rebuild or load the loop Recovery Record, verify the current batch-pass state, a
 
 5. Consume the coordinator result:
    - Record selected issues, worker states, PRs, merge-report state, landing outcomes, skipped issues, blockers, needs-human decisions, failures, cancellations, release-instruction handling, validation, mutations, open risks, and recommended next action.
-   - Treat failed or cancelled workers, failed or cancelled batch passes, permanently blocked workers or issues, needs-human states, unresolved Blocking Human Decisions, and ready unmerged PRs as loop stop conditions.
+   - Treat failed or cancelled workers, failed or cancelled batch passes, blocked workers or issues, needs-human states, unresolved Blocking Human Decisions, and ready unmerged PRs as loop stop conditions.
    - Let `coordinate-issue-batch` finish any same-batch duties it can safely finish, including authorized landing of eligible succeeded and merged issues, before treating blocked work as a loop-level stop.
 
 6. Decide whether to continue:
@@ -144,7 +144,7 @@ Stop the repository-level loop when any of these are true:
 - A Blocking Human Decision is needed.
 - A worker, issue, or batch pass returns `needs-human`.
 - A worker fails or is cancelled, or the batch pass fails or is cancelled.
-- A worker or issue remains permanently blocked after the batch coordinator finishes same-batch work it can safely finish.
+- A worker or issue returns or remains blocked after the batch coordinator finishes same-batch work it can safely finish.
 - Ready PRs need human merge reports before landing can continue.
 - The user explicitly stops the loop.
 - Loop-level caps are reached, such as max passes, max elapsed, or a budget checkpoint.
