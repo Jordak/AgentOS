@@ -25,7 +25,7 @@ For issue-driven work, prefer a GitHub issue as the readiness evidence. The issu
 
 The CI check should remain shallow. It verifies that PR bodies contain the fields and that the readiness verdict is one of the allowed visible states. It must not parse design prose or judge whether the design is good. Humans and agents still apply `os/playbook/IMPLEMENT_FEATURES.md` and `os/skills/ensure-implementation-readiness/SKILL.md`.
 
-Review-loop should treat readiness as preflight context. Before spawning reviewers for feature-sized PRs, it should locate the readiness evidence or record an explicit gate skip. The first review panel should compare the implementation shape against the durable design source so early design drift is surfaced as design risk, not only as isolated code findings.
+Review-loop should treat readiness as a check-only preflight invariant. Before spawning reviewers for feature-sized PRs, it should invoke or follow `ensure-implementation-readiness` in check-only mode and proceed only when that check returns `Ready to Implement` or `Gate Skipped`; if it returns `Needs Design Consensus`, review-loop should return `blocked` before spawning reviewers with the missing evidence recorded. The first review panel should compare the implementation shape against the durable design source so early design drift is surfaced as design risk, not only as isolated code findings.
 
 ## Alternatives Considered
 

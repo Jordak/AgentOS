@@ -178,12 +178,13 @@ Use the matrix to update affected contract surfaces in one pass. Check the ownin
    - Identify the repository, PR or commit target, base branch, head branch, and current branch.
    - Read the repository's local instructions and review policy.
    - Fetch or inspect current PR metadata when network access and permissions allow.
-   - For feature-sized targets, apply the implementation-readiness preflight by invoking or following `ensure-implementation-readiness` in check-only mode against the issue, PR body, ADR, or local design doc. Continue only on `Ready to Implement` or an explicit recorded `Gate Skipped` verdict. If check-only returns `Needs Design Consensus`, stop before reviewer spawning and return `blocked` with the missing consensus evidence.
+   - Initialize a minimal loop ledger or recovery record before readiness preflight with target, base, head, reporting mode, readiness source candidates, current phase, and next safe action.
+   - For feature-sized targets, apply the implementation-readiness preflight by invoking or following `ensure-implementation-readiness` in check-only mode against the issue, PR body, ADR, or local design doc. Continue only when check-only returns `Ready to Implement` or `Gate Skipped`; the bypass reason may already be recorded, but the verdict still comes from the readiness check. If check-only returns `Needs Design Consensus`, stop before reviewer spawning and return `blocked` with check-only mode, source reviewed, verdict, missing consensus evidence, gate-skip state, label state, and next repair owner: `ensure-implementation-readiness`.
    - If the target is not a PR, choose local reporting mode instead of PR comments.
    - Establish the baseline intent summary described in the Design Escape Hatch section. Keep it in the loop ledger so later packets can be compared against the original brief and allowed alternatives.
 
 2. Set the loop ledger:
-   - Track each pass cycle, pass mode, reviewer continuity mode, opaque handle availability, review packet path or chat status, reviewer aliases when supplied by `review-pass`, raw reviewer findings or crosswalk summaries, normalized family IDs, autopilot classification (`auto-fix`, `auto-decline`, or `ask-user`), accepted/declined/user-decision status, `ask-user` decision state, unresolved `ask-user` blockers, lazy-human brief status, complexity posture, chosen smallest closing move, fix commits, validation results, consolidated comment URL or chat status, and pass closure status.
+   - Track readiness-preflight mode, source reviewed, verdict, missing consensus evidence, gate-skip state, label state, next repair owner, and early blocked status when readiness fails before reviewers spawn. When review proceeds, track each pass cycle, pass mode, reviewer continuity mode, opaque handle availability, review packet path or chat status, reviewer aliases when supplied by `review-pass`, raw reviewer findings or crosswalk summaries, normalized family IDs, autopilot classification (`auto-fix`, `auto-decline`, or `ask-user`), accepted/declined/user-decision status, `ask-user` decision state, unresolved `ask-user` blockers, lazy-human brief status, complexity posture, chosen smallest closing move, fix commits, validation results, consolidated comment URL or chat status, and pass closure status.
    - Normalize families into stable ledger IDs such as `C1-IF3` and preserve source reviewer finding IDs from `review-pass`.
    - If compaction or interruption loses details, rebuild the ledger from consolidated "Agent Review" comments, chat pause messages, user replies, conversation summaries, commit history, local validation output, and saved or pasted review packets. Recover autopilot classifications, rationales, ask-user decision states, lazy-human briefs or user decisions, complexity posture, and smallest closing moves from the newest durable source or chat-reporting source that contains them. If no source contains a resolved `ask-user` decision, recover the family as `unresolved` and ask again rather than inferring approval or accepted risk.
    - Prefer one consolidated "Agent Review" comment per panel pass for PR targets. For non-PR targets, keep packet output in chat and the final report.
@@ -253,7 +254,7 @@ Call narrower playbooks for their owned surfaces: GitHub workflow policy for PR 
 ## Quality Bar
 
 - The loop captures target, base, head, baseline intent, final reviewed commit SHA or local diff state, and review-pass sizing rationale.
-- Feature-sized review targets pass `ensure-implementation-readiness` check-only mode with `Ready to Implement`, or have an explicit `Gate Skipped` bypass recorded before reviewers are spawned; missing readiness returns `blocked` without review-phase repair.
+- Feature-sized review targets pass `ensure-implementation-readiness` check-only mode with `Ready to Implement` or `Gate Skipped` before reviewers are spawned; missing readiness returns `blocked` without review-phase repair.
 - Every fresh or verification panel pass is delegated to `review-pass` or its canonical fallback files.
 - The orchestrator owns one durable ledger and posts at most one consolidated "Agent Review" comment per panel pass.
 - Findings are generalized into issue families where possible, and accepted families are swept before verification.
@@ -285,7 +286,7 @@ Before finishing:
 
 1. Confirm the target, base, head, final reviewed commit SHA or local diff state, and review-pass sizing rationale.
 2. Confirm the baseline intent summary was captured from the original brief, including allowed alternatives and non-goals when available.
-3. Confirm feature-sized review targets passed `ensure-implementation-readiness` check-only mode with `Ready to Implement`, or had an explicit `Gate Skipped` bypass before reviewers were spawned; if readiness was missing, confirm the loop returned `blocked` before spawning reviewers.
+3. Confirm feature-sized review targets passed `ensure-implementation-readiness` check-only mode with `Ready to Implement` or `Gate Skipped` before reviewers were spawned; if readiness was missing, confirm the loop returned `blocked` before spawning reviewers with check-only mode, source reviewed, verdict, missing consensus evidence, gate-skip state, label state, and next repair owner.
 4. Confirm every design-escape-hatch trigger was either surfaced to the user, explicitly declined with rationale, or found not applicable.
 5. Confirm every fresh and verification pass used `review-pass` or its canonical fallback files.
 6. Confirm the final fresh `review-pass` packet left no unresolved `auto-fix` or `ask-user` blockers after parent adjudication.

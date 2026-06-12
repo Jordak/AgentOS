@@ -112,7 +112,7 @@ If the user gives a narrower selection goal, honor it explicitly. For example, "
 6. Select the batch:
    - Choose the next 1-N issues that best match the selection goal and future-leverage ranking.
    - Include raw readiness, blocker, and stale-label evidence as risk notes for the selected batch, not as workflow commands or readiness verdicts.
-   - Include the recommended first lane for each selected issue, such as implementation-ready, readiness repair, design consensus, human-participation design, closure audit, or dependency verification.
+   - Include the recommended first lane for each selected issue, such as implementation workflow with readiness gate, readiness repair, design consensus, human-participation design, closure audit, or dependency verification.
    - Leave execution, worker assignment, issue comments, label hygiene, branches, PRs, and implementation workflow invocation to `coordinate-issue-batch` or another explicitly authorized mutating workflow.
    - Recommend no selection for issues that are low leverage, out of scope, or unsafe to include in the batch after current evidence is checked.
 
@@ -134,7 +134,7 @@ Use this structure unless the user requested a smaller answer:
 1. #<issue> <title>
    - Why this now: <future-leverage rationale>
    - Raw readiness/blockers: <evidence and stale-label check>
-   - First lane: <implementation-ready / readiness repair / design consensus / human-participation design / closure audit / dependency verification>
+   - First lane: <implementation workflow with readiness gate / readiness repair / design consensus / human-participation design / closure audit / dependency verification>
    - Parallel-safety notes: <Isolation Boundary or sequencing reason>
 
 ## Parallel-Safety Assessment
