@@ -72,6 +72,8 @@ If a durable design source has no `Design readiness:` field, check-only callers 
 
 If no durable design source exists, or if the source has no valid consensus provenance, the verdict is `Needs Design Consensus`.
 
+Legacy sources with only the old `Design readiness:` marker are not automatically grandfathered into readiness policy v2. Check-only callers should report missing consensus provenance or gate-skip evidence. Normal/repair callers may ask the user to confirm the old source still represents human-agent consensus, then update the current source to the full field set when writes are authorized. Do not bulk-migrate unrelated historical ADRs or design docs just because this policy changed.
+
 ## Consensus Provenance
 
 Design consensus means agreement between the human and the agent or workflow responsible for turning the design into implementation instructions. Consensus provenance is the durable pointer to that agreement.
