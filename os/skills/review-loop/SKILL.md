@@ -24,6 +24,7 @@ Inputs:
 Output artifact:
 
 - A temporary static HTML report that follows `references/report-guidance.md`.
+- An early `blocked` result, when check-only readiness fails before reviewers spawn, that records check-only mode, source reviewed, readiness verdict, missing consensus evidence, gate-skip state, label state, and next repair owner.
 - Optional consolidated "Agent Review" PR comments from the orchestrator that follow `references/agent-review-comment.md`, plus optional PR ready-for-human marking for PR targets.
 
 Mutability:

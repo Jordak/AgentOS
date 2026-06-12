@@ -191,6 +191,6 @@ Before finishing:
 9. Confirm validation commands and results are recorded.
 10. Confirm the PR body includes `Readiness evidence:` and `Readiness verdict:`.
 11. Confirm review-loop was run, or record why it could not be run.
-12. Confirm the final Workflow Result includes canonical terminal status, issue, issue-label state, branch/worktree, PR, commits, validation, review-loop evidence, open risks, recommended next action, any caller-supplied Workflow Invocation Reference or result surface, and release-instruction handling.
+12. Confirm the final Workflow Result includes canonical terminal status, issue, raw readiness evidence or provenance, readiness verdict, final readiness label state, Gate Skipped reason or missing consensus evidence when present, branch/worktree, PR, commits, validation, review-loop evidence, open risks, recommended next action, any caller-supplied Workflow Invocation Reference or result surface, and release-instruction handling.
 13. Confirm merge, issue closure, branch deletion, permission changes, new label creation, and other out-of-scope external actions were not performed without a separate approved workflow or direct user-supervised action.
 14. If this skill or its manifest entry changed, run `git diff --check` and `scripts/run-validator`.
