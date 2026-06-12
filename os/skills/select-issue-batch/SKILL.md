@@ -49,7 +49,7 @@ Safety:
 - Do not create or switch branches, create worktrees, spawn workers, call subagents, or start execution workflows by default.
 - Treat labels as evidence, not truth. Labels such as `blocked`, `HITL`, `ready-for-agent`, `ready-for-human`, `needs-human`, and `needs-a-human` can be stale or incomplete, so verify them against issue bodies, dependencies, comments when needed, and current tracker state before using them as selection reasons.
 - Treat current blocker or human-review evidence conservatively. A candidate may still be high leverage, but the recommendation must name what needs verification or resolution before coordination starts.
-- Do not turn normal issue starting states into selection stop conditions. `needs design consensus`, missing readiness markers, missing design-consensus evidence, sparse acceptance criteria, `HITL`, or human-participation labels are candidate-state facts for ranking and handoff. They may mean the downstream coordinator should start with readiness repair, a design-consensus lane, human-participation workflow, or sequential execution, but they are not by themselves Blocking Human Decisions for this read-only selector.
+- Do not turn normal issue starting states into selection stop conditions. `needs design consensus`, missing readiness fields, missing design-consensus evidence, sparse acceptance criteria, `HITL`, or human-participation labels are candidate-state facts for ranking and handoff. They may mean the downstream coordinator should start with readiness repair, a design-consensus lane, human-participation workflow, or sequential execution, but they are not by themselves Blocking Human Decisions for this read-only selector.
 - Do not return a final `Ready to Implement`, `Needs Design Consensus`, or `Gate Skipped` verdict from this selector. Those verdicts belong to `ensure-implementation-readiness` and the downstream issue workflow that calls it.
 - Do not treat `ready-for-agent` as the primary ranking signal. It is evidence that execution may be possible, not evidence that the issue is the best next move.
 - Ask before any external write request, and do not perform the write from this skill. For execution or coordination requests, stop after the recommendation and tell the caller or user to explicitly invoke `coordinate-issue-batch` or another authorized mutating workflow in a separate step.
@@ -84,7 +84,7 @@ If the user gives a narrower selection goal, honor it explicitly. For example, "
 
 3. Record readiness and blocker context:
    - Inspect labels such as `needs design consensus`, `ready-for-agent`, `ready-for-human`, `blocked`, `AFK`, and `HITL`.
-   - Read issue bodies for readiness markers, acceptance criteria, `Blocked by` relationships, linked design sources, and explicit non-goals.
+   - Read issue bodies for readiness fields, acceptance criteria, `Blocked by` relationships, linked design sources, and explicit non-goals.
    - Treat labels as potentially stale. Verify `blocked` against open dependencies, `HITL` or human-review labels against the issue body and recent comments when needed, and `ready-for-agent` against durable readiness evidence.
    - Describe each relevant issue's observed starting context as one of:
      - `appears ready for coordination`;
@@ -94,7 +94,7 @@ If the user gives a narrower selection goal, honor it explicitly. For example, "
      - `triage or design clarification needed before selection`;
      - `closure audit or no action candidate`.
    - Treat these descriptions as raw selection context and likely first lanes, not as implementation-readiness verdicts.
-   - Do not classify `needs design consensus`, missing readiness evidence, missing readiness markers, sparse acceptance criteria, or `HITL` as Blocking Human Decisions by default. They are normal starting points for issue work. Reserve blocker language for a real dependency, a user goal that excludes that starting state, or evidence that selection itself cannot proceed without a human choosing between incompatible options.
+   - Do not classify `needs design consensus`, missing readiness evidence, missing readiness fields, sparse acceptance criteria, or `HITL` as Blocking Human Decisions by default. They are normal starting points for issue work. Reserve blocker language for a real dependency, a user goal that excludes that starting state, or evidence that selection itself cannot proceed without a human choosing between incompatible options.
    - Remember that `needs design consensus` does not automatically make an issue lower priority than ready low-leverage work.
 
 4. Score by leverage, not only readiness:

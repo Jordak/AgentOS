@@ -4,7 +4,7 @@ Status: implementation readiness policy v2.
 
 Use this playbook before implementing feature-sized AgentOS or mapped-project work. The goal is to keep agents from coding before the design source is durable, complete, source-backed by human-agent consensus provenance, and ready for the requested scope.
 
-For the callable workflow, use `os/skills/ensure-implementation-readiness/SKILL.md`. This playbook is the canonical policy; the skill runs the gate, owns readiness-label cleanup, and repairs missing design consensus before implementation starts when normal/repair mode is authorized.
+For the callable workflow, use `os/skills/ensure-implementation-readiness/SKILL.md`. This playbook is the policy overview and filing guide; the skill is the operational owner for readiness verdicts, consensus-provenance interpretation, mode behavior, readiness-label cleanup, and repair before implementation starts. If operational wording here and the skill diverges, follow the skill and repair the stale wording.
 
 ## No First Commit Before Consensus
 
@@ -51,7 +51,7 @@ The source should include, either explicitly or clearly in prose:
 - validation plan;
 - open questions;
 - deferred follow-ups, if any;
-- design readiness marker;
+- readiness fields;
 - consensus provenance or gate-skip record.
 
 Exact headings are not required when the content is clear, but agents should recommend normalizing messy design sources into this shape before implementation.
@@ -66,9 +66,9 @@ Consensus provenance: <grill/grill-equivalent/session/design-source/human-attest
 Gate skipped: <not applicable | explicit bypass reason and missing evidence>
 ```
 
-A source marked `needs consensus` should not be silently overridden. A source with `Design readiness: ready to implement` but missing core design information or consensus provenance still needs consensus. Content wins over the marker.
+A source marked `needs consensus` should not be silently overridden. A source with `Design readiness: ready to implement` but missing core design information or consensus provenance still needs consensus. Content wins over the fields.
 
-If a durable design source has no `Design readiness:` field, infer readiness from the content and confirm the inference with the user before implementation proceeds. If the user confirms and edits are authorized, add the readiness fields.
+If a durable design source has no `Design readiness:` field, check-only callers report the missing fields or evidence without repair. Normal/repair callers may infer readiness from the content and confirm the inference with the user before implementation proceeds. If the user confirms and edits are authorized, add the full readiness field set: `Design readiness:`, `Consensus provenance:`, and `Gate skipped:`.
 
 If no durable design source exists, or if the source has no valid consensus provenance, the verdict is `Needs Design Consensus`.
 
@@ -163,7 +163,7 @@ Before implementing feature-sized work, confirm:
 1. A durable design source exists, or the gate was explicitly skipped.
 2. The source has enough problem, design, scope, acceptance, and validation detail for the current implementation.
 3. The source records consensus provenance, or the gate-skip field records the explicit bypass.
-4. The readiness fields are present, or the inferred readiness was confirmed with the user and promoted into the durable source.
+4. The readiness fields are present, or the inferred readiness was confirmed with the user and promoted into the durable source as the full readiness field set.
 5. Any `needs design consensus` label has been removed by `ensure-implementation-readiness`, unless the verdict is `Gate Skipped`.
 6. Meaningful deferred questions are out of scope and captured in durable follow-up artifacts.
 7. The current design source links to those follow-up artifacts when they exist.
