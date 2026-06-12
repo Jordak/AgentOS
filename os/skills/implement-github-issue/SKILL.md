@@ -52,7 +52,7 @@ Safety:
 - Do not merge PRs, close issues, or delete branches through this skill. User requests for those actions must route to a workflow or direct integration step whose contract owns landing and closure.
 - A caller-supplied result surface named in the assignment is in scope only when the Authorization Boundary permits it. If the surface is unavailable, private where a public-safe report is needed, or outside the Authorization Boundary, return the Workflow Result in the current reporting mode and record the unavailable result-surface reason.
 - Ask before permission changes, creating new labels, posting outside the target issue or PR scope or outside an authorized caller-supplied result surface, pushing outside the target feature branch, changing repository settings, handling credentials or MFA, or any external action outside this contract.
-- Do not implement when `ensure-implementation-readiness` returns `Needs Design Consensus` unless that skill repairs the durable source to `Ready to Implement` or the user explicitly chooses `Gate Skipped`.
+- Do not implement when `ensure-implementation-readiness` returns `Needs Design Consensus` unless that skill repairs the durable source to `Ready to Implement` or is re-followed with an explicit user bypass and returns `Gate Skipped`.
 - Do not remove `needs design consensus` or equivalent readiness labels directly. During the readiness phase, any readiness-label mutation is performed under the `ensure-implementation-readiness` contract. After readiness returns, consume and verify the verdict instead of performing cleanup yourself.
 - Do not treat a `ready-for-agent` label as a substitute for the readiness gate.
 - Treat human-owned, HITL, blocked, `ready-for-human`, `needs-human`, `needs-a-human`, or equivalent labels as a Blocking Human Decision. Continue only when the current request explicitly authorizes continuing despite that label state, the repository's label or triage owner resolves the human-owned or human-review state, or the only blocker is a stale `blocked` label whose blocking dependency is verifiably resolved. `ensure-implementation-readiness` may resolve readiness evidence, readiness fields, and authorized readiness-label hygiene; it does not by itself clear human-owned, HITL, or human-review states.
@@ -73,10 +73,10 @@ Safety:
 2. Run the readiness gate:
    - Invoke or follow `ensure-implementation-readiness` in normal/repair mode for the issue, passing along the issue context, project guidance, discovered design sources, and this skill's Authorization Boundary.
    - Let the readiness workflow own locating, creating, or repairing the durable design source, including issue-body updates, design-consensus routing, consensus provenance, deferred follow-up artifacts, readiness fields, and readiness-label hygiene when those writes are authorized.
-   - Do not synthesize a design doc, handoff packet, or readiness field and then treat that agent-authored artifact as design consensus. Readiness requires the readiness workflow's verdict backed by durable consensus provenance, or an explicit `Gate Skipped` bypass.
+   - Do not synthesize a design doc, handoff packet, or readiness field and then treat that agent-authored artifact as design consensus. Readiness requires the readiness workflow's returned verdict backed by durable consensus provenance, or its returned `Gate Skipped` verdict for an explicit bypass.
    - After readiness repair writes or approved design-source updates are applied, re-run or re-follow `ensure-implementation-readiness` against the updated durable source before starting implementation.
    - Before invoking the readiness workflow in a mode that may perform external writes, or before carrying out a readiness-workflow-directed external write in this skill's thread, update the Recovery Record in an authorized checkpoint surface.
-   - If the user chooses `Gate Skipped`, record the bypass reason and missing evidence in the Recovery Record and PR readiness fields.
+   - If the user chooses to bypass after readiness reports missing evidence, re-follow `ensure-implementation-readiness` with that explicit bypass and consume its returned `Gate Skipped` verdict. Then record the bypass reason and missing evidence in the Recovery Record and PR readiness fields.
    - If the readiness verdict is `Ready to Implement`, verify that any `needs design consensus` label has been removed by the readiness workflow before continuing.
    - If the readiness verdict is `Gate Skipped`, continue only with the bypass reason recorded in the Recovery Record and PR readiness fields; a `needs design consensus` label may remain.
    - If the readiness verdict is `Needs Design Consensus`, stop before implementation and return a recoverable result naming the missing consensus evidence.
@@ -162,8 +162,8 @@ For this skill, recover at least:
 
 ## Quality Bar
 
-- The issue has a durable readiness source with `Ready to Implement` or an explicit `Gate Skipped` bypass before implementation.
-- `ensure-implementation-readiness` was invoked in normal/repair mode or explicitly skipped with a recorded reason.
+- The readiness workflow returned `Ready to Implement` or `Gate Skipped` before implementation.
+- `ensure-implementation-readiness` was invoked in normal/repair mode, including any explicit bypass path that returns `Gate Skipped`.
 - After readiness repair writes or approved design-source updates, the updated durable source was rechecked by `ensure-implementation-readiness` before implementation started.
 - `implement-github-issue` did not remove readiness labels directly; readiness-label cleanup stayed under `ensure-implementation-readiness`.
 - Human-owned, HITL, blocked, or human-review labels were resolved, explicitly authorized, or recorded as a Blocking Human Decision before mutating implementation work.
@@ -181,7 +181,7 @@ For this skill, recover at least:
 Before finishing:
 
 1. Confirm local instructions, readiness policy, GitHub workflow policy, and `review-loop` contract were read or honored.
-2. Confirm `ensure-implementation-readiness` was invoked in normal/repair mode or explicitly skipped with a reason, and the readiness verdict and evidence are recorded.
+2. Confirm `ensure-implementation-readiness` was invoked in normal/repair mode, including any explicit bypass path that returns `Gate Skipped`, and the readiness verdict and evidence are recorded.
 3. Confirm any readiness repair writes or approved design-source updates were followed by re-running or re-following `ensure-implementation-readiness` against the updated durable source before implementation.
 4. Confirm `needs design consensus` or equivalent readiness-label cleanup was performed only by `ensure-implementation-readiness`, or left in place for `Gate Skipped`.
 5. Confirm human-owned, HITL, blocked, or human-review labels were resolved, explicitly authorized, or recorded as a Blocking Human Decision before mutating implementation work; if `blocked` was removed, confirm the blocker was verifiably resolved and no other blocker remained.
