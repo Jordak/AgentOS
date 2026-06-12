@@ -15,11 +15,12 @@ Inputs:
 - Repository or mapped-project context when the work is project-specific.
 - The durable design source when one exists.
 - Optional explicit mode: normal/repair mode by default, or check-only mode when the caller must verify readiness without repairing it.
+- Current Authorization Boundary or caller-provided write boundary when normal/repair mode might create artifacts, update durable sources, or perform readiness-label hygiene.
 - Applicable external-write policy from `os/connections/SAFETY_RULES.md` and `os/playbook/GITHUB_WORKFLOW.md` when the workflow needs to create or update GitHub issues, comments, labels, or other external project state.
 
 Output artifact:
 
-- A concise readiness report with exactly one verdict: `Ready to Implement`, `Needs Design Consensus`, or `Gate Skipped`, plus the mode used, source reviewed, readiness fields, consensus provenance, missing evidence, and PR-body readiness fields when the work will become a PR.
+- A concise readiness report with exactly one verdict: `Ready to Implement`, `Needs Design Consensus`, or `Gate Skipped`, plus the mode used, source reviewed, readiness fields, consensus provenance, missing evidence or missing consensus evidence, gate-skip field/state, `Gate Skipped` reason when present, final readiness label state, and PR-body readiness fields when the work will become a PR.
 - Optional durable local follow-up artifacts for deferred questions.
 - Optional proposed or approved updates to the source design artifact.
 - Optional GitHub issue updates or follow-up issues only when permitted by the applicable external-write policy.
@@ -90,7 +91,7 @@ Check-only mode verifies the invariant without repair. Read durable sources, iss
    Ask one question at a time, recommend a default answer, inspect the codebase or existing docs instead of asking when the answer is discoverable, and carry resolved answers back into the durable design source before declaring the scope ready. `grill-with-docs` should supply the docs-aware interview path by default, but this skill or its approved caller owns issue-body, PRD, local-design-doc, and other durable-source updates under the applicable write policy. Follow that policy before GitHub issue creation, issue-body edits, comments, or label updates. If GitHub writes are not authorized, create the local artifact named by the playbook unless the project has a better convention or the user redirects. If required durable source updates, consensus provenance, or follow-up artifacts are not created, the verdict remains `Needs Design Consensus`. Update or propose updating the current design source with readiness fields and a `Deferred Follow-ups` section linking to created artifacts. Remove `needs design consensus` only in normal/repair mode, only under this skill's contract, and only after valid consensus provenance and explicit human confirmation are present. Leave the label in place for `Gate Skipped`.
 
 7. Report the verdict.
-   Include the mode, source reviewed, satisfied and missing readiness fields, consensus provenance, label state, implementation boundary, non-goals, design-consensus route used or recommended, created follow-up artifacts, proposed source-design updates, and whether external writes happened, were proposed, or were skipped. If the work will become a PR, include the exact `Readiness evidence:` and `Readiness verdict:` lines the PR body should carry. Prefer a GitHub issue as readiness evidence for issue-driven work; use a design doc only when the design is too large, architectural, private, or not naturally issue-shaped.
+   Include the mode, source reviewed, satisfied and missing readiness fields, consensus provenance, missing consensus evidence when present, gate-skip field/state, `Gate Skipped` reason when present, final readiness label state, implementation boundary, non-goals, design-consensus route used or recommended, created follow-up artifacts, proposed source-design updates, and whether external writes happened, were proposed, or were skipped. If the work will become a PR, include the exact `Readiness evidence:` and `Readiness verdict:` lines the PR body should carry. Prefer a GitHub issue as readiness evidence for issue-driven work; use a design doc only when the design is too large, architectural, private, or not naturally issue-shaped.
 
 ## Filing Rules
 

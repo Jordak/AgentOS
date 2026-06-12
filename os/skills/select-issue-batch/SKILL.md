@@ -79,12 +79,12 @@ If the user gives a narrower selection goal, honor it explicitly. For example, "
 2. Inventory candidates:
    - List open issues in scope.
    - Gather labels, title, body, URL, updated time, and linked PR or dependency evidence when readily available.
-   - Read comments only when the body and labels leave blocker, ownership, or recency state ambiguous enough to affect the recommendation.
+   - Read comments only when the body and labels leave blocker, ownership, readiness/provenance, or recency state ambiguous enough to affect the recommendation.
    - Keep candidate reads proportional to the requested batch size and risk.
 
 3. Record readiness and blocker context:
    - Inspect labels such as `needs design consensus`, `ready-for-agent`, `ready-for-human`, `blocked`, `AFK`, and `HITL`.
-   - Read issue bodies for readiness fields, acceptance criteria, `Blocked by` relationships, linked design sources, and explicit non-goals.
+   - Read issue bodies for readiness fields, consensus provenance pointers, acceptance criteria, `Blocked by` relationships, linked design sources, and explicit non-goals.
    - Treat labels as potentially stale. Verify `blocked` against open dependencies, `HITL` or human-review labels against the issue body and recent comments when needed, and `ready-for-agent` against durable readiness evidence.
    - Describe each relevant issue's observed starting context as one of:
      - `appears ready for coordination`;
