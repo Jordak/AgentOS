@@ -116,7 +116,7 @@ When readiness repair is needed, run `grill-with-docs` by default. Use `grill-wi
 
 ### Gate Skipped
 
-Use this when the work is small, mechanical, or obvious enough to be exempt from the gate, or when the user explicitly chooses to bypass the gate after the agent reports the missing or incomplete readiness evidence. Record why the gate was skipped and, for bypasses, summarize what readiness evidence was missing so future agents can distinguish intentional bypass from omission. If an issue carries `needs design consensus`, leave that label in place for an intentional bypass.
+Use this when the work is small, mechanical, or obvious enough to be exempt from the gate, or when the user explicitly chooses to bypass the gate after the agent reports the missing or incomplete readiness evidence. Record why the gate was skipped and, for bypasses, summarize what readiness evidence was missing so future agents can distinguish intentional bypass from omission. For feature-sized work with a durable issue, PRD, ADR, or design doc, put intentional bypasses in the source's `Gate skipped:` field rather than only in a PR body, Recovery Record, or handoff. If an issue carries `needs design consensus`, leave that label in place for an intentional bypass.
 
 ## Deferred Follow-ups
 

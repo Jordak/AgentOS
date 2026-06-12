@@ -27,7 +27,7 @@ Inputs:
 Output artifact:
 
 - A pull request with `Readiness evidence:` and `Readiness verdict:` fields.
-- A recoverable Workflow Result in the current reporting mode or caller-supplied Workflow Invocation Reference, with terminal status (`completed`, `blocked`, `failed`, `cancelled`, or `needs-human`), issue URL and final issue labels, branch, worktree, PR, raw readiness evidence or provenance, readiness verdict, final readiness label state, `Gate Skipped` reason or missing consensus evidence when present, validation, review-loop status, mutations, open risks, release-instruction handling, and recommended next action for the integration owner.
+- A recoverable Workflow Result in the current reporting mode or caller-supplied Workflow Invocation Reference, with terminal status (`completed`, `blocked`, `failed`, `cancelled`, or `needs-human`), issue URL and final issue labels, branch, worktree, PR, raw readiness evidence or provenance, readiness verdict, final readiness label state, `Gate Skipped` reason plus durable gate-skip field/state or missing consensus evidence when present, validation, review-loop status, mutations, open risks, release-instruction handling, and recommended next action for the integration owner.
 - Optional issue or PR comments when useful for recovery or handoff.
 
 Mutability:
@@ -73,12 +73,12 @@ Safety:
 2. Run the readiness gate:
    - Invoke or follow `ensure-implementation-readiness` in normal/repair mode for the issue, passing along the issue context, project guidance, discovered design sources, and this skill's Authorization Boundary.
    - Let the readiness workflow own locating, creating, or repairing the durable design source, including issue-body updates, design-consensus routing, consensus provenance, deferred follow-up artifacts, readiness fields, and readiness-label hygiene when those writes are authorized.
-   - Do not synthesize a design doc, handoff packet, or readiness field and then treat that agent-authored artifact as design consensus. Readiness requires the readiness workflow's returned verdict backed by durable consensus provenance, or its returned `Gate Skipped` verdict for an explicit bypass.
+   - Do not synthesize a design doc, handoff packet, or readiness field and then treat that agent-authored artifact as design consensus. Readiness requires the readiness workflow's returned verdict backed by durable consensus provenance, or its returned `Gate Skipped` verdict backed by a durable gate-skip field/state for an explicit bypass.
    - After readiness repair writes or approved design-source updates are applied, re-run or re-follow `ensure-implementation-readiness` against the updated durable source before starting implementation.
    - Before invoking the readiness workflow in a mode that may perform external writes, or before carrying out a readiness-workflow-directed external write in this skill's thread, update the Recovery Record in an authorized checkpoint surface.
-   - If the user chooses to bypass after readiness reports missing evidence, re-follow `ensure-implementation-readiness` with that explicit bypass and consume its returned `Gate Skipped` verdict. Then record the bypass reason and missing evidence in the Recovery Record and PR readiness fields.
+   - If the user chooses to bypass after readiness reports missing evidence, re-follow `ensure-implementation-readiness` with that explicit bypass and consume its returned `Gate Skipped` verdict only when the readiness report names the durable source `Gate skipped:` field or an exemption where no durable source is required. Then record the bypass reason, missing evidence, and durable gate-skip record location in the Recovery Record and PR readiness fields.
    - If the readiness verdict is `Ready to Implement`, verify that any `needs design consensus` label has been removed by the readiness workflow before continuing.
-   - If the readiness verdict is `Gate Skipped`, continue only with the bypass reason recorded in the Recovery Record and PR readiness fields; a `needs design consensus` label may remain.
+   - If the readiness verdict is `Gate Skipped`, continue only with the bypass reason and durable gate-skip field/state recorded in the Recovery Record and PR readiness fields; a `needs design consensus` label may remain.
    - If the readiness verdict is `Needs Design Consensus`, stop before implementation and return a recoverable result naming the missing consensus evidence.
 
 3. Check branch and worktree discipline:
@@ -118,7 +118,7 @@ Readiness verdict: <Ready to Implement | Gate Skipped>
    - Record the PR URL in the Recovery Record.
 
 8. Run review-loop:
-   - Before invoking `review-loop`, update the Recovery Record in an authorized checkpoint surface so the issue, PR, branch, raw readiness evidence or provenance, readiness verdict, final readiness label state, `Gate Skipped` reason or missing consensus evidence when present, validation state, Authorization Boundary, and next action are recoverable.
+   - Before invoking `review-loop`, update the Recovery Record in an authorized checkpoint surface so the issue, PR, branch, raw readiness evidence or provenance, readiness verdict, final readiness label state, `Gate Skipped` reason plus durable gate-skip field/state or missing consensus evidence when present, validation state, Authorization Boundary, and next action are recoverable.
    - Invoke `review-loop` on the PR with its normal PR-scoped Authorization Boundary unless this skill was narrowed to read-only mode.
    - Let `review-loop` own reviewer-panel delegation, review/fix convergence, PR comments, fix commits, pushes to the target PR branch, and ready-for-human marking inside its contract.
    - Treat the review-loop final report or Workflow Result as evidence for this skill's final result.
@@ -126,7 +126,7 @@ Readiness verdict: <Ready to Implement | Gate Skipped>
 
 9. Report final Workflow Result:
    - Begin with `Status:` using one canonical terminal value: `completed`, `blocked`, `failed`, `cancelled`, or `needs-human`. Include whether the PR is ready for integration-owner review, naming the parent, coordinator, or human owner when known.
-   - Include issue URL and final issue labels, PR link, branch and worktree, raw readiness evidence or provenance, readiness verdict, final readiness label state, `Gate Skipped` reason or missing consensus evidence when present, mutations performed, commits, validation, review-loop evidence, open risks, and recommended next action for the integration owner.
+   - Include issue URL and final issue labels, PR link, branch and worktree, raw readiness evidence or provenance, readiness verdict, final readiness label state, `Gate Skipped` reason and durable gate-skip field/state or missing consensus evidence when present, mutations performed, commits, validation, review-loop evidence, open risks, and recommended next action for the integration owner.
    - When the caller supplied a Workflow Invocation Reference or result surface, return the Workflow Result there when available, and then stop or wait according to the explicit release instruction.
    - State clearly that merge, issue closure, branch deletion, and any broader integration action remain out of scope for this skill and must be handled by a landing-capable workflow such as `land-github-issue` after integration evidence exists, or by a direct human integration step.
 
@@ -144,7 +144,7 @@ For this skill, recover at least:
 - Authorization Boundary, including any read-only narrowing;
 - caller-supplied Workflow Invocation Reference or result surface, using only public-safe stable references in public or Git-backed surfaces and redacting private runtime handles when needed;
 - release instruction, including whether the worker should stop after returning the result, remain assigned for review corrections, or wait for a caller release signal;
-- raw readiness evidence or provenance, readiness verdict, final readiness label state, and `Gate Skipped` reason or missing consensus evidence when present;
+- raw readiness evidence or provenance, readiness verdict, final readiness label state, and `Gate Skipped` reason plus durable gate-skip field/state or missing consensus evidence when present;
 - current phase and next safe action;
 - PR URL after creation;
 - validation commands and results;
@@ -162,7 +162,7 @@ For this skill, recover at least:
 
 ## Quality Bar
 
-- The readiness workflow returned `Ready to Implement` or `Gate Skipped` before implementation.
+- The readiness workflow returned `Ready to Implement` or `Gate Skipped` before implementation, and any intentional bypass names the durable source `Gate skipped:` field or an exemption where no durable source is required.
 - `ensure-implementation-readiness` was invoked in normal/repair mode, including any explicit bypass path that returns `Gate Skipped`.
 - After readiness repair writes or approved design-source updates, the updated durable source was rechecked by `ensure-implementation-readiness` before implementation started.
 - `implement-github-issue` did not remove readiness labels directly; readiness-label cleanup stayed under `ensure-implementation-readiness`.
@@ -181,7 +181,7 @@ For this skill, recover at least:
 Before finishing:
 
 1. Confirm local instructions, readiness policy, GitHub workflow policy, and `review-loop` contract were read or honored.
-2. Confirm `ensure-implementation-readiness` was invoked in normal/repair mode, including any explicit bypass path that returns `Gate Skipped`, and the readiness verdict and evidence are recorded.
+2. Confirm `ensure-implementation-readiness` was invoked in normal/repair mode, including any explicit bypass path that returns `Gate Skipped`, and the readiness verdict, evidence, and durable gate-skip field/state are recorded.
 3. Confirm any readiness repair writes or approved design-source updates were followed by re-running or re-following `ensure-implementation-readiness` against the updated durable source before implementation.
 4. Confirm `needs design consensus` or equivalent readiness-label cleanup was performed only by `ensure-implementation-readiness`, or left in place for `Gate Skipped`.
 5. Confirm human-owned, HITL, blocked, or human-review labels were resolved, explicitly authorized, or recorded as a Blocking Human Decision before mutating implementation work; if `blocked` was removed, confirm the blocker was verifiably resolved and no other blocker remained.
@@ -191,6 +191,6 @@ Before finishing:
 9. Confirm validation commands and results are recorded.
 10. Confirm the PR body includes `Readiness evidence:` and `Readiness verdict:`.
 11. Confirm review-loop was run, or record why it could not be run.
-12. Confirm the final Workflow Result includes canonical terminal status, issue, raw readiness evidence or provenance, readiness verdict, final readiness label state, Gate Skipped reason or missing consensus evidence when present, branch/worktree, PR, commits, validation, review-loop evidence, open risks, recommended next action, any caller-supplied Workflow Invocation Reference or result surface, and release-instruction handling.
+12. Confirm the final Workflow Result includes canonical terminal status, issue, raw readiness evidence or provenance, readiness verdict, final readiness label state, Gate Skipped reason plus durable gate-skip field/state or missing consensus evidence when present, branch/worktree, PR, commits, validation, review-loop evidence, open risks, recommended next action, any caller-supplied Workflow Invocation Reference or result surface, and release-instruction handling.
 13. Confirm merge, issue closure, branch deletion, permission changes, new label creation, and other out-of-scope external actions were not performed without a separate approved workflow or direct user-supervised action.
 14. If this skill or its manifest entry changed, run `git diff --check` and `scripts/run-validator`.
