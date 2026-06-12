@@ -1,18 +1,18 @@
 # Implement Features
 
-Status: implementation readiness policy v1.
+Status: implementation readiness policy v2.
 
-Use this playbook before implementing feature-sized AgentOS or mapped-project work. The goal is to keep agents from coding before the design source is durable, complete, and ready for the requested scope.
+Use this playbook before implementing feature-sized AgentOS or mapped-project work. The goal is to keep agents from coding before the design source is durable, complete, source-backed by human-agent consensus provenance, and ready for the requested scope.
 
-For the callable workflow, use `os/skills/ensure-implementation-readiness/SKILL.md`. This playbook is the canonical policy; the skill runs the gate and, when requested, repairs missing design consensus before implementation starts.
+For the callable workflow, use `os/skills/ensure-implementation-readiness/SKILL.md`. This playbook is the canonical policy; the skill runs the gate, owns readiness-label cleanup, and repairs missing design consensus before implementation starts when normal/repair mode is authorized.
 
 ## No First Commit Before Consensus
 
 Feature-sized implementation must not get its first implementation commit before the readiness gate returns `Ready to Implement` or the user explicitly chooses `Gate Skipped` after hearing what readiness evidence is missing.
 
-If the only design source is chat, the first durable action is to create or update a GitHub issue, PRD, ADR, local design doc, or other durable planning note. Do not turn chat consensus directly into implementation code. Once the durable source contains the agreed problem, chosen design, scope boundaries, acceptance criteria, validation plan, and readiness marker, implementation may proceed within that boundary.
+If the only design source is chat, the first durable action is to create or update a GitHub issue, PRD, ADR, local design doc, or other durable planning note. Do not turn chat consensus directly into implementation code. Once the durable source contains the agreed problem, chosen design, scope boundaries, acceptance criteria, validation plan, readiness fields, and consensus provenance, implementation may proceed within that boundary.
 
-`ready-for-agent`, a confident user prompt, or an existing branch name is not enough by itself. The readiness evidence must be visible in a durable source, or the bypass must be recorded as `Gate Skipped`.
+`ready-for-agent`, a confident user prompt, an agent-authored design artifact, a Calling Workflow handoff, or an existing branch name is not enough by itself. The readiness evidence and consensus provenance must be visible in a durable source, or the bypass must be recorded as `Gate Skipped`.
 
 ## When This Applies
 
@@ -37,7 +37,7 @@ This checkpoint applies to AgentOS Core and to AgentOS-backed mapped projects. P
 
 ## Design Source
 
-A feature-sized implementation needs a durable design source before coding begins. Acceptable design sources include GitHub issues, PRDs, local Markdown design documents, ADRs, planning notes, or clearly referenced conversation artifacts that have been promoted into durable form.
+A feature-sized implementation needs a durable design source before coding begins. Acceptable design sources include GitHub issues, PRDs, local Markdown design documents, ADRs, planning notes, or clearly referenced conversation artifacts that have been promoted into durable form. Durable existence is necessary but not sufficient: the source must also record consensus provenance or an explicit gate skip.
 
 The source should include, either explicitly or clearly in prose:
 
@@ -51,29 +51,46 @@ The source should include, either explicitly or clearly in prose:
 - validation plan;
 - open questions;
 - deferred follow-ups, if any;
-- design readiness marker.
+- design readiness marker;
+- consensus provenance or gate-skip record.
 
 Exact headings are not required when the content is clear, but agents should recommend normalizing messy design sources into this shape before implementation.
 
-## Readiness Marker
+## Readiness Fields
 
-Use a lightweight marker in durable design sources:
-
-```md
-Design readiness: ready to implement
-```
-
-or:
+Use lightweight fields in durable design sources:
 
 ```md
-Design readiness: needs consensus
+Design readiness: ready to implement | needs consensus
+Consensus provenance: <grill/grill-equivalent/session/design-source/human-attested GitHub comment/bypass reference>
+Gate skipped: <not applicable | explicit bypass reason and missing evidence>
 ```
 
-Content wins over the marker. A source with `Design readiness: ready to implement` but missing core design information still needs consensus. A source marked `needs consensus` should not be silently overridden.
+A source marked `needs consensus` should not be silently overridden. A source with `Design readiness: ready to implement` but missing core design information or consensus provenance still needs consensus. Content wins over the marker.
 
-If a durable design source has no marker, infer readiness from the content and confirm the inference with the user before implementation proceeds. If the user confirms and edits are authorized, add the marker.
+If a durable design source has no `Design readiness:` field, infer readiness from the content and confirm the inference with the user before implementation proceeds. If the user confirms and edits are authorized, add the readiness fields.
 
-If no durable design source exists, the verdict is `Needs Design Consensus`.
+If no durable design source exists, or if the source has no valid consensus provenance, the verdict is `Needs Design Consensus`.
+
+## Consensus Provenance
+
+Design consensus means agreement between the human and the agent or workflow responsible for turning the design into implementation instructions. Consensus provenance is the durable pointer to that agreement.
+
+Examples that may count:
+
+- a `grill-with-docs` or `grill-me` session summary with user-confirmed decisions;
+- a human-attested GitHub comment by a trusted repository author, such as a comment that explicitly says `I am a human. I am <name>.` and clearly states the decision;
+- a durable issue, PRD, ADR, or design doc updated after explicit human confirmation;
+- an explicit `Gate Skipped` bypass that names the missing consensus and why the user chose to proceed anyway.
+
+Examples that do not count by themselves:
+
+- an agent-authored issue, handoff packet, local design doc, or PR body;
+- a freeform GitHub comment without explicit human attestation, because agents may post with the user's credentials;
+- a Calling Workflow handoff that claims consensus exists without pointing to readiness/provenance fields;
+- a removed label without durable readiness/provenance fields explaining why.
+
+For issue-driven work, a `needs design consensus` label or equivalent readiness label wins over contradictory handoff claims. `ensure-implementation-readiness` owns any cleanup of that label. `Gate Skipped` may allow work to proceed with the missing evidence recorded, but the label should remain as a signal that readiness was bypassed.
 
 ## Verdicts
 
@@ -81,13 +98,13 @@ The readiness gate has exactly three verdicts.
 
 ### Ready to Implement
 
-Use this when the design is complete for the current implementation scope. The implementing agent may proceed only within the behavior, boundaries, and validation plan the human agreed to.
+Use this when the design is complete for the current implementation scope and the durable source records valid consensus provenance. The implementing agent may proceed only within the behavior, boundaries, and validation plan the human agreed to.
 
 Meaningful open questions must be explicitly out of scope and captured in durable follow-up artifacts before coding begins. Related deferred questions can be grouped into one follow-up artifact when they belong to the same future decision area. Do not require one artifact per question.
 
 ### Needs Design Consensus
 
-Use this when the design source is missing, not durable, marked as needing consensus, lacks a chosen design, lacks non-goals, lacks acceptance criteria, has blocking open questions, or leaves a scope boundary unclear enough that implementation could drift.
+Use this when the design source is missing, not durable, marked as needing consensus, lacks valid consensus provenance, lacks a chosen design, lacks non-goals, lacks acceptance criteria, has blocking open questions, has an unresolved `needs design consensus` label, or leaves a scope boundary unclear enough that implementation could drift.
 
 Resolve this by running a design-consensus workflow by default, updating the durable design source, and creating any needed follow-up artifacts before coding begins.
 
@@ -95,7 +112,7 @@ When readiness repair is needed, run `grill-with-docs` by default. Use `grill-wi
 
 ### Gate Skipped
 
-Use this when the work is small, mechanical, or obvious enough to be exempt from the gate, or when the user explicitly chooses to bypass the gate after the agent reports the missing or incomplete readiness evidence. Record why the gate was skipped and, for bypasses, summarize what readiness evidence was missing so future agents can distinguish intentional bypass from omission.
+Use this when the work is small, mechanical, or obvious enough to be exempt from the gate, or when the user explicitly chooses to bypass the gate after the agent reports the missing or incomplete readiness evidence. Record why the gate was skipped and, for bypasses, summarize what readiness evidence was missing so future agents can distinguish intentional bypass from omission. If an issue carries `needs design consensus`, leave that label in place for an intentional bypass.
 
 ## Deferred Follow-ups
 
@@ -118,15 +135,9 @@ Follow `os/playbook/GITHUB_WORKFLOW.md` for issue and PR writing conventions, br
 
 ## Review-loop Preflight
 
-Review-loop workflows should run the same readiness gate before spawning reviewers.
+Review-loop workflows should treat implementation readiness as an invariant, not as a repair opportunity. Before spawning reviewers for feature-sized work, call or follow `os/skills/ensure-implementation-readiness/SKILL.md` in check-only mode.
 
-Proceed only when a durable PR design source has `Design readiness: ready to implement` and still satisfies the design-source standard for the PR scope. Content wins over the marker.
-
-If a durable design source exists but has no readiness marker, infer readiness from durable evidence such as the issue, PR body, or local design doc, then confirm with the user before proceeding.
-
-If only chat or a current user request exists, treat the review target as `Needs Design Consensus` until the design is promoted into a durable source. If the user explicitly chooses to bypass the gate, record a `Gate Skipped` verdict with the bypass reason and missing-readiness summary.
-
-If the user proceeds despite missing or incomplete readiness, record the `Gate Skipped` bypass in the review-loop ledger and final report.
+Proceed only when check-only returns `Ready to Implement`, or when it returns an explicit `Gate Skipped` verdict with the bypass reason already recorded. If check-only returns `Needs Design Consensus`, stop before spawning reviewers and return `blocked`. Do not run grills, repair design docs, edit issues, add readiness fields, or remove readiness labels inside `review-loop`.
 
 If the loop later detects design creep, treat the bypass as evidence that the PR may need redesign rather than more local fixes.
 
@@ -151,9 +162,11 @@ Before implementing feature-sized work, confirm:
 
 1. A durable design source exists, or the gate was explicitly skipped.
 2. The source has enough problem, design, scope, acceptance, and validation detail for the current implementation.
-3. The readiness marker is present, or the inferred readiness was confirmed with the user.
-4. Meaningful deferred questions are out of scope and captured in durable follow-up artifacts.
-5. The current design source links to those follow-up artifacts when they exist.
-6. External tracker writes complied with the applicable external-write policy before they happened.
-7. PR-bound tracked-file edits started from an appropriate branch or worktree under the Branch and Integration Discipline section of `os/playbook/GITHUB_WORKFLOW.md`.
-8. Any PR body for the implementation cites readiness evidence and a readiness verdict, preferring a GitHub issue for issue-driven work, or explains the gate skip.
+3. The source records consensus provenance, or the gate-skip field records the explicit bypass.
+4. The readiness fields are present, or the inferred readiness was confirmed with the user and promoted into the durable source.
+5. Any `needs design consensus` label has been removed by `ensure-implementation-readiness`, unless the verdict is `Gate Skipped`.
+6. Meaningful deferred questions are out of scope and captured in durable follow-up artifacts.
+7. The current design source links to those follow-up artifacts when they exist.
+8. External tracker writes complied with the applicable external-write policy before they happened.
+9. PR-bound tracked-file edits started from an appropriate branch or worktree under the Branch and Integration Discipline section of `os/playbook/GITHUB_WORKFLOW.md`.
+10. Any PR body for the implementation cites readiness evidence and a readiness verdict, preferring a GitHub issue for issue-driven work, or explains the gate skip.

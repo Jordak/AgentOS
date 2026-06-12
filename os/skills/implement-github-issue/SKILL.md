@@ -32,7 +32,7 @@ Output artifact:
 
 Mutability:
 
-- Mixed. In normal mode, invoking this skill on a GitHub issue authorizes the ordinary happy-path writes needed for this workflow: passing an Authorization Boundary that permits `ensure-implementation-readiness` to create or update issue-body/design-source readiness evidence and existing readiness labels; existing workflow-label hygiene within the assigned issue scope, such as verified stale `blocked` label removal; issue or PR comments for recoverable status and evidence; caller-supplied result-surface handling when this skill is invoked as a durable Called Workflow and the supplied surface is inside the Authorization Boundary; feature-branch pushes; PR creation with readiness fields; and `review-loop` invocation with its ordinary PR-scoped writes.
+- Mixed. In normal mode, invoking this skill on a GitHub issue authorizes the ordinary happy-path writes needed for this workflow: invoking or following `ensure-implementation-readiness` in normal/repair mode with an Authorization Boundary for issue-body/design-source readiness evidence and existing readiness labels; existing non-readiness workflow-label hygiene within the assigned issue scope, such as verified stale `blocked` label removal; issue or PR comments for recoverable status and evidence; caller-supplied result-surface handling when this skill is invoked as a durable Called Workflow and the supplied surface is inside the Authorization Boundary; feature-branch pushes; PR creation with readiness fields; and `review-loop` invocation with its ordinary PR-scoped writes.
 - Read-only when the caller explicitly says read-only mode, audit-only, no writes, no external writes, or equivalent. In read-only mode, inspect and report the planned steps and blockers without mutating local files or external state.
 
 Tools and connectors:
@@ -53,6 +53,7 @@ Safety:
 - A caller-supplied result surface named in the assignment is in scope only when the Authorization Boundary permits it. If the surface is unavailable, private where a public-safe report is needed, or outside the Authorization Boundary, return the Workflow Result in the current reporting mode and record the unavailable result-surface reason.
 - Ask before permission changes, creating new labels, posting outside the target issue or PR scope or outside an authorized caller-supplied result surface, pushing outside the target feature branch, changing repository settings, handling credentials or MFA, or any external action outside this contract.
 - Do not implement when `ensure-implementation-readiness` returns `Needs Design Consensus` unless that skill repairs the durable source to `Ready to Implement` or the user explicitly chooses `Gate Skipped`.
+- Do not remove `needs design consensus` or equivalent readiness labels directly. During the readiness phase, any readiness-label mutation is performed under the `ensure-implementation-readiness` contract. After readiness returns, consume and verify the verdict instead of performing cleanup yourself.
 - Do not treat a `ready-for-agent` label as a substitute for the readiness gate.
 - Treat human-owned, HITL, blocked, `ready-for-human`, `needs-human`, `needs-a-human`, or equivalent labels as a Blocking Human Decision. Continue only when the current request explicitly authorizes continuing despite that label state, the repository's label or triage owner resolves the human-owned or human-review state, or the only blocker is a stale `blocked` label whose blocking dependency is verifiably resolved. `ensure-implementation-readiness` may resolve readiness evidence, readiness markers, and authorized readiness-label hygiene; it does not by itself clear human-owned, HITL, or human-review states.
 - Preserve unrelated local changes. If the checkout is dirty before edits, identify whether changes are yours; stop or isolate work rather than overwriting user changes.
@@ -70,12 +71,15 @@ Safety:
    - Record the initial Recovery Record: issue URL, repository, branch, worktree, current phase, Authorization Boundary, any caller-supplied Workflow Invocation Reference or result surface, release instruction, known blockers, and next action.
 
 2. Run the readiness gate:
-   - Invoke or follow `ensure-implementation-readiness` for the issue, passing along the issue context, project guidance, discovered design sources, and this skill's Authorization Boundary.
-   - Let the readiness workflow own locating, creating, or repairing the durable design source, including issue-body updates, design-consensus routing, deferred follow-up artifacts, readiness markers, and readiness-label hygiene when those writes are authorized.
+   - Invoke or follow `ensure-implementation-readiness` in normal/repair mode for the issue, passing along the issue context, project guidance, discovered design sources, and this skill's Authorization Boundary.
+   - Let the readiness workflow own locating, creating, or repairing the durable design source, including issue-body updates, design-consensus routing, consensus provenance, deferred follow-up artifacts, readiness markers, and readiness-label hygiene when those writes are authorized.
+   - Do not synthesize a design doc, handoff packet, or readiness marker and then treat that agent-authored artifact as design consensus. Readiness requires the readiness workflow's verdict backed by durable consensus provenance, or an explicit `Gate Skipped` bypass.
    - After readiness repair writes or approved design-source updates are applied, re-run or re-follow `ensure-implementation-readiness` against the updated durable source before starting implementation.
    - Before invoking the readiness workflow in a mode that may perform external writes, or before carrying out a readiness-workflow-directed external write in this skill's thread, update the Recovery Record in an authorized checkpoint surface.
    - If the user chooses `Gate Skipped`, record the bypass reason and missing evidence in the Recovery Record and PR readiness fields.
-   - Do not proceed to implementation until the verdict is `Ready to Implement` or `Gate Skipped`.
+   - If the readiness verdict is `Ready to Implement`, verify that any `needs design consensus` label has been removed by the readiness workflow before continuing.
+   - If the readiness verdict is `Gate Skipped`, continue only with the bypass reason recorded in the Recovery Record and PR readiness fields; a `needs design consensus` label may remain.
+   - If the readiness verdict is `Needs Design Consensus`, stop before implementation and return a recoverable result naming the missing consensus evidence.
 
 3. Check branch and worktree discipline:
    - Run `git status --short --branch` before tracked-file edits.
@@ -159,8 +163,9 @@ For this skill, recover at least:
 ## Quality Bar
 
 - The issue has a durable readiness source with `Ready to Implement` or an explicit `Gate Skipped` bypass before implementation.
-- `ensure-implementation-readiness` was invoked or explicitly skipped with a recorded reason.
+- `ensure-implementation-readiness` was invoked in normal/repair mode or explicitly skipped with a recorded reason.
 - After readiness repair writes or approved design-source updates, the updated durable source was rechecked by `ensure-implementation-readiness` before implementation started.
+- `implement-github-issue` did not remove readiness labels directly; readiness-label cleanup stayed under `ensure-implementation-readiness`.
 - Human-owned, HITL, blocked, or human-review labels were resolved, explicitly authorized, or recorded as a Blocking Human Decision before mutating implementation work.
 - Branch/worktree discipline was checked before tracked-file edits.
 - Implementation stays inside the issue boundary.
@@ -176,15 +181,16 @@ For this skill, recover at least:
 Before finishing:
 
 1. Confirm local instructions, readiness policy, GitHub workflow policy, and `review-loop` contract were read or honored.
-2. Confirm `ensure-implementation-readiness` was invoked or explicitly skipped with a reason, and the readiness verdict and evidence are recorded.
+2. Confirm `ensure-implementation-readiness` was invoked in normal/repair mode or explicitly skipped with a reason, and the readiness verdict and evidence are recorded.
 3. Confirm any readiness repair writes or approved design-source updates were followed by re-running or re-following `ensure-implementation-readiness` against the updated durable source before implementation.
-4. Confirm human-owned, HITL, blocked, or human-review labels were resolved, explicitly authorized, or recorded as a Blocking Human Decision before mutating implementation work; if `blocked` was removed, confirm the blocker was verifiably resolved and no other blocker remained.
-5. Confirm branch/worktree status was inspected before edits.
-6. Confirm a Recovery Checkpoint was created before external writes, called workflows, Blocking Human Decision pauses, and incomplete turn endings.
-7. Confirm no unrelated user changes were overwritten.
-8. Confirm validation commands and results are recorded.
-9. Confirm the PR body includes `Readiness evidence:` and `Readiness verdict:`.
-10. Confirm review-loop was run, or record why it could not be run.
-11. Confirm the final Workflow Result includes canonical terminal status, issue, issue-label state, branch/worktree, PR, commits, validation, review-loop evidence, open risks, recommended next action, any caller-supplied Workflow Invocation Reference or result surface, and release-instruction handling.
-12. Confirm merge, issue closure, branch deletion, permission changes, new label creation, and other out-of-scope external actions were not performed without a separate approved workflow or direct user-supervised action.
-13. If this skill or its manifest entry changed, run `git diff --check` and `scripts/run-validator`.
+4. Confirm `needs design consensus` or equivalent readiness-label cleanup was performed only by `ensure-implementation-readiness`, or left in place for `Gate Skipped`.
+5. Confirm human-owned, HITL, blocked, or human-review labels were resolved, explicitly authorized, or recorded as a Blocking Human Decision before mutating implementation work; if `blocked` was removed, confirm the blocker was verifiably resolved and no other blocker remained.
+6. Confirm branch/worktree status was inspected before edits.
+7. Confirm a Recovery Checkpoint was created before external writes, called workflows, Blocking Human Decision pauses, and incomplete turn endings.
+8. Confirm no unrelated user changes were overwritten.
+9. Confirm validation commands and results are recorded.
+10. Confirm the PR body includes `Readiness evidence:` and `Readiness verdict:`.
+11. Confirm review-loop was run, or record why it could not be run.
+12. Confirm the final Workflow Result includes canonical terminal status, issue, issue-label state, branch/worktree, PR, commits, validation, review-loop evidence, open risks, recommended next action, any caller-supplied Workflow Invocation Reference or result surface, and release-instruction handling.
+13. Confirm merge, issue closure, branch deletion, permission changes, new label creation, and other out-of-scope external actions were not performed without a separate approved workflow or direct user-supervised action.
+14. If this skill or its manifest entry changed, run `git diff --check` and `scripts/run-validator`.

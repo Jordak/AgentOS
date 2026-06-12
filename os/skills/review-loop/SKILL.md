@@ -36,7 +36,7 @@ Tools and connectors:
 - `os/skills/review-pass/SKILL.md` for fresh and verification reviewer-panel passes.
 - Local `git`, project test commands, and repository-specific validation.
 - GitHub connector or `gh` for PR metadata, consolidated comments, labels, draft state, and branch pushes.
-- `os/skills/ensure-implementation-readiness/SKILL.md` and `os/playbook/IMPLEMENT_FEATURES.md` for PR design-source preflight.
+- `os/skills/ensure-implementation-readiness/SKILL.md` in check-only mode and `os/playbook/IMPLEMENT_FEATURES.md` for PR design-source preflight.
 - `make-temp-file` for temporary report paths when available.
 - `os/playbook/ARTIFACTS.md` for substantial report format decisions.
 - `os/playbook/GITHUB_WORKFLOW.md` for GitHub issue, PR, and ready-for-human safety rules.
@@ -47,7 +47,7 @@ Safety:
 - If the user only asked for a normal review, ask before upgrading to `review-loop`; the question must state that the loop may post consolidated "Agent Review" comments, push fix commits to the PR branch, and apply the established ready-for-human marker.
 - Treat a request to run `review-loop` on a specific PR as permission to request read-only `review-pass` panel cycles and for the listed PR-scoped writes when the current request or invocation surface made that write scope explicit. Do not ask for separate reviewer-panel permission, and do not ask before each reviewer spawn or ordinary loop write.
 - Keep `review-pass` reviewers read-only. They report to the parent through `review-pass`; the parent is the single PR-comment writer.
-- Before spawning reviewers for feature-sized work, run or honor the implementation-readiness gate. If no durable design source exists, or if the source is not ready for the PR scope, pause before review unless the user explicitly chooses `Gate Skipped`.
+- Before spawning reviewers for feature-sized work, run or follow `ensure-implementation-readiness` in check-only mode. If check-only returns `Needs Design Consensus`, stop before spawning reviewers and return `blocked`. If it returns `Gate Skipped`, continue only when the bypass is explicit and recorded. Do not grill, repair durable sources, edit issues, add readiness fields, or mutate readiness labels inside `review-loop`.
 - Do not merge the PR, close issues, or delete branches through `review-loop`; route those actions to a landing-capable workflow or direct human integration step whose contract owns them. Ask before creating labels, changing permissions, pushing outside the target PR branch, or publishing outside the PR review surface.
 - Do not copy private connector data, secrets, or unrelated repository context into reviewer prompts, review packets, PR comments, or final reports.
 
@@ -178,7 +178,7 @@ Use the matrix to update affected contract surfaces in one pass. Check the ownin
    - Identify the repository, PR or commit target, base branch, head branch, and current branch.
    - Read the repository's local instructions and review policy.
    - Fetch or inspect current PR metadata when network access and permissions allow.
-   - For feature-sized targets, apply the implementation-readiness preflight from `os/playbook/IMPLEMENT_FEATURES.md`: locate the durable design source from the issue, PR body, ADR, or local design doc; confirm it is `Ready to Implement` for the PR scope or record an explicit `Gate Skipped` bypass before reviewers start.
+   - For feature-sized targets, apply the implementation-readiness preflight by invoking or following `ensure-implementation-readiness` in check-only mode against the issue, PR body, ADR, or local design doc. Continue only on `Ready to Implement` or an explicit recorded `Gate Skipped` verdict. If check-only returns `Needs Design Consensus`, stop before reviewer spawning and return `blocked` with the missing consensus evidence.
    - If the target is not a PR, choose local reporting mode instead of PR comments.
    - Establish the baseline intent summary described in the Design Escape Hatch section. Keep it in the loop ledger so later packets can be compared against the original brief and allowed alternatives.
 
@@ -253,7 +253,7 @@ Call narrower playbooks for their owned surfaces: GitHub workflow policy for PR 
 ## Quality Bar
 
 - The loop captures target, base, head, baseline intent, final reviewed commit SHA or local diff state, and review-pass sizing rationale.
-- Feature-sized review targets have a `Ready to Implement` design source or an explicit `Gate Skipped` bypass recorded before reviewers are spawned.
+- Feature-sized review targets pass `ensure-implementation-readiness` check-only mode with `Ready to Implement`, or have an explicit `Gate Skipped` bypass recorded before reviewers are spawned; missing readiness returns `blocked` without review-phase repair.
 - Every fresh or verification panel pass is delegated to `review-pass` or its canonical fallback files.
 - The orchestrator owns one durable ledger and posts at most one consolidated "Agent Review" comment per panel pass.
 - Findings are generalized into issue families where possible, and accepted families are swept before verification.
@@ -285,7 +285,7 @@ Before finishing:
 
 1. Confirm the target, base, head, final reviewed commit SHA or local diff state, and review-pass sizing rationale.
 2. Confirm the baseline intent summary was captured from the original brief, including allowed alternatives and non-goals when available.
-3. Confirm feature-sized review targets had a durable `Ready to Implement` design source or an explicit `Gate Skipped` bypass before reviewers were spawned.
+3. Confirm feature-sized review targets passed `ensure-implementation-readiness` check-only mode with `Ready to Implement`, or had an explicit `Gate Skipped` bypass before reviewers were spawned; if readiness was missing, confirm the loop returned `blocked` before spawning reviewers.
 4. Confirm every design-escape-hatch trigger was either surfaced to the user, explicitly declined with rationale, or found not applicable.
 5. Confirm every fresh and verification pass used `review-pass` or its canonical fallback files.
 6. Confirm the final fresh `review-pass` packet left no unresolved `auto-fix` or `ask-user` blockers after parent adjudication.

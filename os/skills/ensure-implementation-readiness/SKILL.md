@@ -5,7 +5,7 @@ description: "Use before implementing feature-sized work: implement, build, add,
 
 # Ensure Implementation Readiness
 
-Read `os/playbook/IMPLEMENT_FEATURES.md` first. That playbook owns the readiness policy, including exemptions, design-source requirements, marker rules, verdict definitions, deferred follow-up rules, and review-loop preflight behavior. This skill runs that policy and, when the user has asked to make the work ready, owns the repair loop that turns `Needs Design Consensus` into durable readiness evidence.
+Read `os/playbook/IMPLEMENT_FEATURES.md` first. That playbook owns the readiness policy, including exemptions, design-source requirements, consensus provenance, marker rules, verdict definitions, deferred follow-up rules, and review-loop check-only behavior. This skill runs that policy and owns the repair loop that turns `Needs Design Consensus` into durable readiness evidence when normal/repair mode is authorized.
 
 ## Contract
 
@@ -14,20 +14,22 @@ Inputs:
 - A feature request, GitHub issue, PRD, ADR, local design document, planning note, PR, branch, or user request to implement work.
 - Repository or mapped-project context when the work is project-specific.
 - The durable design source when one exists.
+- Optional explicit mode: normal/repair mode by default, or check-only mode when the caller must verify readiness without repairing it.
 - Applicable external-write policy from `os/connections/SAFETY_RULES.md` and `os/playbook/GITHUB_WORKFLOW.md` when the workflow needs to create or update GitHub issues, comments, labels, or other external project state.
 
 Output artifact:
 
-- A concise readiness report with exactly one verdict: `Ready to Implement`, `Needs Design Consensus`, or `Gate Skipped`.
+- A concise readiness report with exactly one verdict: `Ready to Implement`, `Needs Design Consensus`, or `Gate Skipped`, plus the mode used, source reviewed, readiness fields, consensus provenance, missing evidence, and PR-body readiness fields when the work will become a PR.
 - Optional durable local follow-up artifacts for deferred questions.
 - Optional proposed or approved updates to the source design artifact.
 - Optional GitHub issue updates or follow-up issues only when permitted by the applicable external-write policy.
 
 Mutability:
 
-- Mixed. Read-only by default for inspection and verdicts.
-- Local-write when creating local design docs or follow-up artifacts after the user asked the skill to make the design ready, or after the user declines external tracker updates and accepts a local destination.
-- External-write only for GitHub issue creation, issue updates, comments, labels, or other tracker state when permitted by the applicable external-write policy.
+- Mixed. Normal/repair mode is the default: check first, return immediately when the target is already ready, and otherwise perform authorized readiness repair.
+- Read-only in check-only mode. Do not grill, repair, create artifacts, edit issues, update design sources, or mutate labels in check-only mode.
+- Local-write in normal/repair mode when creating local design docs or follow-up artifacts after the user asked the skill to make the design ready, or after the user declines external tracker updates and accepts a local destination.
+- External-write in normal/repair mode only for GitHub issue creation, issue updates, comments, labels, or other tracker state when permitted by the applicable external-write policy.
 
 Tools and connectors:
 
@@ -42,34 +44,52 @@ Safety:
 
 - Follow `os/connections/SAFETY_RULES.md` and `os/playbook/GITHUB_WORKFLOW.md` before external tracker writes.
 - Do not treat a missing readiness marker as silently ready. Infer, explain, and confirm with the user before implementation proceeds.
-- Do not override `Design readiness: needs consensus` without user confirmation and an authorized design-source update.
+- Do not treat a durable design source as consensus by itself. `Ready to Implement` requires valid consensus provenance or an explicit `Gate Skipped` bypass.
+- Do not override `Design readiness: needs consensus` without user confirmation, valid consensus provenance, and an authorized design-source update.
+- Do not treat a freeform GitHub comment as human consensus provenance unless it explicitly attests human authorship, states the decision clearly enough to cite, and comes from a repository-trusted author relationship such as `OWNER`, `MEMBER`, or a project-approved collaborator role.
+- For issue-driven work, if the issue has `needs design consensus` or an equivalent label, do not return `Ready to Implement` while the label remains. In normal/repair mode, remove that label only after verifying valid consensus provenance and explicit human confirmation under this skill's contract. In check-only mode, report `Needs Design Consensus` instead of mutating the label. For explicit `Gate Skipped`, leave the label in place and record the bypass.
 - Do not leave meaningful deferred questions only in chat, model memory, or an unpersisted report.
 - Do not allow chat-only consensus to become the first implementation commit. Promote the agreed design into a durable source before coding, or record an explicit `Gate Skipped` bypass.
 - Do not require a design-consensus workflow for readiness checks that need no repair, exempt work, or explicit `Gate Skipped` bypasses. When readiness repair is needed, require a Core design-consensus workflow by default and prefer `grill-with-docs`.
 
+## Modes
+
+### Normal / Repair Mode
+
+Normal/repair mode is the default mode. First run the check-only logic. If the target is already ready, return `Ready to Implement` without unnecessary mutation. If readiness is missing and the Authorization Boundary permits repair, run the readiness repair workflow, promote resolved answers into the durable design source, create required follow-up artifacts, update readiness fields, and perform authorized readiness-label hygiene.
+
+Normal/repair mode may use `grill-with-docs`, `grill-me`, targeted residual questions, local design artifacts, issue-body edits, or label cleanup when those actions are inside the applicable write policy. It must not self-ratify readiness: agent-authored design text is a proposal until the durable source records valid consensus provenance or the user explicitly chooses `Gate Skipped`.
+
+### Check-Only Mode
+
+Check-only mode verifies the invariant without repair. Read durable sources, issue labels, PR bodies, linked design sources, and cited provenance. Return `Ready to Implement`, `Needs Design Consensus`, or `Gate Skipped` with exact evidence and missing evidence. Do not grill, ask new design questions, edit durable sources, create follow-up artifacts, add readiness markers, remove labels, or otherwise mutate local or external state.
+
 ## Workflow Phases
 
 1. Establish the target.
-   Identify the implementation request, issue, PRD, design doc, PR, branch, or local plan. Apply the playbook's trigger scope and exemptions. If exempt, return `Gate Skipped` with the reason. If the user explicitly bypasses the gate after missing or incomplete readiness is reported, return `Gate Skipped` with the bypass reason and missing-readiness summary.
+   Identify the implementation request, issue, PRD, design doc, PR, branch, or local plan. Determine whether the invocation is normal/repair mode or check-only mode. Apply the playbook's trigger scope and exemptions. If exempt, return `Gate Skipped` with the reason. If the user explicitly bypasses the gate after missing or incomplete readiness is reported, return `Gate Skipped` with the bypass reason and missing-readiness summary.
 
 2. Locate the durable design source.
-   Prefer the linked GitHub issue, PRD, ADR, local design doc, or planning note named by the request or repository. For PR review work, inspect the linked issue, PR body, and any referenced design source. If only chat context exists, the verdict is `Needs Design Consensus` until that context is promoted into a durable artifact or the user explicitly chooses a `Gate Skipped` bypass. When the user has already asked you to make the work ready, create or update the durable design source first, then evaluate that source before implementation.
+   Prefer the linked GitHub issue, PRD, ADR, local design doc, or planning note named by the request or repository. For issue or PR targets, inspect the issue or PR labels, body, comments when cited as provenance, and any referenced design source. If only chat context exists, the verdict is `Needs Design Consensus` until that context is promoted into a durable artifact or the user explicitly chooses a `Gate Skipped` bypass. In normal/repair mode, when the user has already asked you to make the work ready, create or update the durable design source first, then evaluate that source before implementation. In check-only mode, do not create or update the source.
 
 3. Check readiness.
-   Evaluate the source against the playbook's design-source standard and readiness-marker rules. Content wins over the marker.
+   Evaluate the source against the playbook's design-source standard, readiness-marker rules, consensus provenance rules, gate-skip field, and issue-label state. Content wins over the marker. A durable issue, PRD, ADR, local design doc, or handoff packet is necessary but not sufficient; it must record consensus provenance or an explicit gate skip.
 
-4. Confirm unmarked inference.
+4. Check consensus provenance.
+   Verify that `Consensus provenance:` points to a valid grill session, grill-equivalent process, human-attested GitHub comment from a trusted repository author, durable design-source update after explicit human confirmation, or explicit gate-skip reference. A Calling Workflow handoff that claims consensus exists without a concrete provenance pointer is not enough. If a target issue still has `needs design consensus`, the label wins unless this normal/repair invocation verifies provenance and removes the label under this skill's contract. Check-only mode must report the contradiction rather than repair it.
+
+5. Confirm unmarked inference.
    If the source lacks `Design readiness:`, infer readiness from the content. Tell the user the inferred verdict, reasons, implementation boundary, and marker or edit you plan to make. Wait for confirmation before implementation proceeds. If edits are authorized, add or propose the marker after confirmation.
 
-5. Handle open questions.
-   Classify open questions as blocking or deferred using the playbook's rules. When the user only asked for a readiness check, report the missing consensus and the recommended repair route. When the user asked to make the work ready, own the repair loop:
+6. Handle open questions and repair.
+   Classify open questions as blocking or deferred using the playbook's rules. In check-only mode, report missing consensus, missing provenance, stale labels, blocking questions, and the recommended repair route without mutating. In normal/repair mode, own the repair loop:
    - Use `grill-with-docs` by default when decisions need to sharpen domain language or ADR-worthy rationale, or when the readiness repair must result in updates to an issue body, PRD, local design doc, or other durable design source.
    - Use `grill-me` only for pure design questioning where the durable source already exists and no domain glossary, ADR, issue body, or local design document needs to change during the questioning.
    - Use targeted questions as supporting mechanics inside the selected workflow, post-workflow clarifications for narrow residual gaps, or the fallback only when the Core design-consensus skills are unavailable or explicitly excessive for the scope. If targeted questions are used without `grill-me` or `grill-with-docs`, explain why a grill workflow was unavailable or excessive for the scope.
-   Ask one question at a time, recommend a default answer, inspect the codebase or existing docs instead of asking when the answer is discoverable, and carry resolved answers back into the durable design source before declaring the scope ready. `grill-with-docs` should supply the docs-aware interview path by default, but this skill or its approved caller owns issue-body, PRD, local-design-doc, and other durable-source updates under the applicable write policy. Follow that policy before GitHub issue creation, issue-body edits, comments, or label updates. If GitHub writes are not authorized, create the local artifact named by the playbook unless the project has a better convention or the user redirects. If required durable source updates or follow-up artifacts are not created, the verdict remains `Needs Design Consensus`. Update or propose updating the current design source with a readiness marker and a `Deferred Follow-ups` section linking to created artifacts.
+   Ask one question at a time, recommend a default answer, inspect the codebase or existing docs instead of asking when the answer is discoverable, and carry resolved answers back into the durable design source before declaring the scope ready. `grill-with-docs` should supply the docs-aware interview path by default, but this skill or its approved caller owns issue-body, PRD, local-design-doc, and other durable-source updates under the applicable write policy. Follow that policy before GitHub issue creation, issue-body edits, comments, or label updates. If GitHub writes are not authorized, create the local artifact named by the playbook unless the project has a better convention or the user redirects. If required durable source updates, consensus provenance, or follow-up artifacts are not created, the verdict remains `Needs Design Consensus`. Update or propose updating the current design source with readiness fields and a `Deferred Follow-ups` section linking to created artifacts. Remove `needs design consensus` only in normal/repair mode, only under this skill's contract, and only after valid consensus provenance and explicit human confirmation are present. Leave the label in place for `Gate Skipped`.
 
-6. Report the verdict.
-   Include the source reviewed, satisfied and missing readiness fields, implementation boundary, non-goals, design-consensus route used or recommended, created follow-up artifacts, proposed source-design updates, and whether external writes happened, were proposed, or were skipped. If the work will become a PR, include the exact `Readiness evidence:` and `Readiness verdict:` lines the PR body should carry. Prefer a GitHub issue as readiness evidence for issue-driven work; use a design doc only when the design is too large, architectural, private, or not naturally issue-shaped.
+7. Report the verdict.
+   Include the mode, source reviewed, satisfied and missing readiness fields, consensus provenance, label state, implementation boundary, non-goals, design-consensus route used or recommended, created follow-up artifacts, proposed source-design updates, and whether external writes happened, were proposed, or were skipped. If the work will become a PR, include the exact `Readiness evidence:` and `Readiness verdict:` lines the PR body should carry. Prefer a GitHub issue as readiness evidence for issue-driven work; use a design doc only when the design is too large, architectural, private, or not naturally issue-shaped.
 
 ## Filing Rules
 
@@ -81,9 +101,12 @@ Safety:
 ## Quality Bar
 
 - The verdict is one of the three allowed values.
+- The mode is honored: check-only performs no mutation; normal/repair mode performs only authorized repair.
 - The design source is durable, or the report says why it is not.
+- The source records valid consensus provenance or the verdict is `Needs Design Consensus` or `Gate Skipped`.
 - When the user asked to make the work ready, resolved design answers have been promoted into the durable design source before `Ready to Implement`.
 - Missing marker inference is explicit and confirmed before implementation proceeds.
+- Issue labels such as `needs design consensus` are reconciled only by this skill in normal/repair mode; callers consume the verdict and do not perform readiness-label cleanup directly.
 - Meaningful deferred questions are captured durably, not only in chat.
 - External writes comply with the applicable external-write policy before they happen.
 - The implementation boundary is clear enough that another agent can avoid design creep.
@@ -95,12 +118,15 @@ Before finishing:
 
 1. Confirm the playbook was read for the policy.
 2. Confirm the target was correctly classified as gated or exempt.
-3. Confirm the verdict is `Ready to Implement`, `Needs Design Consensus`, or `Gate Skipped`.
-4. Confirm the design source's marker and content were both checked.
-5. Confirm unmarked readiness was not silently accepted.
-6. Confirm the selected design-consensus route was appropriate: `grill-with-docs` by default for readiness repair, `grill-me` for pure design questioning, targeted questions only as a documented unavailable-or-excessive fallback or residual clarification, or no repair loop needed.
-7. Confirm resolved answers were captured in the durable design source before reporting `Ready to Implement`.
-8. Confirm deferred follow-up artifacts were created where required.
-9. Confirm external tracker writes complied with the applicable external-write policy before they happened.
-10. Confirm PR-bound work has visible PR-body readiness fields or a recorded `Gate Skipped` reason.
-11. If this skill or its manifest entry changed, run `scripts/run-validator`.
+3. Confirm the mode was honored, including no mutations in check-only mode.
+4. Confirm the verdict is `Ready to Implement`, `Needs Design Consensus`, or `Gate Skipped`.
+5. Confirm the design source's marker, content, consensus provenance, gate-skip field, and relevant issue labels were checked.
+6. Confirm unmarked readiness was not silently accepted.
+7. Confirm human-attested GitHub comments counted only when explicit attestation and trusted repository author evidence were present.
+8. Confirm the selected design-consensus route was appropriate: `grill-with-docs` by default for readiness repair, `grill-me` for pure design questioning, targeted questions only as a documented unavailable-or-excessive fallback or residual clarification, or no repair loop needed.
+9. Confirm resolved answers were captured in the durable design source before reporting `Ready to Implement`.
+10. Confirm `needs design consensus` or equivalent labels were removed only by this skill in normal/repair mode, or left in place for `Gate Skipped`.
+11. Confirm deferred follow-up artifacts were created where required.
+12. Confirm external tracker writes complied with the applicable external-write policy before they happened.
+13. Confirm PR-bound work has visible PR-body readiness fields or a recorded `Gate Skipped` reason.
+14. If this skill or its manifest entry changed, run `scripts/run-validator`.

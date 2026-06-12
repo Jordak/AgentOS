@@ -186,7 +186,7 @@ Public, publishable, or Git-backed recovery surfaces must use only public-safe f
 - Loop-run ledgers default to the invocation-owned reporting surface.
 - Dedicated GitHub tracking issues are optional recovery surfaces and require explicit authorization.
 - Batch ledgers, worker states, landing queues, and issue-specific closure evidence stay with `coordinate-issue-batch` and its called workflows.
-- Issue readiness repair and label hygiene stay with assigned worker workflows such as `implement-github-issue`.
+- Issue implementation-readiness gates, repair, verdicts, and related label hygiene stay with assigned issue workflows through their readiness contracts.
 - Reusable improvements outside this contract belong in follow-up issues or project-approved propagation destinations rather than silent scope expansion.
 
 ## Quality Bar
