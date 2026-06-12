@@ -83,6 +83,8 @@ Examples that may count:
 - a durable issue, PRD, ADR, or design doc updated after explicit human confirmation;
 - an explicit `Gate Skipped` bypass that names the missing consensus and why the user chose to proceed anyway.
 
+Human-attested GitHub comments are a non-adversarial operational provenance signal, not a security guarantee. If the author relationship is missing, ambiguous, or untrusted, ask in the current human channel or return `Needs Design Consensus`.
+
 Examples that do not count by themselves:
 
 - an agent-authored issue, handoff packet, local design doc, or PR body;

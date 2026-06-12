@@ -70,7 +70,7 @@ The future coordinator should:
 - support normal, read-only, and resume modes; landing is a phase of normal or resume mode, not a separate top-level mode;
 - default to at most three parallel implementation workers unless the user or Calling Workflow specifies a different concurrency limit;
 - stop for a Blocking Human Decision when coordinator checks show a selected batch is not actually parallel-safe, even if a sequential order is obvious, so planner mistakes and stale evidence are visible;
-- leave per-issue readiness and label hygiene to the assigned worker workflow, while the coordinator records any stale-label or blocker evidence in the worker handoff;
+- leave per-issue readiness and label hygiene to the assigned issue workflow through `ensure-implementation-readiness`, while the coordinator records any stale-label or blocker evidence in the worker handoff;
 - give workers only enough batch context to respect their Isolation Boundary and escalation rules; the coordinator remains responsible for the full batch ledger, landing queue, and other workers' state;
 - wait for all expected workers to return, fail, block, or be explicitly cancelled before beginning closure review for the batch;
 - wait for the worker set to be quiescent before beginning closure review: every expected worker is complete, permanently blocked, failed, or explicitly cancelled, so workers are no longer producing review-correction events for the current batch;
