@@ -1,6 +1,8 @@
 # Issue 126 Landing And Closure Semantics
 
-Design readiness: ready to implement
+Design readiness: needs consensus
+Consensus provenance: Legacy source predates implementation-readiness policy v2; run `ensure-implementation-readiness` to verify or repair provenance before citing this document as v2 readiness evidence for future implementation.
+Gate skipped: not applicable
 
 ## Problem
 

@@ -152,13 +152,13 @@ On the first reviewer panel, ask reviewers to compare the implementation shape a
 Feature PRs should make readiness visible in the PR body:
 
 ```md
-Readiness evidence: <GitHub issue, PRD, ADR, local design doc, or gate-skip reason>
+Readiness evidence: <GitHub issue, PRD, ADR, local design doc, durable gate-skip record, or exempt-work reason>
 Readiness verdict: Ready to Implement
 ```
 
-For issue-driven work, prefer a GitHub issue as the readiness evidence. The issue can contain the design directly or link to a larger PRD, ADR, or local design doc. Create a separate design doc only when the design is too large, architectural, private, or not naturally issue-shaped.
+For issue-driven work, prefer a GitHub issue as the readiness evidence. The issue can contain the design directly or link to a larger PRD, ADR, or local design doc. The cited durable source must satisfy the v2 source contract: `Design readiness:`, `Consensus provenance:`, and `Gate skipped:` are present, with valid consensus provenance for `Ready to Implement` or a durable `Gate skipped:` record for an intentional bypass. Create a separate design doc only when the design is too large, architectural, private, or not naturally issue-shaped.
 
-Use `Readiness verdict: Gate Skipped` only for exempt work or an intentional bypass, and put the bypass reason in `Readiness evidence:`. These fields are a visibility tripwire, not a semantic proof that the design is good. Humans and agents still need to read the source and apply this playbook.
+Use `Readiness verdict: Gate Skipped` only for exempt work or an intentional bypass. For feature-sized intentional bypasses, point `Readiness evidence:` to the durable source whose `Gate skipped:` field records the bypass reason and missing evidence. For exempt work where no durable source is required, a short exempt-work reason is enough. These fields are a visibility tripwire, not a semantic proof that the design is good. Humans and agents still need to read the source and apply this playbook.
 
 ## Completion Check
 

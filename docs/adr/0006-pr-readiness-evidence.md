@@ -1,6 +1,8 @@
 # PR Readiness Evidence Tripwire
 
 Design readiness: ready to implement
+Consensus provenance: GitHub issue #160 human-attested approval for readiness-policy v2 update (`https://github.com/Jordak/AgentOS/issues/160#issuecomment-4695435170`)
+Gate skipped: not applicable
 
 ## Context
 
@@ -15,13 +17,13 @@ AgentOS feature PRs should expose readiness evidence and a readiness verdict in 
 The visible fields are:
 
 ```md
-Readiness evidence: <GitHub issue, PRD, ADR, local design doc, or gate-skip reason>
+Readiness evidence: <GitHub issue, PRD, ADR, local design doc, durable gate-skip record, or exempt-work reason>
 Readiness verdict: Ready to Implement
 ```
 
-For issue-driven work, prefer a GitHub issue as the readiness evidence. The issue can contain the agreed design directly or link to a larger PRD, ADR, or local design doc. Create a separate design document only when the design is too large, architectural, private, or not naturally issue-shaped.
+For issue-driven work, prefer a GitHub issue as the readiness evidence. The issue can contain the agreed design directly or link to a larger PRD, ADR, or local design doc. The cited durable source must satisfy the implementation-readiness v2 source contract: `Design readiness:`, `Consensus provenance:`, and `Gate skipped:` are present, with valid consensus provenance for `Ready to Implement` or a durable `Gate skipped:` record for an intentional bypass. Create a separate design document only when the design is too large, architectural, private, or not naturally issue-shaped.
 
-`Readiness verdict: Gate Skipped` is allowed for exempt work or an intentional bypass, but the reason belongs in `Readiness evidence:`. A `ready-for-agent` label, confident prompt, branch name, or PR existence is not a substitute for readiness evidence.
+`Readiness verdict: Gate Skipped` is allowed for exempt work or an intentional bypass. For feature-sized intentional bypasses, `Readiness evidence:` should point to the durable source whose `Gate skipped:` field records the bypass reason and missing evidence. For exempt work where no durable source is required, a short exempt-work reason is enough. A `ready-for-agent` label, confident prompt, branch name, or PR existence is not a substitute for readiness evidence.
 
 The CI check should remain shallow. It verifies that PR bodies contain the fields and that the readiness verdict is one of the allowed visible states. It must not parse design prose or judge whether the design is good. Humans and agents still apply `os/playbook/IMPLEMENT_FEATURES.md` and `os/skills/ensure-implementation-readiness/SKILL.md`.
 
@@ -39,7 +41,7 @@ Adding a new skill was rejected because the existing implementation-readiness sk
 
 ## Consequences
 
-PR bodies become slightly more structured, and small exempt changes may need an explicit gate-skip line. That is acceptable because the field can be short, such as `Readiness evidence: Gate skipped - typo fix`.
+PR bodies become slightly more structured, and small exempt changes may need an explicit gate-skip line. That is acceptable because the field can be short for exempt work, such as `Readiness evidence: Gate skipped - typo fix`. For feature-sized intentional bypasses, the short PR field should point back to the durable source whose `Gate skipped:` field records the bypass reason and missing evidence.
 
 The check can produce false WARN-style friction when a PR omitted the fields even though the design was discussed elsewhere. That friction is intentional: the durable evidence should be visible to future agents and reviewers.
 
@@ -49,7 +51,7 @@ The check can still produce false confidence if the fields are present but the e
 
 - `IMPLEMENT_FEATURES.md` says no feature implementation commit should happen before `Ready to Implement` or an explicit `Gate Skipped` verdict.
 - `ensure-implementation-readiness` says that chat-only consensus must be promoted into a durable source before implementation.
-- GitHub workflow guidance and the PR template use `Readiness evidence:` and `Readiness verdict:`.
+- GitHub workflow guidance and the PR template use `Readiness evidence:` and `Readiness verdict:`, and tell authors that feature-sized readiness evidence must cite a durable source with v2 readiness fields or a durable gate-skip record.
 - CI fails pull requests whose body is missing those fields or uses an unsupported readiness verdict.
 - `review-loop` preflights readiness before spawning reviewers and asks reviewers to compare implementation shape against the durable design source in the first pass.
 - The checks are deterministic and shallow; scripts do not parse design prose for quality.

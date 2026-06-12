@@ -107,10 +107,10 @@ Safety:
 7. Create the pull request:
    - Before creating the PR or posting related evidence comments, update the Recovery Record in an authorized checkpoint surface.
    - Create a PR against the integration branch with a body that starts from prior behavior, explains why it changes, summarizes the new behavior, and includes validation.
-   - Include exact readiness fields. Use `Ready to Implement` for a passed gate, or `Gate Skipped` only for an explicit bypass with the bypass reason in `Readiness evidence:`:
+   - Include exact readiness fields. Use `Ready to Implement` for a passed gate, or `Gate Skipped` only for an exempt gate or explicit bypass backed by the durable source's `Gate skipped:` field:
 
 ```md
-Readiness evidence: <GitHub issue, PRD, ADR, local design doc, or gate-skip reason>
+Readiness evidence: <GitHub issue, PRD, ADR, local design doc, durable gate-skip record, or exempt-work reason>
 Readiness verdict: <Ready to Implement | Gate Skipped>
 ```
 
