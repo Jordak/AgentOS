@@ -61,9 +61,9 @@ After any pause, interruption, resume, unusually long loop, or suspected compact
 ## Review-Pass Invocation Guard
 
 - Reopen `os/skills/review-pass/SKILL.md`, `os/skills/review-pass/references/reviewer-prompts.md`, and `os/skills/review-pass/references/review-packet-template.md` before every fresh and verification pass. If the harness cannot discover `review-pass` by name, read those canonical files directly and follow them as the fallback.
-- Fill every pass request explicitly with the common fields: target, repository, base, head or current head, mode, baseline intent, reviewer count or risk posture, optional lens overrides, custom lens notes, and reporting mode.
+- Fill every pass request explicitly with the common fields: target, repository, base, head or current head, mode, baseline intent, effort metadata when available or relevant, reviewer count or risk posture, optional lens overrides, custom lens notes, and reporting mode.
 - For `fresh` passes, keep reviewer context clean: do not include prior packets, parent analysis, autopilot classifications, complexity posture, lazy-human decisions, fix commits, accepted fixes, declined rationales, consolidated comment URLs, or validation results unless they are part of the baseline intent itself.
-- For `verification` passes, include only the needed prior packet, reviewer finding IDs, issue-family IDs, autopilot classifications and rationales, complexity posture, smallest closing moves or lazy-human decisions, fix commits, accepted fixes, declined rationales, consolidated comment URL, and validation results.
+- For `verification` passes, include only the needed prior packet, reviewer finding IDs, issue-family IDs, autopilot classifications and rationales, complexity posture, smallest closing moves or lazy-human decisions, fix commits, accepted fixes, declined rationales, effort metadata when available or relevant, consolidated comment URL, and validation results.
 - Preserve `review-pass` template rules about read-only review, no reviewer PR comments, issue-family sweeps, design-escape-hatch concerns, full-diff rereads, provisional IDs, and the clean response sentinel.
 - When the harness supports reviewer subagents, request a real multi-reviewer `review-pass` panel. Do not fall back to a single-agent review merely because the user did not separately say "subagents"; the loop's explicit `review-pass` panel request carries that authorization.
 - Treat the review packet as advisory. The parent owns final accept/decline decisions and records the durable ledger.
@@ -221,7 +221,7 @@ Use the matrix to update affected contract surfaces in one pass. Check the ownin
 6. Run a verification review pass:
    - Reopen `review-pass` and request `verification` mode.
    - Prefer same-source reviewer continuity when the harness can safely resume source reviewers; otherwise use packet/finding-source fallback.
-   - Provide only the needed reviewer continuity preference, source reviewer aliases or handles, prior packet, reviewer finding IDs, issue-family IDs, autopilot classifications and rationales, complexity posture, smallest closing moves or lazy-human decisions, fix commits, accepted fixes, declined rationales, validation results, and consolidated comment URL.
+   - Provide only the needed reviewer continuity preference, source reviewer aliases or handles, prior packet, reviewer finding IDs, issue-family IDs, autopilot classifications and rationales, complexity posture, smallest closing moves or lazy-human decisions, fix commits, accepted fixes, declined rationales, effort metadata when available or relevant, validation results, and consolidated comment URL.
    - Ask `review-pass` to verify prior issue families, reassess declined issue families against the rationale, check whether accepted fixes honored the recorded complexity posture and smallest closing move, and reread the full current diff for missed or newly introduced issues.
    - Record whether the verification pass used same-source reviewer continuity or packet/finding-source fallback, and whether opaque handles were available through the private handoff.
    - If the verification packet contains remaining or new issue families, adjudicate them before deciding whether the loop is still blocked; fix `auto-fix` and `user-approved-fix` families, record or reassess `auto-decline` rationales, and pause for unresolved `ask-user` blockers.
@@ -230,7 +230,7 @@ Use the matrix to update affected contract surfaces in one pass. Check the ownin
    - Pause for the user if the loop stops making progress, the same disputed finding repeats after a clear rationale, or more than five fix/verification rounds occur in one panel cycle without convergence.
 
 7. Confirm with a new fresh pass:
-   - After the active family set is clean, request a new `fresh` pass from `review-pass` with clean context sized to the current PR scope.
+   - After the active family set is clean, request a new `fresh` pass from `review-pass` with clean context sized to the current PR scope, including effort metadata when available or relevant.
    - Adjudicate the new fresh packet without leaking prior parent analysis into the reviewer prompt.
    - If the new fresh packet leaves no unresolved `auto-fix` or `ask-user` blockers after Conservative Autopilot adjudication, the loop is complete.
    - If the new fresh packet has `auto-fix` families, run the fix and verification workflow again, then spawn another fresh pass. If it has unresolved `ask-user` blockers, pause with a lazy-human brief; only a later `user-approved-fix` state enters fix and verification.

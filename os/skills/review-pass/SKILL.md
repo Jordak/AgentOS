@@ -142,7 +142,7 @@ When applicable, read `references/lenses/contract-surface-matrix.md` and include
    - For each assigned named lens, read only the matching file under `references/lenses/` and include its prompt snippet or equivalent instructions in that reviewer's prompt.
    - When the target triggers the Contract Surface Matrix lens, read `references/lenses/contract-surface-matrix.md` and include its prompt snippet or equivalent instructions in every relevant reviewer prompt.
    - Fill the fresh or verification template explicitly for every reviewer.
-   - Include target, repository, base/head or current head, baseline intent, reviewer alias, lens, assigned lens guidance, Contract Surface Matrix guidance when applicable, custom lens notes, verification continuity and caller adjudication context when applicable, reporting mode, read-only rule, full-reread rule, issue-family rule, design-escape-hatch instruction, provisional-ID rule, and clean response sentinel.
+   - Include target, repository, base/head or current head, baseline intent, effort metadata when supplied or observable, reviewer alias, lens, assigned lens guidance, Contract Surface Matrix guidance when applicable, custom lens notes, verification continuity and caller adjudication context when applicable, reporting mode, read-only rule, full-reread rule, issue-family rule, design-escape-hatch instruction, provisional-ID rule, and clean response sentinel.
    - Spawn clean-context reviewers in parallel when the harness supports it and the pass is authorized by an explicit review-pass or reviewer-panel request, or by a caller such as `review-loop`. If subagents are unavailable, run the pass as a clearly labeled single-agent fallback and state the limitation in the packet.
 
 5. Collect and close:
@@ -198,7 +198,7 @@ Before finishing a review pass:
 
 1. Confirm the prompt reference was read for the current pass.
 2. Confirm the packet template reference was read before normalizing or returning the packet.
-3. Confirm target, repository, base, head or current head, mode, reviewer count, and lens plan.
+3. Confirm target, repository, base, head or current head, mode, reviewer count, lens plan, and effort metadata when supplied or observable.
 4. Confirm baseline intent source and any missing-baseline limitation.
 5. Confirm every assigned named lens file under `references/lenses/` was read, and unassigned lens files were not required for prompt assembly.
 6. Confirm `references/lenses/contract-surface-matrix.md` was read when the target changed reusable contract surfaces.

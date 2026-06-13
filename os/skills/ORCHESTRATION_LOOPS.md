@@ -183,7 +183,7 @@ For every mutating Orchestration Loop, the Recovery Record should preserve at le
 - blocking human decisions: exact question, recommended default, and decision state such as `unresolved`, `approved`, or `declined/accepted-risk`;
 - Called Workflow results: links or summaries of returned evidence, reports, comments, commits, or verdicts;
 - validation evidence: commands or checks run, result, and skipped validation with reason;
-- effort metadata when available and relevant, including Prescribed Effort, Effective Effort, inherited or overridden status, and meaningful mismatches;
+- effort metadata when available and relevant, including prescribed model/effort, prescription source, effective model/effort, effective source/status, and meaningful mismatches; use `unknown` or `not reported` when unavailable;
 - next action: the next safe step.
 
 Keep opaque runtime handles, private thread IDs, or harness-internal references out of public, publishable, or Git-backed checkpoint surfaces when they could expose private or irrelevant implementation details. Public issue comments, PR comments, design docs, commits, branch state, and reports should contain only public-safe stable references. Store private runtime references only on an authorized private surface, such as Personal Overlay orchestration state, or record that the stable reference is unavailable or redacted.
