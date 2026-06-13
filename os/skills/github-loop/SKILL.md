@@ -20,6 +20,7 @@ Inputs:
 - A target GitHub repository or issue tracker, inferred from the current checkout when possible.
 - Optional loop goal or selection filters to pass to `coordinate-issue-batch`, such as high-leverage work, ready-only work, label filters, issue scope, or a maximum batch size.
 - Optional loop-level caps, such as max passes, max elapsed or budget checkpoint, max batch size, or max parallel workers to pass through to `coordinate-issue-batch`.
+- Optional prose caller effort prescription or no-override/default statement to preserve as effort metadata when available or relevant.
 - Current local agent instructions and project guidance, including `AGENTS.md`.
 - Current AgentOS GitHub workflow policy at `os/playbook/GITHUB_WORKFLOW.md`.
 - Current orchestration-loop vocabulary at `os/skills/ORCHESTRATION_LOOPS.md`.

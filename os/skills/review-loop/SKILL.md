@@ -17,14 +17,15 @@ Inputs:
 
 - A target PR URL or number, branch/base pair, commit range, patch, or local change set.
 - A checkout for the target repository, or enough remote context for `gh` or the GitHub connector to inspect the PR.
+- Optional caller-provided effort prescription, prescription source, or explicit no-override/default statement to preserve in the loop ledger, review-pass requests, and final report when available or relevant.
 - Explicit user authorization for a review loop. A request to run `review-loop`, "run a review loop", or equivalent delegated review/fix loop includes explicit authorization to request `review-pass` panel cycles, including clean-context reviewer subagents when the harness supports them. If the user only says something like "review PR #X", first ask whether to run `review-loop` or do a normal review, and name the ordinary PR-scoped writes listed below.
 - For a PR target, an explicit request to run `review-loop`, made through a current user request or adapter prompt that names the write scope, grants permission for read-only reviewer subagents plus ordinary PR-scoped loop writes: posting consolidated "Agent Review" comments, pushing fix commits to the PR branch, and applying the repository's established ready-for-human marker at the end.
 - Route PR merges, issue closures, and branch deletion to a landing-capable workflow or direct human integration step whose contract owns those actions. Ask before non-PR-target writes, pushes to branches outside the target PR, creating new labels, permission changes, posting outside the target PR, or other external actions beyond the loop.
 
 Output artifact:
 
-- A temporary static HTML report that follows `references/report-guidance.md`.
-- An early `blocked` result, when check-only readiness fails before reviewers spawn, that records check-only mode, source reviewed, readiness verdict, missing consensus evidence, gate-skip state, label state, and next repair owner.
+- A temporary static HTML report with effort metadata when available or relevant that follows `references/report-guidance.md`.
+- An early `blocked` result, when check-only readiness fails before reviewers spawn, that records check-only mode, source reviewed, effort metadata when available or relevant, readiness verdict, missing consensus evidence, gate-skip state, label state, and next repair owner.
 - Optional consolidated "Agent Review" PR comments from the orchestrator that follow `references/agent-review-comment.md`, plus optional PR ready-for-human marking for PR targets.
 
 Mutability:

@@ -18,6 +18,7 @@ Inputs:
 - A target repository or issue tracker, inferred from the current checkout when possible.
 - Optional user-provided or caller-provided batch of GitHub issues.
 - Optional selection goal or filters for `select-issue-batch` when no explicit batch is supplied.
+- Optional caller-provided coordinator effort prescription, prescription source, or explicit no-override/default statement to preserve as coordinator effort metadata when available or relevant.
 - Current local agent instructions and project guidance, including `AGENTS.md`.
 - Current AgentOS GitHub workflow policy at `os/playbook/GITHUB_WORKFLOW.md`.
 - Current orchestration-loop vocabulary and worker handoff guidance at `os/skills/ORCHESTRATION_LOOPS.md`.
@@ -93,7 +94,7 @@ Landing is a phase of normal or resume mode, not a separate top-level mode.
 1. Establish the target:
    - Identify repository, tracker, base branch, checkout path, mode, Authorization Boundary, and any provided issue batch.
    - Read local instructions, `os/playbook/GITHUB_WORKFLOW.md`, `os/skills/ORCHESTRATION_LOOPS.md`, and the narrow skill contracts this workflow may call.
-   - Record the initial Recovery Record: target, mode, Authorization Boundary, ledger surface, any caller-supplied Workflow Invocation Reference or result surface, coordinator release instruction, current phase, known blockers, and next action.
+   - Record the initial Recovery Record: target, mode, Authorization Boundary, coordinator effort metadata when available or relevant, ledger surface, any caller-supplied Workflow Invocation Reference or result surface, coordinator release instruction, current phase, known blockers, and next action.
 
 2. Select or accept the batch:
    - If no explicit batch is supplied, invoke or follow `select-issue-batch` in read-only mode using the requested selection goal and scope filters.
@@ -104,7 +105,7 @@ Landing is a phase of normal or resume mode, not a separate top-level mode.
 3. Establish the coordinator ledger:
    - Use an invocation-owned coordinator ledger by default.
    - Create or use a dedicated GitHub batch tracking issue only when the Authorization Boundary explicitly permits that tracker write.
-   - Record selected issues, selection evidence, batch source, concurrency limit, worker slots, planned branches/worktrees, public-safe planned thread names and Workflow Invocation References or redacted/private-surface summaries, caller-supplied result-surface handling when present, Isolation Boundaries, known dependencies, stale-label evidence, and next action.
+   - Record selected issues, selection evidence, batch source, concurrency limit, coordinator effort metadata when available or relevant, worker slots, planned branches/worktrees, public-safe planned thread names and Workflow Invocation References or redacted/private-surface summaries, caller-supplied result-surface handling when present, Isolation Boundaries, known dependencies, stale-label evidence, and next action.
    - Create a Recovery Checkpoint before worker launch or any other recovery boundary where losing context would make resumption unsafe.
 
 4. Check blockers and parallel safety:
@@ -158,12 +159,12 @@ Recover at least:
 - caller-supplied Workflow Invocation Reference or result surface for this coordinator invocation, using only public-safe stable references in public or Git-backed surfaces and redacting private runtime handles when needed;
 - coordinator release instruction, including whether the coordinator should stop after returning the result, remain assigned for correction/resume, or wait for a caller release signal;
 - repository and integration branch;
-- mode and Authorization Boundary;
+- mode, Authorization Boundary, and coordinator prescribed/effective effort metadata when available or relevant;
 - ledger surface and checkpoint history;
 - selected or provided issues and selection evidence;
 - concurrency limit and queued issues;
 - worker branch, worktree, public-safe thread name and Workflow Invocation Reference when available, redacted/private-surface summary when references are not public-safe, PR, assigned issue, Isolation Boundary, Authorization Boundary, release instruction, release status or post-result availability, and worker state;
-- worker Workflow Result evidence, including worker-reported raw readiness evidence, worker-reported readiness verdict, final readiness label state, prescribed/effective effort metadata when available and relevant, `Gate Skipped` reason plus durable gate-skip field/state or missing evidence when present, stale-label contradictions, validation, review-loop evidence, and open risks;
+- worker Workflow Result evidence, including worker-reported raw readiness evidence, worker-reported readiness verdict, final readiness label state, worker prescribed/effective effort metadata when available and relevant, `Gate Skipped` reason plus durable gate-skip field/state or missing evidence when present, stale-label contradictions, validation, review-loop evidence, and open risks;
 - bounded polling reason, bound, and result when runtime polling was used for bootstrap, timeout, recovery, or diagnostics;
 - human-review, review-correction, merge, landing, skipped, blocked, needs-human, failed, cancelled, and unresolved state;
 - Blocking Human Decisions with exact question, recommended default, decision state, and resume rule;
