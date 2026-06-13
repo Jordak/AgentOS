@@ -187,7 +187,7 @@ Recover at least:
 - Read-only/plan-only mode performs no local or external mutation.
 - Resume mode can reconstruct enough ledger state to continue safely.
 - The coordinator final Workflow Result includes a canonical terminal status, worker-reported raw readiness evidence, worker-reported readiness verdict, final readiness label state, effort metadata when available and relevant, any `Gate Skipped` reasons plus durable gate-skip field/state or missing evidence, and stale-label contradictions, is returned through any caller-supplied result surface when available, and follows the coordinator release instruction.
-- Every launched worker has an Isolation Boundary, branch/worktree, Authorization Boundary, Workflow Invocation Reference when supported, release instruction, and expected Workflow Result.
+- Every launched worker has an Isolation Boundary, branch/worktree, Authorization Boundary, prescribed model/effort and prescription source or explicit no-override/default statement when relevant, Workflow Invocation Reference when supported, release instruction, and expected Workflow Result.
 - Returned worker results record release status or post-result availability before the batch is treated as quiescent.
 - Supported durable worker threads are renamed to public-safe, legible target-specific names before `READY` or substantive assignment, and worker handoffs are minimal pointer-first packets rather than copied workflow contracts.
 - The coordinator goes idle after worker launch and uses polling only as bounded bootstrap, timeout, recovery, or diagnostic behavior.
