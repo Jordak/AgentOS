@@ -8,7 +8,7 @@ Before sending a reviewer prompt, confirm it includes:
 
 - target, repository, base, and head or current head;
 - baseline intent summary from the issue, PR description, spec, design doc, ADR, commit range, patch, or user request;
-- effort metadata when supplied by the caller or observable to the review-pass orchestrator, including prescribed model/effort, prescription source, effective model/effort, effective source/status, and meaningful prescribed/effective mismatches; use `unknown` or `not reported` when unavailable;
+- effort metadata when supplied by the caller, observable to the review-pass orchestrator, or resolvable from `os/skills/ORCHESTRATION_LOOPS.md`, including prescribed model/effort, prescription source, effective model/effort, effective source/status, and meaningful prescribed/effective mismatches; use `unknown` or `not reported` for unavailable effective metadata;
 - mode: `fresh` or `verification`;
 - reviewer alias and optional lens; reviewer aliases use `P<panel-number>-R<reviewer-number>`, where `P` means panel;
 - custom lens notes when provided;
@@ -178,7 +178,7 @@ For every fresh reviewer, fill and send the "Fresh Reviewer Prompt" template. Fo
 Do not reconstruct these prompts from memory. Each reviewer prompt must include:
 - target, repository, base, and current head;
 - baseline intent summary and source or limitation;
-- effort metadata when supplied or observable, using `unknown` or `not reported` when unavailable;
+- effort metadata when supplied, observable, or resolvable from `os/skills/ORCHESTRATION_LOOPS.md`, using `unknown` or `not reported` for unavailable effective metadata;
 - mode, reviewer alias, optional lens, and custom lens notes;
 - assigned lens guidance loaded from `references/lenses/<lens>.md` when a named lens is assigned;
 - Contract Surface Matrix guidance loaded from `references/lenses/contract-surface-matrix.md` when the target changes reusable contract surfaces;

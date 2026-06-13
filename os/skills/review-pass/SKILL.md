@@ -62,9 +62,9 @@ Safety:
 
 ## Modes
 
-Use `fresh` mode for an independent pass over the current target. The panel gets only the target, repository, base/head or commit range, baseline intent, reviewer alias, optional lens, custom lens notes, effort metadata when provided, and the current prompt template.
+Use `fresh` mode for an independent pass over the current target. The panel gets only the target, repository, base/head or commit range, baseline intent, reviewer alias, optional lens, custom lens notes, effort metadata when supplied, observable, or resolvable from `os/skills/ORCHESTRATION_LOOPS.md`, and the current prompt template.
 
-Use `verification` mode after a caller has fixed, declined, or otherwise adjudicated prior issue families. The panel gets the target, current head, prior packet or relevant reviewer finding IDs and issue-family IDs, fix commits, accepted fixes, declined rationales, optional caller adjudication context, effort metadata when provided, validation results, and any consolidated comment URL. Verification reviewers check the prior issue families and still reread the full current diff for missed or newly introduced issues.
+Use `verification` mode after a caller has fixed, declined, or otherwise adjudicated prior issue families. The panel gets the target, current head, prior packet or relevant reviewer finding IDs and issue-family IDs, fix commits, accepted fixes, declined rationales, optional caller adjudication context, effort metadata when supplied, observable, or resolvable from `os/skills/ORCHESTRATION_LOOPS.md`, validation results, and any consolidated comment URL. Verification reviewers check the prior issue families and still reread the full current diff for missed or newly introduced issues.
 
 Verification continuity is caller-directed. When a caller provides source reviewer handles and asks for same-reviewer continuity, prefer resuming those reviewers for the current verification pass if the harness can do so safely. If live resumption is unavailable or unsafe, fall back to fresh verification reviewers using the prior packet, source reviewer aliases, and source reviewer finding IDs as the continuity trail. Record the continuity mode and handle availability in the packet so callers such as `review-loop` can preserve it in their ledgers.
 
@@ -199,7 +199,7 @@ Before finishing a review pass:
 
 1. Confirm the prompt reference was read for the current pass.
 2. Confirm the packet template reference was read before normalizing or returning the packet.
-3. Confirm target, repository, base, head or current head, mode, reviewer count, lens plan, and effort metadata when supplied or observable.
+3. Confirm target, repository, base, head or current head, mode, reviewer count, lens plan, and effort metadata when supplied, observable, or resolvable from `os/skills/ORCHESTRATION_LOOPS.md`.
 4. Confirm baseline intent source and any missing-baseline limitation.
 5. Confirm every assigned named lens file under `references/lenses/` was read, and unassigned lens files were not required for prompt assembly.
 6. Confirm `references/lenses/contract-surface-matrix.md` was read when the target changed reusable contract surfaces.
