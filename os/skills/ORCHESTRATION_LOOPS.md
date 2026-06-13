@@ -57,6 +57,7 @@ Calling Workflows should send pointer-first assignment packets to Called Workflo
 - Workflow Invocation Reference and release instruction;
 - Isolation Boundary and Authorization Boundary;
 - workflow mode and owned scope;
+- prescribed model/effort when the caller is overriding or confirming the workflow default, including prescription source, or an explicit no-override/default statement when that matters for recovery;
 - required durable sources to read, such as local instructions, issue bodies, ADRs, playbooks, and skill contracts;
 - validation and expected Workflow Result requirements;
 - prohibited actions and escalation rules.
@@ -71,7 +72,7 @@ A **Prescribed Effort** is the effort requested by a workflow default, Calling W
 
 Calling Workflows may prescribe model and effort for a Called Workflow invocation when scope, risk, latency, cost, token budget, or review quality requires it. When the harness can create a separate run, thread, worker, subagent, custom agent, or model request for the Called Workflow, it should apply the prescribed effort there when supported by the selected model and harness.
 
-When multiple skills run in one live thread and the harness cannot reliably switch effort mid-turn, the thread's current effort is the Effective Effort. The workflow should report that the Prescribed Effort was inherited, overridden, unsupported, or unknown instead of implying exact enforcement.
+When multiple skills run in one live thread and the harness cannot reliably switch effort mid-turn, the thread's current effort is the Effective Effort. The workflow should report Effective Effort source/status as inherited from the current thread, overridden, unsupported or degraded, unknown, or not reported, and separately record any meaningful prescribed/effective mismatch.
 
 Explicit user budget, latency, cost, or quality instructions override AgentOS defaults. Platform limits, model support, custom-agent configuration, and harness runtime behavior may also override or constrain the prescribed value. Record those overrides when they matter for trust, validation, cost, recovery, or handoff.
 
@@ -231,6 +232,7 @@ For each parallel Called Workflow, the Calling Workflow should provide:
 - an Isolation Boundary;
 - an explicit Authorization Boundary;
 - a Workflow Invocation Reference;
+- prescribed model/effort and prescription source when the caller supplies an override or wants the worker to confirm the default;
 - an expected Workflow Result;
 - an explicit release instruction;
 - a Recovery Checkpoint before launch;
@@ -279,8 +281,9 @@ When a skill is an Orchestration Loop or can be invoked by one, its skill contra
 - what Workflow Result it returns;
 - which canonical terminal statuses it can return, normally `completed`, `blocked`, `failed`, `cancelled`, and `needs-human` unless the skill documents a narrower set;
 - how it accepts and reports any caller-supplied Workflow Invocation Reference or result surface;
+- how it accepts and reports caller-supplied effort prescriptions, or records that no override/default applies;
 - how it follows release instructions after returning a result to a caller;
-- what Minimal Assignment Packet it sends when it launches called workflows or workers, including callback/result surface, release instruction, target, boundary, and expected Workflow Result ownership;
+- what Minimal Assignment Packet it sends when it launches called workflows or workers, including callback/result surface, release instruction, target, boundary, prescribed effort when relevant, and expected Workflow Result ownership;
 - what Recovery Record or Recovery Checkpoint it maintains;
 - what Integration Ownership, if any, belongs to the skill.
 

@@ -21,6 +21,7 @@ Inputs:
 - Optional mode: `fresh` by default, or `verification` when checking prior issue families after fixes or adjudication.
 - Optional prior review packet, reviewer finding IDs, issue-family IDs, accepted fixes, declined rationales, fix commits, validation results, and consolidated comment URL for verification mode.
 - Optional caller adjudication context for verification mode, such as autopilot classifications and rationales, complexity posture, smallest closing moves, or lazy-human decisions.
+- Optional effort metadata: prescribed model/effort, prescription source, effective model/effort when observable, effective source/status, and meaningful prescribed/effective mismatches.
 - Optional verification continuity preference, source reviewer aliases, opaque source reviewer handles, and source reviewer finding IDs when a caller wants same-reviewer verification and the harness can safely resume prior reviewers.
 - Optional reviewer count, lens plan, custom lens notes, and reporting constraints.
 - An explicit user request to run `review-pass`, run a review pass, use a reviewer panel, or perform equivalent read-only panel review counts as authorization to spawn or resume multiple read-only clean-context reviewers when the harness supports them. This authorization covers reviewer reads only, not target edits or external writes.
@@ -30,6 +31,7 @@ Output artifact:
 - A structured Markdown review packet in chat by default.
 - Optional temporary Markdown packet file when requested or when the packet is too large for comfortable chat delivery.
 - Optional caller-private reviewer continuity handoff when an orchestrating caller may need same-source verification and the harness exposes resumable reviewer handles. Do not include opaque handles in the human-facing packet.
+- Effort metadata in the packet when available and relevant; use `unknown` or `not reported` rather than implying exact enforcement when the harness does not expose it.
 
 Mutability:
 
@@ -59,9 +61,9 @@ Safety:
 
 ## Modes
 
-Use `fresh` mode for an independent pass over the current target. The panel gets only the target, repository, base/head or commit range, baseline intent, reviewer alias, optional lens, custom lens notes, and the current prompt template.
+Use `fresh` mode for an independent pass over the current target. The panel gets only the target, repository, base/head or commit range, baseline intent, reviewer alias, optional lens, custom lens notes, effort metadata when provided, and the current prompt template.
 
-Use `verification` mode after a caller has fixed, declined, or otherwise adjudicated prior issue families. The panel gets the target, current head, prior packet or relevant reviewer finding IDs and issue-family IDs, fix commits, accepted fixes, declined rationales, optional caller adjudication context, validation results, and any consolidated comment URL. Verification reviewers check the prior issue families and still reread the full current diff for missed or newly introduced issues.
+Use `verification` mode after a caller has fixed, declined, or otherwise adjudicated prior issue families. The panel gets the target, current head, prior packet or relevant reviewer finding IDs and issue-family IDs, fix commits, accepted fixes, declined rationales, optional caller adjudication context, effort metadata when provided, validation results, and any consolidated comment URL. Verification reviewers check the prior issue families and still reread the full current diff for missed or newly introduced issues.
 
 Verification continuity is caller-directed. When a caller provides source reviewer handles and asks for same-reviewer continuity, prefer resuming those reviewers for the current verification pass if the harness can do so safely. If live resumption is unavailable or unsafe, fall back to fresh verification reviewers using the prior packet, source reviewer aliases, and source reviewer finding IDs as the continuity trail. Record the continuity mode and handle availability in the packet so callers such as `review-loop` can preserve it in their ledgers.
 
