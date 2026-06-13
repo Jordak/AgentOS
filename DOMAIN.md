@@ -196,6 +196,18 @@ _Avoid_: live worker monitoring, supervisor polling
 A pointer-first launch message that gives a Called Workflow only the invocation-specific target, callback reference, boundaries, required durable sources, validation expectations, expected result, release instruction, and prohibited actions.
 _Avoid_: universal worker prompt, copied skill contract
 
+**Effort Recommendation**:
+The model-effort level a workflow would prefer for an invocation when the active harness supports such control. It is an invocation-level intention, not a guarantee that a live thread can switch effort repeatedly inside one turn.
+_Avoid_: guaranteed runtime effort, mandatory thread setting
+
+**Prescribed Effort**:
+The model effort requested by a workflow default, Calling Workflow override, user instruction, custom-agent configuration, or platform default.
+_Avoid_: actual effort
+
+**Effective Effort**:
+The model effort actually used for a workflow invocation when it is observable, including inherited same-thread effort, platform-selected effort, custom-agent override, user override, unsupported/degraded effort, unknown, or not reported.
+_Avoid_: prescribed effort
+
 **Isolation Boundary**:
 The scope that lets a Calling Workflow run Called Workflows concurrently without uncoordinated mutation of the same surface. An Isolation Boundary may be an issue, task, branch and worktree, PR, artifact, domain or module area, read-only lane, or explicit non-overlap assumption with conflict-resolution.
 _Avoid_: mandatory file ownership, shared mutable checkout
@@ -301,6 +313,8 @@ _Avoid_: AgentOS Core
 - A **Workflow Result** may use a domain-specific artifact name and schema when the Calling Workflow can still extract the generic result fields it needs.
 - A **Workflow Invocation Reference** is the callback surface for a **Callback-First Invocation**.
 - A **Minimal Assignment Packet** should point to durable task and contract sources rather than copying those sources into the launch message.
+- An **Effort Recommendation** may become a **Prescribed Effort** when a workflow or caller requests it for a specific invocation.
+- An **Effective Effort** may differ from the **Prescribed Effort** when the active harness inherits, overrides, degrades, or does not report effort.
 - An **Isolation Boundary** is required before running parallel Called Workflows that may mutate state.
 - **Integration Ownership** belongs to the workflow contract and Authorization Boundary, not inherently to the Calling Workflow or Called Workflow role.
 - A **Review Pass** assembles one **Review Panel** and returns one **Review Packet**.
