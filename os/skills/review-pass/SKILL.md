@@ -1,6 +1,6 @@
 ---
 name: review-pass
-description: Run one read-only review panel pass for a PR, branch/base pair, commit range, patch, or local change set and return a structured Markdown review packet. Use when the user wants a single manual review iteration, fresh-context reviewer panel, verification pass after fixes, lens-based code review, design or issue compliance review, architecture-depth/code-judo review, or when review-loop needs reviewer-panel mechanics without owning them directly.
+description: Run one read-only review panel pass for a PR, branch/base pair, commit range, patch, or local change set and return a structured Markdown review packet. Use when the user wants a single manual review iteration, fresh-context reviewer panel, verification pass after fixes, lens-based code review, design or issue compliance review, architecture-depth/code-judo review, or when an authorized Calling Workflow needs reviewer-panel mechanics without owning them directly.
 ---
 
 # Review Pass
@@ -54,10 +54,10 @@ Safety:
 
 - Do not edit files, commit, push, merge, comment on PRs, label issues, close issues, mark PRs ready, change permissions, or perform external writes.
 - Do not run validation commands that may dirty the target checkout. Recommend validation signals for the caller when proof requires a mutating test, build, coverage, or fixture command.
-- Treat an explicit `review-pass` or reviewer-panel request as authorization to spawn or resume read-only reviewer subagents for the current pass when the harness supports them. Treat caller-provided panel requests from `review-loop` the same way.
+- Treat an explicit `review-pass` or reviewer-panel request as authorization to spawn or resume read-only reviewer subagents for the current pass when the harness supports them. Treat caller-provided panel requests from an authorized Calling Workflow the same way.
 - Keep spawned or resumed reviewers read-only and instruct them not to post comments or mutate state.
 - Close every spawned or resumed reviewer after its current pass completes so stale context does not leak into unrelated later passes.
-- If the user asks for fixes, commits, PR comments, pushes, ready markers, or loop convergence, route that work to the caller or to `review-loop`.
+- If the user asks for fixes, commits, PR comments, pushes, ready markers, or loop convergence, route that work to the caller or owning workflow.
 - Do not copy private connector data, secrets, or unrelated repository context into reviewer prompts or packets.
 
 ## Modes
@@ -173,7 +173,7 @@ When applicable, read `references/lenses/contract-surface-matrix.md` and include
 - Default output stays in chat.
 - Optional temporary packet files live under the system temporary directory.
 - Do not create durable AgentOS state by default.
-- Project-specific fixes, PR comments, and ready markers belong to the caller, usually `review-loop`.
+- Project-specific fixes, PR comments, and ready markers belong to the Calling Workflow.
 - If a pass discovers a durable AgentOS improvement, classify the right inbox: GitHub issue or mapped tracker for public-safe actionable project work, propagation review queue for private/tentative/pre-issue proposals, or direct edit only when the user explicitly asks for the canonical edit.
 
 ## Quality Bar

@@ -148,7 +148,7 @@ Before normalizing or returning a packet, reopen `references/review-packet-templ
 
 ## Caller Handoff Notes
 
-The packet is advisory. The caller owns final accept/decline decisions and any mutation. For `review-loop`, the caller should record packet families in its ledger, post any consolidated PR comments itself, apply fixes itself, then invoke `review-pass` again in verification or fresh mode as appropriate.
+The packet is advisory. The caller owns final accept/decline decisions and any mutation. When the caller is orchestrating fixes or convergence, it should record packet families in its ledger, post any external comments itself, apply fixes itself, then invoke `review-pass` again in verification or fresh mode as appropriate.
 
 ## Recovery Prompt
 
