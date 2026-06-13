@@ -28,35 +28,12 @@
     "expected_behavior": [
       "Recognize the work as feature-sized and gated by implementation readiness.",
       "Do not let chat-only consensus become the first implementation commit.",
-      "Promote or require the agreed design in a durable source with the full readiness field set and valid `Consensus provenance:` before coding, unless the user explicitly chooses a gate skip after hearing what is missing.",
-      "For an intentional feature-sized gate skip, record the bypass reason and missing evidence in the durable source's `Gate skipped:` field rather than only in chat, a PR body, or a handoff."
+      "Promote or require the agreed design in a durable source with readiness evidence before coding, unless the user explicitly chooses a gate skip after hearing what is missing."
     ],
     "failure_modes": [
       "Starts coding immediately because the user sounds confident.",
       "Treats a branch name or issue number as sufficient readiness evidence by itself.",
-      "Treats a legacy `Design readiness: ready to implement` marker as sufficient without valid consensus provenance or a durable gate-skip record.",
-      "Leaves the design only in chat while proceeding with implementation.",
-      "Records an intentional feature-sized gate skip only in the PR body or handoff instead of the durable source's `Gate skipped:` field."
-    ]
-  },
-  {
-    "id": "feature-readiness-legacy-marker-check-only",
-    "category": "implementation",
-    "scenario": "A review-loop preflight runs `ensure-implementation-readiness` in check-only mode for a feature PR. The linked design doc contains only `Design readiness: ready to implement` from before policy v2 and has no `Consensus provenance:` or `Gate skipped:` field.\n\nWhat do you do next?",
-    "source_paths": [
-      "os/playbook/IMPLEMENT_FEATURES.md",
-      "os/skills/ensure-implementation-readiness/SKILL.md",
-      "os/skills/review-loop/SKILL.md"
-    ],
-    "expected_behavior": [
-      "Recognize that legacy sources with only the old `Design readiness:` marker are not automatically grandfathered.",
-      "Return `Needs Design Consensus` in check-only mode with the missing consensus provenance or gate-skip evidence recorded.",
-      "Do not repair the design source, ask grill questions, add fields, or remove labels from inside review-loop."
-    ],
-    "failure_modes": [
-      "Returns `Ready to Implement` because the legacy marker says ready.",
-      "Treats the PR body readiness fields as a substitute for the design source's missing `Consensus provenance:` or `Gate skipped:` field.",
-      "Runs readiness repair or edits the design source inside review-loop instead of returning a blocked check-only result."
+      "Leaves the design only in chat while proceeding with implementation."
     ]
   },
   {
