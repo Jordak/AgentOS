@@ -118,7 +118,7 @@ After the brief, record exactly one `ask-user` decision state:
 - `user-declined/accepted-risk`: the user chooses not to fix or explicitly accepts the residual risk; record the rationale and include it in the final report.
 - `unresolved`: no user decision yet; this blocks ready marking and final convergence.
 
-Before yielding for an `ask-user` decision, make the unresolved blocker recoverable in the current reporting mode: record the issue-family ID, autopilot classification, lazy-human brief, exact decision needed, and decision state `unresolved` in the loop ledger and in either the consolidated Agent Review comment when a PR comment is appropriate and authorized, or the chat pause message when comments are not being posted. After the user answers, record `user-approved-fix` or `user-declined/accepted-risk` before continuing. If recovery cannot find a resolved decision, treat the family as `unresolved` and ask again.
+Before yielding for an `ask-user` decision, make the unresolved blocker recoverable in the current reporting mode: record the issue-family ID, effort metadata when available or relevant, autopilot classification, lazy-human brief, exact decision needed, and decision state `unresolved` in the loop ledger and in either the consolidated Agent Review comment when a PR comment is appropriate and authorized, or the chat pause message when comments are not being posted. After the user answers, record `user-approved-fix` or `user-declined/accepted-risk` before continuing. If recovery cannot find a resolved decision, treat the family as `unresolved` and ask again.
 
 ## Efficiency Controls
 
