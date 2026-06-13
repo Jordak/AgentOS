@@ -1,6 +1,8 @@
 # Issue 126 Landing And Closure Semantics
 
-Design readiness: ready to implement
+Design readiness: needs consensus
+Consensus provenance: Legacy source predates implementation-readiness policy v2; run `ensure-implementation-readiness` to verify or repair provenance before citing this document as v2 readiness evidence for future implementation.
+Gate skipped: not applicable
 
 ## Problem
 
@@ -70,7 +72,7 @@ The future coordinator should:
 - support normal, read-only, and resume modes; landing is a phase of normal or resume mode, not a separate top-level mode;
 - default to at most three parallel implementation workers unless the user or Calling Workflow specifies a different concurrency limit;
 - stop for a Blocking Human Decision when coordinator checks show a selected batch is not actually parallel-safe, even if a sequential order is obvious, so planner mistakes and stale evidence are visible;
-- leave per-issue readiness and label hygiene to the assigned worker workflow, while the coordinator records any stale-label or blocker evidence in the worker handoff;
+- leave per-issue readiness and label hygiene to the assigned issue workflow through `ensure-implementation-readiness`, while the coordinator records any stale-label or blocker evidence in the worker handoff;
 - give workers only enough batch context to respect their Isolation Boundary and escalation rules; the coordinator remains responsible for the full batch ledger, landing queue, and other workers' state;
 - wait for all expected workers to return, fail, block, or be explicitly cancelled before beginning closure review for the batch;
 - wait for the worker set to be quiescent before beginning closure review: every expected worker is complete, permanently blocked, failed, or explicitly cancelled, so workers are no longer producing review-correction events for the current batch;
@@ -144,9 +146,6 @@ Merge approval should not silently imply issue-closure approval. Issue-closure a
 - Run `scripts/run-validator`.
 - Inspect `os/skills/implement-github-issue/SKILL.md`, `os/playbook/GITHUB_WORKFLOW.md`, `os/skills/ORCHESTRATION_LOOPS.md`, and `os/skills/MANIFEST.md` for consistent contract-specific integration ownership.
 
-## PR Readiness Fields
+## Historical PR Readiness Fields
 
-```md
-Readiness evidence: docs/design/issue-126-landing-closure-semantics.md and GitHub issue #126
-Readiness verdict: Ready to Implement
-```
+This document predates implementation-readiness policy v2 and is not currently citable as `Ready to Implement` evidence. Run `ensure-implementation-readiness` before using this document for future feature-sized work.

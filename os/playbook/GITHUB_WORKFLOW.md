@@ -47,13 +47,13 @@ When writing PR bodies, issue comments, commit messages, or other GitHub text th
 For feature-sized implementation PRs, include these fields in the PR body:
 
 ```md
-Readiness evidence: <GitHub issue, PRD, ADR, local design doc, or gate-skip reason>
+Readiness evidence: <GitHub issue, PRD, ADR, local design doc, durable gate-skip record, or exempt-work reason>
 Readiness verdict: Ready to Implement
 ```
 
-Prefer a GitHub issue as the readiness evidence for issue-driven work. The issue can contain the design directly or link to a larger PRD, ADR, or local design doc. Create a separate design doc only when the design is too large, architectural, private, or not naturally issue-shaped.
+Prefer a GitHub issue as the readiness evidence for issue-driven work. The issue can contain the design directly or link to a larger PRD, ADR, or local design doc. The cited durable source must satisfy the implementation-readiness v2 source contract: `Design readiness:`, `Consensus provenance:`, and `Gate skipped:` are present, with valid consensus provenance for `Ready to Implement` or a durable `Gate skipped:` record for an intentional bypass. Create a separate design doc only when the design is too large, architectural, private, or not naturally issue-shaped.
 
-Use `Readiness verdict: Gate Skipped` only when the implementation-readiness gate is exempt or intentionally bypassed, and put the reason in `Readiness evidence:`. A `ready-for-agent` label or a confident implementation prompt is not a substitute for these fields.
+Use `Readiness verdict: Gate Skipped` only when the implementation-readiness gate is exempt or intentionally bypassed. For feature-sized intentional bypasses, `Readiness evidence:` should point to the durable source whose `Gate skipped:` field records the bypass reason and missing evidence. For exempt work where no durable source is required, a short exempt-work reason is enough. A `ready-for-agent` label or a confident implementation prompt is not a substitute for these fields.
 
 Before opening, updating, or merging a feature PR, check that the body still points to current readiness evidence and does not contain stale paths, obsolete commands, or an old readiness verdict. Treat these fields as non-canonical documentation that still matters because future agents read PR bodies.
 

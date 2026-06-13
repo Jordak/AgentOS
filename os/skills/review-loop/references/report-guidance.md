@@ -6,6 +6,7 @@ Use this when creating the final temporary HTML report for a review-loop run. Th
 
 1. Executive summary:
    - PR link, final status, base, head branch, final head commit, merge state when known, commit count, review-pass count, reviewer count, issue-family count, terminal condition, unresolved ask-user blockers, user-declined/accepted-risk decisions, and residual risks.
+   - For readiness-preflight blocked runs with no reviewer panel, include check-only mode, source reviewed, readiness verdict, missing consensus evidence, gate-skip state, label state, next repair owner, and confirmation that no reviewers spawned.
    - One short paragraph explaining the overall pattern the review loop uncovered.
    - A short readiness note with the final consolidated comment link when available.
 

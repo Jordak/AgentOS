@@ -7,7 +7,7 @@ description: "Select and explain the next high-leverage GitHub issue or small is
 
 ## Goal
 
-Recommend the next issue or small batch of issues to work on by inspecting tracker state, blocker relationships, readiness evidence, labels, and the user's current selection goal. The planner is read-only: it selects and explains. It does not coordinate execution, spawn workers, create branches, edit issues, change labels, close issues, or mutate GitHub by default.
+Recommend the next issue or small batch of issues to work on by inspecting tracker state, blocker relationships, raw readiness evidence, labels, and the user's current selection goal. The planner is read-only: it selects and explains. It does not decide implementation-readiness verdicts, coordinate execution, spawn workers, create branches, edit issues, change labels, close issues, or mutate GitHub by default.
 
 This skill is the selection layer in the issue-batch workflow stack:
 
@@ -27,7 +27,7 @@ Inputs:
 
 Output artifact:
 
-- A Markdown recommendation report with ranked issues, rationale, readiness/blocker evidence, parallel-safety assessment, rejected or deferred candidates, assumptions, and useful handoff notes for `coordinate-issue-batch`.
+- A Markdown recommendation report with ranked issues, rationale, raw readiness/blocker evidence, parallel-safety assessment, rejected or deferred candidates, assumptions, and useful handoff notes for `coordinate-issue-batch`.
 
 Mutability:
 
@@ -49,13 +49,14 @@ Safety:
 - Do not create or switch branches, create worktrees, spawn workers, call subagents, or start execution workflows by default.
 - Treat labels as evidence, not truth. Labels such as `blocked`, `HITL`, `ready-for-agent`, `ready-for-human`, `needs-human`, and `needs-a-human` can be stale or incomplete, so verify them against issue bodies, dependencies, comments when needed, and current tracker state before using them as selection reasons.
 - Treat current blocker or human-review evidence conservatively. A candidate may still be high leverage, but the recommendation must name what needs verification or resolution before coordination starts.
-- Do not turn normal issue starting states into selection stop conditions. `needs design consensus`, missing readiness markers, missing design-consensus evidence, sparse acceptance criteria, `HITL`, or human-participation labels are candidate-state facts for ranking and handoff. They may mean the downstream coordinator should start with readiness repair, a design-consensus lane, human-participation workflow, or sequential execution, but they are not by themselves Blocking Human Decisions for this read-only selector.
+- Do not turn normal issue starting states into selection stop conditions. `needs design consensus`, missing readiness fields, missing design-consensus evidence, sparse acceptance criteria, `HITL`, or human-participation labels are candidate-state facts for ranking and handoff. They may mean the downstream coordinator should start with readiness repair, a design-consensus lane, human-participation workflow, or sequential execution, but they are not by themselves Blocking Human Decisions for this read-only selector.
+- Do not return a final `Ready to Implement`, `Needs Design Consensus`, or `Gate Skipped` verdict from this selector. Those verdicts belong to `ensure-implementation-readiness` and the downstream issue workflow that calls it.
 - Do not treat `ready-for-agent` as the primary ranking signal. It is evidence that execution may be possible, not evidence that the issue is the best next move.
 - Ask before any external write request, and do not perform the write from this skill. For execution or coordination requests, stop after the recommendation and tell the caller or user to explicitly invoke `coordinate-issue-batch` or another authorized mutating workflow in a separate step.
 
 ## Ranking Policy
 
-Optimize primarily for future leverage: work that, if done next, makes later work easier, safer, or more valuable. Readiness is a modifier that affects sequencing and coordination risk; it is not the first ranking gate.
+Optimize primarily for future leverage: work that, if done next, makes later work easier, safer, or more valuable. Readiness evidence is a modifier that affects sequencing and coordination risk; it is not the first ranking gate or a selector-owned verdict.
 
 Default ranking posture:
 
@@ -78,21 +79,22 @@ If the user gives a narrower selection goal, honor it explicitly. For example, "
 2. Inventory candidates:
    - List open issues in scope.
    - Gather labels, title, body, URL, updated time, and linked PR or dependency evidence when readily available.
-   - Read comments only when the body and labels leave blocker, ownership, or recency state ambiguous enough to affect the recommendation.
+   - Read comments only when the body and labels leave blocker, ownership, readiness/provenance, or recency state ambiguous enough to affect the recommendation.
    - Keep candidate reads proportional to the requested batch size and risk.
 
-3. Classify readiness and blockers:
+3. Record readiness and blocker context:
    - Inspect labels such as `needs design consensus`, `ready-for-agent`, `ready-for-human`, `blocked`, `AFK`, and `HITL`.
-   - Read issue bodies for readiness markers, acceptance criteria, `Blocked by` relationships, linked design sources, and explicit non-goals.
+   - Read issue bodies for readiness fields, consensus provenance pointers, acceptance criteria, `Blocked by` relationships, linked design sources, and explicit non-goals.
    - Treat labels as potentially stale. Verify `blocked` against open dependencies, `HITL` or human-review labels against the issue body and recent comments when needed, and `ready-for-agent` against durable readiness evidence.
-   - Classify each relevant issue as one of:
+   - Describe each relevant issue's observed starting context as one of:
      - `appears ready for coordination`;
      - `needs readiness or design repair as the first execution lane`;
      - `appears blocked on dependency`;
      - `needs human participation during design or execution`;
      - `triage or design clarification needed before selection`;
      - `closure audit or no action candidate`.
-   - Do not classify `needs design consensus`, missing readiness evidence, missing readiness markers, sparse acceptance criteria, or `HITL` as Blocking Human Decisions by default. They are normal starting points for issue work. Reserve blocker language for a real dependency, a user goal that excludes that starting state, or evidence that selection itself cannot proceed without a human choosing between incompatible options.
+   - Treat these descriptions as raw selection context and likely first lanes, not as implementation-readiness verdicts.
+   - Do not classify `needs design consensus`, missing readiness evidence, missing readiness fields, sparse acceptance criteria, or `HITL` as Blocking Human Decisions by default. They are normal starting points for issue work. Reserve blocker language for a real dependency, a user goal that excludes that starting state, or evidence that selection itself cannot proceed without a human choosing between incompatible options.
    - Remember that `needs design consensus` does not automatically make an issue lower priority than ready low-leverage work.
 
 4. Score by leverage, not only readiness:
@@ -109,8 +111,8 @@ If the user gives a narrower selection goal, honor it explicitly. For example, "
 
 6. Select the batch:
    - Choose the next 1-N issues that best match the selection goal and future-leverage ranking.
-   - Include readiness, blocker, and stale-label evidence as risk notes for the selected batch, not as workflow commands.
-   - Include the recommended first lane for each selected issue, such as implementation-ready, readiness repair, design consensus, human-participation design, closure audit, or dependency verification.
+   - Include raw readiness, blocker, and stale-label evidence as risk notes for the selected batch, not as workflow commands or readiness verdicts.
+   - Include the recommended first lane for each selected issue, such as implementation workflow with readiness gate, readiness repair, design consensus, human-participation design, closure audit, or dependency verification.
    - Leave execution, worker assignment, issue comments, label hygiene, branches, PRs, and implementation workflow invocation to `coordinate-issue-batch` or another explicitly authorized mutating workflow.
    - Recommend no selection for issues that are low leverage, out of scope, or unsafe to include in the batch after current evidence is checked.
 
@@ -131,8 +133,8 @@ Use this structure unless the user requested a smaller answer:
 
 1. #<issue> <title>
    - Why this now: <future-leverage rationale>
-   - Readiness/blockers: <evidence and stale-label check>
-   - First lane: <implementation-ready / readiness repair / design consensus / human-participation design / closure audit / dependency verification>
+   - Raw readiness/blockers: <evidence and stale-label check>
+   - First lane: <implementation workflow with readiness gate / readiness repair / design consensus / human-participation design / closure audit / dependency verification>
    - Parallel-safety notes: <Isolation Boundary or sequencing reason>
 
 ## Parallel-Safety Assessment
@@ -162,7 +164,7 @@ Use this structure unless the user requested a smaller answer:
 ## Quality Bar
 
 - The recommendation optimizes for future leverage unless the user gave a narrower goal.
-- Readiness state affects sequencing and risk notes, not just the ranking.
+- Readiness evidence affects sequencing and risk notes, but the selector does not decide final implementation-readiness verdicts.
 - Normal starting states such as missing readiness evidence, `needs design consensus`, and `HITL` are reported as first-lane handoff notes rather than treated as selector stop conditions.
 - Blocked and human-review labels are checked as potentially stale signals, and current blocker evidence is never silently ignored.
 - Each selected issue has a clear reason for being in the batch.

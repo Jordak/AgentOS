@@ -58,7 +58,7 @@ Use the narrowest route that can answer the task.
 - Quality check code, schemas, and sanitized fixtures: `os/verification/`.
 - Private run reports and benchmark results: `personal/os/verification/`.
 - Cross-cutting operating policy, artifact policy, portability, publication, or programming preferences: `os/playbook/`.
-- Feature-sized implementation requests: check `os/playbook/IMPLEMENT_FEATURES.md` and use `os/skills/ensure-implementation-readiness/SKILL.md` before coding unless the work is clearly gate-exempt. If only chat consensus exists, create or update a durable design source before implementation code. For tracked-file changes meant to land through a pull request, also use the Branch and Integration Discipline section of `os/playbook/GITHUB_WORKFLOW.md` before the first edit.
+- Feature-sized implementation requests: check `os/playbook/IMPLEMENT_FEATURES.md` and use `os/skills/ensure-implementation-readiness/SKILL.md` before coding unless the work is clearly gate-exempt. If only chat consensus exists, promote it into a durable design source with the full readiness fields and valid consensus provenance, or record an explicit `Gate Skipped` bypass, before implementation code. For tracked-file changes meant to land through a pull request, also use the Branch and Integration Discipline section of `os/playbook/GITHUB_WORKFLOW.md` before the first edit.
 - GitHub issue drafting, pull request drafting/creation, branch handoffs, merge/landing notes, issue closure comments, or GitHub CLI authentication during those operations: `os/playbook/GITHUB_WORKFLOW.md`, even when the request is a follow-up to another skill's report or recommendation.
 - Live schedules, recurring jobs, or automation prompts: `personal/os/automations/`, using Core templates under `os/automations/`.
 - Live automation histories, queues, delivery records, and generated outputs: `personal/os/automations/` or the relevant Personal Overlay agent/memory directory.
@@ -114,4 +114,4 @@ Before finishing AgentOS work:
 5. Did generated durable-state recommendations go to the right inbox: GitHub or mapped tracker for public-safe actionable project work, propagation review queue for private/tentative/pre-issue proposals, or direct edit only for exact approved changes?
 6. Did durable new state land in one canonical home?
 7. Did publication work preserve the fresh-history gate in `os/playbook/PUBLICATION.md`?
-8. For feature-sized implementation, did the work pass or intentionally skip the implementation-readiness gate in `os/playbook/IMPLEMENT_FEATURES.md`, and is that verdict visible in the PR body when there is a PR?
+8. For feature-sized implementation, did the work pass or intentionally skip the implementation-readiness gate in `os/playbook/IMPLEMENT_FEATURES.md`, does the durable source record valid consensus provenance or an explicit `Gate Skipped` bypass, and is that verdict visible in the PR body when there is a PR?

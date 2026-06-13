@@ -212,7 +212,7 @@ Existing AgentOS workflows keep their native contracts and artifacts:
 
 - `review-loop` (`os/skills/review-loop/SKILL.md`) is an Orchestration Loop for PR-scoped review/fix convergence. It may own PR-scoped review mutations inside its contract, but it does not merge PRs or close issues.
 - `review-pass` (`os/skills/review-pass/SKILL.md`) is a read-only Called Workflow shape. Its Review Packet can serve as a domain-specific Workflow Result.
-- `ensure-implementation-readiness` (`os/skills/ensure-implementation-readiness/SKILL.md`) owns the feature-sized readiness gate and readiness-repair workflow, including durable design-source updates when authorized.
+- `ensure-implementation-readiness` (`os/skills/ensure-implementation-readiness/SKILL.md`) owns the feature-sized readiness gate and readiness-repair workflow, including consensus provenance checks, check-only invariant checks, durable design-source updates, and readiness-label hygiene when authorized.
 - `audit-issues` (`os/skills/audit-issues/SKILL.md`) owns evidence-backed issue tracker reconciliation after integration evidence exists.
 - `land-github-issue` (`os/skills/land-github-issue/SKILL.md`) owns one-issue acceptance-criteria reconciliation, fulfilled-checkbox updates, and authorized issue closure after integration evidence exists. It returns unmet criteria to the Calling Workflow instead of spawning workers or widening implementation scope.
 - `coordinate-issue-batch` (`os/skills/coordinate-issue-batch/SKILL.md`) owns one GitHub issue batch pass: selection or accepted-batch conversion, callback-first worker launch and tracking, human merge-event handling, and eligible landing through `land-github-issue`.
