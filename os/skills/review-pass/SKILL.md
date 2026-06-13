@@ -42,7 +42,7 @@ Tools and connectors:
 
 - Local filesystem, `git`, `rg`, and existing validation output for read-only inspection.
 - GitHub connector or `gh` for PR metadata reads when authorized and available.
-- The active harness's clean-context reviewer or subagent capability when available and authorized by an explicit review-pass or reviewer-panel request, or by a caller such as `review-loop`.
+- The active harness's clean-context reviewer or subagent capability when available and authorized by an explicit review-pass or reviewer-panel request, or by an authorized Calling Workflow.
 - `os/skills/ORCHESTRATION_LOOPS.md` as the workflow-default effort lookup when caller-supplied effort metadata is absent and effort reporting is relevant.
 - `make-temp-file` for optional temporary packet paths.
 - Per-lens reviewer instructions under `os/skills/review-pass/references/lenses/`.
@@ -66,7 +66,7 @@ Use `fresh` mode for an independent pass over the current target. The panel gets
 
 Use `verification` mode after a caller has fixed, declined, or otherwise adjudicated prior issue families. The panel gets the target, current head, prior packet or relevant reviewer finding IDs and issue-family IDs, fix commits, accepted fixes, declined rationales, optional caller adjudication context, effort metadata when supplied, observable, or resolvable from `os/skills/ORCHESTRATION_LOOPS.md`, validation results, and any consolidated comment URL. Verification reviewers check the prior issue families and still reread the full current diff for missed or newly introduced issues.
 
-Verification continuity is caller-directed. When a caller provides source reviewer handles and asks for same-reviewer continuity, prefer resuming those reviewers for the current verification pass if the harness can do so safely. If live resumption is unavailable or unsafe, fall back to fresh verification reviewers using the prior packet, source reviewer aliases, and source reviewer finding IDs as the continuity trail. Record the continuity mode and handle availability in the packet so callers such as `review-loop` can preserve it in their ledgers.
+Verification continuity is caller-directed. When a caller provides source reviewer handles and asks for same-reviewer continuity, prefer resuming those reviewers for the current verification pass if the harness can do so safely. If live resumption is unavailable or unsafe, fall back to fresh verification reviewers using the prior packet, source reviewer aliases, and source reviewer finding IDs as the continuity trail. Record the continuity mode and handle availability in the packet so the Calling Workflow can preserve it in its ledger.
 
 Source reviewer handles are harness-specific opaque tokens for orchestration and caller ledgers only. Capture any harness-provided handles in the caller-private continuity handoff when same-source verification may be needed. Do not include handle values in reviewer prompts, PR comments, public reports, or human-facing packets. If debugging requires handle-level detail, keep that detail in private orchestration diagnostics outside review packets, reviewer prompts, PR comments, public reports, and other human-facing artifacts. If the harness does not provide a private handoff channel, record handle availability as unavailable and use packet/finding-source fallback for later verification. Closing a reviewer ends the active pass and prevents stale live work; it does not promise future resumability. Each verification pass must attempt safe resumption from the caller-provided handles and fall back to packet/finding-source continuity when handles are absent, stale, or rejected by the harness.
 
@@ -131,7 +131,7 @@ When applicable, read `references/lenses/contract-surface-matrix.md` and include
 2. Establish baseline intent:
    - Derive required outcomes, explicit alternatives, non-goals, chosen implementation shape, and risky assumptions from the PR body, issue, spec, design doc, ADR, commit description, or user request.
    - If the baseline is weak or missing, proceed for manual review but flag the limitation in the packet.
-   - Do not enforce implementation-readiness gates here; callers such as `review-loop` decide whether missing design evidence blocks the larger workflow.
+   - Do not enforce implementation-readiness gates here; the Calling Workflow decides whether missing design evidence blocks the larger workflow.
 
 3. Choose the panel:
    - Use the caller's reviewer count and lenses when provided.
@@ -144,7 +144,7 @@ When applicable, read `references/lenses/contract-surface-matrix.md` and include
    - When the target triggers the Contract Surface Matrix lens, read `references/lenses/contract-surface-matrix.md` and include its prompt snippet or equivalent instructions in every relevant reviewer prompt.
    - Fill the fresh or verification template explicitly for every reviewer.
    - Include target, repository, base/head or current head, baseline intent, effort metadata when supplied, observable, or resolvable from `os/skills/ORCHESTRATION_LOOPS.md`, reviewer alias, lens, assigned lens guidance, Contract Surface Matrix guidance when applicable, custom lens notes, verification continuity and caller adjudication context when applicable, reporting mode, read-only rule, full-reread rule, issue-family rule, design-escape-hatch instruction, provisional-ID rule, and clean response sentinel.
-   - Spawn clean-context reviewers in parallel when the harness supports it and the pass is authorized by an explicit review-pass or reviewer-panel request, or by a caller such as `review-loop`. If subagents are unavailable, run the pass as a clearly labeled single-agent fallback and state the limitation in the packet.
+   - Spawn clean-context reviewers in parallel when the harness supports it and the pass is authorized by an explicit review-pass or reviewer-panel request, or by an authorized Calling Workflow. If subagents are unavailable, run the pass as a clearly labeled single-agent fallback and state the limitation in the packet.
 
 5. Collect and close:
    - Wait for every reviewer in the pass to report.
