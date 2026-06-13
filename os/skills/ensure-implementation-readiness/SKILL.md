@@ -16,11 +16,12 @@ Inputs:
 - The durable design source when one exists.
 - Optional explicit mode: normal/repair mode by default, or check-only mode when the caller must verify readiness without repairing it.
 - Current Authorization Boundary or caller-provided write boundary when normal/repair mode might create artifacts, update durable sources, or perform readiness-label hygiene.
+- Optional caller-provided effort metadata to preserve in the readiness report when available or relevant under `os/skills/ORCHESTRATION_LOOPS.md`.
 - Applicable external-write policy from `os/connections/SAFETY_RULES.md` and `os/playbook/GITHUB_WORKFLOW.md` when the workflow needs to create or update GitHub issues, comments, labels, or other external project state.
 
 Output artifact:
 
-- A concise readiness report with exactly one verdict: `Ready to Implement`, `Needs Design Consensus`, or `Gate Skipped`, plus the mode used, source reviewed, readiness fields, consensus provenance, missing evidence or missing consensus evidence, gate-skip field/state, `Gate Skipped` reason and durable gate-skip record location when present, any proposed source update when readiness repair or bypass recording could not be completed, final readiness label state, and PR-body readiness fields when the work will become a PR.
+- A concise readiness report with exactly one verdict: `Ready to Implement`, `Needs Design Consensus`, or `Gate Skipped`, plus the mode used, source reviewed, effort metadata when available or relevant, readiness fields, consensus provenance, missing evidence or missing consensus evidence, gate-skip field/state, `Gate Skipped` reason and durable gate-skip record location when present, any proposed source update when readiness repair or bypass recording could not be completed, final readiness label state, and PR-body readiness fields when the work will become a PR.
 - Optional durable local follow-up artifacts for deferred questions.
 - Optional proposed or approved updates to the source design artifact.
 - Optional GitHub issue updates or follow-up issues only when permitted by the applicable external-write policy.
@@ -91,7 +92,7 @@ Check-only mode verifies the invariant without repair. Read durable sources, iss
    Ask one question at a time, recommend a default answer, inspect the codebase or existing docs instead of asking when the answer is discoverable, and carry resolved answers back into the durable design source before declaring the scope ready. `grill-with-docs` should supply the docs-aware interview path by default, but this skill or its approved caller owns issue-body, PRD, local-design-doc, and other durable-source updates under the applicable write policy. Follow that policy before GitHub issue creation, issue-body edits, comments, or label updates. If GitHub writes are not authorized, create the local artifact named by the playbook unless the project has a better convention or the user redirects. If required durable source updates, consensus provenance, gate-skip records, or follow-up artifacts are not created, the verdict remains `Needs Design Consensus` unless the work is exempt from the gate. Update or propose updating the current design source with readiness fields and a `Deferred Follow-ups` section linking to created artifacts. For an intentional bypass, update the full readiness field set with `Gate skipped:` containing the bypass reason and missing evidence before returning `Gate Skipped`; if the update can only be proposed, report that proposal while returning `Needs Design Consensus`. Do not treat PR fields or a Recovery Record alone as the durable bypass record. Remove `needs design consensus` only in normal/repair mode, only under this skill's contract, and only after valid consensus provenance and explicit human confirmation are present. Leave the label in place for `Gate Skipped`.
 
 7. Report the verdict.
-   Include the mode, source reviewed, satisfied and missing readiness fields, consensus provenance, missing consensus evidence when present, gate-skip field/state, `Gate Skipped` reason and durable gate-skip record location when present, final readiness label state, implementation boundary, non-goals, design-consensus route used or recommended, created follow-up artifacts, proposed source-design updates, and whether external writes happened, were proposed, or were skipped. If an intentional bypass could not be recorded, report the proposed `Gate skipped:` update while returning `Needs Design Consensus`. If the work will become a PR, include the exact `Readiness evidence:` and `Readiness verdict:` lines the PR body should carry. Prefer a GitHub issue as readiness evidence for issue-driven work; use a design doc only when the design is too large, architectural, private, or not naturally issue-shaped.
+   Include the mode, source reviewed, effort metadata when available or relevant, satisfied and missing readiness fields, consensus provenance, missing consensus evidence when present, gate-skip field/state, `Gate Skipped` reason and durable gate-skip record location when present, final readiness label state, implementation boundary, non-goals, design-consensus route used or recommended, created follow-up artifacts, proposed source-design updates, and whether external writes happened, were proposed, or were skipped. If an intentional bypass could not be recorded, report the proposed `Gate skipped:` update while returning `Needs Design Consensus`. If the work will become a PR, include the exact `Readiness evidence:` and `Readiness verdict:` lines the PR body should carry. Prefer a GitHub issue as readiness evidence for issue-driven work; use a design doc only when the design is too large, architectural, private, or not naturally issue-shaped.
 
 ## Filing Rules
 
@@ -123,12 +124,13 @@ Before finishing:
 3. Confirm the mode was honored, including no mutations in check-only mode.
 4. Confirm the verdict is `Ready to Implement`, `Needs Design Consensus`, or `Gate Skipped`.
 5. Confirm the design source's readiness fields, content, consensus provenance, gate-skip field, and relevant issue labels were checked.
-6. Confirm unmarked readiness was not silently accepted.
-7. Confirm human-attested GitHub comments counted only when explicit attestation and trusted repository author evidence were present.
-8. Confirm the selected design-consensus route was appropriate: `grill-with-docs` by default for readiness repair, `grill-me` for pure design questioning, targeted questions only as a documented unavailable-or-excessive fallback or residual clarification, or no repair loop needed.
-9. Confirm resolved answers were captured in the durable design source before reporting `Ready to Implement`.
-10. Confirm `needs design consensus` or equivalent labels were removed only by this skill in normal/repair mode, or left in place for `Gate Skipped`.
-11. Confirm deferred follow-up artifacts were created where required.
-12. Confirm external tracker writes complied with the applicable external-write policy before they happened.
-13. Confirm PR-bound work has visible PR-body readiness fields, and that `Gate Skipped` intentional bypasses name the durable `Gate skipped:` field; if writes were unavailable, confirm the proposed update was reported with `Needs Design Consensus` instead of `Gate Skipped`.
-14. If this skill or its manifest entry changed, run `scripts/run-validator`.
+6. Confirm effort metadata was preserved in the readiness report when available or relevant.
+7. Confirm unmarked readiness was not silently accepted.
+8. Confirm human-attested GitHub comments counted only when explicit attestation and trusted repository author evidence were present.
+9. Confirm the selected design-consensus route was appropriate: `grill-with-docs` by default for readiness repair, `grill-me` for pure design questioning, targeted questions only as a documented unavailable-or-excessive fallback or residual clarification, or no repair loop needed.
+10. Confirm resolved answers were captured in the durable design source before reporting `Ready to Implement`.
+11. Confirm `needs design consensus` or equivalent labels were removed only by this skill in normal/repair mode, or left in place for `Gate Skipped`.
+12. Confirm deferred follow-up artifacts were created where required.
+13. Confirm external tracker writes complied with the applicable external-write policy before they happened.
+14. Confirm PR-bound work has visible PR-body readiness fields, and that `Gate Skipped` intentional bypasses name the durable `Gate skipped:` field; if writes were unavailable, confirm the proposed update was reported with `Needs Design Consensus` instead of `Gate Skipped`.
+15. If this skill or its manifest entry changed, run `scripts/run-validator`.

@@ -27,7 +27,7 @@ Inputs:
 
 Output artifact:
 
-- A Markdown recommendation report with ranked issues, rationale, raw readiness/blocker evidence, parallel-safety assessment, rejected or deferred candidates, assumptions, and useful handoff notes for `coordinate-issue-batch`.
+- A Markdown recommendation report with ranked issues, rationale, effort metadata when available or relevant to downstream coordination, raw readiness/blocker evidence, parallel-safety assessment, rejected or deferred candidates, assumptions, and useful handoff notes for `coordinate-issue-batch`.
 
 Mutability:
 
@@ -117,7 +117,7 @@ If the user gives a narrower selection goal, honor it explicitly. For example, "
    - Recommend no selection for issues that are low leverage, out of scope, or unsafe to include in the batch after current evidence is checked.
 
 7. Return a selection report:
-   - Include the selection goal, inspected scope, selected issue or batch, ranked rationale, readiness/blocker evidence, parallel-safety conclusion, rejected or deferred candidates, assumptions, and coordinator handoff notes.
+   - Include the selection goal, inspected scope, selected issue or batch, ranked rationale, effort metadata when available or relevant to downstream coordination, readiness/blocker evidence, parallel-safety conclusion, rejected or deferred candidates, assumptions, and coordinator handoff notes.
    - Include issue URLs, recommended sequencing, Isolation Boundary notes, and why each selected issue belongs in or outside the same batch.
 
 ## Output Shape
@@ -184,5 +184,6 @@ Before finishing:
 6. Confirm each selected issue has a rationale for inclusion in the batch.
 7. Confirm batch output states whether the set appears parallel-safe and why.
 8. Confirm the output names each selected issue's recommended first lane when readiness or human participation affects the handoff.
-9. Confirm no branches, worktrees, workers, issue comments, labels, PRs, or other external state were changed.
-10. If this skill or its manifest entry changed, run `git diff --check` and `scripts/run-validator`.
+9. Confirm effort metadata is preserved when available or relevant to downstream coordination.
+10. Confirm no branches, worktrees, workers, issue comments, labels, PRs, or other external state were changed.
+11. If this skill or its manifest entry changed, run `git diff --check` and `scripts/run-validator`.

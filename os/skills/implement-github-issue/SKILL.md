@@ -22,12 +22,13 @@ Inputs:
 - Relevant project domain docs when present, such as `DOMAIN.md` and `DOMAIN-MAP.md`, with legacy `CONTEXT.md` and `CONTEXT-MAP.md` as aliases.
 - `ensure-implementation-readiness`, repository GitHub workflow guidance, and `review-loop` when available in the active AgentOS checkout or harness.
 - Optional caller-supplied Workflow Invocation Reference or result surface, plus an explicit release instruction, when this skill is invoked as a durable Called Workflow.
+- Optional caller-provided effort metadata or caller effort prescription to preserve in handoffs and the final Workflow Result under `os/skills/ORCHESTRATION_LOOPS.md`.
 - Optional explicit mode: normal mutating mode by default, or read-only mode when the caller says not to write.
 
 Output artifact:
 
 - A pull request with `Readiness evidence:` and `Readiness verdict:` fields.
-- A recoverable Workflow Result in the current reporting mode or caller-supplied Workflow Invocation Reference, with terminal status (`completed`, `blocked`, `failed`, `cancelled`, or `needs-human`), issue URL and final issue labels, branch, worktree, PR, raw readiness evidence or provenance, readiness verdict, final readiness label state, `Gate Skipped` reason plus durable gate-skip field/state or missing consensus evidence when present, validation, review-loop status, mutations, open risks, release-instruction handling, and recommended next action for the integration owner.
+- A recoverable Workflow Result in the current reporting mode or caller-supplied Workflow Invocation Reference, with terminal status (`completed`, `blocked`, `failed`, `cancelled`, or `needs-human`), issue URL and final issue labels, branch, worktree, PR, effort metadata when available or relevant, raw readiness evidence or provenance, readiness verdict, final readiness label state, `Gate Skipped` reason plus durable gate-skip field/state or missing consensus evidence when present, validation, review-loop status, mutations, open risks, release-instruction handling, and recommended next action for the integration owner.
 - Optional issue or PR comments when useful for recovery or handoff.
 
 Mutability:
@@ -68,7 +69,7 @@ Safety:
    - Inspect the issue body, labels, linked PR or design context, and comments relevant to readiness or blockers.
    - Read project-local domain docs when relevant to the implementation surface or required by local instructions, using `DOMAIN.md` and `DOMAIN-MAP.md` with legacy `CONTEXT.md` and `CONTEXT-MAP.md` as aliases.
    - If issue labels indicate human ownership, HITL, blocked state, or human review, record a Blocking Human Decision and stop unless the current request explicitly authorizes continuing, the repository's label or triage owner resolves the human-owned or human-review state, or the only blocker is a stale `blocked` label whose blocking dependency is verifiably resolved.
-   - Record the initial Recovery Record: issue URL, repository, branch, worktree, current phase, Authorization Boundary, any caller-supplied Workflow Invocation Reference or result surface, release instruction, known blockers, and next action.
+   - Record the initial Recovery Record: issue URL, repository, branch, worktree, current phase, Authorization Boundary, effort metadata when available or relevant, any caller-supplied Workflow Invocation Reference or result surface, release instruction, known blockers, and next action.
 
 2. Run the readiness gate:
    - Invoke or follow `ensure-implementation-readiness` in normal/repair mode for the issue, passing along the issue context, project guidance, discovered design sources, and this skill's Authorization Boundary.
@@ -118,15 +119,15 @@ Readiness verdict: <Ready to Implement | Gate Skipped>
    - Record the PR URL in the Recovery Record.
 
 8. Run review-loop:
-   - Before invoking `review-loop`, update the Recovery Record in an authorized checkpoint surface so the issue, PR, branch, raw readiness evidence or provenance, readiness verdict, final readiness label state, `Gate Skipped` reason plus durable gate-skip field/state or missing consensus evidence when present, validation state, Authorization Boundary, and next action are recoverable.
-   - Invoke `review-loop` on the PR with its normal PR-scoped Authorization Boundary unless this skill was narrowed to read-only mode.
+   - Before invoking `review-loop`, update the Recovery Record in an authorized checkpoint surface so the issue, PR, branch, raw readiness evidence or provenance, readiness verdict, final readiness label state, `Gate Skipped` reason plus durable gate-skip field/state or missing consensus evidence when present, validation state, effort metadata when available or relevant, Authorization Boundary, and next action are recoverable.
+   - Invoke `review-loop` on the PR with its normal PR-scoped Authorization Boundary unless this skill was narrowed to read-only mode, passing or recording applicable effort metadata per `os/skills/ORCHESTRATION_LOOPS.md`.
    - Let `review-loop` own reviewer-panel delegation, review/fix convergence, PR comments, fix commits, pushes to the target PR branch, and ready-for-human marking inside its contract.
    - Treat the review-loop final report or Workflow Result as evidence for this skill's final result.
    - If review-loop returns a Blocking Human Decision, record it recoverably and pause instead of guessing.
 
 9. Report final Workflow Result:
    - Begin with `Status:` using one canonical terminal value: `completed`, `blocked`, `failed`, `cancelled`, or `needs-human`. Include whether the PR is ready for integration-owner review, naming the parent, coordinator, or human owner when known.
-   - Include issue URL and final issue labels, PR link, branch and worktree, raw readiness evidence or provenance, readiness verdict, final readiness label state, `Gate Skipped` reason and durable gate-skip field/state or missing consensus evidence when present, mutations performed, commits, validation, review-loop evidence, open risks, and recommended next action for the integration owner.
+   - Include issue URL and final issue labels, PR link, branch and worktree, effort metadata when available or relevant, raw readiness evidence or provenance, readiness verdict, final readiness label state, `Gate Skipped` reason and durable gate-skip field/state or missing consensus evidence when present, mutations performed, commits, validation, review-loop evidence, open risks, and recommended next action for the integration owner.
    - When the caller supplied a Workflow Invocation Reference or result surface, return the Workflow Result there when available, and then stop or wait according to the explicit release instruction.
    - State clearly that merge, issue closure, branch deletion, and any broader integration action remain out of scope for this skill and must be handled by a landing-capable workflow such as `land-github-issue` after integration evidence exists, or by a direct human integration step.
 
@@ -141,14 +142,14 @@ For this skill, recover at least:
 - issue URL and repository;
 - relevant issue labels and whether any label state created or resolved a Blocking Human Decision;
 - branch, base branch, worktree, and current commit SHA when available;
-- Authorization Boundary, including any read-only narrowing;
+- Authorization Boundary, including any read-only narrowing, and effort metadata when available or relevant;
 - caller-supplied Workflow Invocation Reference or result surface, using only public-safe stable references in public or Git-backed surfaces and redacting private runtime handles when needed;
 - release instruction, including whether the worker should stop after returning the result, remain assigned for review corrections, or wait for a caller release signal;
 - raw readiness evidence or provenance, readiness verdict, final readiness label state, and `Gate Skipped` reason plus durable gate-skip field/state or missing consensus evidence when present;
 - current phase and next safe action;
 - PR URL after creation;
 - validation commands and results;
-- review-loop status, report path or comment URL, and any unresolved Blocking Human Decision;
+- review-loop status, effort metadata when available or relevant, report path or comment URL, and any unresolved Blocking Human Decision;
 - mutations performed, including issue edits, labels, comments, commits, pushes, and PR state changes;
 - open risks and recommended next action for the integration owner, including any landing recommendation without claiming merge or issue closure.
 
@@ -191,6 +192,6 @@ Before finishing:
 9. Confirm validation commands and results are recorded.
 10. Confirm the PR body includes `Readiness evidence:` and `Readiness verdict:`.
 11. Confirm review-loop was run, or record why it could not be run.
-12. Confirm the final Workflow Result includes canonical terminal status, issue, raw readiness evidence or provenance, readiness verdict, final readiness label state, Gate Skipped reason plus durable gate-skip field/state or missing consensus evidence when present, branch/worktree, PR, commits, validation, review-loop evidence, open risks, recommended next action, any caller-supplied Workflow Invocation Reference or result surface, and release-instruction handling.
+12. Confirm the final Workflow Result includes canonical terminal status, issue, effort metadata when available or relevant, raw readiness evidence or provenance, readiness verdict, final readiness label state, Gate Skipped reason plus durable gate-skip field/state or missing consensus evidence when present, branch/worktree, PR, commits, validation, review-loop evidence, open risks, recommended next action, any caller-supplied Workflow Invocation Reference or result surface, and release-instruction handling.
 13. Confirm merge, issue closure, branch deletion, permission changes, new label creation, and other out-of-scope external actions were not performed without a separate approved workflow or direct user-supervised action.
 14. If this skill or its manifest entry changed, run `git diff --check` and `scripts/run-validator`.

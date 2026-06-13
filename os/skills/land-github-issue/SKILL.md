@@ -17,7 +17,7 @@ Inputs:
 
 - A GitHub issue URL or issue number plus the target repository, inferred from the current checkout when possible.
 - The remote integration branch to verify against, defaulting to `origin/main` unless the caller specifies another branch.
-- Optional evidence from a Calling Workflow, such as merged PR URLs, merge or squash commit SHAs, validation results, worker Workflow Results, or issue comments.
+- Optional evidence from a Calling Workflow, such as merged PR URLs, merge or squash commit SHAs, validation results, worker Workflow Results, effort metadata when available or relevant, or issue comments.
 - Current local agent instructions and project guidance, including `AGENTS.md`.
 - Current GitHub workflow and closure discipline at `os/playbook/GITHUB_WORKFLOW.md`.
 - `os/skills/audit-issues/SKILL.md` for reusable post-integration closure evidence rules.
@@ -26,7 +26,7 @@ Inputs:
 
 Output artifact:
 
-- A Workflow Result naming the issue URL, labels, integration branch, evidence checked, fulfilled acceptance criteria, unmet or ambiguous acceptance criteria, checklist mutations, closure decision, validation, open risks, and recommended next action for the Calling Workflow.
+- A Workflow Result naming the issue URL, labels, integration branch, effort metadata when available or relevant, evidence checked, fulfilled acceptance criteria, unmet or ambiguous acceptance criteria, checklist mutations, closure decision, validation, open risks, and recommended next action for the Calling Workflow.
 - Optional issue-body update that checks off fulfilled Markdown acceptance criteria.
 - Optional issue closure with a factual evidence comment when all closure gates pass and closure plus the closure comment are authorized.
 
@@ -61,7 +61,7 @@ Safety:
    - Identify the issue, repository, remote, integration branch, checkout path, current branch, and Authorization Boundary.
    - Read local instructions, `os/playbook/GITHUB_WORKFLOW.md`, `os/skills/audit-issues/SKILL.md`, and `os/skills/ORCHESTRATION_LOOPS.md`.
    - Inspect the issue body, labels, comments, linked PRs, and caller-provided evidence.
-   - Record the initial Recovery Record: issue URL, repository, integration branch, current phase, Authorization Boundary, known human-review or closure blockers, and next action.
+   - Record the initial Recovery Record: issue URL, repository, integration branch, current phase, Authorization Boundary, effort metadata when available or relevant, known human-review or closure blockers, and next action.
 
 2. Verify integration evidence:
    - Fetch or otherwise refresh the remote integration branch before deciding closure.
@@ -96,7 +96,7 @@ Safety:
    - Create or update a Recovery Checkpoint before closure.
 
 7. Report the Workflow Result:
-   - Include issue URL and final labels, integration branch, evidence checked, acceptance-criteria reconciliation, checklist edits made or proposed, closure action or blocker, validation signals, open risks, and recommended next action.
+   - Include issue URL and final labels, integration branch, effort metadata when available or relevant, evidence checked, acceptance-criteria reconciliation, checklist edits made or proposed, closure action or blocker, validation signals, open risks, and recommended next action.
    - When unmet criteria remain, recommend that the Calling Workflow restart or request an `implement-github-issue` Called Workflow only if the remaining work is implementation-shaped and inside that workflow's contract.
    - State clearly that merge, branch deletion, worker spawning, and broader batch integration remain outside this skill.
 
@@ -106,7 +106,7 @@ Maintain enough state to resume safely after compaction, interruption, or handof
 
 - issue URL and repository;
 - integration branch and fetched remote state when available;
-- Authorization Boundary, including whether checklist edits, comments, and closure are authorized;
+- Authorization Boundary, including whether checklist edits, comments, and closure are authorized, and effort metadata when available or relevant;
 - issue labels and any human-review or human-owned blocker;
 - acceptance criteria with fulfilled, unmet, or ambiguous classification;
 - evidence PRs, commits, merge commits, reachability checks, and validation results;
@@ -135,7 +135,7 @@ Create a Recovery Checkpoint before issue-body edits, issue comments, issue clos
 - Human-owned or human-review issues are not closed by this skill.
 - Issue-body edits, issue comments, and issue closure happen only inside the explicit Authorization Boundary.
 - No PR merge, branch deletion, worker spawning, label creation, permission change, or out-of-target issue mutation happens through this skill.
-- The Workflow Result is recoverable and names all mutations, evidence, validation, risks, and recommended next action.
+- The Workflow Result is recoverable and names effort metadata when available or relevant, all mutations, evidence, validation, risks, and recommended next action.
 
 ## Verification
 
@@ -151,5 +151,5 @@ Before finishing:
 8. Confirm human-review and human-owned labels were treated as closure blockers.
 9. Confirm issue comments were not posted without explicit authorization, except for the closure evidence comment inside an authorized closure operation.
 10. Confirm closure, if performed, used an evidence-backed factual comment and stayed inside the Authorization Boundary.
-11. Confirm the Workflow Result names fulfilled criteria, unmet criteria, checklist mutations, closure state, validation, open risks, and recommended Calling Workflow action.
+11. Confirm the Workflow Result names effort metadata when available or relevant, fulfilled criteria, unmet criteria, checklist mutations, closure state, validation, open risks, and recommended Calling Workflow action.
 12. If this skill or its manifest entry changed, run `git diff --check` and `scripts/run-validator`.
