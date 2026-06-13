@@ -22,6 +22,7 @@ Inputs:
 - A target repository or issue tracker, inferred from the current checkout when possible.
 - Optional selection goal, such as "what should we do next?", "find high-leverage issues", "find only ready issues", "find parallel-safe work", or "choose a batch for a coordinator".
 - Optional scope filters such as labels, milestones, projects, issue numbers, area, recent updates, or maximum batch size.
+- Optional caller-provided effort metadata or explicit no-override/default statement to preserve when available or relevant to downstream coordination.
 - Tracker issue data, usually open GitHub issues with titles, bodies, labels, comments when needed, URLs, and update times.
 - Current AgentOS GitHub workflow policy at `os/playbook/GITHUB_WORKFLOW.md` and orchestration vocabulary at `os/skills/ORCHESTRATION_LOOPS.md` when batch, worker, or parallel-safety reasoning is relevant.
 
@@ -128,6 +129,10 @@ Use this structure unless the user requested a smaller answer:
 ## Selection Goal
 
 <goal and scope>
+
+## Effort Metadata
+
+<caller-provided or workflow-default effort metadata when available or relevant to downstream coordination; otherwise `Not reported.`>
 
 ## Recommended Batch
 

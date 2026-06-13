@@ -72,7 +72,7 @@ Safety:
    - Record the initial Recovery Record: issue URL, repository, branch, worktree, current phase, Authorization Boundary, effort metadata when available or relevant, any caller-supplied Workflow Invocation Reference or result surface, release instruction, known blockers, and next action.
 
 2. Run the readiness gate:
-   - Invoke or follow `ensure-implementation-readiness` in normal/repair mode for the issue, passing along the issue context, project guidance, discovered design sources, and this skill's Authorization Boundary.
+   - Invoke or follow `ensure-implementation-readiness` in normal/repair mode for the issue, passing along the issue context, project guidance, discovered design sources, effort metadata when available or relevant, and this skill's Authorization Boundary.
    - Let the readiness workflow own locating, creating, or repairing the durable design source, including issue-body updates, design-consensus routing, consensus provenance, deferred follow-up artifacts, readiness fields, and readiness-label hygiene when those writes are authorized.
    - Do not synthesize a design doc, handoff packet, or readiness field and then treat that agent-authored artifact as design consensus. Readiness requires the readiness workflow's returned verdict backed by durable consensus provenance, or its returned `Gate Skipped` verdict backed by a durable gate-skip field/state for an explicit bypass.
    - After readiness repair writes or approved design-source updates are applied, re-run or re-follow `ensure-implementation-readiness` against the updated durable source before starting implementation.

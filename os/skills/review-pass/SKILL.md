@@ -43,6 +43,7 @@ Tools and connectors:
 - Local filesystem, `git`, `rg`, and existing validation output for read-only inspection.
 - GitHub connector or `gh` for PR metadata reads when authorized and available.
 - The active harness's clean-context reviewer or subagent capability when available and authorized by an explicit review-pass or reviewer-panel request, or by a caller such as `review-loop`.
+- `os/skills/ORCHESTRATION_LOOPS.md` as the workflow-default effort lookup when caller-supplied effort metadata is absent and effort reporting is relevant.
 - `make-temp-file` for optional temporary packet paths.
 - Per-lens reviewer instructions under `os/skills/review-pass/references/lenses/`.
 - The canonical packet template at `os/skills/review-pass/references/review-packet-template.md`.
@@ -142,7 +143,7 @@ When applicable, read `references/lenses/contract-surface-matrix.md` and include
    - For each assigned named lens, read only the matching file under `references/lenses/` and include its prompt snippet or equivalent instructions in that reviewer's prompt.
    - When the target triggers the Contract Surface Matrix lens, read `references/lenses/contract-surface-matrix.md` and include its prompt snippet or equivalent instructions in every relevant reviewer prompt.
    - Fill the fresh or verification template explicitly for every reviewer.
-   - Include target, repository, base/head or current head, baseline intent, effort metadata when supplied or observable, reviewer alias, lens, assigned lens guidance, Contract Surface Matrix guidance when applicable, custom lens notes, verification continuity and caller adjudication context when applicable, reporting mode, read-only rule, full-reread rule, issue-family rule, design-escape-hatch instruction, provisional-ID rule, and clean response sentinel.
+   - Include target, repository, base/head or current head, baseline intent, effort metadata when supplied, observable, or resolvable from `os/skills/ORCHESTRATION_LOOPS.md`, reviewer alias, lens, assigned lens guidance, Contract Surface Matrix guidance when applicable, custom lens notes, verification continuity and caller adjudication context when applicable, reporting mode, read-only rule, full-reread rule, issue-family rule, design-escape-hatch instruction, provisional-ID rule, and clean response sentinel.
    - Spawn clean-context reviewers in parallel when the harness supports it and the pass is authorized by an explicit review-pass or reviewer-panel request, or by a caller such as `review-loop`. If subagents are unavailable, run the pass as a clearly labeled single-agent fallback and state the limitation in the packet.
 
 5. Collect and close:

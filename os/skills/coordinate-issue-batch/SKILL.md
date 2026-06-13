@@ -97,7 +97,7 @@ Landing is a phase of normal or resume mode, not a separate top-level mode.
    - Record the initial Recovery Record: target, mode, Authorization Boundary, coordinator effort metadata when available or relevant, ledger surface, any caller-supplied Workflow Invocation Reference or result surface, coordinator release instruction, current phase, known blockers, and next action.
 
 2. Select or accept the batch:
-   - If no explicit batch is supplied, invoke or follow `select-issue-batch` in read-only mode using the requested selection goal and scope filters.
+   - If no explicit batch is supplied, invoke or follow `select-issue-batch` in read-only mode using the requested selection goal, scope filters, and effort metadata when available or relevant, or an explicit no-override/default statement.
    - If a user or caller provides a batch, record the source and any supplied rationale.
    - Convert the recommendation or provided list into a concrete coordinator target inside this skill's Authorization Boundary.
    - Default max parallel implementation workers: 3, unless the user or Calling Workflow specifies another concurrency limit. If the candidate batch exceeds the limit, choose or ask for a first wave and record the rest as queued.
@@ -138,7 +138,7 @@ Landing is a phase of normal or resume mode, not a separate top-level mode.
 
 8. Land eligible issues:
    - Fetch or otherwise verify the remote integration branch when landing checks require current integration evidence.
-   - For each eligible merged issue, invoke or follow `land-github-issue` one issue at a time under an explicit landing Authorization Boundary.
+   - For each eligible merged issue, invoke or follow `land-github-issue` one issue at a time under an explicit landing Authorization Boundary, passing effort metadata when available or relevant.
    - Skip issues whose PRs are unmerged, whose acceptance criteria are ambiguous, whose human-review labels block closure, or whose landing authorization is absent.
    - Record fulfilled, skipped, blocked, needs-human, failed, cancelled, unmerged, unresolved, and landed outcomes in the coordinator ledger.
 

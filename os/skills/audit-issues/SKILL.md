@@ -16,7 +16,9 @@ Inputs:
 - A project checkout or explicit repository/issue-tracker target.
 - The tracker source, usually GitHub via `gh` or the GitHub connector. If missing, infer it from the git remote or ask the user.
 - The integration branch to verify against. Default to the remote default branch, usually `origin/main`; use the user's explicit branch if provided.
+- Optional caller-provided effort metadata or explicit no-override/default statement to preserve in the audit report when available or relevant.
 - Current AgentOS GitHub workflow policy at `os/playbook/GITHUB_WORKFLOW.md`.
+- Current orchestration-loop vocabulary at `os/skills/ORCHESTRATION_LOOPS.md` when effort metadata or workflow-default effort reporting is relevant.
 
 Output artifact:
 
@@ -47,6 +49,7 @@ Safety:
 1. Establish the target:
    - Confirm the current repository, issue tracker, and integration branch.
    - Read `os/playbook/GITHUB_WORKFLOW.md` for local issue and closure rules.
+   - When effort metadata is available or relevant, read `os/skills/ORCHESTRATION_LOOPS.md` and preserve caller-provided metadata or the workflow-default/no-override statement in the audit report.
    - Fetch the remote integration branch so reachability checks use current remote state.
 
 2. Inventory candidate issues:
