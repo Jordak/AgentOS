@@ -63,7 +63,7 @@ jobs:
           readiness_verdict="$(sed -n 's/^Readiness verdict:[[:space:]]*//p' "${body_file}" | head -n 1)"
 
           if [ -z "${readiness_evidence}" ]; then
-            echo "::error title=Missing readiness evidence::PRs must expose readiness evidence in the PR body. Add 'Readiness evidence: <GitHub issue, PRD, ADR, local design doc, or gate-skip reason>'."
+            echo "::error title=Missing readiness evidence::PRs must expose readiness evidence in the PR body. Add 'Readiness evidence: <GitHub issue, PRD, ADR, local design doc, durable gate-skip record, or exempt-work reason>'. For feature-sized work, cite a durable source with Design readiness, Consensus provenance, and Gate skipped fields."
             exit 1
           fi
 

@@ -146,9 +146,6 @@ Merge approval should not silently imply issue-closure approval. Issue-closure a
 - Run `scripts/run-validator`.
 - Inspect `os/skills/implement-github-issue/SKILL.md`, `os/playbook/GITHUB_WORKFLOW.md`, `os/skills/ORCHESTRATION_LOOPS.md`, and `os/skills/MANIFEST.md` for consistent contract-specific integration ownership.
 
-## PR Readiness Fields
+## Historical PR Readiness Fields
 
-```md
-Readiness evidence: docs/design/issue-126-landing-closure-semantics.md and GitHub issue #126
-Readiness verdict: Ready to Implement
-```
+This document predates implementation-readiness policy v2 and is not currently citable as `Ready to Implement` evidence. Run `ensure-implementation-readiness` before using this document for future feature-sized work.
