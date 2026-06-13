@@ -16,11 +16,13 @@ Inputs:
 - A project checkout or explicit repository/issue-tracker target.
 - The tracker source, usually GitHub via `gh` or the GitHub connector. If missing, infer it from the git remote or ask the user.
 - The integration branch to verify against. Default to the remote default branch, usually `origin/main`; use the user's explicit branch if provided.
+- Optional caller-provided effort metadata or explicit no-override/default statement to preserve in the audit report when available or relevant.
 - Current AgentOS GitHub workflow policy at `os/playbook/GITHUB_WORKFLOW.md`.
+- Current orchestration-loop vocabulary at `os/skills/ORCHESTRATION_LOOPS.md` when effort metadata or workflow-default effort reporting is relevant.
 
 Output artifact:
 
-- A concise audit report listing closed issues, commented issues, skipped issues, evidence, and follow-up needed.
+- A concise audit report listing closed issues, commented issues, skipped issues, effort metadata when available or relevant, evidence, and follow-up needed.
 - Optional external tracker updates: status comments, issue closures, labels, or other tracker-native state changes.
 
 Mutability:
@@ -47,6 +49,7 @@ Safety:
 1. Establish the target:
    - Confirm the current repository, issue tracker, and integration branch.
    - Read `os/playbook/GITHUB_WORKFLOW.md` for local issue and closure rules.
+   - When effort metadata is available or relevant, read `os/skills/ORCHESTRATION_LOOPS.md` and preserve caller-provided metadata or the workflow-default/no-override statement in the audit report.
    - Fetch the remote integration branch so reachability checks use current remote state.
 
 2. Inventory candidate issues:
@@ -138,4 +141,5 @@ Before finishing:
 3. For each commented issue, record the issue number, comment purpose, evidence used, authorization source, and post result or draft status.
 4. For each skipped issue, record the reason.
 5. Confirm no human-owned issue was closed.
-6. Confirm no external write happened outside the shared external-write policy.
+6. Confirm the audit report preserves effort metadata when available or relevant.
+7. Confirm no external write happened outside the shared external-write policy.

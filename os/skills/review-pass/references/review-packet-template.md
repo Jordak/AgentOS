@@ -39,6 +39,7 @@ Mode: <fresh | verification>
 Base: <base ref or commit>
 Head: <head or current head>
 Baseline intent: <summary and source, or limitation>
+Effort metadata: <prescribed model/effort, prescription source, effective model/effort, effective source/status, and meaningful mismatch; unknown or not reported when unavailable>
 Reviewer continuity: <same-source reviewers resumed | packet/finding-source fallback | none | not applicable>
 Continuity handle availability: <private handoff available | unavailable | not applicable>
 
@@ -114,6 +115,7 @@ Mode: fresh
 Base: origin/main
 Head: feature/review-template
 Baseline intent: Issue #77 requires a canonical packet template and prompt delegation.
+Effort metadata: prescribed effort high from workflow default; effective effort not reported.
 Reviewer continuity: not applicable
 Continuity handle availability: not applicable
 
@@ -173,6 +175,7 @@ Mode: verification
 Base: origin/main
 Head: feature/review-template@abc1234
 Baseline intent: Issue #77 requires exact packet rendering, `DOMAIN.md` language, and prompt delegation.
+Effort metadata: prescribed effort high from caller override; effective effort unknown.
 Reviewer continuity: packet/finding-source fallback
 Continuity handle availability: unavailable
 

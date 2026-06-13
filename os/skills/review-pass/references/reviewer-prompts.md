@@ -8,6 +8,7 @@ Before sending a reviewer prompt, confirm it includes:
 
 - target, repository, base, and head or current head;
 - baseline intent summary from the issue, PR description, spec, design doc, ADR, commit range, patch, or user request;
+- effort metadata when supplied by the caller, observable to the review-pass orchestrator, or resolvable from `os/skills/ORCHESTRATION_LOOPS.md`, including prescribed model/effort, prescription source, effective model/effort, effective source/status, and meaningful prescribed/effective mismatches; use `unknown` or `not reported` for unavailable effective metadata;
 - mode: `fresh` or `verification`;
 - reviewer alias and optional lens; reviewer aliases use `P<panel-number>-R<reviewer-number>`, where `P` means panel;
 - custom lens notes when provided;
@@ -65,6 +66,7 @@ Repository: <repo path or owner/name>
 Base: <base ref or commit>
 Head: <head ref or commit>
 Baseline intent: <brief summary of required outcomes, explicit alternatives, non-goals, chosen implementation shape, and risky assumptions; say when weak or missing>
+Effort metadata: <prescribed model/effort, prescription source, effective model/effort, effective source/status, and meaningful mismatch; unknown or not reported when unavailable>
 Mode: fresh
 Reviewer alias: <P1-R1, P1-R2, etc.>
 Optional lens: <general | correctness | tests-regressions | edge-cases-data-integrity | architecture-depth | code-judo | design-compliance | issue-compliance | ux-api-docs | deep-review | security-privacy | release-risk | structural-depth | none>
@@ -101,6 +103,7 @@ Repository: <repo path or owner/name>
 Base: <base ref or commit>
 Current head: <new head ref or commit>
 Baseline intent: <brief summary of required outcomes, explicit alternatives, non-goals, chosen implementation shape, and risky assumptions; say when weak or missing>
+Effort metadata: <prescribed model/effort, prescription source, effective model/effort, effective source/status, and meaningful mismatch; unknown or not reported when unavailable>
 Mode: verification
 Reviewer alias: <P2-R1, P2-R2, etc.>
 Optional lens: <general | correctness | tests-regressions | edge-cases-data-integrity | architecture-depth | code-judo | design-compliance | issue-compliance | ux-api-docs | deep-review | security-privacy | release-risk | structural-depth | none>
@@ -175,6 +178,7 @@ For every fresh reviewer, fill and send the "Fresh Reviewer Prompt" template. Fo
 Do not reconstruct these prompts from memory. Each reviewer prompt must include:
 - target, repository, base, and current head;
 - baseline intent summary and source or limitation;
+- effort metadata when supplied, observable, or resolvable from `os/skills/ORCHESTRATION_LOOPS.md`, using `unknown` or `not reported` for unavailable effective metadata;
 - mode, reviewer alias, optional lens, and custom lens notes;
 - assigned lens guidance loaded from `references/lenses/<lens>.md` when a named lens is assigned;
 - Contract Surface Matrix guidance loaded from `references/lenses/contract-surface-matrix.md` when the target changes reusable contract surfaces;

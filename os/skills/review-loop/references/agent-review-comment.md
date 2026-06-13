@@ -9,6 +9,7 @@ Scope: <base..head, PR number, commit SHA>
 Pass: <cycle number and mode: fresh | verification>
 Review packet: <chat status, temp packet path, or none>
 Reviewers: <aliases and optional lenses when supplied by review-pass>
+Effort metadata: <prescribed model/effort, prescription source, effective model/effort, effective source/status, and meaningful mismatch; unknown or not reported when unavailable>
 
 Issue families:
 1. [<issue-family-id>] Severity: <P0|P1|P2|P3> - <short title>

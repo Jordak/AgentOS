@@ -14,6 +14,7 @@ Background and rationale live in:
 
 - `docs/adr/0009-contract-based-orchestration-loops.md`
 - `docs/adr/0011-callback-first-orchestration.md`
+- `docs/adr/0012-agentos-workflow-effort-levels.md`
 - `docs/design/issue-121-loop-composition-conventions.md`
 
 Do not duplicate the whole rationale into each skill. Link here when a skill needs the convention.
@@ -56,11 +57,56 @@ Calling Workflows should send pointer-first assignment packets to Called Workflo
 - Workflow Invocation Reference and release instruction;
 - Isolation Boundary and Authorization Boundary;
 - workflow mode and owned scope;
+- prescribed model/effort when the caller is overriding or confirming the workflow default, including prescription source, or an explicit no-override/default statement when that matters for recovery;
 - required durable sources to read, such as local instructions, issue bodies, ADRs, playbooks, and skill contracts;
 - validation and expected Workflow Result requirements;
 - prohibited actions and escalation rules.
 
 Do not copy whole skill contracts, playbooks, issue bodies, or batch ledgers into each launch message when stable pointers are sufficient. Workflow-specific handoff shapes belong in the workflow that owns the launch, while this convention keeps the reusable rule small.
+
+## Effort Recommendations
+
+An **Effort Recommendation** is the model-effort level a workflow would prefer for an invocation when the active harness supports such control. It is an invocation-level intention, not a guarantee that a live thread can switch effort repeatedly inside one turn.
+
+A **Prescribed Effort** is the effort requested by a workflow default, Calling Workflow override, user instruction, custom-agent configuration, or platform default. An **Effective Effort** is the effort actually used when it is observable.
+
+Calling Workflows may prescribe model and effort for a Called Workflow invocation when scope, risk, latency, cost, token budget, or review quality requires it. When the harness can create a separate run, thread, worker, subagent, custom agent, or model request for the Called Workflow, it should apply the prescribed effort there when supported by the selected model and harness.
+
+When multiple skills run in one live thread and the harness cannot reliably switch effort mid-turn, the thread's current effort is the Effective Effort. The workflow should report Effective Effort source/status as inherited from the current thread, overridden, unsupported or degraded, unknown, or not reported, and separately record any meaningful prescribed/effective mismatch.
+
+Explicit user budget, latency, cost, or quality instructions override AgentOS defaults. Platform limits, model support, custom-agent configuration, and harness runtime behavior may also override or constrain the prescribed value. Record those overrides when they matter for trust, validation, cost, recovery, or handoff.
+
+Vendored upstream `SKILL.md` files should stay aligned with upstream. AgentOS-specific effort policy for vendored skills belongs in AgentOS-owned caller instructions, wrapper workflows, routing or manifest metadata when appropriate, or this reusable convention. Do not edit upstream-vendored skill bodies solely to add AgentOS effort policy.
+
+### Effort Lookup
+
+Use this table as the durable lookup home for initial AgentOS workflow effort recommendations. Future workflows should apply the assignment logic in `docs/adr/0012-agentos-workflow-effort-levels.md` and add rows here when a named workflow becomes part of the reusable orchestration surface.
+
+| Workflow | Default effort | Escalation guidance |
+| --- | --- | --- |
+| `github-loop` | `medium` | Use `high` only when the same thread must perform substantial design or integration-risk adjudication. |
+| `coordinate-issue-batch` | `medium` | Use `high` for unusually tangled dependency, safety, or human-decision states. |
+| `implement-github-issue` | `high` | When true Called Workflow delegation is available, prescribe child workflow effort separately and report effective effort for each invocation. |
+| `ensure-implementation-readiness` | `medium` | Use `high` when consensus is fuzzy, scope boundaries are ambiguous, or a design-consensus workflow is needed. |
+| `grill-me` | `high` | Use `xhigh` only for unusually deep or high-stakes design work when budget allows. |
+| `grill-with-docs` | `high` | Use `xhigh` only for hard architecture or cross-document tradeoffs when budget allows. |
+| `review-pass` | `high` | Use `xhigh` for security, deep-review, final-gate, high-risk, difficult, or eval-justified review passes. |
+| `review-loop` | `medium` | Use `high` for hard adjudication, design-escape-hatch calls, or same-thread fallback review/fix work; prescribe `review-pass` as `high` or selective `xhigh` when a separate review pass can honor it. |
+| `select-issue-batch` | `medium` | Use `high` only when selection depends on unusually ambiguous dependency or parallel-safety reasoning. |
+| `audit-issues` | `medium` | Use `high` only for broad, ambiguous, or high-impact reconciliation where evidence conflicts. |
+| `land-github-issue` | `medium` | Use `high` only when acceptance criteria, integration proof, or human-review state is unusually ambiguous. |
+
+### Reporting Effort
+
+Workflow Results, Recovery Records, review packets, reports, or equivalent handoffs should include effort metadata when available and relevant:
+
+- prescribed model and effort, if any;
+- source of prescription: workflow default, Calling Workflow override, user instruction, custom-agent config, platform default, or unknown;
+- Effective Effort and model actually used, when observable;
+- effective source or status: explicit, inherited from current thread, platform-selected, custom-agent override, user override, unsupported or degraded, unknown, or not reported;
+- any mismatch between prescribed and effective effort that matters for trust, validation, cost, or recovery.
+
+Use `unknown` or `not reported` when the active harness does not expose exact metadata. Do not add deterministic enforcement before the convention has stable harness evidence.
 
 ## Authorization Boundary
 
@@ -114,6 +160,7 @@ A Workflow Result should include:
 - evidence: links, paths, commits, comments, reports, packets, verdicts, or other artifacts produced;
 - mutations performed: local edits, commits, pushes, comments, labels, external writes, or `none`;
 - validation: checks run and results;
+- effort metadata when available and relevant, including Prescribed Effort, Effective Effort, source, and meaningful mismatches;
 - open risks or unresolved decisions: especially any Blocking Human Decision;
 - recommended next action.
 
@@ -136,6 +183,7 @@ For every mutating Orchestration Loop, the Recovery Record should preserve at le
 - blocking human decisions: exact question, recommended default, and decision state such as `unresolved`, `approved`, or `declined/accepted-risk`;
 - Called Workflow results: links or summaries of returned evidence, reports, comments, commits, or verdicts;
 - validation evidence: commands or checks run, result, and skipped validation with reason;
+- effort metadata when available and relevant, including prescribed model/effort, prescription source, effective model/effort, effective source/status, and meaningful mismatches; use `unknown` or `not reported` when unavailable;
 - next action: the next safe step.
 
 Keep opaque runtime handles, private thread IDs, or harness-internal references out of public, publishable, or Git-backed checkpoint surfaces when they could expose private or irrelevant implementation details. Public issue comments, PR comments, design docs, commits, branch state, and reports should contain only public-safe stable references. Store private runtime references only on an authorized private surface, such as Personal Overlay orchestration state, or record that the stable reference is unavailable or redacted.
@@ -184,6 +232,7 @@ For each parallel Called Workflow, the Calling Workflow should provide:
 - an Isolation Boundary;
 - an explicit Authorization Boundary;
 - a Workflow Invocation Reference;
+- prescribed model/effort and prescription source when the caller supplies an override or wants the worker to confirm the default;
 - an expected Workflow Result;
 - an explicit release instruction;
 - a Recovery Checkpoint before launch;
@@ -197,7 +246,7 @@ When a harness supports durable worker threads or branch-backed project threads,
 
 1. Create or assign the worker branch, isolated worktree, and worker thread.
 2. When thread renaming is supported, rename the worker thread to a public-safe, legible target-specific name before sending the `READY` signal or substantive assignment message; otherwise record why a public-safe rename was unavailable.
-3. Record the worker branch, worktree, public-safe thread name when available or unavailable reason, public-safe invocation reference, Isolation Boundary, Authorization Boundary, and expected Workflow Result in the Recovery Record.
+3. Record the worker branch, worktree, public-safe thread name when available or unavailable reason, public-safe invocation reference, Isolation Boundary, Authorization Boundary, prescribed model/effort and prescription source or explicit no-override/default statement, and expected Workflow Result in the Recovery Record.
 4. Send the minimal assignment packet only after the setup checkpoint is complete.
 
 Harness-specific invocation references can help recover a live invocation, but they are runtime references rather than reusable contract fields. Keep private or opaque references out of public issue, PR, commit, and design-doc surfaces unless repository policy explicitly allows them.
@@ -232,8 +281,9 @@ When a skill is an Orchestration Loop or can be invoked by one, its skill contra
 - what Workflow Result it returns;
 - which canonical terminal statuses it can return, normally `completed`, `blocked`, `failed`, `cancelled`, and `needs-human` unless the skill documents a narrower set;
 - how it accepts and reports any caller-supplied Workflow Invocation Reference or result surface;
+- how it accepts and reports caller-supplied effort prescriptions, or records that no override/default applies;
 - how it follows release instructions after returning a result to a caller;
-- what Minimal Assignment Packet it sends when it launches called workflows or workers, including callback/result surface, release instruction, target, boundary, and expected Workflow Result ownership;
+- what Minimal Assignment Packet it sends when it launches called workflows or workers, including callback/result surface, release instruction, target, boundary, prescribed effort when relevant, and expected Workflow Result ownership;
 - what Recovery Record or Recovery Checkpoint it maintains;
 - what Integration Ownership, if any, belongs to the skill.
 
@@ -245,5 +295,5 @@ Before changing this convention or a loop-shaped skill that depends on it:
 
 1. Run `scripts/run-validator`.
 2. Run `git diff --check`.
-3. Inspect affected skill contracts or manifest entries for clear Authorization Boundaries, Workflow Invocation References, Minimal Assignment Packets, Workflow Results, Recovery Records, and Integration Ownership where relevant.
+3. Inspect affected skill contracts or manifest entries for clear Authorization Boundaries, Workflow Invocation References, Minimal Assignment Packets, Effort Recommendations, Workflow Results, Recovery Records, and Integration Ownership where relevant.
 4. Keep deterministic validators shallow and objective until the convention matures enough to enforce mechanically.
