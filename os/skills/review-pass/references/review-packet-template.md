@@ -188,7 +188,7 @@ Continuity handle availability: unavailable
 
 ## Coverage
 
-Reviewed the current diff against `origin/main`, the prior packet, issue #77, `DOMAIN.md`, `reviewer-prompts.md`, and `review-loop` caller references. No validation commands were run by reviewers.
+Reviewed the current diff against `origin/main`, the prior packet, issue #77, `DOMAIN.md`, `reviewer-prompts.md`, and caller-owned orchestration references. No validation commands were run by reviewers.
 
 ## Issue Families
 
