@@ -288,7 +288,7 @@ Before finishing:
 
 1. Confirm the target, base, head, final reviewed commit SHA or local diff state, and review-pass sizing rationale.
 2. Confirm the baseline intent summary was captured from the original brief, including allowed alternatives and non-goals when available.
-3. Confirm feature-sized review targets passed `ensure-implementation-readiness` check-only mode with `Ready to Implement` or `Gate Skipped` before reviewers were spawned; if readiness was missing, confirm the loop returned `blocked` before spawning reviewers with check-only mode, source reviewed, verdict, missing consensus evidence, gate-skip state, label state, and next repair owner.
+3. Confirm feature-sized review targets passed `ensure-implementation-readiness` check-only mode with `Ready to Implement` or `Gate Skipped` before reviewers were spawned; if readiness was missing, confirm the loop returned `blocked` before spawning reviewers with check-only mode, source reviewed, effort metadata when available or relevant, verdict, missing consensus evidence, gate-skip state, label state, and next repair owner.
 4. Confirm every design-escape-hatch trigger was either surfaced to the user, explicitly declined with rationale, or found not applicable.
 5. Confirm every fresh and verification pass used `review-pass` or its canonical fallback files.
 6. Confirm the final fresh `review-pass` packet left no unresolved `auto-fix` or `ask-user` blockers after parent adjudication.
