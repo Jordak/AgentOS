@@ -125,13 +125,14 @@ Before finishing:
 3. Confirm the mode was honored, including no mutations in check-only mode.
 4. Confirm the verdict is `Ready to Implement`, `Needs Design Consensus`, or `Gate Skipped`.
 5. Confirm the design source's readiness fields, content, consensus provenance, gate-skip field, and relevant issue labels were checked.
-6. Confirm effort metadata was preserved in the readiness report when available or relevant.
-7. Confirm unmarked readiness was not silently accepted.
-8. Confirm human-attested GitHub comments counted only when explicit attestation and trusted repository author evidence were present.
-9. Confirm the selected design-consensus route was appropriate: `grill-with-docs` by default for readiness repair, `grill-me` for pure design questioning, targeted questions only as a documented unavailable-or-excessive fallback or residual clarification, or no repair loop needed.
-10. Confirm resolved answers were captured in the durable design source before reporting `Ready to Implement`.
-11. Confirm `needs design consensus` or equivalent labels were removed only by this skill in normal/repair mode, or left in place for `Gate Skipped`.
-12. Confirm deferred follow-up artifacts were created where required.
-13. Confirm external tracker writes complied with the applicable external-write policy before they happened.
-14. Confirm PR-bound work has visible PR-body readiness fields, and that `Gate Skipped` intentional bypasses name the durable `Gate skipped:` field; if writes were unavailable, confirm the proposed update was reported with `Needs Design Consensus` instead of `Gate Skipped`.
-15. If this skill or its manifest entry changed, run `scripts/run-validator`.
+6. Confirm workflow invocation, assignment packet, normal/repair mode, existing branch, existing PR, caller handoff, coordinator handoff, or worker launch was not treated as user confirmation, consensus provenance, or gate-skip authorization.
+7. Confirm effort metadata was preserved in the readiness report when available or relevant.
+8. Confirm unmarked readiness was not silently accepted.
+9. Confirm human-attested GitHub comments counted only when explicit attestation and trusted repository author evidence were present.
+10. Confirm the selected design-consensus route was appropriate: `grill-with-docs` by default for readiness repair, `grill-me` for pure design questioning, targeted questions only as a documented unavailable-or-excessive fallback or residual clarification, or no repair loop needed.
+11. Confirm resolved answers were captured in the durable design source before reporting `Ready to Implement`.
+12. Confirm `needs design consensus` or equivalent labels were removed only by this skill in normal/repair mode, or left in place for `Gate Skipped`.
+13. Confirm deferred follow-up artifacts were created where required.
+14. Confirm external tracker writes complied with the applicable external-write policy before they happened.
+15. Confirm PR-bound work has visible PR-body readiness fields, and that `Gate Skipped` intentional bypasses name the durable `Gate skipped:` field; if writes were unavailable, confirm the proposed update was reported with `Needs Design Consensus` instead of `Gate Skipped`.
+16. If this skill or its manifest entry changed, run `scripts/run-validator`.

@@ -208,11 +208,11 @@ Before finishing:
 3. Confirm selection source or provided batch source.
 4. Confirm parallel-safety checks and any Blocking Human Decisions.
 5. Confirm coordinator ledger surface, any caller-supplied Workflow Invocation Reference or result surface, release instruction, and Recovery Checkpoints.
-6. Confirm worker setup checkpoints and handoffs include required fields, effort metadata or explicit no-override/default statements when available or relevant, Workflow Invocation References when supported, release instructions, and only boundary-relevant batch context.
+6. Confirm worker setup checkpoints and handoffs include required fields, effort metadata or explicit no-override/default statements when available or relevant, Workflow Invocation References when supported, release instructions, only boundary-relevant batch context, and for implementation workers the explicit instruction that the handoff or launch is not design consensus, explicit human confirmation, or gate-skip authorization.
 7. Confirm Codex durable workers use branch-backed project threads when that harness path is available, not in-thread subagents.
 8. Confirm supported worker threads were renamed to public-safe, legible target-specific names before `READY` or substantive assignment, or record why a public-safe rename was unavailable.
 9. Confirm the coordinator used callback-first Workflow Results, returned the coordinator result through any caller-supplied result surface when available, followed the coordinator release instruction, and did not continuously poll workers except for recorded bounded bootstrap, timeout, recovery, or diagnostics.
-10. Confirm the per-issue implementation-readiness gate, repair, verdict decisions, and related label hygiene stayed with assigned issue workflows, while worker-reported readiness verdicts were passed through without coordinator reinterpretation.
+10. Confirm the per-issue implementation-readiness gate, repair, verdict decisions, and related label hygiene stayed with assigned issue workflows, while worker-reported readiness verdicts were passed through without coordinator reinterpretation and without treating coordinator handoffs or worker launches as readiness evidence or gate-skip authority.
 11. Confirm no PR merge/squash, branch deletion, label creation, permission change, out-of-scope issue mutation, or Personal Overlay access happened without explicit authorization.
 12. Confirm landing checks waited for worker quiescence, recorded needs-human Blocking Human Decisions, worker release status or post-result availability, and human merge reports.
 13. Confirm `land-github-issue` was invoked or followed only for eligible merged issues under an explicit landing Authorization Boundary.
