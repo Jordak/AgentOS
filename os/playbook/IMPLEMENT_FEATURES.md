@@ -12,7 +12,7 @@ Feature-sized implementation must not get its first implementation commit before
 
 If the only design source is chat, the first durable action is to create or update a GitHub issue, PRD, ADR, local design doc, or other durable planning note. Do not turn chat consensus directly into implementation code. Once the durable source contains the agreed problem, chosen design, scope boundaries, acceptance criteria, validation plan, readiness fields, and consensus provenance, implementation may proceed within that boundary.
 
-`ready-for-agent`, a confident user prompt, an agent-authored design artifact, a Calling Workflow handoff, or an existing branch name is not enough by itself. The readiness evidence and consensus provenance must be visible in a durable source, or the bypass must be recorded as `Gate Skipped`.
+`ready-for-agent`, a confident user prompt, an agent-authored design artifact, a Calling Workflow handoff, an assignment packet, normal/repair mode, or an existing branch or PR is not enough by itself. The readiness evidence and consensus provenance must be visible in a durable source, or the bypass must be recorded as `Gate Skipped`.
 
 ## When This Applies
 
@@ -95,6 +95,8 @@ Examples that do not count by themselves:
 - a removed label without durable readiness/provenance fields explaining why.
 
 For issue-driven work, a `needs design consensus` label or equivalent readiness label wins over contradictory handoff claims. `ensure-implementation-readiness` owns any cleanup of that label. `Gate Skipped` may allow work to proceed with the missing evidence recorded, but the label should remain as a signal that readiness was bypassed.
+
+An assignment may authorize an agent to run the readiness process, but it does not supply the human side of design consensus. When a worker is assigned an issue that has `needs design consensus` and no valid human-attested consensus or explicit durable bypass, the worker should return `Needs Design Consensus` / `needs-human` before implementation, PR creation, or review-loop unless the readiness workflow obtains confirmation and updates the durable source under its own contract.
 
 ## Verdicts
 
