@@ -2,13 +2,15 @@
 
 Source: `mattpocock/skills`
 
-Path: `skills/engineering/grill-with-docs/`
+Path: `skills/engineering/codebase-design/`
 
-Vendored ref: `658d53e6ded8cc0eaa26a96e0580bee9381ca0e3`
+Vendored ref: `ee8bae40062cd6b435073368ed0c540f48c35862`
 
 Files vendored:
 
 - `SKILL.md`
+- `DEEPENING.md`
+- `DESIGN-IT-TWICE.md`
 
 Local AgentOS patches:
 

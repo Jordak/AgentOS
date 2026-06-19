@@ -2,9 +2,9 @@
 
 Source: `mattpocock/skills`
 
-Path: `skills/engineering/grill-with-docs/`
+Path: `skills/productivity/grilling/`
 
-Vendored ref: `658d53e6ded8cc0eaa26a96e0580bee9381ca0e3`
+Vendored ref: `bc4cf903ff4855ce23199a8dd3bf98b3dbd7ad71`
 
 Files vendored:
 
