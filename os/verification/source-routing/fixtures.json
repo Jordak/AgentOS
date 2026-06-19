@@ -137,9 +137,67 @@
         {
           "path": "os/skills/grill-me/SKILL.md",
           "contains": [
-            "Ask the questions one at a time.",
-            "provide your recommended answer",
-            "exploring the codebase"
+            "Run a `/grilling` session",
+            "disable-model-invocation"
+          ]
+        },
+        {
+          "path": "os/skills/grilling/SKILL.md",
+          "contains": [
+            "Ask the questions one at a time",
+            "provide your recommended answer"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "grilling-design-consensus",
+      "category": "design consensus",
+      "prompt": "Pressure-test this design decision one question at a time.",
+      "expected": {
+        "skill": "grilling"
+      },
+      "evidence": [
+        {
+          "path": "os/skills/grilling/SKILL.md",
+          "contains": [
+            "Interview me relentlessly",
+            "resolving dependencies between decisions one-by-one"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "domain-modeling",
+      "category": "domain modeling",
+      "prompt": "Sharpen the fuzzy terms in this design and update the project glossary or ADRs when decisions crystallize.",
+      "expected": {
+        "skill": "domain-modeling"
+      },
+      "evidence": [
+        {
+          "path": "os/skills/domain-modeling/SKILL.md",
+          "contains": [
+            "Actively build and sharpen",
+            "Update CONTEXT.md inline"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "codebase-design",
+      "category": "codebase design",
+      "prompt": "Design a deeper module interface with better seam placement and testability.",
+      "expected": {
+        "skill": "codebase-design"
+      },
+      "evidence": [
+        {
+          "path": "os/skills/codebase-design/SKILL.md",
+          "contains": [
+            "Design **deep modules**",
+            "The deletion test",
+            "The interface is the test surface"
           ]
         }
       ]

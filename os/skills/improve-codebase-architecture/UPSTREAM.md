@@ -4,21 +4,17 @@ Source: `mattpocock/skills`
 
 Path: `skills/engineering/improve-codebase-architecture/`
 
-Vendored ref: `0288510dd61ff6ef7c2003834082ab8f2387e80e`
+Vendored ref: `221ffca96736afefdc08ca7cf0b3965e9ea83f41`
 
 Files vendored:
 
 - `SKILL.md`
-- `LANGUAGE.md`
-- `DEEPENING.md`
-- `INTERFACE-DESIGN.md`
 - `HTML-REPORT.md`
 
 Local AgentOS patches:
 
-- Prefer `DOMAIN.md` and `DOMAIN-MAP.md` as domain-doc names.
-- Treat `CONTEXT.md` and `CONTEXT-MAP.md` as legacy aliases.
-- Keep full architecture-review behavior separate from `review-loop`; `review-pass` may reuse this skill's vocabulary as reviewer-lens source material, and `review-loop` consumes that lens through `review-pass`.
+- Add this provenance file.
+- Update AgentOS manifest and `review-pass` references to consume the upstream `codebase-design` split instead of the removed local `LANGUAGE.md` companion file.
 
 Update procedure:
 

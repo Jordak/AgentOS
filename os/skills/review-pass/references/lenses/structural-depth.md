@@ -2,7 +2,7 @@
 
 Use this lens only when the reviewer prompt assigns `structural-depth` as the optional lens.
 
-This is the composite architecture-depth/code-judo lens. It blends `os/skills/thermo-nuclear-code-quality-review/SKILL.md` and `os/skills/improve-codebase-architecture/LANGUAGE.md` into a PR-review posture. It is a lens inside `review-pass`, not a request to run the full `thermo-nuclear-code-quality-review` workflow or the full `improve-codebase-architecture` HTML-report workflow.
+This is the composite architecture-depth/code-judo lens. It blends `os/skills/thermo-nuclear-code-quality-review/SKILL.md` and `os/skills/codebase-design/SKILL.md` into a PR-review posture. It is a lens inside `review-pass`, not a request to run the full `thermo-nuclear-code-quality-review` workflow or the full `improve-codebase-architecture` HTML-report workflow.
 
 ## Reviewer Behavior
 
@@ -19,5 +19,5 @@ This is the composite architecture-depth/code-judo lens. It blends `os/skills/th
 ## Prompt Snippet
 
 ```md
-Apply the `structural-depth` lens as extra attention. This lens blends `os/skills/thermo-nuclear-code-quality-review/SKILL.md` and `os/skills/improve-codebase-architecture/LANGUAGE.md` into a PR-review posture, but it is only a review-pass lens; do not run the full code-quality workflow or the full architecture HTML-report workflow. Be ambitious about structural simplification, watch for spaghetti growth and file-size pressure, use the architecture vocabulary where relevant, apply the deletion test, and prefer deeper modules with smaller interfaces and better locality. If the target deserves a standalone architecture or code-quality pass, report a `Design escape hatch` recommending `improve-codebase-architecture` or `thermo-nuclear-code-quality-review`.
+Apply the `structural-depth` lens as extra attention. This lens blends `os/skills/thermo-nuclear-code-quality-review/SKILL.md` and `os/skills/codebase-design/SKILL.md` into a PR-review posture, but it is only a review-pass lens; do not run the full code-quality workflow or the full architecture HTML-report workflow. Be ambitious about structural simplification, watch for spaghetti growth and file-size pressure, use the architecture vocabulary where relevant, apply the deletion test, and prefer deeper modules with smaller interfaces and better locality. If the target deserves a standalone architecture or code-quality pass, report a `Design escape hatch` recommending `improve-codebase-architecture` or `thermo-nuclear-code-quality-review`.
 ```

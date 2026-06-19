@@ -48,7 +48,7 @@ Tools and connectors:
 - Per-lens reviewer instructions under `os/skills/review-pass/references/lenses/`.
 - The canonical packet template at `os/skills/review-pass/references/review-packet-template.md`.
 - `os/skills/thermo-nuclear-review/SKILL.md` as source material for the `deep-review` lens.
-- `os/skills/thermo-nuclear-code-quality-review/SKILL.md` and `os/skills/improve-codebase-architecture/LANGUAGE.md` as source material for the `structural-depth` lens.
+- `os/skills/thermo-nuclear-code-quality-review/SKILL.md` and `os/skills/codebase-design/SKILL.md` as source material for the `structural-depth` lens.
 
 Safety:
 

@@ -10,7 +10,7 @@ Contract reference: `os/skills/SKILL_CONTRACT.md`.
 
 ## Summary
 
-- Canonical Core skills: 28.
+- Canonical Core skills: 31.
 
 ## Markdown API
 
@@ -124,29 +124,65 @@ Each skill entry records:
 - Verification coverage: confirm local instructions, GitHub workflow policy, orchestration-loop guidance, and `coordinate-issue-batch` were honored; confirm mode, loop goal, caps, Authorization Boundary, and prose-only inbound invocation contract, Recovery Checkpoints before batch launch or resume, separate durable called-workflow invocation for each normal/resume batch pass when supported or recorded same-thread fallback reason, supported public-safe child coordinator thread renaming before assignment or `READY`, post-create/resume/rename checkpointing of actual child coordinator thread name, invocation reference or result surface, redaction or unavailable reason, and release instruction before assignment or `READY`, Workflow Invocation Reference and release instruction for called batch passes when supported, release-instruction handling in called results and downstream loop reporting, preservation of effort metadata when available or relevant, worker-reported raw readiness evidence, worker-reported readiness verdict, final readiness label state, `Gate Skipped` reasons plus durable gate-skip field/state or missing evidence, and stale-label contradictions from called batch results, absence of continuous coordinator polling except recorded bounded bootstrap/timeout/recovery/diagnostics, absence of direct issue selection/worker launch/landing, clean-settled prior batch before any later batch starts, failed/cancelled/blocked/needs-human/unmerged/human-decision stop handling, final Workflow Result fields, absence of unauthorized merge/closure/branch deletion/label creation/permission changes/out-of-scope external writes/Personal Overlay access, `git diff --check`, and `scripts/run-validator`.
 - Upgrade notes: introduced for GitHub Issue #151 as the repository-level repeated batch-pass loop above `coordinate-issue-batch`; keep v1 conservative and preserve caller-independent contracts for `select-issue-batch`, `coordinate-issue-batch`, `implement-github-issue`, and `land-github-issue`.
 
+### `codebase-design`
+
+- Canonical source: `os/skills/codebase-design/SKILL.md`
+- Contract status: partial.
+- Mutability: read-only.
+- Tools and connectors: local repository files and design context when another workflow asks for deep-module vocabulary, seam placement, interface alternatives, or testability-oriented code design.
+- Output artifact: shared architecture vocabulary, principles, and optional design-it-twice guidance for callers that need deeper module/interface decisions.
+- Filing rule: output stays in chat or the invoking workflow's design artifact by default; the vendored upstream skill does not create durable AgentOS state by itself.
+- Safety posture: read-only guidance; do not edit files, create ADRs, post comments, push, or perform external writes through this skill alone.
+- Verification coverage: confirm the vendored files match `mattpocock/skills` at the recorded `UPSTREAM.md` ref, the vendored upstream freshness check reports `codebase-design` up-to-date, and `scripts/run-validator` plus `git diff --check` pass after skill or manifest changes.
+- Upgrade notes: vendored from `mattpocock/skills` path `skills/engineering/codebase-design/` at ref `ee8bae40062cd6b435073368ed0c540f48c35862`; preserve companion references and `UPSTREAM.md`, keep upstream files mirrored exactly unless a future issue explicitly approves a local patch, and run `expose-skills` dry run when current-machine discoverability matters after accepted updates.
+
+### `domain-modeling`
+
+- Canonical source: `os/skills/domain-modeling/SKILL.md`
+- Contract status: partial.
+- Mutability: mixed: reads project domain docs and code while sharpening language; local-write for glossary or ADR updates only when the user has approved project documentation updates or an invoking workflow owns that write scope.
+- Tools and connectors: user-provided design context, local repository files, existing `CONTEXT.md`/`CONTEXT-MAP.md` domain docs, `docs/adr/`, and no external connectors by default.
+- Output artifact: active domain-modeling conversation plus optional project glossary or ADR updates when decisions crystallize under approved write scope.
+- Filing rule: keep the vendored upstream skill files mirrored exactly from `mattpocock/skills`; project glossary updates follow upstream `CONTEXT.md`/`CONTEXT-MAP.md` conventions unless repository-local instructions or AgentOS callers route through `DOMAIN.md` aliases; ADRs live under the target project's `docs/adr/`.
+- Safety posture: ask one question at a time, recommend a default answer without treating it as consent, inspect local code/docs instead of asking when discoverable, and do not post GitHub comments, edit issues, label, commit, push, merge, close issues, or perform external writes; tracked-file documentation edits require the user's approved write scope or a calling workflow that already owns those writes.
+- Verification coverage: confirm the upstream files are mirrored exactly except for AgentOS `UPSTREAM.md`, confirm provenance points at a full GitHub commit SHA, confirm manifest metadata uses the Markdown API, and run `scripts/run-validator` plus `git diff --check` after skill or manifest changes.
+- Upgrade notes: vendored from `mattpocock/skills` path `skills/engineering/domain-modeling/` at ref `ee8bae40062cd6b435073368ed0c540f48c35862`; preserve companion references and `UPSTREAM.md`, keep upstream files mirrored exactly unless a future issue explicitly approves a local patch, and run `expose-skills` dry run when current-machine discoverability matters after accepted updates.
+
 ### `grill-me`
 
 - Canonical source: `os/skills/grill-me/SKILL.md`
 - Contract status: partial.
 - Mutability: read-only.
-- Tools and connectors: user-provided plan or design context and local codebase exploration when a question can be answered from the codebase.
-- Output artifact: a conversational grilling session that walks the design tree one question at a time and includes a recommended answer for each question.
+- Tools and connectors: user-provided plan or design context, local codebase exploration when a question can be answered from the codebase, and the vendored `grilling` skill.
+- Output artifact: a thin adapter into `grilling`, which runs a conversational design interview one question at a time and includes a recommended answer for each question.
 - Filing rule: output stays in chat or the invoking workflow's result artifact by default; the vendored upstream skill does not create durable AgentOS state by itself.
 - Safety posture: read-only; ask questions, inspect local evidence when available, and do not edit files or perform connector or external writes as part of this skill.
 - Verification coverage: confirm the vendored `SKILL.md` matches `mattpocock/skills` at the recorded `UPSTREAM.md` ref, the source-routing fixture resolves to `grill-me`, the vendored upstream freshness check reports `grill-me` up-to-date, and `scripts/run-validator` plus `git diff --check` pass after skill or manifest changes.
-- Upgrade notes: vendored from `mattpocock/skills` for GitHub Issue #122; preserve `UPSTREAM.md`, keep the skill aligned with upstream, avoid local AgentOS behavior patches unless a future issue explicitly approves them, and keep AgentOS-owned effort defaults in callers or `os/skills/ORCHESTRATION_LOOPS.md` rather than the vendored skill body.
+- Upgrade notes: vendored from `mattpocock/skills` path `skills/productivity/grill-me/` at ref `cbf6db4233c7e4202abaf79643f7ab395c75a2df`; preserve `UPSTREAM.md`, keep the skill aligned with upstream, avoid local AgentOS behavior patches unless a future issue explicitly approves them, and keep AgentOS-owned effort defaults in callers or `os/skills/ORCHESTRATION_LOOPS.md` rather than the vendored skill body.
 
 ### `grill-with-docs`
 
 - Canonical source: `os/skills/grill-with-docs/SKILL.md`
 - Contract status: partial.
 - Mutability: mixed: interviews are read-only until a project documentation update is agreed; local-write for glossary or ADR updates during an approved project documentation workflow; no connector or external-write behavior by itself.
-- Tools and connectors: user-provided plan or design context, local repository code, existing `CONTEXT.md`/`CONTEXT-MAP.md` domain docs, `docs/adr/`, and no external connectors by default.
-- Output artifact: conversational design-consensus interview plus inline project documentation updates when the session resolves glossary terms or ADR-worthy decisions and local write scope is approved.
+- Tools and connectors: user-provided plan or design context, local repository code, existing `CONTEXT.md`/`CONTEXT-MAP.md` domain docs, `docs/adr/`, the vendored `grilling` and `domain-modeling` skills, and no external connectors by default.
+- Output artifact: a thin adapter into `grilling` and `domain-modeling` for conversational design consensus plus inline project documentation updates when the session resolves glossary terms or ADR-worthy decisions and local write scope is approved.
 - Filing rule: keep the vendored upstream skill files mirrored exactly from `mattpocock/skills`; project glossary updates follow upstream `CONTEXT.md`/`CONTEXT-MAP.md` conventions; ADRs live under the target project's `docs/adr/`; AgentOS-specific adaptation should live in callers, repository instructions, or future upstream-aligned changes rather than patching the mirrored skill body.
 - Safety posture: ask one question at a time, recommend a default answer without treating it as consent, inspect local code/docs instead of asking when the answer can be discovered safely, and do not post GitHub comments, edit issue bodies, label, commit, push, merge, close issues, or perform external writes; tracked-file documentation edits require the user's approved write scope or a calling workflow that already owns those writes.
 - Verification coverage: confirm the upstream files are mirrored exactly except for AgentOS `UPSTREAM.md`, confirm provenance points at a full GitHub commit SHA, confirm manifest metadata uses the Markdown API, and run `scripts/run-validator` plus `git diff --check` after skill or manifest changes.
-- Upgrade notes: vendored from `mattpocock/skills` path `skills/engineering/grill-with-docs/` at ref `e3b90b5238f38cdea5996e16861dcae28ef52eda`; preserve companion references and `UPSTREAM.md`, keep upstream files mirrored exactly unless a future issue explicitly approves a local patch, keep AgentOS-owned effort defaults in callers or `os/skills/ORCHESTRATION_LOOPS.md` rather than the vendored skill body, and run `expose-skills` dry run when current-machine discoverability matters after accepted updates.
+- Upgrade notes: vendored from `mattpocock/skills` path `skills/engineering/grill-with-docs/` at ref `658d53e6ded8cc0eaa26a96e0580bee9381ca0e3`; preserve `UPSTREAM.md`, keep upstream files mirrored exactly unless a future issue explicitly approves a local patch, keep AgentOS-owned effort defaults in callers or `os/skills/ORCHESTRATION_LOOPS.md` rather than the vendored skill body, and run `expose-skills` dry run when current-machine discoverability matters after accepted updates.
+
+### `grilling`
+
+- Canonical source: `os/skills/grilling/SKILL.md`
+- Contract status: partial.
+- Mutability: read-only.
+- Tools and connectors: user-provided plan or design context and local codebase exploration when a question can be answered from the codebase.
+- Output artifact: a conversational grilling session that walks the design tree one question at a time and includes a recommended answer for each question.
+- Filing rule: output stays in chat or the invoking workflow's result artifact by default; the vendored upstream skill does not create durable AgentOS state by itself.
+- Safety posture: read-only; ask questions, inspect local evidence when available, and do not edit files or perform connector or external writes as part of this skill.
+- Verification coverage: confirm the vendored `SKILL.md` matches `mattpocock/skills` at the recorded `UPSTREAM.md` ref, the vendored upstream freshness check reports `grilling` up-to-date, and `scripts/run-validator` plus `git diff --check` pass after skill or manifest changes.
+- Upgrade notes: vendored from `mattpocock/skills` path `skills/productivity/grilling/` at ref `bc4cf903ff4855ce23199a8dd3bf98b3dbd7ad71`; preserve `UPSTREAM.md`, keep the skill aligned with upstream, avoid local AgentOS behavior patches unless a future issue explicitly approves them, and keep AgentOS-owned effort defaults in callers or `os/skills/ORCHESTRATION_LOOPS.md` rather than the vendored skill body.
 
 ### `vendor-skill`
 
@@ -223,14 +259,14 @@ Each skill entry records:
 ### `improve-codebase-architecture`
 
 - Canonical source: `os/skills/improve-codebase-architecture/SKILL.md`
-- Contract status: full.
+- Contract status: partial.
 - Mutability: mixed: read-only while exploring architecture and presenting candidates; local-write when creating temporary HTML reports; mapped-project local-write only after the user chooses a candidate and approves domain-doc or ADR updates during the grilling loop.
-- Tools and connectors: local repository files, project domain docs (`DOMAIN.md`/`DOMAIN-MAP.md`, with legacy `CONTEXT.md`/`CONTEXT-MAP.md` fallback), `docs/adr/`, local search, optional exploration subagents, temporary HTML output, and no external connectors by default.
+- Tools and connectors: local repository files, project domain docs, `docs/adr/`, local search, optional exploration subagents, temporary HTML output, and the vendored `codebase-design`, `grilling`, and `domain-modeling` skills; no external connectors by default.
 - Output artifact: temporary static HTML architecture-review report with deepening candidates, before/after visuals, recommendation strengths, and a top recommendation; optional project domain-doc or ADR updates after user approval.
 - Filing rule: reports live under the system temporary directory; project-specific domain docs and ADRs live in the mapped project; no durable AgentOS state is created by default.
 - Safety posture: do not write project domain docs or ADRs until the user has selected a candidate or approved the specific update; do not treat a review candidate as implementation approval; external writes require separate approval through the relevant workflow.
-- Verification coverage: confirm domain docs and relevant ADRs were checked, generated reports exist under the temp directory when produced, proposed modules use the skill's architecture vocabulary, ADR conflicts are surfaced when real, and skill validation plus `scripts/run-validator` pass after skill changes.
-- Upgrade notes: vendored from `mattpocock/skills` path `skills/engineering/improve-codebase-architecture/` at ref `0288510dd61ff6ef7c2003834082ab8f2387e80e`; preserve companion references and `UPSTREAM.md`, reapply AgentOS domain-doc alias patches after upstream updates, and run `expose-skills` dry run when current-machine discoverability matters after accepted updates.
+- Verification coverage: confirm upstream files are mirrored exactly except for AgentOS `UPSTREAM.md`, confirm `review-pass` structural-depth lens references the new `codebase-design` vocabulary source, generated reports exist under the temp directory when produced, ADR conflicts are surfaced when real, and skill validation plus `scripts/run-validator` pass after skill changes.
+- Upgrade notes: vendored from `mattpocock/skills` path `skills/engineering/improve-codebase-architecture/` at ref `221ffca96736afefdc08ca7cf0b3965e9ea83f41`; preserve `UPSTREAM.md`, keep upstream files mirrored exactly unless a future issue explicitly approves a local patch, keep `review-pass` structural-depth lens guidance aligned with the upstream `codebase-design` split, and run `expose-skills` dry run when current-machine discoverability matters after accepted updates.
 
 ### `check-vendored-skill-upstreams`
 
