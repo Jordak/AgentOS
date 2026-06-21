@@ -30,7 +30,7 @@ Inputs:
 
 Output artifact:
 
-- A coordinator Workflow Result returned in the current reporting mode or caller-supplied Workflow Invocation Reference, with terminal status (`completed`, `blocked`, `failed`, `cancelled`, or `needs-human`), batch status, selected or provided issues, ledger location, worker branches, worktrees, PRs, worker lifecycle states, worker/coordinator effort metadata when available and relevant, worker-reported raw readiness evidence, worker-reported readiness verdict, final readiness label state, `Gate Skipped` reasons plus durable gate-skip field/state or missing evidence when present, stale-label contradictions, public-safe thread names and invocation references or redacted private-surface summaries, merge-event state, landing outcomes, skipped issues, blockers and needs-human decisions, release-instruction handling, validation, mutations performed, open risks, and recommended next action.
+- A coordinator Workflow Result returned in the current reporting mode or caller-supplied Workflow Invocation Reference, with terminal status (`completed`, `blocked`, `failed`, `cancelled`, or `needs-human`) selected by the shared Aggregate Status precedence in `os/skills/ORCHESTRATION_LOOPS.md`, an `Aggregate status map:` with batch/coordinator state, worker states by issue, PR or review states, landing states, blockers, and release-instruction handling when relevant, selected or provided issues, ledger location, worker branches, worktrees, PRs, worker lifecycle states, worker/coordinator effort metadata when available and relevant, worker-reported raw readiness evidence, worker-reported readiness verdict, final readiness label state, `Gate Skipped` reasons plus durable gate-skip field/state or missing evidence when present, stale-label contradictions, public-safe thread names and invocation references or redacted private-surface summaries, merge-event state, landing outcomes, skipped issues, blockers and needs-human decisions, validation, mutations performed, open risks, and recommended next action.
 - A recoverable coordinator ledger or report in the current reporting mode.
 - Optional dedicated GitHub batch tracking issue when the Authorization Boundary explicitly permits creating or using that tracker surface.
 
@@ -145,8 +145,26 @@ Landing is a phase of normal or resume mode, not a separate top-level mode.
    - Record fulfilled, skipped, blocked, needs-human, failed, cancelled, unmerged, unresolved, and landed outcomes in the coordinator ledger.
 
 9. Report the coordinator Workflow Result:
-   - Begin with `Status:` using one canonical terminal value: `completed`, `blocked`, `failed`, `cancelled`, or `needs-human`.
-   - For mixed child outcomes, report the detailed worker, issue, landing, skipped, blocked, needs-human, failed, and cancelled states. Aggregate status precedence rules and richer status maps are deferred to GitHub issue #158.
+   - Begin with `Status:` using one canonical terminal value: `completed`, `blocked`, `failed`, `cancelled`, or `needs-human`, selected by the Aggregate Status precedence in `os/skills/ORCHESTRATION_LOOPS.md`.
+   - Include an `Aggregate status map:` for mixed and aggregate outcomes. At minimum, cover batch/coordinator state, workers by issue, PR or review states, landing states, blockers, and release-instruction handling when relevant.
+   - Example mixed-result shape:
+
+```md
+Status: needs-human
+
+Aggregate status map:
+- batch: needs-human
+- workers:
+  - #158: completed
+  - #162: blocked
+- pull requests:
+  - #201: ready-for-human-review
+- landing:
+  - #158: waiting-for-merge-report
+- blockers:
+  - Human merge report required before landing can continue.
+```
+
    - Include issue URLs, selection source, ledger surface, branch and worktree status, PRs, worker-reported raw readiness evidence, worker-reported readiness verdict, and final readiness label state, worker/coordinator effort metadata when available and relevant, `Gate Skipped` reasons plus durable gate-skip field/state or missing evidence when present, stale-label contradictions, public-safe thread status or redacted private-surface summary, merge-event status, landing outcomes, skipped issues, blocked and needs-human states, per-worker release status or post-result availability, validation, mutations, open risks, and recommended next action.
    - When the caller supplied a Workflow Invocation Reference or result surface, return the coordinator Workflow Result there when available, and then stop or wait according to the explicit coordinator release instruction.
    - State clearly that PR merge/squash, branch deletion, new label creation, and any out-of-boundary external action remain outside v1 unless a separate approved workflow or direct human step owns them.
@@ -188,7 +206,7 @@ Recover at least:
 - Normal mode owns a full batch pass while preserving explicit Authorization Boundaries for worker launch, tracking issue creation, landing, closure, and other external writes.
 - Read-only/plan-only mode performs no local or external mutation.
 - Resume mode can reconstruct enough ledger state to continue safely.
-- The coordinator final Workflow Result includes a canonical terminal status, worker-reported raw readiness evidence, worker-reported readiness verdict, final readiness label state, effort metadata when available and relevant, any `Gate Skipped` reasons plus durable gate-skip field/state or missing evidence, and stale-label contradictions, is returned through any caller-supplied result surface when available, and follows the coordinator release instruction.
+- The coordinator final Workflow Result includes a canonical terminal status selected by shared Aggregate Status precedence, an `Aggregate status map:` with batch/coordinator, worker-by-issue, PR/review, landing, blocker, and release-instruction scopes when relevant, worker-reported raw readiness evidence, worker-reported readiness verdict, final readiness label state, effort metadata when available and relevant, any `Gate Skipped` reasons plus durable gate-skip field/state or missing evidence, and stale-label contradictions, is returned through any caller-supplied result surface when available, and follows the coordinator release instruction.
 - Every launched worker has an Isolation Boundary, branch/worktree, Authorization Boundary, prescribed model/effort and prescription source or explicit no-override/default statement when relevant, Workflow Invocation Reference when supported, release instruction, and expected Workflow Result.
 - Returned worker results record release status or post-result availability before the batch is treated as quiescent.
 - Supported durable worker threads are renamed to public-safe, legible target-specific names before `READY` or substantive assignment, and worker handoffs are minimal pointer-first packets rather than copied workflow contracts.
@@ -216,5 +234,5 @@ Before finishing:
 11. Confirm no PR merge/squash, branch deletion, label creation, permission change, out-of-scope issue mutation, or Personal Overlay access happened without explicit authorization.
 12. Confirm landing checks waited for worker quiescence, recorded needs-human Blocking Human Decisions, worker release status or post-result availability, and human merge reports.
 13. Confirm `land-github-issue` was invoked or followed only for eligible merged issues under an explicit landing Authorization Boundary.
-14. Confirm final Workflow Result includes canonical terminal status, selected issues, ledger state, worker terminal statuses and lifecycle states including needs-human, worker-reported raw readiness evidence, worker-reported readiness verdict, final readiness label state, effort metadata when available and relevant, `Gate Skipped` reasons plus durable gate-skip field/state or missing evidence when present, stale-label contradictions, release-instruction handling, PRs, merge status, landing outcomes, skipped issues, validation, mutations, open risks, and recommended next action.
+14. Confirm final Workflow Result includes canonical terminal status selected by Aggregate Status precedence, `Aggregate status map:` scopes for batch/coordinator state, workers by issue, PR or review states, landing states, blockers, and release-instruction handling when relevant, selected issues, ledger state, worker terminal statuses and lifecycle states including needs-human, worker-reported raw readiness evidence, worker-reported readiness verdict, final readiness label state, effort metadata when available and relevant, `Gate Skipped` reasons plus durable gate-skip field/state or missing evidence when present, stale-label contradictions, release-instruction handling, PRs, merge status, landing outcomes, skipped issues, validation, mutations, open risks, and recommended next action.
 15. If this skill or its manifest entry changed, run `git diff --check` and `scripts/run-validator`.

@@ -45,7 +45,7 @@ When a Calling Workflow delegates durable work, it should include a Workflow Inv
 
 A Called Workflow should return completion, blocked, failed, cancelled, and needs-human states through the invocation reference when the reference is available. After returning the result, it should stop or wait according to the release instruction. It should not assume the caller is watching the worker live.
 
-Convention v1 standardizes callback result surfaces and terminal status vocabulary, not aggregate status precedence. For workflows that aggregate mixed child outcomes, keep per-worker, per-issue, or per-batch outcomes visible in the Workflow Result; aggregate precedence rules and richer status maps are deferred to GitHub issue #158.
+Convention v1 standardizes callback result surfaces, terminal status vocabulary, and aggregate status selection for workflows that summarize mixed child outcomes. For workflows that aggregate child, worker, issue, PR, landing, batch-pass, or phase outcomes, the top-level `Status:` is the caller-facing control state selected by the Aggregate Status rule below, while an `Aggregate status map:` preserves the detailed child outcomes.
 
 Runtime polling of Called Workflows is not the normal orchestration pattern. It is allowed only as bounded bootstrap, timeout, recovery, or diagnostic behavior. After callback setup is acknowledged or a called workflow is simply active, do not poll for ordinary progress; the Calling Workflow should record a waiting-for-callback state, stop its active turn, and record any later polling reason, bound, and result in its Recovery Record.
 
@@ -168,6 +168,45 @@ Domain-specific result artifacts should keep their names and richer structure. F
 
 Prefer Markdown-first, field-stable results. Use predictable labels such as `Status`, `Evidence`, `Mutations performed`, `Validation`, `Open risks`, and `Recommended next action` where possible. Do not introduce JSON, YAML, or a separate schema unless a script or validator genuinely needs deterministic parsing.
 
+## Aggregate Status
+
+An **Aggregate Status** is the top-level `Status:` returned by a workflow that summarizes multiple child workflow results, issues, workers, PRs, landing checks, batch passes, or phases.
+
+For aggregate workflows, top-level `Status:` means caller-facing control state: the next routing state the calling workflow or human owner must know to continue safely. It is not a complete summary of every child outcome.
+
+Aggregate workflows should include both:
+
+- one canonical top-level `Status:` selected by shared precedence; and
+- an `Aggregate status map:` or equivalent Markdown section that preserves per-scope detail for child outcomes, issues, workers, PRs, landing, batch passes, blockers, stop reasons, and release-instruction handling as applicable.
+
+Use this top-level precedence for mixed aggregate outcomes:
+
+1. `failed` when the aggregate workflow itself failed, or a required child failed in a way the aggregate cannot recover from.
+2. `cancelled` when the aggregate workflow or a required child was intentionally cancelled and no higher-precedence failure exists.
+3. `needs-human` when safe progress now depends on a human decision or action, such as a PR merge report, scope choice, unresolved ask-user blocker, or human-owned review state.
+4. `blocked` when progress is blocked by a non-human dependency, unavailable prerequisite, unresolved external state, or recoverable workflow dependency.
+5. `completed` only when every required aggregate-owned unit has reached its convergence point and there are no unresolved failed, cancelled, needs-human, or blocked states.
+
+Aggregate status maps are Markdown-first recovery surfaces, not machine-enforced schemas. Each aggregate workflow should name its required map scopes in its own contract. A typical shape is:
+
+```md
+Status: needs-human
+
+Aggregate status map:
+- batch: needs-human
+- workers:
+  - #158: completed
+  - #162: blocked
+- pull requests:
+  - #201: ready-for-human-review
+- landing:
+  - #158: waiting-for-merge-report
+- blockers:
+  - Human merge report required before landing can continue.
+```
+
+Non-aggregate workflows do not need an aggregate status map.
+
 ## Recovery Record
 
 A **Recovery Record** is the minimum durable or reconstructable state needed to resume an Orchestration Loop safely after a pause, compaction, handoff, or Called Workflow completion.
@@ -280,6 +319,7 @@ When a skill is an Orchestration Loop or can be invoked by one, its skill contra
 - what it may call;
 - what Workflow Result it returns;
 - which canonical terminal statuses it can return, normally `completed`, `blocked`, `failed`, `cancelled`, and `needs-human` unless the skill documents a narrower set;
+- for aggregate workflows, what `Aggregate status map:` scopes it returns and how its top-level `Status:` follows the shared Aggregate Status precedence;
 - how it accepts and reports any caller-supplied Workflow Invocation Reference or result surface;
 - how it accepts and reports caller-supplied effort prescriptions, or records that no override/default applies;
 - how it follows release instructions after returning a result to a caller;
