@@ -232,7 +232,55 @@
           "path": "os/skills/review-pass/SKILL.md",
           "contains": [
             "one read-only review panel pass",
-            "structured Markdown review packet"
+            "structured Markdown review packet",
+            "Eligible clean-context reviewers"
+          ]
+        },
+        {
+          "path": "os/skills/review-pass/agents/openai.yaml",
+          "contains": [
+            "eligible clean-context reviewers",
+            "blocked result with the prompt packet"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "review-pass-clean-reviewer-blocked",
+      "category": "code review",
+      "prompt": "Run a review pass, but if clean-context reviewers are unavailable, block instead of doing a same-agent self-check.",
+      "expected": {
+        "skill": "review-pass"
+      },
+      "evidence": [
+        {
+          "path": "os/skills/review-pass/SKILL.md",
+          "contains": [
+            "Eligible clean-context reviewers are separate clean-context or equivalent isolated reviewers",
+            "the current implementation, parent, or same-context agent does not count",
+            "return a blocked result instead of running a same-context single-agent fallback"
+          ]
+        },
+        {
+          "path": "os/skills/review-pass/references/review-packet-template.md",
+          "contains": [
+            "Review Pass Blocked",
+            "Blocked reason: clean-context reviewer capability unavailable",
+            "Same-context review run: no"
+          ]
+        },
+        {
+          "path": "os/skills/review-pass/references/reviewer-prompts.md",
+          "contains": [
+            "If clean-context reviewers are unavailable before prompts can be sent",
+            "do not run a same-context review"
+          ]
+        },
+        {
+          "path": "os/skills/review-pass/agents/openai.yaml",
+          "contains": [
+            "eligible clean-context reviewers",
+            "blocked result with the prompt packet"
           ]
         }
       ]
@@ -321,6 +369,39 @@
       ]
     },
     {
+      "id": "review-loop-clean-reviewer-blocked",
+      "category": "code review loop",
+      "prompt": "Run a review/fix loop, but clean-context reviewers are unavailable. Report the blocked state instead of claiming clean convergence or marking the PR ready.",
+      "expected": {
+        "skill": "review-loop"
+      },
+      "evidence": [
+        {
+          "path": "os/skills/review-loop/SKILL.md",
+          "contains": [
+            "eligible clean-context reviewers",
+            "Do not treat same-context self-review or the current parent agent's read-only check as review-loop evidence",
+            "do not post ready-for-human markers"
+          ]
+        },
+        {
+          "path": "os/skills/review-loop/references/report-guidance.md",
+          "contains": [
+            "clean-context-reviewer-unavailable blocked runs",
+            "confirmation that no same-context review ran",
+            "confirmation that no ready-for-human marker was applied"
+          ]
+        },
+        {
+          "path": "os/skills/review-loop/agents/openai.yaml",
+          "contains": [
+            "clean-context read-only reviewers",
+            "clean-context review-loop convergence leaves no unresolved `auto-fix` or `ask-user` blockers"
+          ]
+        }
+      ]
+    },
+    {
       "id": "review-loop-issue-family-normalization",
       "category": "code review loop",
       "prompt": "Run a review/fix loop where multiple reviewer findings describe the same bug. Decide what unit the loop should accept, decline, fix, report, and verify.",
@@ -385,6 +466,8 @@
             "readiness gating",
             "pull request creation",
             "review-loop convergence",
+            "eligible clean-context reviewers are unavailable",
+            "do not claim PR-ready review-loop convergence",
             "Readiness evidence:",
             "stop before merge and issue closure"
           ]

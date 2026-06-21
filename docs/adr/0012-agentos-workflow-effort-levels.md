@@ -54,7 +54,7 @@ Higher outer-loop scope does not automatically imply higher effort. Coordinators
 
 Calling Workflows can be explicit about desired quality, latency, and cost posture without pretending every harness can enforce effort at fine granularity.
 
-Same-thread fallback remains valid, but its reports must distinguish prescribed effort from effective inherited effort when that matters.
+Same-thread fallback remains valid for orchestration, fixing, reporting, and other non-review-evidence work, but it cannot satisfy `review-pass` or `review-loop` clean-context reviewer evidence; reports must distinguish prescribed effort from effective inherited effort when that matters.
 
 Workflow Results and Recovery Records become more useful for later review, reruns, and cost-quality diagnosis.
 
