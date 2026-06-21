@@ -127,7 +127,7 @@ When delegating implementation issues to workers on feature branches, make workt
 - Record each worker's worktree path, branch name, assigned issue, owned files or responsibility, callback/result surface or unavailable reason, release instruction, and expected terminal Workflow Result before starting parallel work.
 - Before integrating results, inspect the worktree list and each worker branch status to confirm workers did not step on each other's branches or local changes.
 - Instruct workers to commit, push their feature branch, open or update their PR when their contract owns that step, and return evidence through their Workflow Result or issue/PR comments.
-- Give workers a callback thread id, invocation reference, ledger surface, or equivalent result target when the harness supports one. Do not continuously poll workers for progress except as bounded bootstrap, timeout, recovery, or diagnostic behavior.
+- Give workers a callback thread id, invocation reference, ledger surface, or equivalent result target when the harness supports one. After callback setup is acknowledged or workers are simply active, repeated progress checks are live polling rather than bootstrap; stop in a waiting-for-callback state unless timeout, recovery, or diagnostic polling has a recorded reason and bound.
 - Do not instruct feature-branch workers to merge PRs, close issues, or delete branches.
 - Landing, issue closure, and branch deletion belong to a workflow or human integration step whose contract explicitly owns those surfaces.
 - Issue closure belongs after the resolving commit has landed on `main` or the pull request has merged and the integration owner has reconciled the issue acceptance criteria.
