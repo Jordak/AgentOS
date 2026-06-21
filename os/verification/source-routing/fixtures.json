@@ -364,8 +364,9 @@
         {
           "path": "os/skills/review-loop/agents/openai.yaml",
           "contains": [
+            "clean-context read-only reviewers",
             "commit and push only `auto-fix` and explicit `user-approved-fix` fixes",
-            "no unresolved `auto-fix` or `ask-user` blockers"
+            "clean-context review-loop convergence leaves no unresolved `auto-fix` or `ask-user` blockers"
           ]
         }
       ]

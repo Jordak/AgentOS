@@ -91,7 +91,7 @@ Use this table as the durable lookup home for initial AgentOS workflow effort re
 | `grill-me` | `high` | Use `xhigh` only for unusually deep or high-stakes design work when budget allows. |
 | `grill-with-docs` | `high` | Use `xhigh` only for hard architecture or cross-document tradeoffs when budget allows. |
 | `review-pass` | `high` | Use `xhigh` for security, deep-review, final-gate, high-risk, difficult, or eval-justified review passes. |
-| `review-loop` | `medium` | Use `high` for hard adjudication, design-escape-hatch calls, or same-thread fallback review/fix work; prescribe `review-pass` as `high` or selective `xhigh` when a separate review pass can honor it. |
+| `review-loop` | `medium` | Use `high` for hard adjudication, design-escape-hatch calls, or same-thread orchestration and fix work after clean reviewer evidence; prescribe `review-pass` as `high` or selective `xhigh` when a separate review pass can honor it. |
 | `select-issue-batch` | `medium` | Use `high` only when selection depends on unusually ambiguous dependency or parallel-safety reasoning. |
 | `audit-issues` | `medium` | Use `high` only for broad, ambiguous, or high-impact reconciliation where evidence conflicts. |
 | `land-github-issue` | `medium` | Use `high` only when acceptance criteria, integration proof, or human-review state is unusually ambiguous. |

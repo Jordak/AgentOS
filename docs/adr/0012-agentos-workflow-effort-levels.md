@@ -45,7 +45,7 @@ Higher outer-loop scope does not automatically imply higher effort. Coordinators
 - `grill-me`: `high`, with selective `xhigh` for unusually deep or high-stakes design work.
 - `grill-with-docs`: `high`, with selective `xhigh` for hard architecture or cross-document tradeoffs.
 - `review-pass`: `high`, with selective `xhigh` for security, deep-review, final-gate, high-risk, difficult, or eval-justified passes.
-- `review-loop`: `medium`, escalating to `high` for hard adjudication, design-escape-hatch calls, or same-thread fallback review/fix work.
+- `review-loop`: `medium`, escalating to `high` for hard adjudication, design-escape-hatch calls, or same-thread orchestration and fix work after clean reviewer evidence.
 - `select-issue-batch`: `medium` for issue-state interpretation, dependency judgment, and parallel-safety reasoning.
 - `audit-issues`: `medium` for evidence-backed issue tracker reconciliation.
 - `land-github-issue`: `medium` for integration proof, acceptance-criteria reconciliation, and human-review label judgment.

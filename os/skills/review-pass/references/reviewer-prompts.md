@@ -173,7 +173,7 @@ When the target changes reusable contract surfaces, also reopen:
 `os/skills/review-pass/references/lenses/contract-surface-matrix.md`
 or the current harness's configured adapter path for `review-pass/references/lenses/contract-surface-matrix.md`, if it is known.
 
-For every fresh reviewer, fill and send the "Fresh Reviewer Prompt" template. For every verification reviewer, fill and send the "Verification Reviewer Prompt" template.
+For every fresh reviewer, fill and send the "Fresh Reviewer Prompt" template. For every verification reviewer, fill and send the "Verification Reviewer Prompt" template. If clean-context reviewers are unavailable before prompts can be sent, do not run a same-context review; return a blocked result using the blocked-result template in `review-packet-template.md`, including the assembled reviewer request or prompt packet.
 
 Do not reconstruct these prompts from memory. Each reviewer prompt must include:
 - target, repository, base, and current head;
@@ -197,5 +197,5 @@ Do not reconstruct these prompts from memory. Each reviewer prompt must include:
 - the provisional-ID instruction for new findings;
 - the clean response sentinel: start with exactly `No new findings.` on its own first line.
 
-Keep review-pass read-only. Close every spawned or resumed reviewer after collecting its report, then return a packet using the canonical Review Packet Template.
+Keep review-pass read-only. Close every spawned or resumed reviewer after collecting its report, then return a packet using the canonical Review Packet Template. If no clean-context reviewers were available, confirm no same-context review was run and return the blocked result instead.
 ```

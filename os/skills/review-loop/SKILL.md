@@ -124,7 +124,7 @@ Before yielding for an `ask-user` decision, make the unresolved blocker recovera
 
 ## Efficiency Controls
 
-- Follow `os/skills/ORCHESTRATION_LOOPS.md` effort guidance when the harness exposes effort controls: use `medium` for routine orchestration, `high` for hard adjudication, design-escape-hatch calls, or same-thread fallback review/fix work, and prescribe `review-pass` as `high` or selective `xhigh` when a separate review pass can honor it.
+- Follow `os/skills/ORCHESTRATION_LOOPS.md` effort guidance when the harness exposes effort controls: use `medium` for routine orchestration, `high` for hard adjudication, design-escape-hatch calls, or same-thread orchestration and fix work after clean reviewer evidence, and prescribe `review-pass` as `high` or selective `xhigh` when a separate review pass can honor it.
 - Keep the orchestrator focused on ledger management, deduplication, implementation, validation, PR-surface writes, and reporting.
 - Batch work by issue family. When a candidate Reviewer Finding identifies real risk, normalize it into an Issue Family, then search or inspect for sibling occurrences and fix the whole family before requesting verification.
 - Prefer one family-level fix commit over several single-occurrence commits when the related fixes are cohesive. Keep separate commits for unrelated families or risky changes that need isolated validation.

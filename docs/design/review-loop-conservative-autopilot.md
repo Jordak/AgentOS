@@ -18,7 +18,7 @@ The parent agent should classify every issue family into one of three buckets:
 - `auto-decline`: speculative, stylistic, duplicate, clearly out of scope, a low-value scope expansion, or more complex than the risk justifies.
 - `ask-user`: an evidenced in-scope finding whose fix would change product behavior, change scope, add durable workflow semantics, introduce new abstractions or parser/schema/lifecycle/synchronization logic, or trigger the design escape hatch.
 
-Completion should be based on parent adjudication, not raw reviewer recommendation labels: the loop is clean only when no unresolved `auto-fix` or `ask-user` blockers remain, and any remaining reviewer concerns are recorded as `auto-decline` with rationale. After a lazy-human brief, an `ask-user` family is resolved only by an explicit user decision: `user-approved-fix` enters the normal fix and verification path, `user-declined/accepted-risk` is recorded as residual risk, and `unresolved` blocks readiness.
+Completion should be based on clean-context review evidence plus parent adjudication, not raw reviewer recommendation labels: the loop is clean only when clean-context review-loop convergence leaves no unresolved `auto-fix` or `ask-user` blockers, and any remaining reviewer concerns are recorded as `auto-decline` with rationale. After a lazy-human brief, an `ask-user` family is resolved only by an explicit user decision: `user-approved-fix` enters the normal fix and verification path, `user-declined/accepted-risk` is recorded as residual risk, and `unresolved` blocks readiness.
 
 For accepted fixes, the loop should apply a complexity governor before editing. It should choose the smallest closing move in this order:
 
