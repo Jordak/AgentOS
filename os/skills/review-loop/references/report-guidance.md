@@ -27,7 +27,7 @@ Use this when creating the final temporary HTML report for a review-loop run. Th
 
 5. Review-loop convergence:
    - Show review-pass cycles, reviewer aliases, reviewer continuity mode and opaque handle availability for verification passes, prescribed/effective effort metadata for the orchestrator and review-pass invocations when available or relevant, auto-fix issue families, user-approved-fix ask-user decisions, unresolved ask-user blockers, user-declined/accepted-risk decisions, autopilot classification counts, complexity posture summaries, fix commits, and final adjudicated-clean status. For ready recommendations, name the clean-context review evidence that supports convergence. Include source aliases when useful, but never expose opaque reviewer handles.
-   - Name the final fresh review-pass packet and terminal condition.
+   - Name the final eligible clean-context fresh review-pass packet and terminal condition.
 
 6. Validation evidence:
    - List final validation commands and results.

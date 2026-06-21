@@ -18,6 +18,7 @@ Before sending a reviewer prompt, confirm it includes:
 - Contract Surface Matrix guidance loaded from `references/lenses/contract-surface-matrix.md` when the target changes reusable contract surfaces;
 - source-workflow boundary and design-escape-hatch escalation guidance from the lens file when `deep-review` or `structural-depth` is assigned;
 - reporting mode: chat to review-pass orchestrator only;
+- eligible clean-context reviewer rule: separate clean-context or equivalent isolated reviewers count, but the current implementation, parent, or same-context agent does not count as review evidence even for a read-only self-check;
 - instruction to read repository instructions before inspecting the target;
 - read-only rule, including no PR comments by reviewers;
 - dirty-validation rule: use existing validation output only, do not run validation commands that may dirty the target checkout, and recommend validation signals for the caller instead;
@@ -78,6 +79,7 @@ Reporting mode: chat to review-pass orchestrator only
 Rules:
 - Do not edit files, commit, push, merge, comment on the PR, label, close issues, mark ready, or change external state.
 - Use existing validation output only. Do not run validation commands that may dirty the target checkout; recommend validation signals for the caller instead.
+- You are eligible review evidence only if you are a separate clean-context or equivalent isolated reviewer that did not implement or adjudicate the target. If you are the current implementation, parent, or same-context agent, do not produce review findings; report that eligible clean-context review is unavailable.
 - Read the repository instructions and inspect the full target against the base.
 - Your optional lens is a prompt for extra attention, not a limit; still review the full target.
 - Apply the assigned lens guidance exactly as provided. If it is `none`, continue with the baseline review priorities.
@@ -124,6 +126,7 @@ Reporting mode: chat to review-pass orchestrator only
 Rules:
 - Do not edit files, commit, push, merge, comment on the PR, label, close issues, mark ready, or change external state.
 - Use existing validation output only. Do not run validation commands that may dirty the target checkout; recommend validation signals for the caller instead.
+- You are eligible review evidence only if you are a separate clean-context or equivalent isolated reviewer that did not implement or adjudicate the target. If you are the current implementation, parent, or same-context agent, do not produce review findings; report that eligible clean-context review is unavailable.
 - Read the repository instructions and inspect the full current target against the base.
 - Your optional lens is a prompt for extra attention, not a limit; still review the full target.
 - Apply the assigned lens guidance exactly as provided. If it is `none`, continue with the baseline review priorities.

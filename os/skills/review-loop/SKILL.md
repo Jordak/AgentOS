@@ -238,6 +238,7 @@ Use the matrix to update affected contract surfaces in one pass. Check the ownin
 7. Confirm with a new fresh pass:
    - After the active family set is clean, request a new `fresh` pass from `review-pass` with clean context sized to the current PR scope, including effort metadata when available or relevant.
    - Adjudicate the new fresh packet without leaking prior parent analysis into the reviewer prompt.
+   - If the final fresh `review-pass` reports unavailable eligible clean-context reviewers, preserve the reviewer request or prompt packet in the ledger or blocked result, mark the loop `blocked` or `needs-human`, and stop before final report completion, ready-for-human marking, or any clean-convergence claim.
    - If the new fresh packet leaves no unresolved `auto-fix` or `ask-user` blockers after Conservative Autopilot adjudication, the loop is complete.
    - If the new fresh packet has `auto-fix` families, run the fix and verification workflow again, then spawn another fresh pass. If it has unresolved `ask-user` blockers, pause with a lazy-human brief; only a later `user-approved-fix` state enters fix and verification.
    - Run a soft budget checkpoint before another fresh pass when a checkpoint trigger is met.
@@ -276,7 +277,7 @@ Call narrower playbooks for their owned surfaces: GitHub workflow policy for PR 
 - `auto-fix` and `user-approved-fix` issue families have concrete fix commits or local changes, plus validation evidence.
 - Declined issue families have short rationales and are not silently dropped.
 - Verification passes prefer same-source reviewer continuity when safely available, record opaque handle availability and any packet/finding-source fallback, check prior fixes, and reread the full current diff.
-- The final state is supported by a fresh `review-pass` packet whose families leave no unresolved `auto-fix` or `ask-user` blockers after parent adjudication.
+- The final state is supported by an eligible clean-context fresh `review-pass` packet whose families leave no unresolved `auto-fix` or `ask-user` blockers after parent adjudication.
 - The final HTML report follows `references/report-guidance.md` and can be reconstructed from consolidated PR comments, review packets, and commits.
 - PR-scoped comments and commits are factual and clearly labeled as agent-generated review work.
 
@@ -297,7 +298,7 @@ Before finishing:
 3. Confirm feature-sized review targets passed `ensure-implementation-readiness` check-only mode with `Ready to Implement` or `Gate Skipped` before reviewers were spawned; if readiness was missing, confirm the loop returned `blocked` before spawning reviewers with check-only mode, source reviewed, effort metadata when available or relevant, verdict, missing consensus evidence, gate-skip state, label state, and next repair owner.
 4. Confirm every design-escape-hatch trigger was either surfaced to the user, explicitly declined with rationale, or found not applicable.
 5. Confirm every fresh and verification pass used `review-pass` or its canonical fallback files.
-6. Confirm the final fresh `review-pass` packet left no unresolved `auto-fix` or `ask-user` blockers after parent adjudication.
+6. Confirm the final fresh `review-pass` packet came from eligible clean-context reviewers and left no unresolved `auto-fix` or `ask-user` blockers after parent adjudication; if the final fresh pass blocked on unavailable eligible clean-context reviewers, confirm the loop stopped before final report completion, ready marking, or clean-convergence claims.
 7. Confirm every issue family was classified as `auto-fix`, `auto-decline`, or `ask-user`, with rationale.
 8. Confirm every `auto-fix` issue family has a fix or a scope/design change.
 9. Confirm every accepted fix recorded the smallest closing move from the complexity governor, or recorded why new machinery was necessary.
