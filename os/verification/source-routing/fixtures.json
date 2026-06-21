@@ -402,7 +402,12 @@
           "path": "os/skills/review-loop/references/agent-review-comment.md",
           "contains": [
             "eligible clean-context final fresh `review-pass` packet",
+            "reviewers or reviewer aliases",
+            "terminal condition",
             "Do not post a final readiness or clean-pass comment when `review-pass` blocked on unavailable eligible clean-context reviewers",
+            "must state `blocked` or `needs-human`",
+            "include the reviewer request or prompt packet",
+            "confirm no same-context review ran",
             "confirm no ready-for-human marker was applied"
           ]
         },
