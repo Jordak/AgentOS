@@ -86,7 +86,7 @@ report_matches \
 report_matches \
   "raw-git-persistence-instruction" \
   '(^|[^[:alnum:]_./-])(git[[:space:]]+push|pushed to `?origin/(main|master)`?|push(ed)? to `?origin/(main|master)`?)' \
-  --glob '!os/verification/scripts/agentos_validator/**' \
+  --glob '!**/os/verification/scripts/agentos_validator/**' \
   "${existing_scopes[@]}"
 
 # Installed skills and automations that adapt private live agents should not
