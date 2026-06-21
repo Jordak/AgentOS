@@ -30,7 +30,7 @@ Inputs:
 
 Output artifact:
 
-- A GitHub loop Workflow Result with terminal status (`completed`, `blocked`, `failed`, `cancelled`, or `needs-human`), repository, loop goal, mode, Authorization Boundary, loop caps, pass count, effort metadata when available or relevant under `os/skills/ORCHESTRATION_LOOPS.md`, public-safe child coordinator thread names or unavailable reasons, called batch-pass invocation references or public-safe summaries, called batch-pass results, worker-reported raw readiness evidence, worker-reported readiness verdict, and final readiness label state, `Gate Skipped` reasons plus durable gate-skip field/state or missing evidence when present, stale-label contradictions, merge-report state, blockers, needs-human decisions, failures, cancellations, release-instruction handling, stop reason, validation, mutations performed, open risks, and recommended next action.
+- A GitHub loop Workflow Result with terminal status (`completed`, `blocked`, `failed`, `cancelled`, or `needs-human`) selected by the shared Aggregate Status precedence in `os/skills/ORCHESTRATION_LOOPS.md`, an `Aggregate status map:` with loop state, batch-pass results, current or most recent batch state, stop reason, blockers, and downstream release-instruction handling when relevant, repository, loop goal, mode, Authorization Boundary, loop caps, pass count, effort metadata when available or relevant under `os/skills/ORCHESTRATION_LOOPS.md`, public-safe child coordinator thread names or unavailable reasons, called batch-pass invocation references or public-safe summaries, called batch-pass results, worker-reported raw readiness evidence, worker-reported readiness verdict, and final readiness label state, `Gate Skipped` reasons plus durable gate-skip field/state or missing evidence when present, stale-label contradictions, merge-report state, needs-human decisions, failures, cancellations, validation, mutations performed, open risks, and recommended next action.
 - A recoverable loop Recovery Record in the current reporting mode.
 - Optional dedicated GitHub tracking issue only when the Authorization Boundary explicitly permits creating or using that tracker surface.
 
@@ -138,8 +138,25 @@ Rebuild or load the loop Recovery Record, verify the current batch-pass state, a
    - If successful PRs and blocked or needs-human work coexist, return a combined stop report naming both the merge-report state and the blocker or human decision needed.
 
 7. Report the loop Workflow Result:
-   - Begin with `Status:` using one canonical terminal value: `completed`, `blocked`, `failed`, `cancelled`, or `needs-human`.
-   - For mixed batch-pass outcomes, report the detailed batch, worker, issue, merge-report, landing, blocked, needs-human, failed, and cancelled states. Aggregate status precedence rules and richer status maps are deferred to GitHub issue #158.
+   - Begin with `Status:` using one canonical terminal value: `completed`, `blocked`, `failed`, `cancelled`, or `needs-human`, selected by the Aggregate Status precedence in `os/skills/ORCHESTRATION_LOOPS.md`.
+   - Include an `Aggregate status map:` for mixed and aggregate outcomes. At minimum, cover loop state, batch-pass results, current or most recent batch state, stop reason, blockers, and downstream release-instruction handling when relevant.
+   - Example mixed-result shape:
+
+```md
+Status: needs-human
+
+Aggregate status map:
+- loop: needs-human
+- batch_passes:
+  - pass 3: needs-human
+- current_batch:
+  - #158: completed
+  - #162: blocked
+- stop_reason: human merge report required before the next pass
+- blockers:
+  - Ready PRs need a human merge report before landing can continue.
+```
+
    - Include repository, loop goal, mode, Authorization Boundary, pass count, effort metadata when available or relevant, public-safe child coordinator thread names or unavailable reasons, batch invocation references or public-safe summaries, batch result summaries, worker-reported raw readiness evidence, worker-reported readiness verdict, and final readiness label state, `Gate Skipped` reasons plus durable gate-skip field/state or missing evidence when present, stale-label contradictions, release-instruction handling, stop reason, validation, mutations performed, open risks, and recommended next action.
    - Return the result in the current prose reporting surface. Do not wait for a caller release signal; inbound caller-supplied Workflow Invocation References, result surfaces, and release instructions are out of scope for `github-loop` v1.
    - State clearly that merge, branch deletion, new label creation, and out-of-boundary external actions remain outside v1 unless a separate approved workflow or direct human step owns them.
@@ -206,7 +223,7 @@ Public, publishable, or Git-backed recovery surfaces must use only public-safe f
 - Another pass starts only after the prior batch is cleanly settled.
 - No selected issues ends the loop for the current goal instead of silently broadening scope.
 - Failed or cancelled workers, failed or cancelled batch passes, blocked workers or issues, needs-human states, unresolved human decisions, and unmerged ready PRs stop the loop before later batch selection.
-- The final Workflow Result makes canonical terminal status, effort metadata when available or relevant, worker-reported raw readiness evidence, worker-reported readiness verdict, final readiness label state, `Gate Skipped` reasons plus durable gate-skip field/state or missing evidence when present, stale-label contradictions, merge reports, blockers, release-instruction handling, validation, mutations, open risks, and next action recoverable.
+- The final Workflow Result makes canonical terminal status selected by shared Aggregate Status precedence, an `Aggregate status map:` with loop state, batch-pass results, current or most recent batch state, stop reason, blockers, and downstream release-instruction handling when relevant, effort metadata when available or relevant, worker-reported raw readiness evidence, worker-reported readiness verdict, final readiness label state, `Gate Skipped` reasons plus durable gate-skip field/state or missing evidence when present, stale-label contradictions, merge reports, validation, mutations, open risks, and next action recoverable.
 
 ## Verification
 
@@ -223,5 +240,5 @@ Before finishing:
 9. Confirm any called `coordinate-issue-batch` pass returned a recoverable Workflow Result with release-instruction handling, or a Blocking Human Decision, before the loop continued.
 10. Confirm no later batch started while the prior batch had failed or cancelled workers, failed or cancelled batch passes, blocked work, needs-human states, unresolved human decisions, ready unmerged PRs, or incomplete landing decisions.
 11. Confirm no PR merge/squash, branch deletion, issue closure, label creation, permission change, out-of-scope external write, or Personal Overlay access happened without explicit authorization.
-12. Confirm final Workflow Result includes canonical terminal status, repository, loop goal, pass count, batch result summaries, effort metadata when available or relevant, worker-reported raw readiness evidence, worker-reported readiness verdict, final readiness label state, `Gate Skipped` reasons plus durable gate-skip field/state or missing evidence when present, stale-label contradictions, stop reason, downstream release-instruction handling, validation, mutations, open risks, and recommended next action.
+12. Confirm final Workflow Result includes canonical terminal status selected by Aggregate Status precedence, `Aggregate status map:` scopes for loop state, batch-pass results, current or most recent batch state, stop reason, blockers, and downstream release-instruction handling when relevant, repository, loop goal, pass count, batch result summaries, effort metadata when available or relevant, worker-reported raw readiness evidence, worker-reported readiness verdict, final readiness label state, `Gate Skipped` reasons plus durable gate-skip field/state or missing evidence when present, stale-label contradictions, stop reason, validation, mutations, open risks, and recommended next action.
 13. If this skill or its manifest entry changed, run `git diff --check` and `scripts/run-validator`.
