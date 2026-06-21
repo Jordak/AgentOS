@@ -29,6 +29,7 @@ Inputs:
 Output artifact:
 
 - A structured Markdown review packet in chat by default.
+- A blocked review-pass result when clean-context reviewer capability is unavailable, including the reviewer request or prompt packet that would have been sent and a clear statement that no same-context review was run.
 - Optional temporary Markdown packet file when requested or when the packet is too large for comfortable chat delivery.
 - Optional caller-private reviewer continuity handoff when an orchestrating caller may need same-source verification and the harness exposes resumable reviewer handles. Do not include opaque handles in the human-facing packet.
 - Effort metadata in the packet when available and relevant; use `unknown` or `not reported` rather than implying exact enforcement when the harness does not expose it.
@@ -57,6 +58,7 @@ Safety:
 - Treat an explicit `review-pass` or reviewer-panel request as authorization to spawn or resume read-only reviewer subagents for the current pass when the harness supports them. Treat caller-provided panel requests from an authorized Calling Workflow the same way.
 - Keep spawned or resumed reviewers read-only and instruct them not to post comments or mutate state.
 - Close every spawned or resumed reviewer after its current pass completes so stale context does not leak into unrelated later passes.
+- If clean-context reviewer capability is unavailable, return a blocked result instead of running a same-context single-agent fallback. Include the reviewer request or prompt packet that would have been sent so the caller can recover by providing clean-context reviewers.
 - If the user asks for fixes, commits, PR comments, pushes, ready markers, or loop convergence, route that work to the caller or owning workflow.
 - Do not copy private connector data, secrets, or unrelated repository context into reviewer prompts or packets.
 
@@ -144,7 +146,7 @@ When applicable, read `references/lenses/contract-surface-matrix.md` and include
    - When the target triggers the Contract Surface Matrix lens, read `references/lenses/contract-surface-matrix.md` and include its prompt snippet or equivalent instructions in every relevant reviewer prompt.
    - Fill the fresh or verification template explicitly for every reviewer.
    - Include target, repository, base/head or current head, baseline intent, effort metadata when supplied, observable, or resolvable from `os/skills/ORCHESTRATION_LOOPS.md`, reviewer alias, lens, assigned lens guidance, Contract Surface Matrix guidance when applicable, custom lens notes, verification continuity and caller adjudication context when applicable, reporting mode, read-only rule, full-reread rule, issue-family rule, design-escape-hatch instruction, provisional-ID rule, and clean response sentinel.
-   - Spawn clean-context reviewers in parallel when the harness supports it and the pass is authorized by an explicit review-pass or reviewer-panel request, or by an authorized Calling Workflow. If subagents are unavailable, run the pass as a clearly labeled single-agent fallback and state the limitation in the packet.
+   - Spawn clean-context reviewers in parallel when the harness supports it and the pass is authorized by an explicit review-pass or reviewer-panel request, or by an authorized Calling Workflow. If clean-context reviewers are unavailable, return a blocked result before review instead of running a same-context single-agent fallback. Include the assembled reviewer request or prompt packet in the blocked result.
 
 5. Collect and close:
    - Wait for every reviewer in the pass to report.
@@ -180,6 +182,7 @@ When applicable, read `references/lenses/contract-surface-matrix.md` and include
 
 - The target, base, head or current head, mode, reviewer count, lens plan, and baseline-intent quality are explicit.
 - Reviewers get clean, read-only prompts assembled from the current reference template and assigned per-lens files.
+- Unavailable clean-context reviewer capability returns a blocked result with the reviewer request or prompt packet and no same-context review findings.
 - Every reviewer reviews the full target, even when assigned a lens.
 - The packet groups findings by issue family, not only by reviewer chronology.
 - The packet uses the exact headings, section order, field labels, ID vocabulary, empty states, and temporary artifact wording from `references/review-packet-template.md`.
@@ -206,7 +209,7 @@ Before finishing a review pass:
 7. Confirm reviewer prompts included the read-only rule, no-comment rule, dirty-validation rule, assigned lens guidance, Contract Surface Matrix guidance when applicable, issue-family instruction, design-escape-hatch instruction, full-reread instruction, provisional-ID rule, and clean response sentinel.
 8. If `deep-review` was assigned, confirm the reviewer received the deep-review lens instructions and no full Thermos orchestration or standalone `thermo-nuclear-review` workflow was run.
 9. If `structural-depth` was assigned, confirm the reviewer received the structural-depth lens instructions and no full `improve-codebase-architecture` or `thermo-nuclear-code-quality-review` workflow was run.
-10. Confirm an explicit review-pass or reviewer-panel request was treated as authorization for read-only reviewer subagents when the harness supported them, or record why fallback was used.
+10. Confirm an explicit review-pass or reviewer-panel request was treated as authorization for read-only reviewer subagents when the harness supported them, or that unavailable clean-context reviewer capability returned a blocked result before same-context review.
 11. Confirm raw Reviewer Findings were deduped into Issue Families and mapped back to reviewer sources.
 12. Confirm every likely accepted family has evidence, a sibling-search suggestion, and a validation signal.
 13. Confirm every likely declined issue family has a short rationale.

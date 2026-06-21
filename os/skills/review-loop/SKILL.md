@@ -26,6 +26,7 @@ Output artifact:
 
 - A temporary static HTML report with effort metadata when available or relevant that follows `references/report-guidance.md`.
 - An early `blocked` result, when check-only readiness fails before reviewers spawn, that records check-only mode, source reviewed, effort metadata when available or relevant, readiness verdict, missing consensus evidence, gate-skip state, label state, and next repair owner.
+- An early `blocked` or `needs-human` result when clean-context reviewer capability is unavailable, including the reviewer request or prompt packet that would have been sent and confirmation that no ready-for-human marker was applied.
 - Optional consolidated "Agent Review" PR comments from the orchestrator that follow `references/agent-review-comment.md`, plus optional PR ready-for-human marking for PR targets.
 
 Mutability:
@@ -49,6 +50,7 @@ Safety:
 - If the user only asked for a normal review, ask before upgrading to `review-loop`; the question must state that the loop may post consolidated "Agent Review" comments, push fix commits to the PR branch, and apply the established ready-for-human marker.
 - Treat a request to run `review-loop` on a specific PR as permission to request read-only `review-pass` panel cycles and for the listed PR-scoped writes when the current user request or Calling Workflow Authorization Boundary made that write scope explicit. Do not ask for separate reviewer-panel permission, and do not ask before each reviewer spawn or ordinary loop write.
 - Keep `review-pass` reviewers read-only. They report to the parent through `review-pass`; the parent is the single PR-comment writer.
+- If `review-pass` cannot obtain clean-context reviewers, stop before convergence or ready marking and return a recoverable blocked/needs-human result. Do not treat same-context self-review as review-loop evidence.
 - Before spawning reviewers for feature-sized work, run or follow `ensure-implementation-readiness` in check-only mode. If check-only returns `Needs Design Consensus`, stop before spawning reviewers and return `blocked`. If it returns `Gate Skipped`, continue only when the bypass is explicit and recorded. Do not grill, repair durable sources, edit issues, add readiness fields, or mutate readiness labels inside `review-loop`.
 - Do not merge the PR, close issues, or delete branches through `review-loop`; route those actions to a landing-capable workflow or direct human integration step whose contract owns them. Ask before creating labels, changing permissions, pushing outside the target PR branch, or publishing outside the PR review surface.
 - Do not copy private connector data, secrets, or unrelated repository context into reviewer prompts, review packets, PR comments, or final reports.
@@ -61,12 +63,13 @@ After any pause, interruption, resume, unusually long loop, or suspected compact
 
 ## Review-Pass Invocation Guard
 
-- Reopen `os/skills/review-pass/SKILL.md`, `os/skills/review-pass/references/reviewer-prompts.md`, and `os/skills/review-pass/references/review-packet-template.md` before every fresh and verification pass. If the harness cannot discover `review-pass` by name, read those canonical files directly and follow them as the fallback.
+- Reopen `os/skills/review-pass/SKILL.md`, `os/skills/review-pass/references/reviewer-prompts.md`, and `os/skills/review-pass/references/review-packet-template.md` before every fresh and verification pass. If the harness cannot discover `review-pass` by name, read those canonical files directly and use them to assemble the reviewer request as the fallback. This fallback does not waive the requirement for clean-context reviewers.
 - Fill every pass request explicitly with the common fields: target, repository, base, head or current head, mode, baseline intent, effort metadata when available or relevant, reviewer count or risk posture, optional lens overrides, custom lens notes, and reporting mode.
 - For `fresh` passes, keep reviewer context clean: do not include prior packets, parent analysis, autopilot classifications, complexity posture, lazy-human decisions, fix commits, accepted fixes, declined rationales, consolidated comment URLs, or validation results unless they are part of the baseline intent itself.
 - For `verification` passes, include only the needed prior packet, reviewer finding IDs, issue-family IDs, autopilot classifications and rationales, complexity posture, smallest closing moves or lazy-human decisions, fix commits, accepted fixes, declined rationales, effort metadata when available or relevant, consolidated comment URL, and validation results.
 - Preserve `review-pass` template rules about read-only review, no reviewer PR comments, issue-family sweeps, design-escape-hatch concerns, full-diff rereads, provisional IDs, and the clean response sentinel.
 - When the harness supports reviewer subagents, request a real multi-reviewer `review-pass` panel. Do not fall back to a single-agent review merely because the user did not separately say "subagents"; the loop's explicit `review-pass` panel request carries that authorization.
+- When clean-context reviewers are unavailable, record the assembled reviewer request or prompt packet, return a blocked/needs-human result, and do not post ready-for-human markers.
 - Treat the review packet as advisory. The parent owns final accept/decline decisions and records the durable ledger.
 - Do not ask the user to manage reviewer opening, reviewer closure, or pass-level prompt assembly; that is `review-pass` responsibility.
 - After compaction, rebuild the ledger first, then reload `review-pass`, then request the next pass.
@@ -195,6 +198,7 @@ Use the matrix to update affected contract surfaces in one pass. Check the ownin
    - Reopen `review-pass` and request a `fresh` pass with the target, base/head or commit range, baseline intent, effort metadata when available or relevant, reporting mode, and any risk-based reviewer count or lens hints.
    - Ask `review-pass` to compare the implementation shape against the durable design source and flag first-commit design drift before the loop starts treating symptoms as isolated bugs.
    - When the user or prior loop history points at over-complexity, ask for simplicity or `code-judo` attention so reviewers surface smaller shapes that preserve behavior while deleting moving parts.
+   - If `review-pass` reports unavailable clean-context reviewer capability, preserve the reviewer request or prompt packet in the ledger or blocked result, mark the loop `blocked` or `needs-human`, and stop before adjudication, fix commits, PR comments that imply review completion, or ready-for-human marking.
    - Wait for the packet before adjudicating.
 
 4. Adjudicate and consolidate packet findings:
@@ -224,6 +228,7 @@ Use the matrix to update affected contract surfaces in one pass. Check the ownin
    - Prefer same-source reviewer continuity when the harness can safely resume source reviewers; otherwise use packet/finding-source fallback.
    - Provide only the needed reviewer continuity preference, source reviewer aliases or handles, prior packet, reviewer finding IDs, issue-family IDs, autopilot classifications and rationales, complexity posture, smallest closing moves or lazy-human decisions, fix commits, accepted fixes, declined rationales, effort metadata when available or relevant, validation results, and consolidated comment URL.
    - Ask `review-pass` to verify prior issue families, reassess declined issue families against the rationale, check whether accepted fixes honored the recorded complexity posture and smallest closing move, and reread the full current diff for missed or newly introduced issues.
+   - If `review-pass` reports unavailable clean-context reviewer capability, preserve the reviewer request or prompt packet in the ledger or blocked result, mark the loop `blocked` or `needs-human`, and stop before further fixes, PR comments that imply review completion, or ready-for-human marking.
    - Record whether the verification pass used same-source reviewer continuity or packet/finding-source fallback, and whether opaque handles were available through the private handoff.
    - If the verification packet contains remaining or new issue families, adjudicate them before deciding whether the loop is still blocked; fix `auto-fix` and `user-approved-fix` families, record or reassess `auto-decline` rationales, and pause for unresolved `ask-user` blockers.
    - If a verification packet challenges a declined rationale, reassess once from repository evidence; ask the user if the dispute changes product behavior, scope, or remains genuinely ambiguous.
@@ -257,6 +262,7 @@ Call narrower playbooks for their owned surfaces: GitHub workflow policy for PR 
 
 - The loop captures target, base, head, baseline intent, final reviewed commit SHA or local diff state, and review-pass sizing rationale.
 - Feature-sized review targets pass `ensure-implementation-readiness` check-only mode with `Ready to Implement` or `Gate Skipped` before reviewers are spawned; missing readiness returns `blocked` without review-phase repair.
+- Unavailable clean-context reviewer capability returns `blocked` or `needs-human` with the reviewer request or prompt packet and never counts as clean convergence.
 - Every fresh or verification panel pass is delegated to `review-pass` or its canonical fallback files.
 - The orchestrator owns one durable ledger and posts at most one consolidated "Agent Review" comment per panel pass.
 - Findings are generalized into issue families where possible, and accepted families are swept before verification.
@@ -303,7 +309,7 @@ Before finishing:
 15. Confirm review-pass requests used the current fresh or verification templates, including effort metadata when available or relevant, reporting mode, read-only rule, no-reviewer-PR-comment rule, dirty-validation rule, issue-family sweep instruction, design-escape-hatch instruction, full-reread instruction, provisional-ID rule, and clean response sentinel.
 16. If a deep-review lens was assigned, confirm `review-pass` supplied the deep-review lens instructions and no full standalone `thermo-nuclear-review` workflow was run inside `review-loop`.
 17. If a structural-depth lens was assigned, confirm `review-pass` supplied the structural-depth lens instructions and no full standalone `improve-codebase-architecture` or `thermo-nuclear-code-quality-review` workflow was run inside `review-loop`.
-18. Confirm explicit `review-pass` panel requests were treated as permission for read-only reviewer subagents when the harness supported them, or record why `review-pass` used fallback.
+18. Confirm explicit `review-pass` panel requests were treated as permission for read-only reviewer subagents when the harness supported them, or that unavailable clean-context reviewer capability returned blocked/needs-human without same-context review or ready marking.
 19. Confirm verification continuity mode and opaque handle availability were recorded for verification passes without exposing handle values.
 20. Confirm soft budget checkpoints were surfaced when checkpoint triggers occurred.
 21. Confirm validation commands and results are captured.
