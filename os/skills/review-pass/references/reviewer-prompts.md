@@ -173,7 +173,7 @@ When the target changes reusable contract surfaces, also reopen:
 `os/skills/review-pass/references/lenses/contract-surface-matrix.md`
 or the current harness's configured adapter path for `review-pass/references/lenses/contract-surface-matrix.md`, if it is known.
 
-For every fresh reviewer, fill and send the "Fresh Reviewer Prompt" template. For every verification reviewer, fill and send the "Verification Reviewer Prompt" template. If clean-context reviewers are unavailable before prompts can be sent, do not run a same-context review; return a blocked result using the blocked-result template in `review-packet-template.md`, including the assembled reviewer request or prompt packet.
+For every fresh reviewer, fill and send the "Fresh Reviewer Prompt" template. For every verification reviewer, fill and send the "Verification Reviewer Prompt" template. Eligible clean-context reviewers are separate clean-context or equivalent isolated reviewers that did not implement or adjudicate the target; the current implementation, parent, or same-context agent does not count as review evidence even for a read-only self-check. If eligible clean-context reviewers are unavailable before prompts can be sent, do not run a same-context review; return a blocked result using the blocked-result template in `review-packet-template.md`, including the assembled reviewer request or prompt packet.
 
 Do not reconstruct these prompts from memory. Each reviewer prompt must include:
 - target, repository, base, and current head;
@@ -184,6 +184,7 @@ Do not reconstruct these prompts from memory. Each reviewer prompt must include:
 - Contract Surface Matrix guidance loaded from `references/lenses/contract-surface-matrix.md` when the target changes reusable contract surfaces;
 - source-workflow boundary and design-escape-hatch escalation guidance from the assigned lens file when `deep-review` or `structural-depth` is assigned;
 - reporting mode: chat to review-pass orchestrator only;
+- the eligible clean-context reviewer rule: separate clean-context or equivalent isolated reviewers count, but the current implementation, parent, or same-context agent does not;
 - the repository-instruction rule;
 - the read-only rule, including no PR comments by reviewers;
 - the dirty-validation rule: use existing validation output only, do not run validation commands that may dirty the target checkout, and recommend validation signals for the caller instead;
@@ -197,5 +198,5 @@ Do not reconstruct these prompts from memory. Each reviewer prompt must include:
 - the provisional-ID instruction for new findings;
 - the clean response sentinel: start with exactly `No new findings.` on its own first line.
 
-Keep review-pass read-only. Close every spawned or resumed reviewer after collecting its report, then return a packet using the canonical Review Packet Template. If no clean-context reviewers were available, confirm no same-context review was run and return the blocked result instead.
+Keep review-pass read-only. Close every spawned or resumed reviewer after collecting its report, then return a packet using the canonical Review Packet Template. If no eligible clean-context reviewers were available, confirm no same-context review was run and return the blocked result instead.
 ```

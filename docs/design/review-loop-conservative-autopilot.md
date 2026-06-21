@@ -57,7 +57,7 @@ Out of scope:
 - The default fix policy prefers simplification and scope reduction over added machinery.
 - The loop records auto-fix, auto-decline, and ask-user decisions in its ledger/reporting trail.
 - User-approved ask-user fixes re-enter fix and verification, while unresolved ask-user blockers prevent ready marking.
-- Final convergence is based on no unresolved auto-fix or ask-user blockers after parent adjudication, not on raw reviewer labels alone.
+- Final convergence is based on clean-context review-loop convergence evidence with no unresolved auto-fix or ask-user blockers after parent adjudication, not on raw reviewer labels alone.
 - User interruptions use the lazy-human brief shape instead of dumping raw issue-family adjudication on the user.
 - Existing safety boundaries for PR comments, pushes, ready markers, and non-PR writes remain intact.
 

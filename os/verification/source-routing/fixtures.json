@@ -272,7 +272,9 @@
         {
           "path": "os/skills/review-pass/references/reviewer-prompts.md",
           "contains": [
-            "If clean-context reviewers are unavailable before prompts can be sent",
+            "Eligible clean-context reviewers are separate clean-context or equivalent isolated reviewers",
+            "the current implementation, parent, or same-context agent does not count as review evidence",
+            "If eligible clean-context reviewers are unavailable before prompts can be sent",
             "do not run a same-context review"
           ]
         },
