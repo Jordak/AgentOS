@@ -45,7 +45,7 @@ Higher outer-loop scope does not automatically imply higher effort. Coordinators
 - `grill-me`: `high`, with selective `xhigh` for unusually deep or high-stakes design work.
 - `grill-with-docs`: `high`, with selective `xhigh` for hard architecture or cross-document tradeoffs.
 - `review-pass`: `high`, with selective `xhigh` for security, deep-review, final-gate, high-risk, difficult, or eval-justified passes.
-- `review-loop`: `medium`, escalating to `high` for hard adjudication, design-escape-hatch calls, or same-thread fallback review/fix work.
+- `review-loop`: `medium`, escalating to `high` for hard adjudication, design-escape-hatch calls, or same-thread orchestration and fix work after clean reviewer evidence.
 - `select-issue-batch`: `medium` for issue-state interpretation, dependency judgment, and parallel-safety reasoning.
 - `audit-issues`: `medium` for evidence-backed issue tracker reconciliation.
 - `land-github-issue`: `medium` for integration proof, acceptance-criteria reconciliation, and human-review label judgment.
@@ -54,7 +54,7 @@ Higher outer-loop scope does not automatically imply higher effort. Coordinators
 
 Calling Workflows can be explicit about desired quality, latency, and cost posture without pretending every harness can enforce effort at fine granularity.
 
-Same-thread fallback remains valid, but its reports must distinguish prescribed effort from effective inherited effort when that matters.
+Same-thread fallback remains valid for orchestration, fixing, reporting, and other non-review-evidence work, but it cannot satisfy `review-pass` or `review-loop` clean-context reviewer evidence; reports must distinguish prescribed effort from effective inherited effort when that matters.
 
 Workflow Results and Recovery Records become more useful for later review, reruns, and cost-quality diagnosis.
 

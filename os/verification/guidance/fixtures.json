@@ -283,9 +283,9 @@
       "Use the complexity governor and record the smallest closing move for auto-fix and user-approved-fix families.",
       "Keep new durable machinery out of auto-fix unless the durable brief already approved the exact mechanism; P0/P1 severity informs the lazy-human recommendation instead of bypassing ask-user.",
       "Sweep sibling occurrences and fix the whole accepted issue family before requesting verification.",
-      "Use a lazy-human brief only for unresolved ask-user blockers, route user-approved-fix ask-user decisions through fix and verification, and finish only when no unresolved auto-fix or ask-user blockers remain after parent adjudication.",
+      "Use a lazy-human brief only for unresolved ask-user blockers, route user-approved-fix ask-user decisions through fix and verification, and finish only when clean-context review-loop convergence leaves no unresolved auto-fix or ask-user blockers after parent adjudication.",
       "Before yielding for an ask-user decision, record the unresolved blocker in the ledger and current reporting mode; after recovery, use PR comments or chat pause/user-reply/conversation-summary sources, and ask again when no resolved decision exists.",
-      "Keep the manifest mutability and safety surface limited to auto-fix and explicit user-approved-fix writes, with ready marking blocked by unresolved auto-fix or ask-user blockers.",
+      "Keep the manifest mutability and safety surface limited to auto-fix and explicit user-approved-fix writes, with ready marking blocked by unresolved auto-fix or ask-user blockers and by missing clean-context review evidence.",
       "Preserve resolved ask-user decisions in the consolidated comment or report trail instead of suppressing them as a clean pass."
     ],
     "failure_modes": [
@@ -297,6 +297,8 @@
       "Skips the complexity governor for a user-approved-fix because the user already approved the direction.",
       "Treats P0/P1 severity as authority to add new durable machinery through auto-fix.",
       "Treats an unresolved ask-user blocker as terminal without an explicit user-approved-fix or user-declined/accepted-risk decision.",
+      "Treats same-context self-review or lower-confidence self-check fallback as review-loop convergence evidence.",
+      "Marks ready when clean-context reviewer capability is unavailable or missing from the final fresh review evidence.",
       "Yields for an ask-user decision before recording the unresolved blocker in the current reporting mode.",
       "Leaves the manifest describing broad fix/push/ready authority after the skill narrows writes to auto-fix and user-approved-fix.",
       "Suppresses the consolidated comment or report trail for a resolved ask-user decision."

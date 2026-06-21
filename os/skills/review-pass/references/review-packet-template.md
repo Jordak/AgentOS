@@ -1,6 +1,6 @@
 # Review Packet Template
 
-Use this file as the canonical rendering template for `review-pass` Review Packets. `reviewer-prompts.md` owns reviewer prompt mechanics; this file owns packet shape, headings, IDs, field labels, examples, and empty states.
+Use this file as the canonical rendering template for `review-pass` Review Packets and blocked review-pass results. `reviewer-prompts.md` owns reviewer prompt mechanics; this file owns packet shape, headings, IDs, field labels, examples, and empty states.
 
 ## Rendering Rules
 
@@ -18,6 +18,7 @@ Use this file as the canonical rendering template for `review-pass` Review Packe
 - Fixed prior issue families do not appear under `## Issue Families`; summarize them in `## Verification Results`.
 - Within each issue family, render `Recommended disposition`, `Failure mode`, and `Suggested fix shape` as the first three fields.
 - If chat output is a summary because the packet is too large, `## Temporary Packet Artifact` must name the temporary Markdown file that contains the complete packet.
+- When clean-context reviewer capability is unavailable, return the blocked-result template instead of the normal review-packet template. Do not synthesize same-context findings.
 
 ## Severity
 
@@ -91,6 +92,29 @@ Continuity handle availability: <private handoff available | unavailable | not a
 ## Temporary Packet Artifact
 
 <None. Complete packet returned in chat. | Complete packet written to `<temporary path>`; chat output summarizes issue families only.>
+```
+
+## Blocked Result Template
+
+Use this when clean-context reviewer capability is unavailable before reviewer prompts can be sent.
+
+```md
+# Review Pass Blocked
+
+Status: blocked
+Target: <target>
+Repository: <repo path or owner/name>
+Mode: <fresh | verification>
+Base: <base ref or commit>
+Head: <head or current head>
+Effort metadata: <prescribed model/effort, prescription source, effective model/effort, effective source/status, and meaningful mismatch; unknown or not reported when unavailable>
+Blocked reason: clean-context reviewer capability unavailable
+Reviewer request or prompt packet: <the assembled reviewer request, prompt packet, or temporary path containing it>
+Same-context review run: no
+Reviewer findings: none
+Mutations performed: none
+Validation used: <existing validation supplied by caller, or not applicable>
+Next action: <provide clean-context reviewers, retry in a harness that supports them, or return to the caller/user for a Blocking Human Decision>
 ```
 
 ## Empty States

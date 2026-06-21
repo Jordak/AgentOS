@@ -125,6 +125,7 @@ Readiness verdict: <Ready to Implement | Gate Skipped>
    - Look up `review-loop` in `os/skills/ORCHESTRATION_LOOPS.md` and, when a separate invocation boundary can honor it, pass the child workflow's prescribed effort plus prescription source, or record an explicit no-override/default statement. Invoke `review-loop` on the PR with its normal PR-scoped Authorization Boundary unless this skill was narrowed to read-only mode, passing or recording applicable effort metadata per `os/skills/ORCHESTRATION_LOOPS.md`. This normal invocation is equivalent delegated review/fix-loop authorization for `review-loop` to request read-only `review-pass` reviewer subagents when the harness supports them; it does not expand mutation rights beyond `review-loop`'s ordinary PR-scoped writes.
    - Let `review-loop` own reviewer-panel delegation, review/fix convergence, PR comments, fix commits, pushes to the target PR branch, and ready-for-human marking inside its contract.
    - Treat the review-loop final report or Workflow Result as evidence for this skill's final result.
+   - If review-loop returns `blocked` or `needs-human` because eligible clean-context reviewers are unavailable, propagate that terminal status in this workflow result, do not claim PR-ready review-loop convergence, and include the review-loop prompt packet or report evidence for recovery.
    - If review-loop returns a Blocking Human Decision, record it recoverably and pause instead of guessing.
 
 9. Report final Workflow Result:

@@ -39,3 +39,5 @@ Validation notes:
 ```
 
 If a pass has no `auto-fix` issue families, no resolved `ask-user` decisions, no useful declined issue-family rationale, and no unresolved `ask-user` blockers, do not post a clean-pass comment unless the parent explicitly wants a final readiness comment.
+
+Any final readiness or clean-pass comment must name the eligible clean-context final fresh `review-pass` packet, reviewers or reviewer aliases, and terminal condition that support convergence. Do not post a final readiness or clean-pass comment when `review-pass` blocked on unavailable eligible clean-context reviewers. For a blocked clean-reviewer run, an authorized Agent Review comment must state `blocked` or `needs-human`, include the reviewer request or prompt packet, confirm no same-context review ran, and confirm no ready-for-human marker was applied.
