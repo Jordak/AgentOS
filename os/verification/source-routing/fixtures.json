@@ -399,6 +399,14 @@
           ]
         },
         {
+          "path": "os/skills/review-loop/references/agent-review-comment.md",
+          "contains": [
+            "eligible clean-context final fresh `review-pass` packet",
+            "Do not post a final readiness or clean-pass comment when `review-pass` blocked on unavailable eligible clean-context reviewers",
+            "confirm no ready-for-human marker was applied"
+          ]
+        },
+        {
           "path": "os/skills/review-loop/agents/openai.yaml",
           "contains": [
             "clean-context read-only reviewers",
