@@ -126,7 +126,7 @@ Landing is a phase of normal or resume mode, not a separate top-level mode.
 
 6. Launch and track workers:
    - Launch supported workers only in normal mode and only after the ledger checkpoint, parallel-safety checks, worker setup, thread naming when available, and callback/reference recording pass.
-   - After launch, let the coordinator go idle until worker Workflow Results return. Once workers have acknowledged setup or are simply active, repeated `read_thread` checks for worker progress are live polling rather than bootstrap; stop with a durable waiting-for-callback state unless timeout, recovery, or diagnostic polling has a recorded reason and bound.
+   - After launch, let the coordinator go idle until worker Workflow Results return. Once workers have acknowledged setup or are simply active, do not poll for progress; stop with a durable waiting-for-callback state unless timeout, recovery, or diagnostic polling has a recorded reason and bound.
    - Preserve one worker per isolated checkout, index, branch, and issue scope.
    - Track terminal Workflow Result status values `completed`, `blocked`, `failed`, `cancelled`, and `needs-human` separately from worker lifecycle states such as `queued`, `launched`, `implementing`, `ready-for-human-review`, `revising-after-review`, `merged`, `landing-skipped`, and `landed`, plus release status or post-result availability for workers that should stop, remain assigned, or wait for caller release.
    - Let workers run issue-local readiness repair, design consensus, implementation, validation, PR creation, review-loop convergence, and review-comment corrections within their assigned scope and readiness contract.
