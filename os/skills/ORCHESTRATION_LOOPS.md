@@ -47,7 +47,7 @@ A Called Workflow should return completion, blocked, failed, cancelled, and need
 
 Convention v1 standardizes callback result surfaces and terminal status vocabulary, not aggregate status precedence. For workflows that aggregate mixed child outcomes, keep per-worker, per-issue, or per-batch outcomes visible in the Workflow Result; aggregate precedence rules and richer status maps are deferred to GitHub issue #158.
 
-Runtime polling of Called Workflows is not the normal orchestration pattern. It is allowed only as bounded bootstrap, timeout, recovery, or diagnostic behavior. The Calling Workflow should record the polling reason, bound, and result in its Recovery Record.
+Runtime polling of Called Workflows is not the normal orchestration pattern. It is allowed only as bounded bootstrap, timeout, recovery, or diagnostic behavior. After callback setup is acknowledged or a called workflow is simply active, do not poll for ordinary progress; the Calling Workflow should record a waiting-for-callback state, stop its active turn, and record any later polling reason, bound, and result in its Recovery Record.
 
 ## Minimal Assignment Packets
 

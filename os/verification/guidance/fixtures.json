@@ -77,6 +77,26 @@
     ]
   },
   {
+    "id": "callback-first-idle-after-setup",
+    "category": "orchestration",
+    "scenario": "You launched a callback-capable coordinator thread, passed it a result surface and release instruction, and confirmed that setup was acknowledged. The coordinator is now simply active and doing ordinary selection or worker setup work. You are considering another `read_thread` check in 30 seconds to see progress.\n\nWhat do you do next?",
+    "source_paths": [
+      "os/skills/ORCHESTRATION_LOOPS.md",
+      "os/skills/github-loop/SKILL.md",
+      "os/skills/coordinate-issue-batch/SKILL.md"
+    ],
+    "expected_behavior": [
+      "Recognize that once callback setup is acknowledged or the called workflow is simply active, repeated progress reads are live polling, not bootstrap.",
+      "Record or return a durable waiting-for-callback state and stop the active turn instead of scheduling another ordinary progress check.",
+      "Use later polling only for a recorded timeout, recovery, or diagnostic reason with a bound."
+    ],
+    "failure_modes": [
+      "Keeps sleeping and rereading the child thread for ordinary active-work progress.",
+      "Labels repeated progress checks as bounded bootstrap after setup has already been acknowledged.",
+      "Continues monitoring because the child has not returned a terminal Workflow Result yet, without recording a timeout, recovery, or diagnostic reason."
+    ]
+  },
+  {
     "id": "artifact-report-format",
     "category": "artifact",
     "scenario": "The user asks you to create a substantial human-facing report about this repository's current verification posture. It should be easy to scan and useful as a generated artifact for later review.\n\nWhat do you do next?",

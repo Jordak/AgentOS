@@ -57,7 +57,7 @@ Safety:
 - Do not launch workers for a batch that is not parallel-safe. Stop for a Blocking Human Decision when coordinator checks contradict the selected batch, even if a sequential order is obvious.
 - Do not silently downgrade a selected parallel batch to sequential execution.
 - Do not make workers responsible for the full batch ledger, landing queue, other workers' detailed state, or selection rationale. Give workers only enough batch context to respect their Isolation Boundary and escalation rules.
-- Do not continuously poll worker threads as the normal progress model. Use callback-first Workflow Results, with polling only as bounded bootstrap, timeout, recovery, or diagnostic behavior recorded in the coordinator ledger.
+- Do not continuously poll worker threads as the normal progress model. Use callback-first Workflow Results, stop the active turn after callback setup is acknowledged, and use later polling only as bounded timeout, recovery, or diagnostic behavior recorded in the coordinator ledger.
 - Leave the per-issue implementation-readiness gate, repair, verdict, and related label hygiene to assigned issue workflows such as `implement-github-issue` using `ensure-implementation-readiness`. The coordinator may detect stale labels or blocker contradictions and pass raw evidence into worker handoffs, but it does not decide implementation readiness.
 - A coordinator handoff or worker launch authorizes the assigned worker to run the readiness workflow inside its issue boundary; it is not design consensus, explicit human confirmation, or gate-skip authorization.
 - Treat issue-local design consensus and `grill-with-docs` sessions as outside coordinator ownership unless the decision changes the batch ledger, Isolation Boundary, Authorization Boundary, worker assignment, landing sequence, or coordinator-owned integration state.
@@ -126,7 +126,7 @@ Landing is a phase of normal or resume mode, not a separate top-level mode.
 
 6. Launch and track workers:
    - Launch supported workers only in normal mode and only after the ledger checkpoint, parallel-safety checks, worker setup, thread naming when available, and callback/reference recording pass.
-   - After launch, let the coordinator go idle until worker Workflow Results return. Use runtime polling only as bounded bootstrap, timeout, recovery, or diagnostic behavior, and record the reason and bound in the ledger.
+   - After launch, let the coordinator go idle until worker Workflow Results return. Once workers have acknowledged setup or are simply active, do not poll for progress; stop with a durable waiting-for-callback state unless timeout, recovery, or diagnostic polling has a recorded reason and bound.
    - Preserve one worker per isolated checkout, index, branch, and issue scope.
    - Track terminal Workflow Result status values `completed`, `blocked`, `failed`, `cancelled`, and `needs-human` separately from worker lifecycle states such as `queued`, `launched`, `implementing`, `ready-for-human-review`, `revising-after-review`, `merged`, `landing-skipped`, and `landed`, plus release status or post-result availability for workers that should stop, remain assigned, or wait for caller release.
    - Let workers run issue-local readiness repair, design consensus, implementation, validation, PR creation, review-loop convergence, and review-comment corrections within their assigned scope and readiness contract.
@@ -192,7 +192,7 @@ Recover at least:
 - Every launched worker has an Isolation Boundary, branch/worktree, Authorization Boundary, prescribed model/effort and prescription source or explicit no-override/default statement when relevant, Workflow Invocation Reference when supported, release instruction, and expected Workflow Result.
 - Returned worker results record release status or post-result availability before the batch is treated as quiescent.
 - Supported durable worker threads are renamed to public-safe, legible target-specific names before `READY` or substantive assignment, and worker handoffs are minimal pointer-first packets rather than copied workflow contracts.
-- The coordinator goes idle after worker launch and uses polling only as bounded bootstrap, timeout, recovery, or diagnostic behavior.
+- The coordinator goes idle after worker launch, stops the active turn after callback setup is acknowledged, and uses later polling only as bounded timeout, recovery, or diagnostic behavior.
 - Non-parallel-safe selected batches stop for a Blocking Human Decision.
 - Assigned issue workflows own issue-local design/readiness questions through their readiness contract, while coordinator-owned batch decisions return to the coordinator.
 - Landing waits for worker quiescence and human merge reports.
@@ -211,7 +211,7 @@ Before finishing:
 6. Confirm worker setup checkpoints and handoffs include required fields, effort metadata or explicit no-override/default statements when available or relevant, Workflow Invocation References when supported, release instructions, only boundary-relevant batch context, and for implementation workers the explicit instruction that the handoff or launch is not design consensus, explicit human confirmation, or gate-skip authorization.
 7. Confirm Codex durable workers use branch-backed project threads when that harness path is available, not in-thread subagents.
 8. Confirm supported worker threads were renamed to public-safe, legible target-specific names before `READY` or substantive assignment, or record why a public-safe rename was unavailable.
-9. Confirm the coordinator used callback-first Workflow Results, returned the coordinator result through any caller-supplied result surface when available, followed the coordinator release instruction, and did not continuously poll workers except for recorded bounded bootstrap, timeout, recovery, or diagnostics.
+9. Confirm the coordinator used callback-first Workflow Results, returned the coordinator result through any caller-supplied result surface when available, followed the coordinator release instruction, stopped the active turn after callback setup was acknowledged, and did not continuously poll workers except for recorded bounded bootstrap, timeout, recovery, or diagnostics.
 10. Confirm the per-issue implementation-readiness gate, repair, verdict decisions, and related label hygiene stayed with assigned issue workflows, while worker-reported readiness verdicts were passed through without coordinator reinterpretation and without treating coordinator handoffs or worker launches as readiness evidence or gate-skip authority.
 11. Confirm no PR merge/squash, branch deletion, label creation, permission change, out-of-scope issue mutation, or Personal Overlay access happened without explicit authorization.
 12. Confirm landing checks waited for worker quiescence, recorded needs-human Blocking Human Decisions, worker release status or post-result availability, and human merge reports.
