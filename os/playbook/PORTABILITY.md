@@ -140,7 +140,7 @@ Sources:
 - https://code.claude.com/docs/en/memory
 - https://developers.googleblog.com/en/an-important-update-transitioning-gemini-cli-to-antigravity-cli/
 - https://google-gemini.github.io/gemini-cli/docs/cli/gemini-md.html
-- https://google-gemini.github.io/gemini-cli/docs/reference/configuration/
+- https://geminicli.com/docs/reference/configuration/
 - https://github.com/google-antigravity/antigravity-cli
 - https://github.com/google-antigravity/antigravity-cli/blob/main/CHANGELOG.md
 - https://antigravity.google/docs/rules-workflows
