@@ -57,7 +57,7 @@ Safety:
 
 - Do not run issue selection directly. Pass selection goals and filters to `coordinate-issue-batch`.
 - Do not launch implementation workers directly. Worker launch, branch/worktree/thread setup, handoffs, parallel-safety checks, and batch ledgers remain owned by `coordinate-issue-batch`.
-- Do not continuously poll `coordinate-issue-batch` as the normal progress model. Pass a Workflow Invocation Reference when supported and wait for a Workflow Result, using polling only as bounded bootstrap, timeout, recovery, or diagnostic behavior recorded in the loop Recovery Record.
+- Do not continuously poll `coordinate-issue-batch` as the normal progress model. Pass a Workflow Invocation Reference when supported, stop the active turn after callback setup is acknowledged, and wait for a Workflow Result, using later polling only as bounded timeout, recovery, or diagnostic behavior recorded in the loop Recovery Record.
 - Do not land issues directly. Resume or invoke `coordinate-issue-batch` so its batch ledger can invoke or follow `land-github-issue` for eligible merged issues.
 - Do not merge or squash PRs, close issues, delete branches, create labels, change permissions or settings, handle credentials or MFA, or write outside the loop's assigned scope unless another approved workflow or explicit user authorization owns that action.
 - Do not start a later batch while the current batch has unmerged ready PRs waiting for human merge reports, failed or cancelled workers, a failed or cancelled batch pass, blocked issues or workers, needs-human states, unresolved Blocking Human Decisions, or incomplete landing decisions.
@@ -202,7 +202,7 @@ Public, publishable, or Git-backed recovery surfaces must use only public-safe f
 - Each called batch pass receives a Workflow Invocation Reference and release instruction when the harness supports it.
 - Supported child coordinator threads are renamed to public-safe, legible target-specific names before assignment or `READY`, or the unavailable rename is recorded.
 - Actual child coordinator thread names, invocation references or result surfaces, redaction or unavailable reasons, effort metadata or explicit no-override/default statements, and release instructions are checkpointed after create/resume/rename and before assignment or `READY`.
-- The loop goes idle after batch-pass launch and uses polling only as bounded bootstrap, timeout, recovery, or diagnostic behavior.
+- The loop goes idle after batch-pass launch, stops the active turn after callback setup is acknowledged, and uses later polling only as bounded timeout, recovery, or diagnostic behavior.
 - Another pass starts only after the prior batch is cleanly settled.
 - No selected issues ends the loop for the current goal instead of silently broadening scope.
 - Failed or cancelled workers, failed or cancelled batch passes, blocked workers or issues, needs-human states, unresolved human decisions, and unmerged ready PRs stop the loop before later batch selection.
