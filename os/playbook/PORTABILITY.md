@@ -83,7 +83,9 @@ Google Antigravity adapter:
 - Global rules/context: `<home>/.gemini/GEMINI.md` for default Antigravity global rules and Antigravity CLI global context.
 - Workspace context: `AGENTS.md` and `GEMINI.md` in the active workspace directory. Keep AgentOS's root `AGENTS.md` as the portable entry point; add a small `GEMINI.md` only when a workspace needs a Gemini/Antigravity-native pointer or local instructions.
 - Workspace rules: `.agents/rules` in the workspace or git root. Use this for Antigravity-specific rule files, activation metadata, or rule sets that should not live in the portable AgentOS root adapter.
-- Antigravity CLI settings and plugins: `<home>/.gemini/antigravity-cli/`, including `settings.json` and plugins staged under `plugins/<plugin_name>/`.
+- Shared Antigravity configuration: `<home>/.gemini/config/` for shared CLI/backend configuration that should stay synchronized with Antigravity, including plugin installs and hooks such as `hooks.json`.
+- Antigravity CLI app/cache/session state: `<home>/.gemini/antigravity-cli/` for CLI-private application data, cache, session, and troubleshooting state. Do not assume plugins, hooks, or every settings surface live under this private app-data folder.
+- Permissions and settings: current Antigravity CLI changelog notes that CLI permissions merge project-level permissions, shared Antigravity user settings, and CLI `settings.json`; preserve that distinction when writing local setup notes.
 - `GEMINI_CLI_HOME` caveat: Gemini CLI documents `GEMINI_CLI_HOME` as the root for Gemini CLI user-level configuration, but current official Antigravity docs checked for this update do not say that Antigravity honors it. Do not assume `GEMINI_CLI_HOME` moves Antigravity's default global rules path; manage `<home>/.gemini/GEMINI.md` explicitly when a machine uses both an alternate Gemini CLI home and default Antigravity.
 
 Other tools should get small adapter files that point back to the portable core. Do not copy the whole OS into every adapter unless the tool cannot read local files.
@@ -124,21 +126,23 @@ When moving AgentOS to a new tool:
 
 ## Current Source Notes
 
-Checked on 2026-05-07 for Codex and Claude Code; checked on 2026-05-27 for Google Antigravity and Gemini CLI:
+Checked on 2026-05-07 for Codex and Claude Code; checked on 2026-06-19 for Google Antigravity and Gemini CLI path details:
 
 - Codex: OpenAI's AGENTS.md docs say Codex reads global guidance from the user-level Codex `AGENTS.md` file and project guidance from `AGENTS.md` files in the workspace path.
 - Claude Code: Anthropic's memory docs say Claude Code reads `CLAUDE.md`, can import `AGENTS.md`, and supports user/project/local scopes.
 - Google Developers Blog: consumer Gemini CLI and Gemini Code Assist access for Google AI Pro, Ultra, and free individual use stops serving requests on June 18, 2026; enterprise/API-key Gemini CLI access remains supported.
-- Gemini CLI: Google Gemini CLI docs identify `<home>/.gemini/GEMINI.md` as the global context file, support `@file.md` imports, allow configurable context filenames, and document `GEMINI_CLI_HOME` as the root for Gemini CLI user-level configuration.
-- Google Antigravity: Google Antigravity docs identify global rules/default CLI context at `<home>/.gemini/GEMINI.md`, workspace context in both `GEMINI.md` and `AGENTS.md`, workspace rules under `.agents/rules`, and Antigravity CLI settings/plugins under `<home>/.gemini/antigravity-cli/`.
+- Gemini CLI: Google Gemini CLI docs identify `<home>/.gemini/GEMINI.md` as the global context file, support `@file.md` imports, allow configurable context filenames, and document JSON settings files at system defaults, user, project, and system override locations.
+- Google Antigravity: Google's transition announcement says consumer Gemini CLI access stopped serving requests on June 18, 2026 while enterprise/API-key Gemini CLI access remains supported; the official Antigravity CLI README describes a shared Antigravity agent engine, shared settings, and session export. The Antigravity CLI changelog distinguishes CLI-private app/cache/session state under `<home>/.gemini/antigravity-cli/` from shared configuration under `<home>/.gemini/config/`: `1.0.2` says plugin installs go directly to `<home>/.gemini/config/`, `1.0.5` says permissions merge project-level permissions, shared Antigravity user settings, and CLI `settings.json`, and `1.0.8` says `/hooks` writes to `<home>/.gemini/config/hooks.json`.
 
 Sources:
 
 - https://developers.openai.com/codex/guides/agents-md
 - https://code.claude.com/docs/en/memory
-- https://developers.googleblog.com/an-important-update-transitioning-gemini-cli-to-antigravity-cli/
+- https://developers.googleblog.com/en/an-important-update-transitioning-gemini-cli-to-antigravity-cli/
 - https://google-gemini.github.io/gemini-cli/docs/cli/gemini-md.html
 - https://google-gemini.github.io/gemini-cli/docs/reference/configuration/
+- https://github.com/google-antigravity/antigravity-cli
+- https://github.com/google-antigravity/antigravity-cli/blob/main/CHANGELOG.md
 - https://antigravity.google/docs/rules-workflows
 - https://antigravity.google/docs/gcli-migration
 - https://antigravity.google/docs/cli-using
