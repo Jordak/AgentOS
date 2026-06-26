@@ -25,9 +25,15 @@ When eligible evidence has non-passing results, status entries may include `Non-
 
 ### Codex
 
-- Status: `passing`
-- Reviewed Core revision: `95be0563bb4774fee4eb8b5ea3dde958c6f88d9c`
-- Last reviewed evidence: `2026-06-06T21:18:13.830554+00:00`
-- Evidence scope: `guidance Codex harness; HUT user config allowed; 15 default guidance fixtures; gpt-5.5 low; judge gpt-5.5 low`
-- Summary: Codex produced judged responses for all 15 default Guidance scenarios and passed 15 behavioral checks. No status-counting behavioral failures or fixture-stale cases were reported.
+- Status: `attention needed`
+- Reviewed Core revision: `1eac39a8d1ba250df0bd782b5ec48772f9176728`
+- Last reviewed evidence: `2026-06-26T17:16:33.210482+00:00`
+- Evidence scope: `guidance Codex harness; HUT user config allowed; 17 default guidance fixtures; gpt-5.5 low; judge gpt-5.5 low`
+- Summary: Codex produced judged responses for 17 default Guidance scenarios and passed 16 behavioral checks. Status-counting results include 1 behavioral failures. The non-passing details below provide public-safe result classes for investigation.
 - Caveats: No fixture-stale cases, needs-user-judgment cases, harness-unavailable cases, harness-error cases, judge-unavailable cases, judge-error cases, judge-invalid cases were reported. The host-boundary sentinel was not observed, which satisfies the contamination tripwire for this status run but does not prove full host filesystem isolation. This status uses a full default, status-eligible run from clean remote-fresh `main`; diagnostic non-default fixture or judge-protocol runs remain useful for investigation but are not status evidence.
+
+#### Non-Passing Details
+
+| Fixture | Category | Result | Public-safe diagnosis | Suggested next step |
+| --- | --- | --- | --- | --- |
+| `review-loop-issue-families` | review | Behavioral failure | Behavioral failure reported with status `graded`, verdict `fail`, source alignment `partial`, staleness `current`, and host-boundary sentinel observed `no`. | Review the fixture expectation and Guidance source for this scenario, then rerun the status benchmark. |
