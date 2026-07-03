@@ -16,7 +16,7 @@ This skill is not a copy workflow. Canonical skill behavior stays under `os/skil
 Inputs:
 
 - AgentOS root, defaulting to the current workspace.
-- `os/skills/MANIFEST.md` as the Core skill list.
+- `os/skills/MANIFEST.md` as the Core exported-skill map.
 - Current-machine global skill root: `~/.agents/skills`.
 - Optional repeated `--skill <name>` filter.
 - Optional apply flag: `--no-dry-run`.
@@ -50,7 +50,7 @@ Safety:
 ## Workflow Phases
 
 1. Confirm scope:
-   - Default: all Core manifest skills.
+   - Default: all exported Core manifest skills.
    - Use `--skill <name>` for named subsets.
    - Personal Overlay is doc-only in v1 and not scanned by the script.
    - Target is always global `~/.agents/skills`.
@@ -117,8 +117,8 @@ Private skills may live under `personal/os/skills/<skill-name>/SKILL.md`, but v1
 ## Quality Bar
 
 - Dry run is the default and shows planned global adapter changes before writes.
-- Apply mode creates only missing symlink adapters for Core manifest skills.
-- Existing same-name Core skill directories, wrong-target symlinks, and blocked paths for Core manifest skill names are visible in the report.
+- Apply mode creates only missing symlink adapters for exported Core manifest skills.
+- Existing same-name Core skill directories, wrong-target symlinks, and blocked paths for exported Core manifest skill names are visible in the report.
 - Existing same-name Core skill directories are replaced only with `--replace-existing-copy --no-dry-run`, and their backups are reported.
 - The script does not prove those directories are byte-identical copies of Core. It treats same-name Core skill directories as eligible only after the user has seen and approved the dry run.
 - Wrong-target symlinks, files, blocked paths, and unrelated global harness skills are not replaced.

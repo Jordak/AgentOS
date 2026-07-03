@@ -311,7 +311,7 @@ Link to these contracts rather than copying their rules into every new loop.
 
 ## Skill Contract Guidance
 
-When a skill is an Orchestration Loop or can be invoked by one, its skill contract or manifest entry should make the relevant boundaries clear:
+When a skill is an Orchestration Loop or can be invoked by one, its skill contract should make the relevant boundaries clear:
 
 - whether it is read-only, mutating, or mode-dependent;
 - what target it owns;
