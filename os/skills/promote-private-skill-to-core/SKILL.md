@@ -17,7 +17,7 @@ Do not use this for ordinary Core skill creation from public examples. Use `skil
 
 Turn a private skill candidate into a Core-safe reusable workflow without leaking private state and without breaking the user's private behavior.
 
-The workflow can stop after a read-only promotion audit. When implementation is explicitly approved, it can create or update a Core skill, Core manifest entry, validation fixtures, and the matching Personal Overlay config or private thin adapter plan.
+The workflow can stop after a read-only promotion audit. When implementation is explicitly approved, it can create or update a Core skill, Core export-map entry, validation fixtures, and the matching Personal Overlay config or private thin adapter plan.
 
 ## Contract
 
@@ -114,7 +114,7 @@ Before proposing a Core promotion as safe, inspect paths and content for:
 ## Filing Rules
 
 - Core-safe promoted skill sources live under `os/skills/<skill-name>/`.
-- Core maintenance facts live in `os/skills/MANIFEST.md`.
+- Core export membership lives in `os/skills/MANIFEST.md`; skill maintenance facts live in the promoted skill, its provenance files, or generated audit evidence.
 - Private inputs for reusable Core skills live in `personal/os/skills/<skill-name>/CONFIG.md` when a separate config is warranted.
 - Private skill governance facts live in ignored `personal/os/skills/MANIFEST.md`.
 - Private examples, reports, run histories, live agent state, live automation state, and generated outputs remain in the relevant Personal Overlay layer.

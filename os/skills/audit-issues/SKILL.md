@@ -130,7 +130,7 @@ Adjust `origin/main` to the verified remote integration branch.
 
 - Do not create a durable local file by default; the audit report can stay in chat.
 - If the user asks for an audit artifact, file it in the mapped project, not in AgentOS, unless the report is about AgentOS itself.
-- External tracker state stays in the tracker. AgentOS keeps only this reusable workflow and manifest metadata.
+- External tracker state stays in the tracker. AgentOS keeps only this reusable workflow and its export-map membership.
 
 ## Verification
 

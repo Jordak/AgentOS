@@ -8,7 +8,7 @@ Design readiness: ready to implement
 
 The script has grown into a roughly 3k-line monolith. That makes the validator harder to audit, harder to extend safely, and harder to keep aligned with AgentOS's thin-script habit. The main validator should coordinate smaller helper validators instead of owning every structural, publication, privacy, skill, benchmark, and self-test detail in one file.
 
-While touching the file, the skills manifest also has a partially documented deterministic-check surface that is worth preserving: a malformed entry can still use an unsupported contract status, an unsupported mutability level, placeholder safety or filing text, or a stale summary count while satisfying minimal field-presence checks.
+While touching the file, the skills manifest also has a partially documented deterministic-check surface that is worth preserving. As of the export-map redesign, malformed entries can still use unsupported export statuses, placeholder catalog values, unsafe canonical sources, or a stale summary count while satisfying minimal field-presence checks.
 
 ## Desired Behavior
 
@@ -25,11 +25,10 @@ Helper validator modules should share common path, git, redaction, reporting, an
 
 For `os/skills/MANIFEST.md`, the validator should additionally catch:
 
-- summary count drift from the actual number of canonical manifest entries;
-- unsupported `Contract status` values outside the statuses documented by `os/skills/SKILL_CONTRACT.md`;
-- unsupported `Mutability` levels outside the contract's mutability vocabulary;
-- placeholder metadata such as `none`, `n/a`, `tbd`, or `safe` in required operational fields;
-- mutating skills whose safety posture does not visibly name approval, explicit authorization, permission, or a default dry-run gate.
+- summary count drift from the actual number of exported manifest entries;
+- unsupported `Export status` values outside the export-map vocabulary;
+- placeholder metadata such as `none`, `n/a`, `tbd`, or `safe` in required catalog fields;
+- unsafe or missing `Canonical source` paths for exported skills.
 
 ## Chosen Design
 
@@ -40,7 +39,7 @@ Use these modules:
 - `common.py` for bootstrap loading, shared constants, `Finding`, redaction, local git/path helpers, text reads, and reporting.
 - `managed.py` for managed symlink policy checks.
 - `publication.py` for publication precheck, public export, Personal Overlay ignore/tracking, privacy marker, generated-output, and secret-like token checks.
-- `skills.py` for skills manifest, skill frontmatter, and full-skill contract checks.
+- `skills.py` for the skills export map, skill frontmatter, and selected mechanical skill-shape checks.
 - `structural.py` for Markdown portability, source map, agent, automation, resolver, PR readiness, source-routing fixture, and benchmark-manifest checks.
 - `self_test.py` for the shared temporary-directory harness, expectation aggregation, and self-test orchestration.
 
@@ -56,9 +55,8 @@ Keep checks intentionally mechanical:
 
 - parse the existing Markdown API only;
 - normalize punctuation and code spans already handled by `extract_field()`;
-- treat the prefix before `:`, `;`, or `.` as the mutability level;
 - fail placeholder field values exactly, not by broad natural-language interpretation;
-- use a short approval-keyword heuristic only for non-read-only mutability levels.
+- validate only the export-map fields that remain source-of-truth in the manifest.
 
 ## Scope
 

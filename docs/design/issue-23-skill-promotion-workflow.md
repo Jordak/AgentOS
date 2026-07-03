@@ -8,7 +8,7 @@ GitHub issue #23 asks AgentOS to define a safe workflow for turning a maintained
 
 - Personal Overlay skills use the same Core skill contract as public Core skills.
 - A private skill is maintained canonical state only when `personal/os/skills/MANIFEST.md` has an entry with `Lifecycle status: maintained`.
-- Core and Personal Overlay skill manifests remain Markdown-first in v1, using the strict Markdown API documented in `os/skills/MANIFEST.md` and `os/skills/SKILL_CONTRACT.md`.
+- Core and Personal Overlay skill manifests remain Markdown-first, but they now serve different jobs: the Core manifest is an export map, while the Personal Overlay manifest is an ignored private governance registry.
 - `expose-skills` remains Core-only and must not scan or expose Personal Overlay skills.
 
 ## Chosen Design
@@ -46,7 +46,7 @@ The workflow must check both paths and content for private leakage:
 - examples that appear sanitized but still encode real private facts;
 - private filenames or directory names that would leak state even if contents are rewritten.
 
-Core may receive reusable procedure, public-safe safety policy, sanitized examples, validators, fixtures, and manifest metadata. Private live inputs stay in the Personal Overlay.
+Core may receive reusable procedure, public-safe safety policy, sanitized examples, validators, fixtures, and export-map membership. Private live inputs stay in the Personal Overlay.
 
 ## Alternatives Considered
 

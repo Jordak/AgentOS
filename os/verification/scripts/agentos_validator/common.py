@@ -175,15 +175,11 @@ SKILL_HEADING_RE = re.compile(r"^### `([^`]+)`\s*$", re.MULTILINE)
 SKILL_FRONTMATTER_KEY_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*$")
 REQUIRED_SKILL_MANIFEST_FIELDS = (
     "Canonical source",
-    "Contract status",
-    "Mutability",
-    "Tools and connectors",
-    "Output artifact",
-    "Filing rule",
-    "Safety posture",
-    "Verification coverage",
-    "Upgrade notes",
+    "Export group",
+    "Export status",
+    "Summary",
 )
+ALLOWED_SKILL_EXPORT_STATUSES = {"exported", "transitional", "deprecated", "explicit-only"}
 ALLOWED_SKILL_CONTRACT_STATUSES = {"full", "partial", "needs-upgrade", "thin-adapter"}
 ALLOWED_SKILL_MUTABILITY_LEVELS = {
     "read-only",

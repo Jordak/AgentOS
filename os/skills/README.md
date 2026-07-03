@@ -7,7 +7,7 @@ Use `os/skills/` for reusable workflows: repeatable procedures that an agent can
 ## Belongs Here
 
 - Canonical AgentOS skill sources.
-- The AgentOS skill contract and skills manifest.
+- The AgentOS skill contract and skills export map.
 - Thin adapters that intentionally route to fuller agent definitions.
 - Durable workflow rules, quality bars, verification expectations, and filing rules for repeated work.
 
@@ -23,8 +23,8 @@ Use `os/skills/` for reusable workflows: repeatable procedures that an agent can
 
 - Skill vs agent: use a skill for a callable repeated workflow; use an agent for a durable role with its own job, inputs, outputs, cadence, reports, and history.
 - Skill vs playbook: use a skill when the workflow is invoked as a capability; use the playbook for cross-cutting AgentOS operating policy.
-- Skill vs manifest: the manifest tracks maintenance facts. It is not the invocation surface and should not duplicate harness-provided descriptions.
-- Manifest format: Core and Personal Overlay skill manifests use Markdown in v1. Treat ``### `skill-name` `` headings and exact, case-sensitive `- Field name: value` labels as the stable manifest API for validators and exposure helpers.
+- Skill vs manifest: the Core manifest is the exported skillbase boundary. It is not the invocation surface and should not duplicate skill contracts, safety prose, or harness-provided descriptions.
+- Manifest format: Core export-map entries use Markdown in v2. Treat ``### `skill-name` `` headings and exact, case-sensitive `- Field name: value` labels as the stable manifest API for validators and exposure helpers.
 - Skill vs installed adapter: edit canonical files first, then use `expose-skills` to update current-machine Core skill adapters when needed. Existing same-name Core skill directories require explicit backup-backed replacement. Canonical public skills live in Core; canonical private skills can live in the Personal Overlay.
 - Canonical private skill vs private draft: a Personal Overlay skill is a maintained canonical private skill only when `personal/os/skills/MANIFEST.md` has an entry for it with `Lifecycle status: maintained`; directory-only private skills are drafts or ad hoc local files.
 - Private skill promotion vs ordinary skillification: use `promote-private-skill-to-core` when the candidate starts from a Personal Overlay skill or private config and must be sanitized into Core safely; use `skillify-agentos` for general repeated-work skill creation.
@@ -37,14 +37,14 @@ Use `os/skills/` for reusable workflows: repeatable procedures that an agent can
 - Put private user-specific skills under `personal/os/skills/<skill-name>/SKILL.md` when the skill itself depends on private identity, tools, paths, agents, or account state. Use `personal/os/skills/<core-skill>/CONFIG.md` for private inputs to a reusable Core skill.
 - For maintained private skills or important Core skill private config overlays, create or update ignored `personal/os/skills/MANIFEST.md` from `os/skills/PERSONAL_OVERLAY_MANIFEST.template.md` when the user asks or the current task explicitly maintains, imports, promotes, or governance-reviews a private skill.
 - Use `os/skills/promote-private-skill-to-core/SKILL.md` before turning a private skill into a Core skill. Promotion must prove reusable value, map private versus Core-safe behavior, preserve private behavior through config or a private thin adapter, and run privacy validation before Core publication.
-- Record lifecycle status, contract status, mutability, tools/connectors, safety posture, output artifact, filing rule, verification coverage, provenance, and private config status.
+- Keep invocation, mutability, tools/connectors, safety posture, output artifact, filing rule, verification coverage, provenance, and private config facts with the skill or private governance source that owns them.
 - Reference `personal/os/context/SOURCE_MAP.md` for nontrivial private source routes and `personal/os/connections/CONNECTIONS.md` for connector/account permissions; do not duplicate full source-map or connection inventories in the skills manifest.
-- Keep long-form manifest fields as readable Markdown prose. Consider a structured sidecar only when multiple scripts need typed data, cross-field validation, generated machine output, or query/sort/merge behavior.
+- Keep the Core manifest thin. Consider a structured sidecar only when multiple scripts need typed data, cross-field validation, generated machine output, or query/sort/merge behavior that cannot be derived from skill-local sources.
 - Prefer upgrading skills during real repeated work over speculative rewrites.
 
 ## Provenance
 
-When a skill comes from a repeated user request, failed run, or external recipe, record the reason in the skill or manifest. Do not record current-machine adapter paths or exposure state in the manifest; rerun `expose-skills` on each machine. For Personal Overlay skills, add Core-promotion notes only when a user or workflow is actively evaluating promotion; do not make promotion status a default field.
+When a skill comes from a repeated user request, failed run, or external recipe, record the reason in the skill or a skill-local provenance note. Do not record current-machine adapter paths or exposure state in the manifest; rerun `expose-skills` on each machine. For Personal Overlay skills, add Core-promotion notes only when a user or workflow is actively evaluating promotion; do not make promotion status a default field.
 
 ## Handoff Rules
 

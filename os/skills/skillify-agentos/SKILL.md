@@ -17,19 +17,19 @@ When the candidate starts as a Personal Overlay skill or private skill config th
 
 Turn real repeated work into durable AgentOS behavior with the smallest stable artifact that will prevent the repeated cost or failure.
 
-The output may be a skill update, a new skill, resolver guidance, manifest maintenance, a deterministic validator, a routing fixture, or a propagation queue proposal. The default is the least machinery that makes the future run better.
+The output may be a skill update, a new exported skill, resolver guidance, export-map maintenance, a deterministic validator, a routing fixture, or a propagation queue proposal. The default is the least machinery that makes the future run better.
 
 ## Contract
 
 Inputs:
 
 - At least one concrete example of the repeated task, repeated failure, or manual check. If no example exists, ask for one or stop with a proposed observation to watch.
-- The current AgentOS resolver, skills resolver, skill contract, skills manifest, verification checklist, and relevant existing skill or agent files.
+- The current AgentOS resolver, skills resolver, skill contract, skills export map, verification checklist, and relevant existing skill or agent files.
 - Any issue, report, transcript, failed run, validator output, or user correction that shows the pattern.
 
 Output artifact:
 
-- A new or updated AgentOS skill, resolver entry, manifest entry, deterministic validator, source-routing fixture, smoke example, or review-queue proposal.
+- A new or updated AgentOS skill, resolver entry, export-map entry, deterministic validator, source-routing fixture, smoke example, or review-queue proposal.
 - A short implementation summary naming what changed and how it was verified.
 
 Mutability:
@@ -73,7 +73,7 @@ Safety:
      should explain the judgment.
 5. Apply the AgentOS skill contract. New or materially changed skills must name inputs, output artifact, mutability, tools/connectors, safety, phases, quality bar, verification, and filing rules.
 6. Update maintenance surfaces:
-   - `os/skills/MANIFEST.md` for any skill add/update;
+   - `os/skills/MANIFEST.md` when adding, removing, renaming, deprecating, or changing export status for an exported Core skill;
    - `os/skills/expose-skills/SKILL.md` when current-machine Core skill
      exposure behavior changes;
    - `os/RESOLVER.md` only when lookup, routing, authority, safety, or filing
@@ -103,8 +103,8 @@ Keep the behavior as Markdown guidance when:
 
 ## File Conventions
 
-- Canonical skills live under `os/skills/`.
-- Skill contract metadata lives in `os/skills/MANIFEST.md`; current-machine Core skill exposure checks live in `os/skills/expose-skills/`.
+- Exported Core skills live under `os/skills/<skill-name>/SKILL.md` and appear in `os/skills/MANIFEST.md`.
+- Skill contract metadata lives with the skill or a skill-local provenance/governance file; current-machine Core skill exposure checks live in `os/skills/expose-skills/`.
 - Resolver changes live in `os/RESOLVER.md` or the narrow directory resolver.
 - Deterministic local checks live in `os/verification/scripts/validate_agentos.py` unless a separate script is clearly warranted.
 - Source-routing and smoke fixtures live under `os/verification/source-routing/`.
@@ -117,7 +117,7 @@ Do not duplicate the same rule across layers. Put the canonical rule in the narr
 - The workflow is grounded in at least one concrete example.
 - The resulting artifact is narrower than the repeated problem, not a generic framework for its own sake.
 - Deterministic checks cover exact invariants and avoid external network calls.
-- Skill and manifest updates remain consistent with `os/skills/SKILL_CONTRACT.md`.
+- Skill and export-map updates remain consistent with `os/skills/SKILL_CONTRACT.md`.
 - Smoke examples are safe to run locally and do not contain private data.
 - Resolver edits stay small and preserve the resolver's role as a policy spine, not a skill catalog.
 
@@ -126,7 +126,7 @@ Do not duplicate the same rule across layers. Put the canonical rule in the narr
 Before finishing:
 
 1. Confirm the concrete example is named in the work summary or encoded in a smoke fixture.
-2. Confirm `os/skills/MANIFEST.md` reflects any skill changes.
+2. Confirm `os/skills/MANIFEST.md` reflects any exported skill set changes.
 3. Confirm resolver or directory-resolver edits were made only for real tie-breakers.
 4. Run `scripts/run-validator`.
 5. If the validator changed, also run `scripts/run-validator --self-test`.

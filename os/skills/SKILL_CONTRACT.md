@@ -8,7 +8,7 @@ This contract is not a routing catalog. Harnesses may already expose skill names
 
 ## Required Shape
 
-Durable AgentOS skills should make these facts clear, either in frontmatter, in short sections, or in the skills manifest:
+Durable AgentOS skills should make these facts clear, either in frontmatter, short sections, or skill-local companion files:
 
 - Name: stable skill identifier.
 - Purpose: what repeated workflow this skill exists to perform.
@@ -22,7 +22,7 @@ Durable AgentOS skills should make these facts clear, either in frontmatter, in 
 - Verification: checks to run before trusting or delivering the result.
 - Filing rules: where generated artifacts, decisions, notes, or state updates belong.
 
-When these facts live in a manifest, use the Markdown manifest API: exact third-level headings shaped as ``### `skill-name` `` plus exact, case-sensitive list labels shaped as `- Field name: value`. Keep long-form safety, filing, verification, provenance, and maintenance notes as readable Markdown prose. Add a structured sidecar only when scripts or validators need deterministic typed data that cannot be represented safely by the narrow Markdown convention.
+Do not duplicate those contract facts into the Core skills manifest by default. The Core manifest is the skillbase export map: it records the intentionally exported skill set and a small catalog surface, while execution contracts stay with the skill. Add a structured sidecar only when scripts or validators need deterministic typed data that cannot be represented safely by skill-local Markdown.
 
 ## Mutability Levels
 
@@ -75,9 +75,9 @@ That convention defines AgentOS guidance for Authorization Boundaries, Workflow 
 
 ## Exposure Rules
 
-Canonical public AgentOS skills live under `os/skills/`. Canonical private skills can live under `personal/os/skills/<skill-name>/SKILL.md`. Personal Overlay skills implement this same Core contract; do not fork a separate private skill contract in v1.
+Exported public AgentOS skills live under `os/skills/<skill-name>/SKILL.md` and appear in `os/skills/MANIFEST.md`. Canonical private skills can live under `personal/os/skills/<skill-name>/SKILL.md`. Personal Overlay skills implement this same Core contract; do not fork a separate private skill contract in v1.
 
-A Personal Overlay skill counts as a maintained canonical private skill only when `personal/os/skills/MANIFEST.md` has an entry for it with `Lifecycle status: maintained`. Directory-only private skills are drafts or ad hoc local files until the private manifest records their governance facts. Use `os/skills/PERSONAL_OVERLAY_MANIFEST.template.md` as the public-safe template when creating the ignored private manifest. Core and Personal Overlay skill manifests use the same Markdown manifest API in v1.
+A Personal Overlay skill counts as a maintained canonical private skill only when `personal/os/skills/MANIFEST.md` has an entry for it with `Lifecycle status: maintained`. Directory-only private skills are drafts or ad hoc local files until the private manifest records their governance facts. Use `os/skills/PERSONAL_OVERLAY_MANIFEST.template.md` as the public-safe template when creating the ignored private manifest. The Personal Overlay manifest remains a private governance registry; the Core manifest is the public export map.
 
 Private config is optional for private skills. Since `personal/os/skills/<skill-name>/SKILL.md` is already private, stable private settings may live directly in that file. Use `personal/os/skills/<skill-name>/CONFIG.md` when settings are volatile, machine-specific, generated, profile-like, useful to audit separately, or needed by scripts. Private inputs to a reusable Core skill belong in `personal/os/skills/<core-skill>/CONFIG.md`, not in the Core skill source.
 
@@ -102,10 +102,12 @@ When changing skill behavior:
 
 ## Contract Adoption
 
-Existing skills do not need to be fully rewritten in one pass. Use the manifest to classify each skill as:
+Existing skills do not need to be fully rewritten in one pass. Track contract adoption in the skill body, a skill-local provenance or governance note, an issue, or a generated audit report when needed. Do not reintroduce a central hand-maintained contract-status registry in the Core manifest.
+
+Useful adoption states remain:
 
 - `full`: the skill itself clearly contains the contract facts.
-- `partial`: the skill plus manifest together contain enough facts to operate.
+- `partial`: the skill plus a skill-local companion file contains enough facts to operate.
 - `needs-upgrade`: important contract facts are missing.
 - `thin-adapter`: the skill intentionally routes to a fuller agent or workflow.
 

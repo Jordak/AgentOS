@@ -22,7 +22,7 @@ Calling Workflows may prescribe effort for Called Workflow invocations. When the
 
 Workflow Results, Recovery Records, review packets, reports, or equivalent handoffs should report prescribed model/effort, the prescription source, effective model/effort when observable, effective source or status, and meaningful mismatches. `unknown` and `not reported` are valid values when the harness does not expose exact metadata.
 
-Vendored upstream skill bodies should not be edited solely to add AgentOS effort policy. AgentOS-specific effort recommendations for vendored workflows belong in AgentOS-owned caller instructions, wrapper workflows, routing/manifest metadata when appropriate, or the reusable orchestration convention.
+Vendored upstream skill bodies should not be edited solely to add AgentOS effort policy. AgentOS-specific effort recommendations for vendored workflows belong in AgentOS-owned caller instructions, wrapper workflows, routing guidance, generated audit evidence, or the reusable orchestration convention.
 
 ## Assignment Logic
 

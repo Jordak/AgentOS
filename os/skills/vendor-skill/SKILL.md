@@ -1,6 +1,6 @@
 ---
 name: vendor-skill
-description: Vendor a public GitHub skill into AgentOS Core with source-first provenance, license-first safety, honest manifest metadata, and validation. Use when importing, refreshing, or correcting a reusable Core skill from an upstream repository.
+description: Vendor a public GitHub skill into AgentOS Core with source-first provenance, license-first safety, honest export-map membership, and validation. Use when importing, refreshing, or correcting a reusable Core skill from an upstream repository.
 ---
 
 # Vendor Skill
@@ -34,7 +34,7 @@ Output artifact:
 
 - A Core skill directory under `os/skills/<skill-name>/`.
 - `os/skills/<skill-name>/UPSTREAM.md` with source, path, vendored ref, vendored files, local patches, update procedure, and license notice.
-- An `os/skills/MANIFEST.md` entry with honest contract metadata.
+- An `os/skills/MANIFEST.md` export-map entry when the vendored skill should be exported.
 - Optional source-routing fixture when the new skill should be discoverable by stable prompt evidence.
 - A concise report naming provenance, license status, local patches, validation, and any blocked source or license decisions.
 
@@ -95,13 +95,12 @@ Safety:
    - Create or update `os/skills/<skill-name>/`.
    - Mirror upstream files exactly unless an approved local patch is in scope.
    - Add `UPSTREAM.md`.
-   - For exact mirrors, keep AgentOS-specific governance in `UPSTREAM.md`, `os/skills/MANIFEST.md`, calling workflow guidance, or a separate approved patch rather than silently editing upstream files.
+   - For exact mirrors, keep AgentOS-specific governance in `UPSTREAM.md`, calling workflow guidance, generated audit evidence, or a separate approved patch rather than silently editing upstream files.
 
-6. Update the manifest honestly.
+6. Update the export map honestly.
    - Add or update an exact ``### `skill-name` `` entry in `os/skills/MANIFEST.md`.
-   - Use `partial` for exact upstream mirrors that rely on the manifest for AgentOS contract facts.
-   - Use `full` only when the skill source itself clearly carries the Core contract facts.
-   - State mutability, tools/connectors, output artifact, filing rule, safety posture, verification coverage, and upgrade notes.
+   - Include the root-relative `Canonical source`, appropriate `Export group`, `Export status`, and a short `Summary`.
+   - Record contract-adoption notes in the skill body, `UPSTREAM.md`, an issue, or generated audit evidence instead of adding central manifest metadata.
    - Do not record current-machine exposure state or adapter paths in the manifest.
 
 7. Add route or smoke coverage when useful.
@@ -161,7 +160,7 @@ Update procedure:
 
 - Vendored Core skill files live under `os/skills/<skill-name>/`.
 - Vendored source provenance and license notices live in `os/skills/<skill-name>/UPSTREAM.md`.
-- Core maintenance metadata lives in `os/skills/MANIFEST.md`.
+- Core export membership lives in `os/skills/MANIFEST.md`.
 - Source-routing and smoke fixtures live under `os/verification/source-routing/` only when they add stable public-safe route evidence.
 - Current-machine adapter state stays out of Core files and is handled by `expose-skills`.
 - External issue, label, PR, and review state stays in GitHub.
@@ -174,7 +173,7 @@ Update procedure:
 - The path and full vendored commit ref are recorded.
 - The vendored files are listed and match upstream unless local patches are explicitly documented.
 - The license was located, judged usable, and included.
-- Manifest metadata is honest about whether the skill source is a full AgentOS contract or an upstream mirror plus manifest metadata.
+- Export-map metadata is honest about whether the skill should be globally exposed, transitional, deprecated, or explicit-only.
 - The workflow did not broaden validators or freshness checks to hide provenance uncertainty.
 - The issue or PR body records readiness evidence and validation when this is issue-driven.
 
@@ -187,7 +186,7 @@ Before finishing:
 3. Confirm every vendored file is listed in `UPSTREAM.md`.
 4. Confirm exact upstream mirrors still diff cleanly against raw upstream at the recorded ref.
 5. Confirm local patches are documented and intentionally accepted.
-6. Confirm `os/skills/MANIFEST.md` uses the Markdown manifest API and honest contract status.
+6. Confirm `os/skills/MANIFEST.md` uses the Markdown export-map API and honest export status.
 7. Run `git diff --check`.
 8. Run `scripts/run-validator`.
 9. Run upstream-checker self-test when relevant.

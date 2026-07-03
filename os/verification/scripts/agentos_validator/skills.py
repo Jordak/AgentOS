@@ -22,13 +22,12 @@ class SkillValidator(ValidatorDelegate):
                 self.add_error(
                     check,
                     f"{self.display_path(manifest_path)}:{line_no}",
-                    f"duplicate manifest entry for canonical skill {skill_name!r}",
+                    f"duplicate manifest entry for exported skill {skill_name!r}",
                 )
                 continue
             seen_entry_names.add(skill_name)
             entries[skill_name] = section
-        expected = self.discover_canonical_skills()
-        self.check_skill_manifest_summary_count(manifest, manifest_path, len(expected), check)
+        self.check_skill_manifest_summary_count(manifest, manifest_path, len(entries), check)
 
         for forbidden in [
             "- Installed mirror:",
@@ -43,28 +42,14 @@ class SkillValidator(ValidatorDelegate):
                     f"manifest records legacy machine-local installed-skill state: {forbidden}",
                 )
 
-        for skill_name, source_path in sorted(expected.items()):
-            if skill_name not in entries:
-                self.add_error(
-                    check,
-                    manifest_path,
-                    f"canonical skill {skill_name!r} is missing from manifest",
-                )
-
         for skill_name, section in sorted(entries.items()):
             fields = {
                 "Canonical source": self.extract_field(section, "Canonical source"),
-                "Contract status": self.extract_field(section, "Contract status"),
-                "Mutability": self.extract_field(section, "Mutability"),
-                "Tools and connectors": self.extract_field(section, "Tools and connectors"),
-                "Output artifact": self.extract_field(section, "Output artifact"),
-                "Filing rule": self.extract_field(section, "Filing rule"),
-                "Safety posture": self.extract_field(section, "Safety posture"),
-                "Verification coverage": self.extract_field(section, "Verification coverage"),
-                "Upgrade notes": self.extract_field(section, "Upgrade notes"),
+                "Export group": self.extract_field(section, "Export group"),
+                "Export status": self.extract_field(section, "Export status"),
+                "Summary": self.extract_field(section, "Summary"),
             }
             canonical = fields["Canonical source"]
-            contract = fields["Contract status"]
 
             for field_name in REQUIRED_SKILL_MANIFEST_FIELDS:
                 if self.skill_manifest_field_count(section, field_name) > 1:
@@ -80,7 +65,7 @@ class SkillValidator(ValidatorDelegate):
                 elif field_name != "Canonical source":
                     self.check_skill_manifest_field_value(skill_name, field_name, value, manifest_path, check)
 
-            self.check_skill_manifest_contract_semantics(skill_name, fields, manifest_path, check)
+            self.check_skill_manifest_export_semantics(skill_name, fields, manifest_path, check)
 
             if canonical:
                 canonical_path = self.managed_relative_path(
@@ -91,6 +76,12 @@ class SkillValidator(ValidatorDelegate):
                 )
                 if not canonical_path:
                     continue
+                if canonical_path.name != "SKILL.md":
+                    self.add_error(
+                        check,
+                        manifest_path,
+                        f"{skill_name}: exported canonical source must be a SKILL.md file: {canonical}",
+                    )
                 source_problem = self.no_follow_path_problem(
                     canonical_path,
                     expected_kind="file",
@@ -102,8 +93,18 @@ class SkillValidator(ValidatorDelegate):
                         manifest_path,
                         f"{skill_name}: canonical source is missing or unsafe: {canonical} ({source_problem})",
                     )
-                elif contract == "full":
-                    self.check_full_skill_contract(skill_name, canonical_path, check)
+                else:
+                    frontmatter = self.parse_skill_frontmatter(
+                        canonical_path,
+                        self.read_text(canonical_path, check),
+                        check,
+                    )
+                    if frontmatter and frontmatter.get("name") != skill_name:
+                        self.add_error(
+                            check,
+                            canonical_path,
+                            f"exported skill frontmatter.name must match manifest entry {skill_name!r}",
+                        )
 
         self.checked.append(check)
 
@@ -114,16 +115,16 @@ class SkillValidator(ValidatorDelegate):
         expected_count: int,
         check: str,
     ) -> None:
-        match = re.search(r"^- Canonical Core skills:\s*(\d+)\.\s*$", manifest, re.MULTILINE)
+        match = re.search(r"^- Exported Core skills:\s*(\d+)\.\s*$", manifest, re.MULTILINE)
         if not match:
-            self.add_error(check, manifest_path, "missing canonical Core skills summary count")
+            self.add_error(check, manifest_path, "missing exported Core skills summary count")
             return
         actual_count = int(match.group(1))
         if actual_count != expected_count:
             self.add_error(
                 check,
                 manifest_path,
-                f"canonical Core skills summary count is {actual_count}, expected {expected_count}",
+                f"exported Core skills summary count is {actual_count}, expected {expected_count}",
             )
 
     def check_skill_manifest_headings(self, manifest: str, manifest_path: Path, check: str) -> None:
@@ -173,44 +174,22 @@ class SkillValidator(ValidatorDelegate):
         if normalized in PLACEHOLDER_SKILL_MANIFEST_VALUES:
             self.add_error(check, manifest_path, f"{skill_name}: {field_name} uses placeholder value {value!r}")
 
-    def check_skill_manifest_contract_semantics(
+    def check_skill_manifest_export_semantics(
         self,
         skill_name: str,
         fields: dict[str, str | None],
         manifest_path: Path,
         check: str,
     ) -> None:
-        contract = fields.get("Contract status")
-        if contract:
-            normalized_contract = self.normalize_skill_manifest_value(contract)
-            if normalized_contract not in ALLOWED_SKILL_CONTRACT_STATUSES:
-                allowed = ", ".join(sorted(ALLOWED_SKILL_CONTRACT_STATUSES))
+        export_status = fields.get("Export status")
+        if export_status:
+            normalized_status = self.normalize_skill_manifest_value(export_status)
+            if normalized_status not in ALLOWED_SKILL_EXPORT_STATUSES:
+                allowed = ", ".join(sorted(ALLOWED_SKILL_EXPORT_STATUSES))
                 self.add_error(
                     check,
                     manifest_path,
-                    f"{skill_name}: Contract status must be one of {allowed}; got {contract!r}",
-                )
-
-        mutability = fields.get("Mutability")
-        mutability_level: str | None = None
-        if mutability:
-            mutability_level = self.skill_manifest_mutability_level(mutability)
-            if mutability_level not in ALLOWED_SKILL_MUTABILITY_LEVELS:
-                allowed = ", ".join(sorted(ALLOWED_SKILL_MUTABILITY_LEVELS))
-                self.add_error(
-                    check,
-                    manifest_path,
-                    f"{skill_name}: Mutability must start with one of {allowed}; got {mutability!r}",
-                )
-
-        safety = fields.get("Safety posture")
-        if mutability_level and mutability_level != "read-only" and safety:
-            normalized_safety = self.normalize_skill_manifest_value(safety)
-            if not any(term in normalized_safety for term in MUTATING_SKILL_APPROVAL_TERMS):
-                self.add_error(
-                    check,
-                    manifest_path,
-                    f"{skill_name}: mutating skill Safety posture must name approval, explicit authorization, permission, or dry-run gating",
+                    f"{skill_name}: Export status must be one of {allowed}; got {export_status!r}",
                 )
 
     def normalize_skill_manifest_value(self, value: str) -> str:
@@ -223,7 +202,7 @@ class SkillValidator(ValidatorDelegate):
                 return level
         return normalized.split(":", maxsplit=1)[0].split(";", maxsplit=1)[0].strip()
 
-    def discover_canonical_skills(self) -> dict[str, Path]:
+    def discover_skill_files(self) -> dict[str, Path]:
         skills_dir = self.root / "os/skills"
         skills: dict[str, Path] = {}
         for path in skills_dir.glob("*.md"):
@@ -238,7 +217,7 @@ class SkillValidator(ValidatorDelegate):
 
     def check_skill_frontmatter(self) -> None:
         check = "skill frontmatter"
-        for skill_name, path in sorted(self.discover_canonical_skills().items()):
+        for skill_name, path in sorted(self.discover_skill_files().items()):
             text = self.read_text(path, check)
             if not text:
                 continue
@@ -425,16 +404,14 @@ def run_self_test(harness) -> None:
     (canonical_escape_root / "personal").mkdir()
     (canonical_escape_root / "os/skills/MANIFEST.md").write_text(
         "# Skills\n\n"
+        "## Summary\n\n"
+        "- Exported Core skills: 1.\n\n"
+        "## Exported Skills\n\n"
         "### `escape`\n\n"
         "- Canonical source: `/agentos-fixture-outside/SKILL.md`\n"
-        "- Contract status: `partial`\n"
-        "- Mutability: read-only\n"
-        "- Tools and connectors: none\n"
-        "- Output artifact: none\n"
-        "- Filing rule: none\n"
-        "- Safety posture: safe\n"
-        "- Verification coverage: none\n"
-        "- Upgrade notes: none\n",
+        "- Export group: fixture.\n"
+        "- Export status: exported.\n"
+        "- Summary: Fixture export.\n",
         encoding="utf-8",
     )
     canonical_escape_validator = harness.validator(canonical_escape_root)
@@ -446,47 +423,30 @@ def run_self_test(harness) -> None:
         write_fixture_skill(malformed_manifest_root, skill_name)
     (malformed_manifest_root / "os/skills/MANIFEST.md").write_text(
         "# Skills\n\n"
+        "## Summary\n\n"
+        "- Exported Core skills: 4.\n\n"
+        "## Exported Skills\n\n"
         "### `duplicate`\n\n"
         "- Canonical source: `os/skills/duplicate/SKILL.md`\n"
-        "- Contract status: partial\n"
-        "- Mutability: read-only\n"
-        "- Mutability: mixed\n"
-        "- Tools and connectors: none\n"
-        "- Output artifact: none\n"
-        "- Filing rule: none\n"
-        "- Safety posture: safe\n"
-        "- Verification coverage: none\n"
-        "- Upgrade notes: none\n\n"
+        "- Export group: fixture.\n"
+        "- Export group: duplicate.\n"
+        "- Export status: exported.\n"
+        "- Summary: Fixture export.\n\n"
         "### `duplicate`\n\n"
         "- Canonical source: `os/skills/duplicate/SKILL.md`\n"
-        "- Contract status: partial\n"
-        "- Mutability: read-only\n"
-        "- Tools and connectors: none\n"
-        "- Output artifact: none\n"
-        "- Filing rule: none\n"
-        "- Safety posture: safe\n"
-        "- Verification coverage: none\n"
-        "- Upgrade notes: none\n\n"
+        "- Export group: fixture.\n"
+        "- Export status: exported.\n"
+        "- Summary: Fixture export.\n\n"
         "### malformed-heading\n\n"
         "- Canonical source: `os/skills/malformed-heading/SKILL.md`\n"
-        "- Contract status: partial\n"
-        "- Mutability: read-only\n"
-        "- Tools and connectors: none\n"
-        "- Output artifact: none\n"
-        "- Filing rule: none\n"
-        "- Safety posture: safe\n"
-        "- Verification coverage: none\n"
-        "- Upgrade notes: none\n\n"
+        "- Export group: fixture.\n"
+        "- Export status: exported.\n"
+        "- Summary: Fixture export.\n\n"
         "### `directory-source`\n\n"
         "- Canonical source: `os/skills/directory-source`\n"
-        "- Contract status: partial\n"
-        "- Mutability: read-only\n"
-        "- Tools and connectors: none\n"
-        "- Output artifact: none\n"
-        "- Filing rule: none\n"
-        "- Safety posture: safe\n"
-        "- Verification coverage: none\n"
-        "- Upgrade notes: none\n",
+        "- Export group: fixture.\n"
+        "- Export status: exported.\n"
+        "- Summary: Fixture export.\n",
         encoding="utf-8",
     )
     malformed_manifest_validator = harness.validator(malformed_manifest_root)
@@ -494,7 +454,7 @@ def run_self_test(harness) -> None:
 
     semantic_manifest_root = harness.root / "skills_semantic_manifest_fixture"
     (semantic_manifest_root / "os/skills").mkdir(parents=True)
-    for skill_name in ("bad-contract", "bad-mutability", "mixed-without-approval", "placeholder"):
+    for skill_name in ("bad-status", "placeholder", "unlisted-draft"):
         write_fixture_skill(semantic_manifest_root, skill_name)
     (semantic_manifest_root / "os/skills/ORCHESTRATION_LOOPS.md").write_text(
         "# Orchestration Loops\n\nStatus: convention fixture.\n",
@@ -503,48 +463,18 @@ def run_self_test(harness) -> None:
     (semantic_manifest_root / "os/skills/MANIFEST.md").write_text(
         "# Skills\n\n"
         "## Summary\n\n"
-        "- Canonical Core skills: 3.\n\n"
-        "## Canonical Skills\n\n"
-        "### `bad-contract`\n\n"
-        "- Canonical source: `os/skills/bad-contract/SKILL.md`\n"
-        "- Contract status: experimental\n"
-        "- Mutability: read-only\n"
-        "- Tools and connectors: local files\n"
-        "- Output artifact: concise report\n"
-        "- Filing rule: output stays in chat\n"
-        "- Safety posture: do not write files\n"
-        "- Verification coverage: inspect output\n"
-        "- Upgrade notes: fixture entry\n\n"
-        "### `bad-mutability`\n\n"
-        "- Canonical source: `os/skills/bad-mutability/SKILL.md`\n"
-        "- Contract status: partial\n"
-        "- Mutability: teleport-write\n"
-        "- Tools and connectors: local files\n"
-        "- Output artifact: concise report\n"
-        "- Filing rule: output stays in chat\n"
-        "- Safety posture: require approval before writes\n"
-        "- Verification coverage: inspect output\n"
-        "- Upgrade notes: fixture entry\n\n"
-        "### `mixed-without-approval`\n\n"
-        "- Canonical source: `os/skills/mixed-without-approval/SKILL.md`\n"
-        "- Contract status: partial\n"
-        "- Mutability: mixed: local-write when needed\n"
-        "- Tools and connectors: local files\n"
-        "- Output artifact: local report\n"
-        "- Filing rule: reports live under docs/design/\n"
-        "- Safety posture: writes local files when useful\n"
-        "- Verification coverage: inspect output\n"
-        "- Upgrade notes: fixture entry\n\n"
+        "- Exported Core skills: 3.\n\n"
+        "## Exported Skills\n\n"
+        "### `bad-status`\n\n"
+        "- Canonical source: `os/skills/bad-status/SKILL.md`\n"
+        "- Export group: fixture.\n"
+        "- Export status: experimental.\n"
+        "- Summary: Fixture export.\n\n"
         "### `placeholder`\n\n"
         "- Canonical source: `os/skills/placeholder/SKILL.md`\n"
-        "- Contract status: partial\n"
-        "- Mutability: read-only\n"
-        "- Tools and connectors: none\n"
-        "- Output artifact: none\n"
-        "- Filing rule: none\n"
-        "- Safety posture: safe\n"
-        "- Verification coverage: none\n"
-        "- Upgrade notes: none\n",
+        "- Export group: fixture.\n"
+        "- Export status: exported.\n"
+        "- Summary: none\n",
         encoding="utf-8",
     )
     semantic_manifest_validator = harness.validator(semantic_manifest_root)
@@ -592,17 +522,16 @@ def run_self_test(harness) -> None:
     harness.expect(
         "skills rejects malformed manifest headings and duplicates",
         any("manifest skill heading must use exact shape" in error.message for error in malformed_manifest_validator.errors)
-        and any("duplicate manifest entry for canonical skill 'duplicate'" in error.message for error in malformed_manifest_validator.errors)
-        and any("duplicate Mutability" in error.message for error in malformed_manifest_validator.errors)
+        and any("duplicate manifest entry for exported skill 'duplicate'" in error.message for error in malformed_manifest_validator.errors)
+        and any("duplicate Export group" in error.message for error in malformed_manifest_validator.errors)
         and any("canonical source is missing or unsafe" in error.message for error in malformed_manifest_validator.errors),
     )
     harness.expect(
         "skills rejects semantic manifest drift",
-        any("canonical Core skills summary count is 3, expected 4" in error.message for error in semantic_manifest_validator.errors)
-        and any("bad-contract: Contract status must be one of" in error.message for error in semantic_manifest_validator.errors)
-        and any("bad-mutability: Mutability must start with one of" in error.message for error in semantic_manifest_validator.errors)
-        and any("mixed-without-approval: mutating skill Safety posture must name approval" in error.message for error in semantic_manifest_validator.errors)
-        and any("placeholder: Safety posture uses placeholder value 'safe'" in error.message for error in semantic_manifest_validator.errors),
+        any("exported Core skills summary count is 3, expected 2" in error.message for error in semantic_manifest_validator.errors)
+        and any("bad-status: Export status must be one of" in error.message for error in semantic_manifest_validator.errors)
+        and any("placeholder: Summary uses placeholder value 'none'" in error.message for error in semantic_manifest_validator.errors)
+        and not any("unlisted-draft" in error.message and "missing from manifest" in error.message for error in semantic_manifest_validator.errors),
     )
     harness.expect(
         "skills rejects unsupported frontmatter",
