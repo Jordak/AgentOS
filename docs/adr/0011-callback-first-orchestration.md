@@ -48,7 +48,7 @@ The implementation for GitHub issue #156 should:
 
 - update `os/skills/ORCHESTRATION_LOOPS.md` with callback-first invocation, anti-polling, minimal assignment, and worker-thread setup guidance;
 - record that aggregate workflow status precedence and richer status maps are deferred to GitHub issue #158 while preserving detailed child outcome reporting;
-- move or restate the `coordinate-issue-batch` to `implement-github-issue` worker handoff shape in `os/skills/coordinate-issue-batch/SKILL.md`;
+- move or restate the `coordinate-issue-batch` to `implement-github-issue` worker handoff shape in `os/skills/github-issue-lifecycle/batch-orchestration/coordinate-issue-batch/IMPLEMENTATION.md`;
 - update `github-loop`, GitHub workflow guidance, and manifest summaries so parent workflows go idle after launch and recover through Workflow Results rather than continuous polling;
 - run `git diff --check` and `scripts/run-validator`.
 

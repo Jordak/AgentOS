@@ -476,14 +476,21 @@
       "category": "github issue implementation",
       "prompt": "Take this GitHub issue through readiness gating, implementation, pull request creation, and review-loop convergence.",
       "expected": {
-        "skill": "implement-github-issue"
+        "skill": "github-issue-lifecycle"
       },
       "evidence": [
         {
-          "path": "os/skills/implement-github-issue/SKILL.md",
+          "path": "os/skills/github-issue-lifecycle/SKILL.md",
           "contains": [
-            "readiness gating",
-            "pull request creation",
+            "issue-execution",
+            "Load the selected child `IMPLEMENTATION.md` only after the leaf has been selected"
+          ]
+        },
+        {
+          "path": "os/skills/github-issue-lifecycle/issue-execution/implement-github-issue/IMPLEMENTATION.md",
+          "contains": [
+            "Run the readiness gate",
+            "Create the pull request",
             "review-loop convergence",
             "eligible clean-context reviewers are unavailable",
             "do not claim PR-ready review-loop convergence",
@@ -498,13 +505,13 @@
       "category": "github issue batch selection",
       "prompt": "Recommend the next high-leverage batch of GitHub issues to work on without starting workers or mutating tracker state.",
       "expected": {
-        "skill": "select-issue-batch"
+        "skill": "github-issue-lifecycle"
       },
       "evidence": [
         {
-          "path": "os/skills/select-issue-batch/SKILL.md",
+          "path": "os/skills/github-issue-lifecycle/batch-orchestration/select-issue-batch/IMPLEMENTATION.md",
           "contains": [
-            "Select and explain the next high-leverage GitHub issue or small issue batch",
+            "Recommend the next issue or small batch",
             "The planner is read-only",
             "ranked issues",
             "future leverage",
@@ -519,11 +526,11 @@
       "category": "github issue batch coordination",
       "prompt": "Coordinate a GitHub issue batch pass by selecting issues, launching isolated workers, tracking their PRs, and landing eligible merged issues.",
       "expected": {
-        "skill": "coordinate-issue-batch"
+        "skill": "github-issue-lifecycle"
       },
       "evidence": [
         {
-          "path": "os/skills/coordinate-issue-batch/SKILL.md",
+          "path": "os/skills/github-issue-lifecycle/batch-orchestration/coordinate-issue-batch/IMPLEMENTATION.md",
           "contains": [
             "Coordinate a full GitHub issue batch pass",
             "call `select-issue-batch`",
@@ -540,13 +547,13 @@
       "category": "github issue repository loop",
       "prompt": "Keep running GitHub issue batch passes for this repository until no suitable issues remain or a human stop condition blocks the loop.",
       "expected": {
-        "skill": "github-loop"
+        "skill": "github-issue-lifecycle"
       },
       "evidence": [
         {
-          "path": "os/skills/github-loop/SKILL.md",
+          "path": "os/skills/github-issue-lifecycle/batch-orchestration/github-loop/IMPLEMENTATION.md",
           "contains": [
-            "Repeatedly run or resume GitHub issue batch passes",
+            "Coordinate repeated GitHub issue batch passes",
             "coordinate-issue-batch",
             "successive batch-pass invocations",
             "no selected issues",
@@ -561,14 +568,14 @@
       "category": "github issue landing",
       "prompt": "Land this merged GitHub issue by verifying its acceptance criteria on origin/main, checking off fulfilled checklist items, and reporting any unmet criteria before authorized closure.",
       "expected": {
-        "skill": "land-github-issue"
+        "skill": "github-issue-lifecycle"
       },
       "evidence": [
         {
-          "path": "os/skills/land-github-issue/SKILL.md",
+          "path": "os/skills/github-issue-lifecycle/issue-execution/land-github-issue/IMPLEMENTATION.md",
           "contains": [
-            "Verify a GitHub issue's acceptance criteria against remote integration-branch evidence",
-            "update fulfilled Markdown checklist criteria",
+            "Verify the issue's acceptance criteria",
+            "check off fulfilled Markdown checklist items",
             "return unmet criteria to the caller",
             "Authorization Boundary explicitly allows",
             "Do not close issues labeled for human ownership or human review"

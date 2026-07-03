@@ -1,8 +1,3 @@
----
-name: github-loop
-description: Repeatedly run or resume GitHub issue batch passes by invoking coordinate-issue-batch until no suitable issues remain or a stop condition halts the repository-level loop.
----
-
 # GitHub Loop
 
 ## Goal
@@ -49,7 +44,7 @@ Durable called-workflow launch authorization:
 Tools and connectors:
 
 - Local filesystem, `git`, `rg`, GitHub connector or `gh`, and repository-local push helpers when local instructions require them.
-- `os/skills/coordinate-issue-batch/SKILL.md` for each full batch pass.
+- `os/skills/github-issue-lifecycle/batch-orchestration/coordinate-issue-batch/IMPLEMENTATION.md` for each full batch pass.
 - `os/skills/ORCHESTRATION_LOOPS.md` for Authorization Boundary, Recovery Record, Recovery Checkpoint, Blocking Human Decision, Workflow Result, and Integration Ownership vocabulary.
 - `os/playbook/GITHUB_WORKFLOW.md` for GitHub issue, branch, worker, PR, merge-report, and closure discipline.
 
@@ -96,7 +91,7 @@ Rebuild or load the loop Recovery Record, verify the current batch-pass state, a
 
 1. Establish the target:
    - Identify repository, issue tracker, integration branch, checkout path, mode, loop goal, caps, Authorization Boundary, and reporting mode.
-   - Read local instructions, `os/playbook/GITHUB_WORKFLOW.md`, `os/skills/ORCHESTRATION_LOOPS.md`, and `os/skills/coordinate-issue-batch/SKILL.md`.
+   - Read local instructions, `os/playbook/GITHUB_WORKFLOW.md`, `os/skills/ORCHESTRATION_LOOPS.md`, and `os/skills/github-issue-lifecycle/batch-orchestration/coordinate-issue-batch/IMPLEMENTATION.md`.
    - Record the initial Recovery Record: target, mode, loop goal, caps, Authorization Boundary, effort metadata when available or relevant, ledger surface, current phase, known blockers, and next action.
 
 2. Plan the next batch pass:

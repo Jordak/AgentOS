@@ -1,8 +1,3 @@
----
-name: implement-github-issue
-description: Take one GitHub issue in a repository checkout through readiness gating, implementation, validation, pull request creation, review-loop convergence, and recoverable final reporting while stopping before merge, issue closure, and branch deletion.
----
-
 # Implement GitHub Issue
 
 ## Goal
@@ -45,7 +40,7 @@ Tools and connectors:
 - `os/skills/review-loop/SKILL.md` for PR convergence when available.
 - `os/skills/ORCHESTRATION_LOOPS.md`, with background in `docs/adr/0009-contract-based-orchestration-loops.md` and `docs/design/issue-121-loop-composition-conventions.md`, for AgentOS orchestration-loop vocabulary and recovery semantics when those Core files are available.
 - `docs/design/issue-126-landing-closure-semantics.md` for the durable decision that `implement-github-issue` does not own merge, issue closure, or branch deletion.
-- `os/skills/land-github-issue/SKILL.md` only as a downstream integration-owner reference; this skill does not call or own it.
+- `os/skills/github-issue-lifecycle/issue-execution/land-github-issue/IMPLEMENTATION.md` only as a downstream integration-owner reference; this skill does not call or own it.
 
 Safety:
 

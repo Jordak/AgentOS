@@ -1,8 +1,3 @@
----
-name: select-issue-batch
-description: "Select and explain the next high-leverage GitHub issue or small issue batch without mutating tracker state or starting workers. Use when the user asks what issue to do next, wants a batch recommendation, or needs a read-only planner for coordinate-issue-batch."
----
-
 # Select Issue Batch
 
 ## Goal

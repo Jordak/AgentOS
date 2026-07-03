@@ -24,6 +24,17 @@ Durable AgentOS skills should make these facts clear, either in frontmatter, sho
 
 Do not duplicate those contract facts into the Core skills manifest by default. The Core manifest is the skillbase export map: it records the intentionally exported skill set and a small catalog surface, while execution contracts stay with the skill. Add a structured sidecar only when scripts or validators need deterministic typed data that cannot be represented safely by skill-local Markdown.
 
+## Private Modules
+
+Use `SKILL.md` only for exported, harness-visible skills. When an exported skill owns nontrivial internal workflow families or leaves, use private Markdown modules under the exported skill directory:
+
+- `INTERFACE.md` describes the caller-visible contract: capability summary, when to choose it, when not to choose it, inputs, outputs, mutability, safety boundaries, guarantees, and child interface links needed for routing.
+- `IMPLEMENTATION.md` describes execution procedure, local routing, sequencing, recovery behavior, quality gates, validation, references to load after selection, and child invocation handling.
+
+Parent modules should route by reading child `INTERFACE.md` files. They should load a child `IMPLEMENTATION.md` only after selecting that module. Do not create `SKILL.md` files for private leaves unless the leaf should become independently exported or a transition plan explicitly marks it as such in the Core export map.
+
+Tiny helper directories do not need both files by ceremony. Use the split when callers need an interface separate from execution details.
+
 ## Mutability Levels
 
 Use the narrowest level that describes normal operation:
@@ -75,7 +86,7 @@ That convention defines AgentOS guidance for Authorization Boundaries, Workflow 
 
 ## Exposure Rules
 
-Exported public AgentOS skills live under `os/skills/<skill-name>/SKILL.md` and appear in `os/skills/MANIFEST.md`. Canonical private skills can live under `personal/os/skills/<skill-name>/SKILL.md`. Personal Overlay skills implement this same Core contract; do not fork a separate private skill contract in v1.
+Exported public AgentOS skills live under `os/skills/<skill-name>/SKILL.md` and appear in `os/skills/MANIFEST.md`. Private modules inside an exported skill may use `INTERFACE.md` and `IMPLEMENTATION.md` without manifest entries. Canonical private skills can live under `personal/os/skills/<skill-name>/SKILL.md`. Personal Overlay skills implement this same Core contract; do not fork a separate private skill contract in v1.
 
 A Personal Overlay skill counts as a maintained canonical private skill only when `personal/os/skills/MANIFEST.md` has an entry for it with `Lifecycle status: maintained`. Directory-only private skills are drafts or ad hoc local files until the private manifest records their governance facts. Use `os/skills/PERSONAL_OVERLAY_MANIFEST.template.md` as the public-safe template when creating the ignored private manifest. The Personal Overlay manifest remains a private governance registry; the Core manifest is the public export map.
 

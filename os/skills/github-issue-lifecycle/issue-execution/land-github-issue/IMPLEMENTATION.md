@@ -1,8 +1,3 @@
----
-name: land-github-issue
-description: Verify a GitHub issue's acceptance criteria against remote integration-branch evidence, update fulfilled Markdown checklist criteria, and close the issue only when closure is authorized and fully evidenced.
----
-
 # Land GitHub Issue
 
 ## Goal
