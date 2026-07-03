@@ -21,8 +21,8 @@ FIELD_RE_TEMPLATE = r"^- {field}:\s*(.*)$"
 SYMLINK_PERMISSION_ERRNOS = {errno.EACCES, errno.EPERM, errno.EROFS}
 SYMLINK_PERMISSION_WINERRORS = {5, 1314}
 APPLY_SUCCESS_STATUSES = {"already-linked", "created-symlink", "replaced-copy-with-symlink"}
-APPLY_SUCCESS_STATUSES.add("pruned-retired-core-adapter")
-DRY_RUN_FAILURE_STATUSES = {"blocked", "missing-source", "retired-core-adapter"}
+APPLY_SUCCESS_STATUSES.add("pruned-retired-core-export-candidate")
+DRY_RUN_FAILURE_STATUSES = {"blocked", "missing-source", "retired-core-export-candidate"}
 BACKUP_PARENT = ".archive"
 BACKUP_NAMESPACE = "expose-skills"
 RETIRED_CORE_EXPORTS = {
@@ -470,7 +470,7 @@ def collect_retired_core_adapter_results(
                     skill_name,
                     str(adapter_path),
                     "",
-                    (f"could not inspect retired Core adapter: {error.__class__.__name__}: {error}",),
+                    (f"could not inspect same-name retired Core export candidate: {error.__class__.__name__}: {error}",),
                 )
             )
             continue
@@ -478,12 +478,13 @@ def collect_retired_core_adapter_results(
         if not prune_retired_core_adapters:
             results.append(
                 ExposureResult(
-                    "retired-core-adapter",
+                    "retired-core-export-candidate",
                     skill_name,
                     str(adapter_path),
                     "",
                     (
                         reason,
+                        "same-name global skill entry; provenance is not proven",
                         "rerun with --prune-retired-core-adapters to back it up and remove it from global exposure",
                     ),
                 )
@@ -493,11 +494,11 @@ def collect_retired_core_adapter_results(
         if not apply:
             results.append(
                 ExposureResult(
-                    "would-prune-retired-core-adapter",
+                    "would-prune-retired-core-export-candidate",
                     skill_name,
                     str(adapter_path),
                     "",
-                    (f"{reason}; would move adapter to backup under: {backup_root}",),
+                    (f"{reason}; same-name global skill entry with unproven provenance; would move it to backup under: {backup_root}",),
                 )
             )
             continue
@@ -509,11 +510,11 @@ def collect_retired_core_adapter_results(
             continue
         results.append(
             ExposureResult(
-                "pruned-retired-core-adapter",
+                "pruned-retired-core-export-candidate",
                 skill_name,
                 str(adapter_path),
                 "",
-                (f"{reason}; backed up retired adapter to: {backup_path}",),
+                (f"{reason}; same-name global skill entry with unproven provenance; backed up candidate to: {backup_path}",),
             )
         )
     return results

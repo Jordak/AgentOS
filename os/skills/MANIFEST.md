@@ -50,7 +50,7 @@ Allowed `Export status` values are `exported`, `transitional`, `deprecated`, and
 - Canonical source: `os/skills/github-issue-lifecycle/SKILL.md`
 - Export group: github-issue-lifecycle.
 - Export status: exported.
-- Summary: Route GitHub issue lifecycle work from issue selection through batch coordination, one-issue implementation, PR review handoff, and authorized issue landing using private lifecycle modules.
+- Summary: Route GitHub issue lifecycle work from issue selection through batch coordination, one-issue implementation, PR review handoff, and authorized issue landing.
 
 ### `ensure-implementation-readiness`
 

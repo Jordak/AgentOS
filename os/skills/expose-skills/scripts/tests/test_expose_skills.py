@@ -158,8 +158,9 @@ def test_retired_core_adapter_is_reported() -> None:
         retired.symlink_to(root / "os/skills/github-loop", target_is_directory=True)
         code, output, _error = run_cli(root, home)
         _case.assertEqual(code, 1)
-        _case.assertIn("retired-core-adapter", output)
+        _case.assertIn("retired-core-export-candidate", output)
         _case.assertIn("github-loop", output)
+        _case.assertIn("provenance is not proven", output)
         _case.assertTrue(retired.is_symlink())
 
 
@@ -174,12 +175,13 @@ def test_prune_retired_core_adapter_backs_up_before_removal() -> None:
 
         dry_code, dry_output, _dry_error = run_cli(root, home, "--prune-retired-core-adapters")
         _case.assertEqual(dry_code, 0)
-        _case.assertIn("would-prune-retired-core-adapter", dry_output)
+        _case.assertIn("would-prune-retired-core-export-candidate", dry_output)
+        _case.assertIn("unproven provenance", dry_output)
         _case.assertTrue((retired / "old.txt").is_file())
 
         code, output, _error = run_cli(root, home, "--prune-retired-core-adapters", "--no-dry-run")
         _case.assertEqual(code, 0)
-        _case.assertIn("pruned-retired-core-adapter", output)
+        _case.assertIn("pruned-retired-core-export-candidate", output)
         _case.assertFalse(retired.exists())
         backups = list((home / ".agents/skills/.archive/expose-skills").glob("*/coordinate-issue-batch/old.txt"))
         _case.assertEqual(len(backups), 1)

@@ -1,6 +1,6 @@
 ---
 name: github-issue-lifecycle
-description: Route GitHub issue lifecycle work from issue selection through batch coordination, one-issue implementation, PR review handoff, and authorized issue landing using private lifecycle modules.
+description: Route GitHub issue lifecycle work from issue selection through batch coordination, one-issue implementation, PR review handoff, and authorized issue landing.
 ---
 
 # GitHub Issue Lifecycle
