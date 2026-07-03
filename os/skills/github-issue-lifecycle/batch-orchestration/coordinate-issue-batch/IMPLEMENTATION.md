@@ -17,7 +17,7 @@ Inputs:
 - Current local agent instructions and project guidance, including `AGENTS.md`.
 - Current AgentOS GitHub workflow policy at `os/playbook/GITHUB_WORKFLOW.md`.
 - Current orchestration-loop vocabulary and worker handoff guidance at `os/skills/ORCHESTRATION_LOOPS.md`.
-- `select-issue-batch`, `implement-github-issue`, and `land-github-issue` when available in the active AgentOS checkout or harness.
+- Private module implementations for `select-issue-batch`, `implement-github-issue`, and `land-github-issue` under `os/skills/github-issue-lifecycle/`.
 - Optional caller-supplied Workflow Invocation Reference or result surface, plus an explicit coordinator release instruction, when this skill is invoked as a durable Called Workflow.
 - A supported durable worker-launch path when normal mode launches implementation workers. In Codex harnesses that support branch-backed project threads, durable implementation workers should be separate branch-backed threads, not in-thread subagents.
 - A callback or result surface for each launched worker when the harness supports one, such as a callback thread id, child-thread URL, coordinator ledger location, or equivalent Workflow Invocation Reference.
@@ -93,7 +93,7 @@ Landing is a phase of normal or resume mode, not a separate top-level mode.
    - Record the initial Recovery Record: target, mode, Authorization Boundary, coordinator effort metadata when available or relevant, ledger surface, any caller-supplied Workflow Invocation Reference or result surface, coordinator release instruction, current phase, known blockers, and next action.
 
 2. Select or accept the batch:
-   - If no explicit batch is supplied, invoke or follow `select-issue-batch` in read-only mode using the requested selection goal, scope filters, and effort metadata when available or relevant, or an explicit no-override/default statement.
+   - If no explicit batch is supplied, load and follow the private `select-issue-batch` module in read-only mode using the requested selection goal, scope filters, and effort metadata when available or relevant, or an explicit no-override/default statement.
    - If a user or caller provides a batch, record the source and any supplied rationale.
    - Convert the recommendation or provided list into a concrete coordinator target inside this skill's Authorization Boundary.
    - Default max parallel implementation workers: 3, unless the user or Calling Workflow specifies another concurrency limit. If the candidate batch exceeds the limit, choose or ask for a first wave and record the rest as queued.
@@ -136,7 +136,7 @@ Landing is a phase of normal or resume mode, not a separate top-level mode.
 
 8. Land eligible issues:
    - Fetch or otherwise verify the remote integration branch when landing checks require current integration evidence.
-   - For each eligible merged issue, invoke or follow `land-github-issue` one issue at a time under an explicit landing Authorization Boundary, passing effort metadata when available or relevant.
+   - For each eligible merged issue, load and follow the private `land-github-issue` module one issue at a time under an explicit landing Authorization Boundary, passing effort metadata when available or relevant.
    - Skip issues whose PRs are unmerged, whose acceptance criteria are ambiguous, whose human-review labels block closure, or whose landing authorization is absent.
    - Record fulfilled, skipped, blocked, needs-human, failed, cancelled, unmerged, unresolved, and landed outcomes in the coordinator ledger.
 

@@ -21,9 +21,17 @@ FIELD_RE_TEMPLATE = r"^- {field}:\s*(.*)$"
 SYMLINK_PERMISSION_ERRNOS = {errno.EACCES, errno.EPERM, errno.EROFS}
 SYMLINK_PERMISSION_WINERRORS = {5, 1314}
 APPLY_SUCCESS_STATUSES = {"already-linked", "created-symlink", "replaced-copy-with-symlink"}
-DRY_RUN_FAILURE_STATUSES = {"blocked", "missing-source"}
+APPLY_SUCCESS_STATUSES.add("pruned-retired-core-adapter")
+DRY_RUN_FAILURE_STATUSES = {"blocked", "missing-source", "retired-core-adapter"}
 BACKUP_PARENT = ".archive"
 BACKUP_NAMESPACE = "expose-skills"
+RETIRED_CORE_EXPORTS = {
+    "coordinate-issue-batch": "replaced by exported skill github-issue-lifecycle",
+    "github-loop": "replaced by exported skill github-issue-lifecycle",
+    "implement-github-issue": "replaced by exported skill github-issue-lifecycle",
+    "land-github-issue": "replaced by exported skill github-issue-lifecycle",
+    "select-issue-batch": "replaced by exported skill github-issue-lifecycle",
+}
 
 
 @dataclass(frozen=True)
@@ -315,6 +323,22 @@ def replace_copy_with_symlink(entry: SkillEntry, adapter_path: Path, backup_root
     return backup_path
 
 
+def prune_retired_adapter(adapter_path: Path, backup_root: Path) -> Path:
+    backup_path = backup_root / adapter_path.name
+    ensure_backup_root(adapter_path.parent, backup_root)
+    if backup_path.exists() or backup_path.is_symlink():
+        raise SystemExit(f"Backup path already exists; refusing to overwrite: {backup_path}")
+    try:
+        adapter_path.rename(backup_path)
+    except OSError as error:
+        raise SystemExit(
+            "Could not back up retired Core skill adapter before pruning: "
+            f"{adapter_path} -> {backup_path}. "
+            f"Original error: {error.__class__.__name__}: {error}"
+        )
+    return backup_path
+
+
 def replacement_backup_note(backup_path: Path) -> str:
     if backup_path.exists() or backup_path.is_symlink():
         return f"Replacement backup remains at: {backup_path}."
@@ -389,6 +413,7 @@ def collect_results(
     adapter_root: Path,
     apply: bool,
     replace_existing_copy: bool,
+    prune_retired_core_adapters: bool,
     backup_root: Path,
 ) -> list[ExposureResult]:
     results: list[ExposureResult] = []
@@ -414,6 +439,83 @@ def collect_results(
                 )
             )
             break
+    results.extend(
+        collect_retired_core_adapter_results(
+            adapter_root,
+            apply=apply,
+            prune_retired_core_adapters=prune_retired_core_adapters,
+            backup_root=backup_root,
+        )
+    )
+    return results
+
+
+def collect_retired_core_adapter_results(
+    adapter_root: Path,
+    apply: bool,
+    prune_retired_core_adapters: bool,
+    backup_root: Path,
+) -> list[ExposureResult]:
+    results: list[ExposureResult] = []
+    for skill_name, reason in sorted(RETIRED_CORE_EXPORTS.items()):
+        adapter_path = adapter_root / skill_name
+        try:
+            adapter_path.lstat()
+        except FileNotFoundError:
+            continue
+        except OSError as error:
+            results.append(
+                ExposureResult(
+                    "blocked",
+                    skill_name,
+                    str(adapter_path),
+                    "",
+                    (f"could not inspect retired Core adapter: {error.__class__.__name__}: {error}",),
+                )
+            )
+            continue
+
+        if not prune_retired_core_adapters:
+            results.append(
+                ExposureResult(
+                    "retired-core-adapter",
+                    skill_name,
+                    str(adapter_path),
+                    "",
+                    (
+                        reason,
+                        "rerun with --prune-retired-core-adapters to back it up and remove it from global exposure",
+                    ),
+                )
+            )
+            continue
+
+        if not apply:
+            results.append(
+                ExposureResult(
+                    "would-prune-retired-core-adapter",
+                    skill_name,
+                    str(adapter_path),
+                    "",
+                    (f"{reason}; would move adapter to backup under: {backup_root}",),
+                )
+            )
+            continue
+
+        try:
+            backup_path = prune_retired_adapter(adapter_path, backup_root)
+        except SystemExit as error:
+            results.append(ExposureResult("blocked", skill_name, str(adapter_path), "", (str(error),)))
+            continue
+        results.append(
+            ExposureResult(
+                "pruned-retired-core-adapter",
+                skill_name,
+                str(adapter_path),
+                "",
+                (f"{reason}; backed up retired adapter to: {backup_path}",),
+            )
+        )
     return results
 
 
@@ -445,6 +547,14 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--prune-retired-core-adapters",
+        action="store_true",
+        help=(
+            "Back up and remove global adapters for former AgentOS Core exports. "
+            "Dry run reports the plan; apply requires --no-dry-run."
+        ),
+    )
+    parser.add_argument(
         "--self-test",
         action="store_true",
         help="Run temporary-directory self-tests and exit.",
@@ -455,10 +565,19 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.self_test:
-        if args.agentos_root is not None or args.skill or args.no_dry_run or args.replace_existing_copy:
+        if (
+            args.agentos_root is not None
+            or args.skill
+            or args.no_dry_run
+            or args.replace_existing_copy
+            or args.prune_retired_core_adapters
+        ):
             print("error: --self-test cannot be combined with other options", file=sys.stderr)
             return 2
         return run_self_tests()
+    if args.skill and args.prune_retired_core_adapters:
+        print("error: --prune-retired-core-adapters cannot be combined with --skill", file=sys.stderr)
+        return 2
 
     agentos_root = lexical_absolute(args.agentos_root) if args.agentos_root else find_agentos_root(lexical_absolute(Path.cwd()))
     root_problem = path_problem(agentos_root, expected_kind="directory", allow_missing=False)
@@ -477,6 +596,7 @@ def main(argv: list[str] | None = None) -> int:
         adapter_root,
         apply=apply,
         replace_existing_copy=bool(args.replace_existing_copy),
+        prune_retired_core_adapters=bool(args.prune_retired_core_adapters) and not args.skill,
         backup_root=backup_root,
     )
     print_table(results)

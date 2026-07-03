@@ -19,7 +19,7 @@ Inputs:
 - Current local agent instructions and project guidance, including `AGENTS.md`.
 - Current AgentOS GitHub workflow policy at `os/playbook/GITHUB_WORKFLOW.md`.
 - Current orchestration-loop vocabulary at `os/skills/ORCHESTRATION_LOOPS.md`.
-- `coordinate-issue-batch` when available in the active AgentOS checkout or harness.
+- Private `coordinate-issue-batch` module implementation under `os/skills/github-issue-lifecycle/batch-orchestration/`.
 - Optional explicit mode: normal, read-only/plan-only, or resume.
 - No inbound callback/release protocol in v1; treat the user's prose request and current reporting surface as the invocation contract.
 

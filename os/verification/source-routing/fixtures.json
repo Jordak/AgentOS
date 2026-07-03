@@ -483,19 +483,23 @@
           "path": "os/skills/github-issue-lifecycle/SKILL.md",
           "contains": [
             "issue-execution",
-            "Load the selected child `IMPLEMENTATION.md` only after the leaf has been selected"
+            "Choose `issue-execution` when"
           ]
         },
         {
-          "path": "os/skills/github-issue-lifecycle/issue-execution/implement-github-issue/IMPLEMENTATION.md",
+          "path": "os/skills/github-issue-lifecycle/issue-execution/INTERFACE.md",
           "contains": [
-            "Run the readiness gate",
-            "Create the pull request",
+            "Choose this module when the user names one issue to implement",
+            "For implementation: PR-ready Workflow Result"
+          ]
+        },
+        {
+          "path": "os/skills/github-issue-lifecycle/issue-execution/implement-github-issue/INTERFACE.md",
+          "contains": [
+            "readiness gating",
+            "pull request creation",
             "review-loop convergence",
-            "eligible clean-context reviewers are unavailable",
-            "do not claim PR-ready review-loop convergence",
-            "Readiness evidence:",
-            "stop before merge and issue closure"
+            "stopping before merge, issue closure, and branch deletion"
           ]
         }
       ]
@@ -509,14 +513,25 @@
       },
       "evidence": [
         {
-          "path": "os/skills/github-issue-lifecycle/batch-orchestration/select-issue-batch/IMPLEMENTATION.md",
+          "path": "os/skills/github-issue-lifecycle/SKILL.md",
           "contains": [
-            "Recommend the next issue or small batch",
-            "The planner is read-only",
-            "ranked issues",
-            "future leverage",
-            "Treat labels as evidence, not truth",
-            "stop after the recommendation"
+            "Choose `batch-orchestration` when",
+            "select what to work on"
+          ]
+        },
+        {
+          "path": "os/skills/github-issue-lifecycle/batch-orchestration/INTERFACE.md",
+          "contains": [
+            "asks what issue to do next",
+            "small issue batch"
+          ]
+        },
+        {
+          "path": "os/skills/github-issue-lifecycle/batch-orchestration/select-issue-batch/INTERFACE.md",
+          "contains": [
+            "Select and explain the next high-leverage GitHub issue or small issue batch",
+            "without mutating tracker state",
+            "read-only planner"
           ]
         }
       ]
@@ -530,14 +545,25 @@
       },
       "evidence": [
         {
-          "path": "os/skills/github-issue-lifecycle/batch-orchestration/coordinate-issue-batch/IMPLEMENTATION.md",
+          "path": "os/skills/github-issue-lifecycle/SKILL.md",
           "contains": [
-            "Coordinate a full GitHub issue batch pass",
-            "call `select-issue-batch`",
-            "branch-backed project threads",
-            "coordinator ledger",
-            "worker quiescence",
-            "land-github-issue"
+            "Choose `batch-orchestration` when",
+            "coordinate a batch pass"
+          ]
+        },
+        {
+          "path": "os/skills/github-issue-lifecycle/batch-orchestration/INTERFACE.md",
+          "contains": [
+            "wants workers launched or coordinated",
+            "broader batch pass"
+          ]
+        },
+        {
+          "path": "os/skills/github-issue-lifecycle/batch-orchestration/coordinate-issue-batch/INTERFACE.md",
+          "contains": [
+            "Coordinate one GitHub issue batch pass",
+            "launching isolated implementation workers",
+            "coordinator ledger"
           ]
         }
       ]
@@ -551,14 +577,25 @@
       },
       "evidence": [
         {
-          "path": "os/skills/github-issue-lifecycle/batch-orchestration/github-loop/IMPLEMENTATION.md",
+          "path": "os/skills/github-issue-lifecycle/SKILL.md",
           "contains": [
-            "Coordinate repeated GitHub issue batch passes",
-            "coordinate-issue-batch",
-            "successive batch-pass invocations",
-            "no selected issues",
-            "human merge reports",
-            "cleanly settled"
+            "Choose `batch-orchestration` when",
+            "repeatedly run issue batches"
+          ]
+        },
+        {
+          "path": "os/skills/github-issue-lifecycle/batch-orchestration/INTERFACE.md",
+          "contains": [
+            "keep running issue batches",
+            "stop condition"
+          ]
+        },
+        {
+          "path": "os/skills/github-issue-lifecycle/batch-orchestration/github-loop/INTERFACE.md",
+          "contains": [
+            "repeated GitHub issue batch passes",
+            "no suitable issues remain",
+            "stop condition"
           ]
         }
       ]
@@ -572,13 +609,25 @@
       },
       "evidence": [
         {
-          "path": "os/skills/github-issue-lifecycle/issue-execution/land-github-issue/IMPLEMENTATION.md",
+          "path": "os/skills/github-issue-lifecycle/SKILL.md",
           "contains": [
-            "Verify the issue's acceptance criteria",
-            "check off fulfilled Markdown checklist items",
-            "return unmet criteria to the caller",
-            "Authorization Boundary explicitly allows",
-            "Do not close issues labeled for human ownership or human review"
+            "Choose `issue-execution` when",
+            "one issue's acceptance criteria"
+          ]
+        },
+        {
+          "path": "os/skills/github-issue-lifecycle/issue-execution/INTERFACE.md",
+          "contains": [
+            "one merged issue",
+            "authorized acceptance reconciliation and closure"
+          ]
+        },
+        {
+          "path": "os/skills/github-issue-lifecycle/issue-execution/land-github-issue/INTERFACE.md",
+          "contains": [
+            "Verify one GitHub issue's acceptance criteria",
+            "update fulfilled checklist criteria",
+            "close the issue only when closure is authorized"
           ]
         }
       ]
