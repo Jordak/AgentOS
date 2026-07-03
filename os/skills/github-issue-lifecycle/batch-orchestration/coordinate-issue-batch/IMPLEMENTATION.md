@@ -1,8 +1,3 @@
----
-name: coordinate-issue-batch
-description: Coordinate a full GitHub issue batch pass by selecting or accepting a batch, launching isolated implementation workers when authorized, maintaining a coordinator ledger, waiting for human PR merge events, and landing eligible merged issues through land-github-issue.
----
-
 # Coordinate Issue Batch
 
 ## Goal
@@ -22,7 +17,7 @@ Inputs:
 - Current local agent instructions and project guidance, including `AGENTS.md`.
 - Current AgentOS GitHub workflow policy at `os/playbook/GITHUB_WORKFLOW.md`.
 - Current orchestration-loop vocabulary and worker handoff guidance at `os/skills/ORCHESTRATION_LOOPS.md`.
-- `select-issue-batch`, `implement-github-issue`, and `land-github-issue` when available in the active AgentOS checkout or harness.
+- Private module implementations for `select-issue-batch`, `implement-github-issue`, and `land-github-issue` under `os/skills/github-issue-lifecycle/`.
 - Optional caller-supplied Workflow Invocation Reference or result surface, plus an explicit coordinator release instruction, when this skill is invoked as a durable Called Workflow.
 - A supported durable worker-launch path when normal mode launches implementation workers. In Codex harnesses that support branch-backed project threads, durable implementation workers should be separate branch-backed threads, not in-thread subagents.
 - A callback or result surface for each launched worker when the harness supports one, such as a callback thread id, child-thread URL, coordinator ledger location, or equivalent Workflow Invocation Reference.
@@ -43,9 +38,9 @@ Mutability:
 Tools and connectors:
 
 - Local filesystem, `git`, `rg`, GitHub connector or `gh`, and repository-local push helpers when local instructions require them.
-- `os/skills/select-issue-batch/SKILL.md` for read-only selection when no explicit batch is supplied.
-- `os/skills/implement-github-issue/SKILL.md` or another approved worker contract for assigned implementation workers.
-- `os/skills/land-github-issue/SKILL.md` for one-issue acceptance reconciliation and authorized closure after integration evidence exists.
+- `os/skills/github-issue-lifecycle/batch-orchestration/select-issue-batch/IMPLEMENTATION.md` for read-only selection when no explicit batch is supplied.
+- `os/skills/github-issue-lifecycle/issue-execution/implement-github-issue/IMPLEMENTATION.md` or another approved worker contract for assigned implementation workers.
+- `os/skills/github-issue-lifecycle/issue-execution/land-github-issue/IMPLEMENTATION.md` for one-issue acceptance reconciliation and authorized closure after integration evidence exists.
 - `os/skills/ORCHESTRATION_LOOPS.md` for Authorization Boundary, Isolation Boundary, Workflow Result, Recovery Record, Recovery Checkpoint, Blocking Human Decision, worker handoff, and Integration Ownership vocabulary.
 - `os/playbook/GITHUB_WORKFLOW.md` for GitHub branch, worktree, PR, worker, and issue-closure discipline.
 
@@ -98,7 +93,7 @@ Landing is a phase of normal or resume mode, not a separate top-level mode.
    - Record the initial Recovery Record: target, mode, Authorization Boundary, coordinator effort metadata when available or relevant, ledger surface, any caller-supplied Workflow Invocation Reference or result surface, coordinator release instruction, current phase, known blockers, and next action.
 
 2. Select or accept the batch:
-   - If no explicit batch is supplied, invoke or follow `select-issue-batch` in read-only mode using the requested selection goal, scope filters, and effort metadata when available or relevant, or an explicit no-override/default statement.
+   - If no explicit batch is supplied, load and follow the private `select-issue-batch` module in read-only mode using the requested selection goal, scope filters, and effort metadata when available or relevant, or an explicit no-override/default statement.
    - If a user or caller provides a batch, record the source and any supplied rationale.
    - Convert the recommendation or provided list into a concrete coordinator target inside this skill's Authorization Boundary.
    - Default max parallel implementation workers: 3, unless the user or Calling Workflow specifies another concurrency limit. If the candidate batch exceeds the limit, choose or ask for a first wave and record the rest as queued.
@@ -121,7 +116,7 @@ Landing is a phase of normal or resume mode, not a separate top-level mode.
    - Before any branch-backed worker thread or worktree launch that requires an existing branch ref, resolve the intended base commit, create the target worker branch ref from that base when it is missing, and verify the branch resolves before passing it to the launch mechanism. If the launch mechanism can create the branch atomically from the intended base, record that path in the ledger instead. If the branch already exists but does not match the expected resume state, do not reset it silently; stop for a Blocking Human Decision or recover through an explicit branch-reuse plan.
    - In Codex, use separate branch-backed project threads for durable implementation workers when available. Do not use in-thread subagents for durable implementation workers that need branches and worktrees.
    - When the harness supports worker thread renaming, create or assign the worker thread, rename it to a public-safe, legible target-specific name, record the thread name, Workflow Invocation Reference, and worker prescribed model/effort plus prescription source or explicit no-override/default statement in the coordinator ledger only on a surface where those references are public-safe or authorized, and only then send the `READY` signal or substantive assignment.
-   - For a `coordinate-issue-batch` to `implement-github-issue` worker, use a pointer-first assignment packet with these fields: assigned issue URL and number; worker branch and isolated worktree; base branch and rebase policy; instruction to run `implement-github-issue` in the assigned mode; Isolation Boundary; Authorization Boundary; callback or result surface; release instruction; prescribed model/effort and prescription source, or an explicit no-override/default statement; durable sources to read, including `AGENTS.md`, the issue body, `os/playbook/GITHUB_WORKFLOW.md`, `os/skills/ORCHESTRATION_LOOPS.md`, and `os/skills/implement-github-issue/SKILL.md`; raw readiness labels or provenance links when relevant; validation expectations; PR and readiness-field expectations; Personal Overlay restrictions; prohibited actions, especially merge, issue closure, branch deletion, integration-branch mutation, label creation, permission changes, and writes outside the assigned scope; expected Workflow Result fields, including effort metadata when available and relevant; and blocked, failed, cancelled, and needs-human reporting rules.
+   - For a `coordinate-issue-batch` to `implement-github-issue` worker, use a pointer-first assignment packet with these fields: assigned issue URL and number; worker branch and isolated worktree; base branch and rebase policy; instruction to run `implement-github-issue` in the assigned mode; Isolation Boundary; Authorization Boundary; callback or result surface; release instruction; prescribed model/effort and prescription source, or an explicit no-override/default statement; durable sources to read, including `AGENTS.md`, the issue body, `os/playbook/GITHUB_WORKFLOW.md`, `os/skills/ORCHESTRATION_LOOPS.md`, and `os/skills/github-issue-lifecycle/issue-execution/implement-github-issue/IMPLEMENTATION.md`; raw readiness labels or provenance links when relevant; validation expectations; PR and readiness-field expectations; Personal Overlay restrictions; prohibited actions, especially merge, issue closure, branch deletion, integration-branch mutation, label creation, permission changes, and writes outside the assigned scope; expected Workflow Result fields, including effort metadata when available and relevant; and blocked, failed, cancelled, and needs-human reporting rules.
    - In that worker packet, state explicitly that the assignment authorizes running the readiness workflow; it is not design consensus, explicit human confirmation, or gate-skip authorization. If raw readiness evidence shows `needs design consensus` and no valid human-attested consensus or explicit durable bypass, instruct the worker to return `Needs Design Consensus` / `needs-human` before issue-body edits that mark the source ready or skipped, implementation edits, PR creation, or review-loop unless the readiness workflow obtains confirmation and updates the durable source under its own contract.
    - Include only enough batch context for the worker to respect its Isolation Boundary and escalation rules, such as sibling issue numbers, known shared surfaces to avoid, dependency notes that affect the assigned issue, and escalation rules. Do not make the worker responsible for the full batch ledger, selection rationale, landing queue, or other workers' detailed state.
 
@@ -141,7 +136,7 @@ Landing is a phase of normal or resume mode, not a separate top-level mode.
 
 8. Land eligible issues:
    - Fetch or otherwise verify the remote integration branch when landing checks require current integration evidence.
-   - For each eligible merged issue, invoke or follow `land-github-issue` one issue at a time under an explicit landing Authorization Boundary, passing effort metadata when available or relevant.
+   - For each eligible merged issue, load and follow the private `land-github-issue` module one issue at a time under an explicit landing Authorization Boundary, passing effort metadata when available or relevant.
    - Skip issues whose PRs are unmerged, whose acceptance criteria are ambiguous, whose human-review labels block closure, or whose landing authorization is absent.
    - Record fulfilled, skipped, blocked, needs-human, failed, cancelled, unmerged, unresolved, and landed outcomes in the coordinator ledger.
 

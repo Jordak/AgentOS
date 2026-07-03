@@ -29,6 +29,8 @@ def run_self_tests() -> int:
         test_wrong_target_symlink_is_not_replaced,
         test_regular_file_is_blocked_not_replaced,
         test_unrelated_global_skill_is_ignored,
+        test_retired_core_adapter_is_reported,
+        test_prune_retired_core_adapter_backs_up_before_removal,
         test_scoped_skill_replaces_only_requested_skill,
         test_partial_failure_reports_prior_backup_path,
         test_self_test_rejects_other_options,
@@ -146,6 +148,46 @@ def test_unrelated_global_skill_is_ignored() -> None:
         _case.assertTrue(extra.is_dir())
 
 
+def test_retired_core_adapter_is_reported() -> None:
+    with tempfile.TemporaryDirectory(prefix="expose-skills-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        home = Path(tmp) / "home"
+        make_agentos(root)
+        retired = home / ".agents/skills/github-loop"
+        retired.parent.mkdir(parents=True)
+        retired.symlink_to(root / "os/skills/github-loop", target_is_directory=True)
+        code, output, _error = run_cli(root, home)
+        _case.assertEqual(code, 1)
+        _case.assertIn("retired-core-export-candidate", output)
+        _case.assertIn("github-loop", output)
+        _case.assertIn("provenance is not proven", output)
+        _case.assertTrue(retired.is_symlink())
+
+
+def test_prune_retired_core_adapter_backs_up_before_removal() -> None:
+    with tempfile.TemporaryDirectory(prefix="expose-skills-self-test-") as tmp:
+        root = Path(tmp) / "AgentOS"
+        home = Path(tmp) / "home"
+        make_agentos(root)
+        retired = home / ".agents/skills/coordinate-issue-batch"
+        retired.mkdir(parents=True)
+        (retired / "old.txt").write_text("retired copy\n", encoding="utf-8")
+
+        dry_code, dry_output, _dry_error = run_cli(root, home, "--prune-retired-core-adapters")
+        _case.assertEqual(dry_code, 0)
+        _case.assertIn("would-prune-retired-core-export-candidate", dry_output)
+        _case.assertIn("unproven provenance", dry_output)
+        _case.assertTrue((retired / "old.txt").is_file())
+
+        code, output, _error = run_cli(root, home, "--prune-retired-core-adapters", "--no-dry-run")
+        _case.assertEqual(code, 0)
+        _case.assertIn("pruned-retired-core-export-candidate", output)
+        _case.assertFalse(retired.exists())
+        backups = list((home / ".agents/skills/.archive/expose-skills").glob("*/coordinate-issue-batch/old.txt"))
+        _case.assertEqual(len(backups), 1)
+        _case.assertEqual(backups[0].read_text(encoding="utf-8"), "retired copy\n")
+
+
 def test_scoped_skill_replaces_only_requested_skill() -> None:
     with tempfile.TemporaryDirectory(prefix="expose-skills-self-test-") as tmp:
         root = Path(tmp) / "AgentOS"
@@ -199,6 +241,7 @@ def test_partial_failure_reports_prior_backup_path() -> None:
                 adapter_root,
                 apply=True,
                 replace_existing_copy=True,
+                prune_retired_core_adapters=False,
                 backup_root=backup_root,
             )
         finally:
@@ -223,6 +266,13 @@ def test_self_test_rejects_other_options() -> None:
     stderr = io.StringIO()
     with redirect_stdout(stdout), redirect_stderr(stderr):
         code = subject.main(["--self-test", "--no-dry-run"])
+    _case.assertEqual(code, 2)
+    _case.assertIn("cannot be combined", stderr.getvalue())
+
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    with redirect_stdout(stdout), redirect_stderr(stderr):
+        code = subject.main(["--agentos-root", ".", "--skill", "alpha", "--prune-retired-core-adapters"])
     _case.assertEqual(code, 2)
     _case.assertIn("cannot be combined", stderr.getvalue())
 

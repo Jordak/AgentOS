@@ -144,7 +144,7 @@ Merge approval should not silently imply issue-closure approval. Issue-closure a
 
 - Run `git diff --check`.
 - Run `scripts/run-validator`.
-- Inspect `os/skills/implement-github-issue/SKILL.md`, `os/playbook/GITHUB_WORKFLOW.md`, `os/skills/ORCHESTRATION_LOOPS.md`, and `os/skills/MANIFEST.md` for consistent contract-specific integration ownership.
+- Inspect `os/skills/github-issue-lifecycle/issue-execution/implement-github-issue/IMPLEMENTATION.md`, `os/playbook/GITHUB_WORKFLOW.md`, `os/skills/ORCHESTRATION_LOOPS.md`, and `os/skills/MANIFEST.md` for consistent contract-specific integration ownership.
 
 ## Historical PR Readiness Fields
 

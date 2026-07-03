@@ -4,7 +4,7 @@ Status: Core export map v2.
 
 This manifest is the hand-authored export interface for AgentOS Core skills. It identifies which skill modules are intentionally exported for harness/global discovery, distribution, validation, and current-machine exposure.
 
-Per-skill invocation and execution truth belongs with each exported skill: `SKILL.md` frontmatter is the harness-facing invocation interface, the `SKILL.md` body is the implementation entrypoint and workflow contract, and `UPSTREAM.md` is the source of truth for vendored provenance. Non-exported support files and private/internal modules are intentionally absent from this export map unless they become exported skills.
+Per-skill invocation and execution truth belongs with each exported skill: `SKILL.md` frontmatter is the harness-facing invocation interface, the `SKILL.md` body is the implementation entrypoint and workflow contract, and `UPSTREAM.md` is the source of truth for vendored provenance. Private skill modules introduced under exported skills use plain Markdown module files such as `INTERFACE.md` and `IMPLEMENTATION.md`; they are intentionally absent from this export map unless they become exported skills.
 
 Machine-local exposure state and private live skill adapters belong outside portable Core metadata. Use `personal/os/skills/<skill-name>/CONFIG.md` for private live inputs to Core skills.
 
@@ -12,7 +12,7 @@ Contract reference: `os/skills/SKILL_CONTRACT.md`.
 
 ## Summary
 
-- Exported Core skills: 31.
+- Exported Core skills: 27.
 
 ## Markdown API
 
@@ -45,47 +45,19 @@ Allowed `Export status` values are `exported`, `transitional`, `deprecated`, and
 - Export status: exported.
 - Summary: Audit a project's issue tracker against merged code, local evidence, and current project state, then recommend or perform tracker updates such as status comments, closure, labels, or follow-up notes. Use when the user asks to audit issues, reconcile stale GitHub issues, post automated issue status updates, identify issues already implemented on origin main, or close verified completed issues.
 
+### `github-issue-lifecycle`
+
+- Canonical source: `os/skills/github-issue-lifecycle/SKILL.md`
+- Export group: github-issue-lifecycle.
+- Export status: exported.
+- Summary: Route GitHub issue lifecycle work from issue selection through batch coordination, one-issue implementation, PR review handoff, and authorized issue landing.
+
 ### `ensure-implementation-readiness`
 
 - Canonical source: `os/skills/ensure-implementation-readiness/SKILL.md`
 - Export group: implementation-readiness.
 - Export status: exported.
 - Summary: Use before implementing feature-sized work: implement, build, add, redesign, substantially refactor, or start an issue/PRD/spec where the outcome changes behavior, workflow, data model, public docs policy, validation policy, or reusable AgentOS structure. Ensures durable design consensus when possible, creates required follow-up artifacts for deferred questions, and returns Ready to Implement, Needs Design Consensus, or Gate Skipped.
-
-### `implement-github-issue`
-
-- Canonical source: `os/skills/implement-github-issue/SKILL.md`
-- Export group: github-issue-lifecycle.
-- Export status: exported.
-- Summary: Take one GitHub issue in a repository checkout through readiness gating, implementation, validation, pull request creation, review-loop convergence, and recoverable final reporting while stopping before merge, issue closure, and branch deletion.
-
-### `land-github-issue`
-
-- Canonical source: `os/skills/land-github-issue/SKILL.md`
-- Export group: github-issue-lifecycle.
-- Export status: exported.
-- Summary: Verify a GitHub issue's acceptance criteria against remote integration-branch evidence, update fulfilled Markdown checklist criteria, and close the issue only when closure is authorized and fully evidenced.
-
-### `select-issue-batch`
-
-- Canonical source: `os/skills/select-issue-batch/SKILL.md`
-- Export group: github-issue-lifecycle.
-- Export status: exported.
-- Summary: Select and explain the next high-leverage GitHub issue or small issue batch without mutating tracker state or starting workers. Use when the user asks what issue to do next, wants a batch recommendation, or needs a read-only planner for coordinate-issue-batch.
-
-### `coordinate-issue-batch`
-
-- Canonical source: `os/skills/coordinate-issue-batch/SKILL.md`
-- Export group: github-issue-lifecycle.
-- Export status: exported.
-- Summary: Coordinate a full GitHub issue batch pass by selecting or accepting a batch, launching isolated implementation workers when authorized, maintaining a coordinator ledger, waiting for human PR merge events, and landing eligible merged issues through land-github-issue.
-
-### `github-loop`
-
-- Canonical source: `os/skills/github-loop/SKILL.md`
-- Export group: github-issue-lifecycle.
-- Export status: exported.
-- Summary: Repeatedly run or resume GitHub issue batch passes by invoking coordinate-issue-batch until no suitable issues remain or a stop condition halts the repository-level loop.
 
 ### `codebase-design`
 

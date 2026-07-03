@@ -1,8 +1,3 @@
----
-name: select-issue-batch
-description: "Select and explain the next high-leverage GitHub issue or small issue batch without mutating tracker state or starting workers. Use when the user asks what issue to do next, wants a batch recommendation, or needs a read-only planner for coordinate-issue-batch."
----
-
 # Select Issue Batch
 
 ## Goal
@@ -34,7 +29,7 @@ Mutability:
 
 - Read-only by default for local files, GitHub, branches, worktrees, issues, labels, and PRs.
 - No local-write, connector-write, or external-write behavior by default.
-- If the user asks to turn the recommendation into tracker updates, worker launch, branch creation, issue comments, labels, or PR work, stop after the recommendation and tell the caller or user to explicitly invoke `coordinate-issue-batch` or another authorized mutating workflow in a separate step.
+- If the user asks to turn the recommendation into tracker updates, worker launch, branch creation, issue comments, labels, or PR work, stop after the recommendation and tell the caller or user to route through the private `coordinate-issue-batch` module or another authorized mutating workflow in a separate step.
 
 Tools and connectors:
 
@@ -42,7 +37,7 @@ Tools and connectors:
 - GitHub connector or `gh` for read-only issue and PR metadata.
 - `os/playbook/GITHUB_WORKFLOW.md` for issue, branch, worker, and closure discipline.
 - `os/skills/ORCHESTRATION_LOOPS.md` for Workflow Result, Blocking Human Decision, Isolation Boundary, and parallel Called Workflow vocabulary.
-- Mutating coordination workflow contracts when the user wants execution after selection.
+- The private `coordinate-issue-batch` module contract when the user wants execution after selection.
 
 Safety:
 
@@ -53,7 +48,7 @@ Safety:
 - Do not turn normal issue starting states into selection stop conditions. `needs design consensus`, missing readiness fields, missing design-consensus evidence, sparse acceptance criteria, `HITL`, or human-participation labels are candidate-state facts for ranking and handoff. They may mean the downstream coordinator should start with readiness repair, a design-consensus lane, human-participation workflow, or sequential execution, but they are not by themselves Blocking Human Decisions for this read-only selector.
 - Do not return a final `Ready to Implement`, `Needs Design Consensus`, or `Gate Skipped` verdict from this selector. Those verdicts belong to `ensure-implementation-readiness` and the downstream issue workflow that calls it.
 - Do not treat `ready-for-agent` as the primary ranking signal. It is evidence that execution may be possible, not evidence that the issue is the best next move.
-- Ask before any external write request, and do not perform the write from this skill. For execution or coordination requests, stop after the recommendation and tell the caller or user to explicitly invoke `coordinate-issue-batch` or another authorized mutating workflow in a separate step.
+- Ask before any external write request, and do not perform the write from this module. For execution or coordination requests, stop after the recommendation and tell the caller or user to route through the private `coordinate-issue-batch` module or another authorized mutating workflow in a separate step.
 
 ## Ranking Policy
 

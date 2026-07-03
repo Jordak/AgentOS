@@ -82,8 +82,8 @@
     "scenario": "You launched a callback-capable coordinator thread, passed it a result surface and release instruction, and confirmed that setup was acknowledged. The coordinator is now simply active and doing ordinary selection or worker setup work. You are considering another `read_thread` check in 30 seconds to see progress.\n\nWhat do you do next?",
     "source_paths": [
       "os/skills/ORCHESTRATION_LOOPS.md",
-      "os/skills/github-loop/SKILL.md",
-      "os/skills/coordinate-issue-batch/SKILL.md"
+      "os/skills/github-issue-lifecycle/batch-orchestration/github-loop/IMPLEMENTATION.md",
+      "os/skills/github-issue-lifecycle/batch-orchestration/coordinate-issue-batch/IMPLEMENTATION.md"
     ],
     "expected_behavior": [
       "Recognize that once callback setup is acknowledged or the called workflow is simply active, repeated progress reads are live polling, not bootstrap.",

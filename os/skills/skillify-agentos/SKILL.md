@@ -17,7 +17,7 @@ When the candidate starts as a Personal Overlay skill or private skill config th
 
 Turn real repeated work into durable AgentOS behavior with the smallest stable artifact that will prevent the repeated cost or failure.
 
-The output may be a skill update, a new exported skill, resolver guidance, export-map maintenance, a deterministic validator, a routing fixture, or a propagation queue proposal. The default is the least machinery that makes the future run better.
+The output may be a skill update, a new exported skill, a private module inside an exported skill, resolver guidance, export-map maintenance, a deterministic validator, a routing fixture, or a propagation queue proposal. The default is the least machinery that makes the future run better.
 
 ## Contract
 
@@ -29,7 +29,7 @@ Inputs:
 
 Output artifact:
 
-- A new or updated AgentOS skill, resolver entry, export-map entry, deterministic validator, source-routing fixture, smoke example, or review-queue proposal.
+- A new or updated AgentOS skill, private module, resolver entry, export-map entry, deterministic validator, source-routing fixture, smoke example, or review-queue proposal.
 - A short implementation summary naming what changed and how it was verified.
 
 Mutability:
@@ -104,6 +104,7 @@ Keep the behavior as Markdown guidance when:
 ## File Conventions
 
 - Exported Core skills live under `os/skills/<skill-name>/SKILL.md` and appear in `os/skills/MANIFEST.md`.
+- Private modules inside an exported skill use `INTERFACE.md` and `IMPLEMENTATION.md` when they need a caller-visible contract separate from execution details.
 - Skill contract metadata lives with the skill or a skill-local provenance/governance file; current-machine Core skill exposure checks live in `os/skills/expose-skills/`.
 - Resolver changes live in `os/RESOLVER.md` or the narrow directory resolver.
 - Deterministic local checks live in `os/verification/scripts/validate_agentos.py` unless a separate script is clearly warranted.

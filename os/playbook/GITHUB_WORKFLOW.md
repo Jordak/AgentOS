@@ -15,9 +15,11 @@ When the active agent harness exposes these skills or equivalent workflows, pref
 - Use `/to-prd` when the user wants to turn the current conversation context into a PRD and publish it to the project issue tracker.
 - Use `/to-issues` when the user wants to break a plan, spec, or PRD into independently grabbable implementation issues. Publish issues only after the breakdown is approved, and do not close or modify any parent issue as part of that workflow.
 - Use `/triage` for issue intake, classification, readiness checks, label/state transitions, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`, and agent brief comments.
-- Use `github-loop` when the user wants to keep running successive GitHub issue batch passes for a repository until no suitable issues remain or a stop condition halts the repository-level loop.
-- Use `coordinate-issue-batch` when the user wants one full GitHub issue batch pass: select or accept a batch, launch isolated workers when authorized, track PRs and merge reports, and land eligible merged issues.
-- Use `land-github-issue` when a landing-capable workflow needs to verify one issue's acceptance criteria against remote integration-branch evidence, check off fulfilled Markdown criteria, and close the issue when closure is authorized.
+- Use `github-issue-lifecycle` for GitHub issue lifecycle work, then route inside it to the narrow private module:
+  - `github-loop` for successive GitHub issue batch passes until no suitable issues remain or a stop condition halts the repository-level loop;
+  - `coordinate-issue-batch` for one full batch pass: select or accept a batch, launch isolated workers when authorized, track PRs and merge reports, and land eligible merged issues;
+  - `implement-github-issue` for one issue through readiness, implementation, validation, PR creation, and review convergence;
+  - `land-github-issue` for one issue's acceptance-criteria reconciliation and authorized closure after integration evidence exists.
 - Use `audit-issues` for broader issue-tracker reconciliation, stale issue sweeps, or multi-issue audits against merged code.
 
 Do not use PRD, issue-breakdown, or triage workflows as the default for simple PR descriptions, branch integration, merge verification, or post-implementation issue closure unless the work also needs PRD generation, issue breakdown, or triage/state changes. Use the narrow workflow that owns the requested surface instead.
@@ -118,7 +120,7 @@ Do not broad-copy `personal/os/` into feature worktrees, and do not use `git add
 When delegating implementation issues to workers on feature branches, make worktree isolation explicit, and make landing and issue closure an integration responsibility, not a branch-worker responsibility.
 
 - Follow the callback-first and minimal-assignment guidance in `os/skills/ORCHESTRATION_LOOPS.md` when launching durable workers.
-- For `coordinate-issue-batch` to `implement-github-issue` worker launches, use the pointer-first handoff shape in `os/skills/coordinate-issue-batch/SKILL.md`. This playbook supplies branch, worktree, push, pull request, and issue-closure discipline, but it is not the universal worker prompt.
+- For `coordinate-issue-batch` to `implement-github-issue` worker launches, use the pointer-first handoff shape in `os/skills/github-issue-lifecycle/batch-orchestration/coordinate-issue-batch/IMPLEMENTATION.md`. This playbook supplies branch, worktree, push, pull request, and issue-closure discipline, but it is not the universal worker prompt.
 - Give each worker its own isolated worktree and feature branch. Prefer `git worktree` checkouts rooted from the current integration branch.
 - In Codex harnesses that support branch-backed project threads, use separate Codex threads for durable implementation workers rather than in-thread subagents. In-thread subagents remain suitable for read-only review, exploration, or short-lived advisory fan-out when no durable branch/worktree worker is needed.
 - When the harness supports thread renaming, rename the worker thread to a public-safe, legible target-specific name before sending the `READY` signal or substantive assignment message.

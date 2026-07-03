@@ -476,19 +476,30 @@
       "category": "github issue implementation",
       "prompt": "Take this GitHub issue through readiness gating, implementation, pull request creation, and review-loop convergence.",
       "expected": {
-        "skill": "implement-github-issue"
+        "skill": "github-issue-lifecycle"
       },
       "evidence": [
         {
-          "path": "os/skills/implement-github-issue/SKILL.md",
+          "path": "os/skills/github-issue-lifecycle/SKILL.md",
+          "contains": [
+            "issue-execution",
+            "Choose `issue-execution` when"
+          ]
+        },
+        {
+          "path": "os/skills/github-issue-lifecycle/issue-execution/INTERFACE.md",
+          "contains": [
+            "Choose this module when the user names one issue to implement",
+            "For implementation: PR-ready Workflow Result"
+          ]
+        },
+        {
+          "path": "os/skills/github-issue-lifecycle/issue-execution/implement-github-issue/INTERFACE.md",
           "contains": [
             "readiness gating",
             "pull request creation",
             "review-loop convergence",
-            "eligible clean-context reviewers are unavailable",
-            "do not claim PR-ready review-loop convergence",
-            "Readiness evidence:",
-            "stop before merge and issue closure"
+            "stopping before merge, issue closure, and branch deletion"
           ]
         }
       ]
@@ -498,18 +509,29 @@
       "category": "github issue batch selection",
       "prompt": "Recommend the next high-leverage batch of GitHub issues to work on without starting workers or mutating tracker state.",
       "expected": {
-        "skill": "select-issue-batch"
+        "skill": "github-issue-lifecycle"
       },
       "evidence": [
         {
-          "path": "os/skills/select-issue-batch/SKILL.md",
+          "path": "os/skills/github-issue-lifecycle/SKILL.md",
+          "contains": [
+            "Choose `batch-orchestration` when",
+            "select what to work on"
+          ]
+        },
+        {
+          "path": "os/skills/github-issue-lifecycle/batch-orchestration/INTERFACE.md",
+          "contains": [
+            "asks what issue to do next",
+            "small issue batch"
+          ]
+        },
+        {
+          "path": "os/skills/github-issue-lifecycle/batch-orchestration/select-issue-batch/INTERFACE.md",
           "contains": [
             "Select and explain the next high-leverage GitHub issue or small issue batch",
-            "The planner is read-only",
-            "ranked issues",
-            "future leverage",
-            "Treat labels as evidence, not truth",
-            "stop after the recommendation"
+            "without mutating tracker state",
+            "read-only planner"
           ]
         }
       ]
@@ -519,18 +541,29 @@
       "category": "github issue batch coordination",
       "prompt": "Coordinate a GitHub issue batch pass by selecting issues, launching isolated workers, tracking their PRs, and landing eligible merged issues.",
       "expected": {
-        "skill": "coordinate-issue-batch"
+        "skill": "github-issue-lifecycle"
       },
       "evidence": [
         {
-          "path": "os/skills/coordinate-issue-batch/SKILL.md",
+          "path": "os/skills/github-issue-lifecycle/SKILL.md",
           "contains": [
-            "Coordinate a full GitHub issue batch pass",
-            "call `select-issue-batch`",
-            "branch-backed project threads",
-            "coordinator ledger",
-            "worker quiescence",
-            "land-github-issue"
+            "Choose `batch-orchestration` when",
+            "coordinate a batch pass"
+          ]
+        },
+        {
+          "path": "os/skills/github-issue-lifecycle/batch-orchestration/INTERFACE.md",
+          "contains": [
+            "wants workers launched or coordinated",
+            "broader batch pass"
+          ]
+        },
+        {
+          "path": "os/skills/github-issue-lifecycle/batch-orchestration/coordinate-issue-batch/INTERFACE.md",
+          "contains": [
+            "Coordinate one GitHub issue batch pass",
+            "launching isolated implementation workers",
+            "coordinator ledger"
           ]
         }
       ]
@@ -540,18 +573,29 @@
       "category": "github issue repository loop",
       "prompt": "Keep running GitHub issue batch passes for this repository until no suitable issues remain or a human stop condition blocks the loop.",
       "expected": {
-        "skill": "github-loop"
+        "skill": "github-issue-lifecycle"
       },
       "evidence": [
         {
-          "path": "os/skills/github-loop/SKILL.md",
+          "path": "os/skills/github-issue-lifecycle/SKILL.md",
           "contains": [
-            "Repeatedly run or resume GitHub issue batch passes",
-            "coordinate-issue-batch",
-            "successive batch-pass invocations",
-            "no selected issues",
-            "human merge reports",
-            "cleanly settled"
+            "Choose `batch-orchestration` when",
+            "repeatedly run issue batches"
+          ]
+        },
+        {
+          "path": "os/skills/github-issue-lifecycle/batch-orchestration/INTERFACE.md",
+          "contains": [
+            "keep running issue batches",
+            "stop condition"
+          ]
+        },
+        {
+          "path": "os/skills/github-issue-lifecycle/batch-orchestration/github-loop/INTERFACE.md",
+          "contains": [
+            "repeated GitHub issue batch passes",
+            "no suitable issues remain",
+            "stop condition"
           ]
         }
       ]
@@ -561,17 +605,29 @@
       "category": "github issue landing",
       "prompt": "Land this merged GitHub issue by verifying its acceptance criteria on origin/main, checking off fulfilled checklist items, and reporting any unmet criteria before authorized closure.",
       "expected": {
-        "skill": "land-github-issue"
+        "skill": "github-issue-lifecycle"
       },
       "evidence": [
         {
-          "path": "os/skills/land-github-issue/SKILL.md",
+          "path": "os/skills/github-issue-lifecycle/SKILL.md",
           "contains": [
-            "Verify a GitHub issue's acceptance criteria against remote integration-branch evidence",
-            "update fulfilled Markdown checklist criteria",
-            "return unmet criteria to the caller",
-            "Authorization Boundary explicitly allows",
-            "Do not close issues labeled for human ownership or human review"
+            "Choose `issue-execution` when",
+            "one issue's acceptance criteria"
+          ]
+        },
+        {
+          "path": "os/skills/github-issue-lifecycle/issue-execution/INTERFACE.md",
+          "contains": [
+            "one merged issue",
+            "authorized acceptance reconciliation and closure"
+          ]
+        },
+        {
+          "path": "os/skills/github-issue-lifecycle/issue-execution/land-github-issue/INTERFACE.md",
+          "contains": [
+            "Verify one GitHub issue's acceptance criteria",
+            "update fulfilled checklist criteria",
+            "close the issue only when closure is authorized"
           ]
         }
       ]

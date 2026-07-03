@@ -21,6 +21,7 @@ Inputs:
 - Optional repeated `--skill <name>` filter.
 - Optional apply flag: `--no-dry-run`.
 - Optional replacement flag: `--replace-existing-copy`.
+- Optional retired-export pruning flag: `--prune-retired-core-adapters`.
 
 Output artifact:
 
@@ -41,8 +42,9 @@ Safety:
 
 - Ask before applying writes to `~/.agents/skills` unless the user explicitly requested `--no-dry-run` or equivalent apply behavior.
 - Do not expose Personal Overlay skills in v1.
-- Do not copy skills, create Windows junctions, delete global skill dirs, replace same-name Core skill directories without `--replace-existing-copy`, or overwrite wrong-target symlinks.
+- Do not copy skills, create Windows junctions, delete global skill dirs, replace same-name Core skill directories without `--replace-existing-copy`, prune same-name retired Core export candidates without `--prune-retired-core-adapters`, or overwrite wrong-target symlinks.
 - With `--replace-existing-copy --no-dry-run`, move same-name Core skill directories into `~/.agents/skills/.archive/expose-skills/<run-id>/` before creating symlink adapters.
+- With `--prune-retired-core-adapters --no-dry-run`, move same-name global entries for former AgentOS Core exports into `~/.agents/skills/.archive/expose-skills/<run-id>/` before removing them from global exposure. Provenance is not proven; a same-name custom skill is treated as a prune candidate, not as confirmed AgentOS Core state.
 - Replacement mode does not byte-compare directory contents or prove same-name directory provenance. Its approval surface is the dry-run report for each same-name Core skill directory.
 - If symlink creation is blocked by OS, filesystem, sandbox, or permission policy, stop and report the fix.
 - Do not record global adapter status in `os/skills/MANIFEST.md`.
@@ -57,7 +59,7 @@ Safety:
 
 2. Run dry run:
    - Use `python3 os/skills/expose-skills/scripts/expose_skills.py`.
-   - Report missing adapters, already-linked adapters, wrong-target symlinks, existing same-name Core skill directories, blocked paths, and missing sources.
+   - Report missing adapters, already-linked adapters, wrong-target symlinks, existing same-name Core skill directories, same-name retired Core export candidates, blocked paths, and missing sources.
    - Ignore non-AgentOS skills that happen to live under the global skill root.
 
 3. Apply only when approved:
@@ -66,6 +68,7 @@ Safety:
    - Missing entries become directory symlinks to canonical Core skill directories.
    - Existing same-name Core skill directories and wrong-target symlinks are reported, not changed.
    - To migrate same-name Core skill directories, use `--replace-existing-copy --no-dry-run`; those directories are backed up before symlinks are created.
+   - To remove same-name global entries for former Core exports, use `--prune-retired-core-adapters --no-dry-run`; those candidate adapters are backed up before pruning.
 
 4. Verify:
    - Re-run dry run after applying.
@@ -110,6 +113,18 @@ Apply replacement of same-name Core skill directories after approval:
 python3 os/skills/expose-skills/scripts/expose_skills.py --replace-existing-copy --no-dry-run
 ```
 
+Dry run same-name retired Core export candidate pruning:
+
+```bash
+python3 os/skills/expose-skills/scripts/expose_skills.py --prune-retired-core-adapters
+```
+
+Apply same-name retired Core export candidate pruning after approval:
+
+```bash
+python3 os/skills/expose-skills/scripts/expose_skills.py --prune-retired-core-adapters --no-dry-run
+```
+
 ## Personal Overlay V1
 
 Private skills may live under `personal/os/skills/<skill-name>/SKILL.md`, but v1 does not discover, scan, or expose them. Future Personal Overlay exposure must be explicit because private skill names and content can leak into global harness context.
@@ -120,6 +135,7 @@ Private skills may live under `personal/os/skills/<skill-name>/SKILL.md`, but v1
 - Apply mode creates only missing symlink adapters for exported Core manifest skills.
 - Existing same-name Core skill directories, wrong-target symlinks, and blocked paths for exported Core manifest skill names are visible in the report.
 - Existing same-name Core skill directories are replaced only with `--replace-existing-copy --no-dry-run`, and their backups are reported.
+- Same-name retired Core export candidates are reported by default and backed up before removal only with `--prune-retired-core-adapters --no-dry-run`; the script does not prove whether the candidate is an old Core adapter or a user's custom same-name skill.
 - The script does not prove those directories are byte-identical copies of Core. It treats same-name Core skill directories as eligible only after the user has seen and approved the dry run.
 - Wrong-target symlinks, files, blocked paths, and unrelated global harness skills are not replaced.
 - Unrelated global harness skills are outside this skill's scope and are not reported.
@@ -148,11 +164,12 @@ Before finishing changes to this skill:
 4. Confirm existing same-name Core skill directories are reported but not changed.
 5. Confirm `--replace-existing-copy` dry run reports same-name Core skill directory replacement plans without changes.
 6. Confirm `--replace-existing-copy --no-dry-run` backs up same-name Core skill directories and creates symlinks.
-7. Confirm wrong-target symlinks are reported but not changed.
-8. Confirm regular files are reported but not changed.
-9. Confirm unknown skills fail clearly.
-10. Confirm permission-style symlink failures fail with remediation.
-11. Confirm unrelated global harness skills are ignored.
-12. Confirm dry run exits nonzero only for blocked or missing-source statuses, while apply exits nonzero when requested Core adapters remain unlinked.
-13. Run `python3 os/skills/expose-skills/scripts/expose_skills.py --self-test`.
-14. Run `scripts/run-validator`.
+7. Confirm same-name retired Core export candidates are reported with a provenance caveat by default and `--prune-retired-core-adapters --no-dry-run` backs them up before removing them.
+8. Confirm wrong-target symlinks are reported but not changed.
+9. Confirm regular files are reported but not changed.
+10. Confirm unknown skills fail clearly.
+11. Confirm permission-style symlink failures fail with remediation.
+12. Confirm unrelated global harness skills are ignored.
+13. Confirm dry run exits nonzero only for blocked, missing-source, or retired-core-export-candidate statuses, while apply exits nonzero when requested Core adapters remain unlinked or retired Core export candidates remain exposed.
+14. Run `python3 os/skills/expose-skills/scripts/expose_skills.py --self-test`.
+15. Run `scripts/run-validator`.
