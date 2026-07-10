@@ -12,7 +12,7 @@ Contract reference: `os/skills/SKILL_CONTRACT.md`.
 
 ## Summary
 
-- Exported Core skills: 27.
+- Exported Core skills: 28.
 
 ## Markdown API
 
@@ -226,3 +226,10 @@ Allowed `Export status` values are `exported`, `transitional`, `deprecated`, and
 - Export group: artifact-workflow.
 - Export status: exported.
 - Summary: Draft concise weekly updates, status reports, or check-ins from supplied facts and local AgentOS context without inventing progress, blockers, owners, dates, or commitments. Use when the user asks for a weekly update, weekly summary, status report, or check-in draft.
+
+### `teach`
+
+- Canonical source: `os/skills/teach/SKILL.md`
+- Export group: productivity.
+- Export status: exported.
+- Summary: Teach the user a new skill or concept through a stateful workspace of missions, resources, lessons, reusable assets, and learning records.
