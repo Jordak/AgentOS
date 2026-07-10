@@ -92,7 +92,7 @@ Allowed `Export status` values are `exported`, `transitional`, `deprecated`, and
 - Canonical source: `os/skills/grilling/SKILL.md`
 - Export group: design-consensus.
 - Export status: exported.
-- Summary: Interview the user relentlessly about a plan or design. Use when the user wants to stress-test a plan before building, or uses any 'grill' trigger phrases.
+- Summary: Grill the user relentlessly about a plan or design. Use when the user wants to stress-test a plan before building, or uses any 'grill' trigger phrases.
 
 ### `vendor-skill`
 

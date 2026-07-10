@@ -4,7 +4,7 @@ Source: `mattpocock/skills`
 
 Path: `skills/productivity/grilling/`
 
-Vendored ref: `bc4cf903ff4855ce23199a8dd3bf98b3dbd7ad71`
+Vendored ref: `e5932a7a47e5cae312c1b814ce6194b09aa27be1`
 
 Files vendored:
 
