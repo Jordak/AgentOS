@@ -137,15 +137,15 @@
         {
           "path": "os/skills/grill-me/SKILL.md",
           "contains": [
-            "Run a `/grilling` session",
+            "Call the Skill tool with \"grilling\"",
             "disable-model-invocation"
           ]
         },
         {
           "path": "os/skills/grilling/SKILL.md",
           "contains": [
-            "Ask the questions one at a time",
-            "provide your recommended answer"
+            "Work the tree in **rounds**",
+            "give your recommended answer"
           ]
         }
       ]
@@ -153,7 +153,7 @@
     {
       "id": "grilling-design-consensus",
       "category": "design consensus",
-      "prompt": "Pressure-test this design decision one question at a time.",
+      "prompt": "Pressure-test this design decision through a structured interview.",
       "expected": {
         "skill": "grilling"
       },
@@ -161,8 +161,8 @@
         {
           "path": "os/skills/grilling/SKILL.md",
           "contains": [
-            "Interview me relentlessly",
-            "resolving dependencies between decisions one-by-one"
+            "Interview the user relentlessly",
+            "The **frontier** is every decision whose prerequisites are already settled"
           ]
         }
       ]

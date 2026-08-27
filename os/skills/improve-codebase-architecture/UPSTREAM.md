@@ -4,10 +4,11 @@ Source: `mattpocock/skills`
 
 Path: `skills/engineering/improve-codebase-architecture/`
 
-Vendored ref: `221ffca96736afefdc08ca7cf0b3965e9ea83f41`
+Vendored ref: `321658273cb1d20b76026717d027d505790106d4`
 
 Files vendored:
 
+- `agents/openai.yaml`
 - `SKILL.md`
 - `HTML-REPORT.md`
 

@@ -70,6 +70,16 @@ HARNESS_ADAPTER_FILENAMES = {
 }
 
 
+def command_line_limit() -> int:
+    """Return a conservative platform command-line size limit."""
+    if hasattr(os, "sysconf"):
+        try:
+            return int(os.sysconf("SC_ARG_MAX"))
+        except (OSError, ValueError):
+            pass
+    return 32_767 if os.name == "nt" else 131_072
+
+
 def stderr_progress(message: str) -> None:
     print(f"Guidance progress: {message}", file=sys.stderr, flush=True)
 
@@ -2121,17 +2131,18 @@ def run_self_test(root: Path, fixtures_path: Path, judge_prompt_path: Path, judg
         schema_path=Path("os/verification/guidance/judge_response.schema.json"),
     )
     all_fixture_argv_bytes = sum(len(part.encode("utf-8")) + 1 for part in all_fixture_judge_command)
+    arg_max = command_line_limit()
     if (
         all_fixture_judge_command[-1] != "-"
         or all_fixture_judge_prompt in all_fixture_judge_command
-        or all_fixture_argv_bytes >= os.sysconf("SC_ARG_MAX")
+        or all_fixture_argv_bytes >= arg_max
     ):
         print("SELF-TEST FAIL: default judge prompt was not transported through stdin.")
         print(json.dumps({
             "last_argument": all_fixture_judge_command[-1],
             "prompt_in_argv": all_fixture_judge_prompt in all_fixture_judge_command,
             "argv_bytes": all_fixture_argv_bytes,
-            "arg_max": os.sysconf("SC_ARG_MAX"),
+            "arg_max": arg_max,
         }, indent=2))
         return 1
 

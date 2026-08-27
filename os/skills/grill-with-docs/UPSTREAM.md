@@ -4,10 +4,11 @@ Source: `mattpocock/skills`
 
 Path: `skills/engineering/grill-with-docs/`
 
-Vendored ref: `658d53e6ded8cc0eaa26a96e0580bee9381ca0e3`
+Vendored ref: `447ca70872026d5b79d6073a546dac082117fed7`
 
 Files vendored:
 
+- `agents/openai.yaml`
 - `SKILL.md`
 
 Local AgentOS patches:
