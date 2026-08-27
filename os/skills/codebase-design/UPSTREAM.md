@@ -4,10 +4,11 @@ Source: `mattpocock/skills`
 
 Path: `skills/engineering/codebase-design/`
 
-Vendored ref: `ee8bae40062cd6b435073368ed0c540f48c35862`
+Vendored ref: `321658273cb1d20b76026717d027d505790106d4`
 
 Files vendored:
 
+- `agents/openai.yaml`
 - `SKILL.md`
 - `DEEPENING.md`
 - `DESIGN-IT-TWICE.md`

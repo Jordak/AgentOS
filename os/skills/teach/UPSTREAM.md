@@ -4,10 +4,11 @@ Source: `mattpocock/skills`
 
 Path: `skills/productivity/teach/`
 
-Vendored ref: `aa024cb1954fedbc8221967c080fa40b9867f994`
+Vendored ref: `321658273cb1d20b76026717d027d505790106d4`
 
 Files vendored:
 
+- `agents/openai.yaml`
 - `GLOSSARY-FORMAT.md`
 - `LEARNING-RECORD-FORMAT.md`
 - `MISSION-FORMAT.md`
